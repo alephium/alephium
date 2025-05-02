@@ -25,7 +25,7 @@ import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, BlockHash, GroupIndex, TransactionId}
+import org.alephium.protocol.model.{Address, AddressLike, BlockHash, GroupIndex, TransactionId}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{TimeStamp, U256}
 
@@ -51,6 +51,9 @@ trait TapirCodecs extends ApiModelCodec with TapirSchemasLike {
 
   implicit val addressTapirCodec: Codec[String, Address, TextPlain] =
     fromJson[Address]
+
+  implicit val addressLikeTapirCodec: Codec[String, AddressLike, TextPlain] =
+    fromJson[AddressLike]
 
   implicit val apiKeyTapirCodec: Codec[String, ApiKey, TextPlain] =
     fromJson[ApiKey]

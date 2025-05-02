@@ -20,7 +20,7 @@ import java.net.InetSocketAddress
 
 import scala.util.Random
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Props}
 import akka.testkit.{TestActorRef, TestProbe}
 import org.scalacheck.Gen
 
@@ -49,10 +49,12 @@ class DiscoveryServerSpec extends AlephiumActorSpec with SocketUtil {
   def buildMisbehaviorManager(system: ActorSystem): ActorRefT[MisbehaviorManager.Command] = {
     ActorRefT.build(
       system,
-      MisbehaviorManager.props(
-        Duration.ofDaysUnsafe(1),
-        Duration.ofHoursUnsafe(1),
-        Duration.ofMinutesUnsafe(1)
+      Props(
+        new MisbehaviorManager(
+          Duration.ofDaysUnsafe(1),
+          Duration.ofHoursUnsafe(1),
+          Duration.ofMinutesUnsafe(1)
+        )
       )
     )
   }

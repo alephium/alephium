@@ -25,11 +25,8 @@ import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
 class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   val keyGen = groupIndexGen.flatMap(publicKeyGen)
-  val dummyMethod = Method[StatelessContext](
+  val dummyMethod = Method.testDefault[StatelessContext](
     isPublic = true,
-    usePreapprovedAssets = false,
-    useContractAssets = false,
-    usePayToContractOnly = false,
     argsLength = 0,
     localsLength = 0,
     returnLength = 0,
@@ -60,6 +57,8 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
       val unlock = UnlockScript.polw(publicKey)
       deserialize[UnlockScript](serialize[UnlockScript](unlock)) isE unlock
     }
+
+    deserialize[UnlockScript](serialize[UnlockScript](UnlockScript.P2PK)) isE UnlockScript.P2PK
   }
 
   it should "serialize examples" in {
@@ -82,6 +81,8 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     val encoded = Hex.unsafe(s"04${publicKey0.toHexString}")
     serialize[UnlockScript](unlock3) is encoded
     deserialize[UnlockScript](encoded).rightValue is unlock3
+
+    serialize[UnlockScript](UnlockScript.P2PK) is Hex.unsafe("05")
   }
 
   it should "validate multisig" in {

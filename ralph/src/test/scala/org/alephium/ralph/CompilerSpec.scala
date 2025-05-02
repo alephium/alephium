@@ -22,8 +22,9 @@ import scala.util.Random
 import akka.util.ByteString
 import org.scalatest.Assertion
 
+import org.alephium.crypto.Byte64
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, TokenId}
+import org.alephium.protocol.model.{Address, ContractId, TokenId}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -648,9 +649,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     deserialize[StatelessScript](serialize(script)) isE script
 
     val args             = AVector[Val](Val.ByteVec.from(pubKey))
-    val statelessContext = genStatelessContext(signatures = AVector(Signature.zero))
-    val signature        = SignatureSchema.sign(statelessContext.txId.bytes, priKey)
-    statelessContext.signatures.pop().rightValue is Signature.zero
+    val statelessContext = genStatelessContext(signatures = AVector(Byte64.from(Signature.zero)))
+    val signature        = Byte64.from(SignatureSchema.sign(statelessContext.txId.bytes, priKey))
+    statelessContext.signatures.pop().rightValue is Byte64.from(Signature.zero)
     statelessContext.signatures.push(signature) isE ()
     StatelessVM.execute(statelessContext, script.toObject, args).isRight is true
     StatelessVM.execute(statelessContext, script.toObject, args) is
@@ -1415,11 +1416,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val contract = compileContract(code).rightValue
     // format: off
-    contract.methods(0) is Method[StatefulContext](
+    contract.methods(0) is Method.testDefault[StatefulContext](
       isPublic = false,
-      usePreapprovedAssets = false,
-      useContractAssets = false,
-      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 6,
       returnLength = 0,
@@ -1436,11 +1434,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-21)
       )
     )
-    contract.methods(1) is Method[StatefulContext](
+    contract.methods(1) is Method.testDefault(
       isPublic = false,
-      usePreapprovedAssets = false,
-      useContractAssets = false,
-      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 14,
       returnLength = 0,
@@ -1879,11 +1874,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     compileContract(code).rightValue.methods.head is
-      Method[StatefulContext](
+      Method.testDefault(
         isPublic = true,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 5,
         returnLength = 0,
@@ -4221,15 +4213,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     contract is StatefulContract(
       6,
       methods = AVector(
-        Method[StatefulContext](
+        Method.testDefault[StatefulContext](
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
-          1,
-          1,
-          0,
-          AVector[Instr[StatefulContext]](
+          argsLength = 1,
+          localsLength = 1,
+          returnLength = 0,
+          instrs = AVector[Instr[StatefulContext]](
             methodSelectorOf("foo(I256)->()"),
             U256Const0,
             StoreMutField(0.toByte),
@@ -4243,15 +4232,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           ) ++
             AVector(LoadLocal(0.toByte), I256Const0, I256Neq, U256Const0, AssertWithErrorCode)
         ),
-        Method[StatefulContext](
+        Method.testDefault[StatefulContext](
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
-          1,
-          1,
-          0,
-          AVector[Instr[StatefulContext]](
+          argsLength = 1,
+          localsLength = 1,
+          returnLength = 0,
+          instrs = AVector[Instr[StatefulContext]](
             methodSelectorOf("bar(ByteVec)->()"),
             LoadImmField(2.toByte),
             U256Const0,
@@ -4290,11 +4276,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     contract is StatefulContract(
       6,
       methods = AVector(
-        Method[StatefulContext](
+        Method.testDefault(
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
           argsLength = 2,
           localsLength = 2,
           returnLength = 0,
@@ -4321,15 +4304,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           ) ++
             AVector(LoadLocal(0.toByte), I256Const0, I256Neq, U256Const0, AssertWithErrorCode)
         ),
-        Method[StatefulContext](
+        Method.testDefault(
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
-          2,
-          2,
-          0,
-          AVector[Instr[StatefulContext]](
+          argsLength = 2,
+          localsLength = 2,
+          returnLength = 0,
+          instrs = AVector[Instr[StatefulContext]](
             methodSelectorOf("bar(ByteVec,U256)->()"),
             LoadLocal(1.toByte),
             U256Const1,
@@ -4424,11 +4404,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     warnings.isEmpty is true
     script is StatelessScript.unsafe(
       AVector(
-        Method[StatelessContext](
+        Method.testDefault[StatelessContext](
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,
@@ -5953,7 +5930,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code("address, #00"),
         "Invalid args type List(Address, ByteVec), expected List(Address, U256)"
       )
-      testContractError(code("f1(address)"), "Invalid args length, expected 2, got 1")
+      testContractError(
+        code("f1(address)"),
+        "Invalid args type List(Address, U256), expected List(U256)"
+      )
       testContractError(code("address, 1, 1"), "Invalid args length, expected 2, got 3")
     }
 
@@ -6848,19 +6828,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "assign correct method index to interface functions" in {
     def createFunc(name: String, methodIndex: Option[Int] = None): Ast.FuncDef[StatefulContext] =
       Ast.FuncDef(
-        Seq.empty,
-        Ast.FuncId(name, false),
+        annotations = Seq.empty,
+        id = Ast.FuncId(name, false),
         isPublic = false,
         usePreapprovedAssets = false,
-        Ast.NotUseContractAssets,
+        useAssetsInContract = Ast.NotUseContractAssets,
         usePayToContractOnly = false,
         useCheckExternalCaller = false,
+        useRoutePattern = false,
         useUpdateFields = false,
-        methodIndex,
+        useMethodIndex = methodIndex,
         inline = false,
-        Seq.empty,
-        Seq.empty,
-        None
+        args = Seq.empty,
+        rtypes = Seq.empty,
+        bodyOpt = None
       )
 
     def checkFuncIndexes(funcs: Seq[Ast.FuncDef[StatefulContext]], indexes: Map[String, Byte]) = {
@@ -9980,5 +9961,129 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compiled.methods(1).useContractAssets is true
       compiled.methods(1).usePayToContractOnly is false
     }
+  }
+
+  it should "derive contract address from script" in {
+    val contractId      = ContractId.generate
+    val contractAddress = Address.contract(contractId)
+
+    {
+      val script =
+        s"""
+           |TxScript Main {
+           |  assert!(1 == 1, 0)
+           |}
+      """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is None
+
+    }
+
+    {
+      val script =
+        s"""
+           |TxScript Main() {
+           |  Bar(#${contractId.toHexString}).bar()
+           |}
+           |
+           |Contract Bar() {
+           |  pub fn bar() -> () {}
+           |}
+    """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is Some(contractAddress)
+    }
+
+    {
+      val script =
+        s"""
+           |TxScript Main() {
+           |  callBar()
+           |
+           |  fn callBar() -> () {
+           |    Bar(#${contractId.toHexString}).bar()
+           |  }
+           |}
+           |
+           |Contract Bar() {
+           |  pub fn bar() -> () {}
+           |}
+    """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is Some(contractAddress)
+    }
+  }
+
+  it should "skip preapproved assets check for contract creation" in {
+    val noAnnotation   = ""
+    val withAnnotation = ", preapprovedAssets = true"
+
+    {
+      info("Test createContract without deposit")
+
+      def code(annotation: String) =
+        s"""
+           |Contract Create() {
+           |  @using(checkExternalCaller = false$annotation)
+           |  pub fn noDeposit() -> () {
+           |    createContract!(#00, #00, #00)
+           |  }
+           |}
+           |""".stripMargin
+      compileContract(code(noAnnotation)).isRight is true
+      compileContract(code(withAnnotation)).isRight is true
+    }
+
+    {
+      info("Test createContract with deposit")
+
+      def code(annotation: String) =
+        s"""
+           |Contract Create() {
+           |  $$@using(checkExternalCaller = false$annotation)
+           |  pub fn withDeposit() -> () {
+           |    createContract!{callerAddress!() -> ALPH: 1}(#00, #00, #00)
+           |  }$$
+           |}
+           |""".stripMargin
+      testContractError(
+        code(noAnnotation),
+        """Function "Create.withDeposit" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"""
+      )
+      compileContract(replace(code(withAnnotation))).isRight is true
+    }
+  }
+
+  it should "support bitwise operators for I256" in {
+    def code(expr: String, retTpe: String) =
+      s"""
+         |Contract Foo(@unused a: I256, @unused b: I256, @unused c: U256) {
+         |  pub fn foo() -> $retTpe {
+         |    return $expr
+         |  }
+         |}
+         |""".stripMargin
+
+    val exprs0 = Seq("a & b", "a | b", "a ^ b", "a << c", "a >> c")
+    exprs0.foreach(expr => compileContract(code(expr, "I256")).isRight is true)
+    exprs0.foreach(expr =>
+      compileContract(code(expr, "U256")).leftValue.message is
+        s"""Invalid return types "List(I256)" for func foo, expected "List(U256)""""
+    )
+    val exprs1 = Seq("a & c", "a | c", "a ^ c")
+    exprs1.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(I256, U256) for ${expr.slice(2, 3)} operator"""
+    )
+    val exprs2 = Seq("a << b", "a >> b")
+    exprs2.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(I256, I256) for ${expr.slice(2, 4)} operator"""
+    )
+    val exprs3 = Seq("c << b", "c >> b")
+    exprs3.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(U256, I256) for ${expr.slice(2, 4)} operator"""
+    )
   }
 }

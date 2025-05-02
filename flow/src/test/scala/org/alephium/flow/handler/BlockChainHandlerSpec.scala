@@ -18,6 +18,7 @@ package org.alephium.flow.handler
 
 import java.net.InetSocketAddress
 
+import akka.actor.Props
 import akka.testkit.{TestActorRef, TestProbe}
 import akka.util.ByteString
 
@@ -45,7 +46,9 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
     lazy val chainIndex     = ChainIndex.unsafe(0, 0)
     lazy val blockChainHandler =
       TestActorRef[BlockChainHandler](
-        BlockChainHandler.props(blockFlow, chainIndex, ActorRefT(TestProbe().ref), maxForkDepth)
+        Props(
+          new BlockChainHandler(blockFlow, chainIndex, ActorRefT(TestProbe().ref), maxForkDepth)
+        )
       )
 
     system.eventStream.subscribe(

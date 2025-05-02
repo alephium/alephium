@@ -24,6 +24,7 @@ import scala.annotation.nowarn
 import scala.collection.mutable
 import scala.language.implicitConversions
 
+import akka.util.ByteString
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalacheck.Arbitrary._
 import org.scalactic.Equality
@@ -154,4 +155,7 @@ trait AlephiumFixture extends Matchers {
 
   implicit def intToBigInteger(x: Int): BigInteger       = BigInt(x).bigInteger
   implicit def bigIntToBigInteger(x: BigInt): BigInteger = x.bigInteger
+
+  def bytesGen(size: Int): Gen[ByteString] =
+    Gen.listOfN(size, arbitrary[Byte]).map(ByteString.apply)
 }

@@ -20,8 +20,9 @@ import fastparse.{EagerOps, Parsed}
 
 import org.alephium.crypto.Byte32
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, ContractId}
-import org.alephium.protocol.vm.Val
+import org.alephium.protocol.vm.{LockupScript, PublicKeyLike, Val}
 import org.alephium.ralph.ArithOperator._
 import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
@@ -42,8 +43,11 @@ abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   }
 
   it should "parse lexer" in {
-    val byte32  = Byte32.generate.toHexString
-    val address = Address.p2pkh(PublicKey.generate)
+    val byte32     = Byte32.generate.toHexString
+    val pubKey     = PublicKey.generate
+    val pubKeyLike = PublicKeyLike.SecP256K1(pubKey)
+    val address1   = Address.p2pkh(pubKey)
+    val address2   = Address.Asset(LockupScript.P2PK.unsafe(pubKeyLike, 0.toByte))
 
     parsePositioned("5", Lexer.typedNum(_)).get.value.v is Val.U256(U256.unsafe(5))
     parsePositioned("5u", Lexer.typedNum(_)).get.value.v is Val.U256(U256.unsafe(5))
@@ -69,9 +73,26 @@ abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parsePositioned(s"#$byte32", Lexer.bytes(_)).get.value.v is Val.ByteVec(
       Hex.from(byte32).get
     )
-    parsePositioned(s"@${address.toBase58}", Lexer.address(_)).get.value.v is Val.Address(
-      address.lockupScript
+    parsePositioned(s"@${address1.toBase58}", Lexer.address(_)).get.value.v is Val.Address(
+      address1.lockupScript
     )
+
+    val groupConfig = new GroupConfig { override def groups: Int = 4 }
+    groupConfig.cliqueGroups.foreach { group =>
+      val lockupScript = LockupScript.p2pk(pubKeyLike, group)
+      val address      = Address.Asset(lockupScript)
+      parsePositioned(s"@${address.toBase58}", Lexer.address(_)).get.value.v is Val.Address(
+        lockupScript
+      )
+    }
+
+    val address2Base58 = address2.toBase58
+    parsePositioned(s"@$address2Base58", Lexer.address(_)).get.value.v is Val.Address(
+      address2.lockupScript
+    )
+    intercept[CompilerError.`Invalid address`] {
+      parsePositioned(s"@${address2Base58.dropRight(2)}", Lexer.address(_))
+    } is CompilerError.`Invalid address`(s"${address2Base58.dropRight(2)}", 1, fileURI)
     parsePositioned("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     parsePositioned("U256", Lexer.typeId(_)).get.value is Ast.TypeId("U256")
     parsePositioned("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")

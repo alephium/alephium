@@ -48,6 +48,8 @@ final class CachedSMT[K, V](
     } yield inMemoryTrie
   }
 
+  def getRootHash(): IOResult[Hash] = persistInMemory().map(_.rootHash)
+
   def getNewTrieNodeKeys(): IOResult[AVector[Hash]] = {
     persistInMemory().map(_.getNewTrieNodeKeys())
   }

@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 
 import org.alephium.flow.Utils
-import org.alephium.io.IOResult
+import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, EitherF}
@@ -31,7 +31,7 @@ trait FlowTipsUtil {
   def groups: Int
   def initialGenesisHashes: AVector[BlockHash]
   def genesisHashes: AVector[AVector[BlockHash]]
-  def getBestDeps(groupIndex: GroupIndex): BlockDeps
+  def getBestDepsPreDanube(groupIndex: GroupIndex): BlockDeps
 
   def getHeightUnsafe(hash: BlockHash): Int
   def getBlockUnsafe(hash: BlockHash): Block
@@ -43,13 +43,16 @@ trait FlowTipsUtil {
   def isConflicted(hashes: AVector[BlockHash], getBlock: BlockHash => Block): Boolean
 
   def getInTip(dep: BlockHash, currentGroup: GroupIndex): IOResult[BlockHash] = {
-    getBlockHeader(dep).map { header =>
-      val from = header.chainIndex.from
-      if (header.isGenesis) {
-        genesisHashes(from.value)(currentGroup.value)
-      } else {
-        if (currentGroup == ChainIndex.from(dep).to) dep else header.uncleHash(currentGroup)
-      }
+    IOUtils.tryExecute(getInTipUnsafe(dep, currentGroup))
+  }
+
+  def getInTipUnsafe(dep: BlockHash, currentGroup: GroupIndex): BlockHash = {
+    val header = getBlockHeaderUnsafe(dep)
+    val from   = header.chainIndex.from
+    if (header.isGenesis) {
+      genesisHashes(from.value)(currentGroup.value)
+    } else {
+      if (currentGroup == header.chainIndex.to) dep else header.uncleHash(currentGroup)
     }
   }
 
@@ -142,6 +145,17 @@ trait FlowTipsUtil {
     FlowTips(targetGroup, inTips, targetTips)
   }
 
+  def getBlockFlowSkeletonUnsafe(intraGroupTip: BlockHash): BlockFlowSkeleton = {
+    val header = getBlockHeaderUnsafe(intraGroupTip)
+
+    val builder = BlockFlowSkeleton.Builder(groups)
+    brokerConfig.cliqueGroups.foreach { g =>
+      val tip = getGroupTip(header, g)
+      builder.setTip(g, tip, getOutTipsUnsafe(tip))
+    }
+    builder.getResult()
+  }
+
   private[core] def getFlowTipsDiffUnsafe(
       newTips: FlowTips,
       oldTips: FlowTips
@@ -227,7 +241,7 @@ trait FlowTipsUtil {
       val chainIndex = ChainIndex.from(inDep)
       assume(ChainIndex.from(inDep).isIntraGroup)
       if (brokerConfig.contains(chainIndex.from)) {
-        val bestInDep = getBestDeps(chainIndex.from).getOutDep(targetGroupIndex)
+        val bestInDep = getBestDepsPreDanube(chainIndex.from).getOutDep(targetGroupIndex)
         getInTip(inDep, targetGroupIndex).flatMap { bestTargetDep =>
           getTipsDiff(bestInDep, bestTargetDep).map(acc ++ _)
         }
@@ -246,18 +260,56 @@ trait FlowTipsUtil {
     if (flowTips.outTips.contains(tip) || flowTips.inTips.contains(tip)) {
       Some(flowTips)
     } else {
-      tryMergeUnsafe(targetGroup, flowTips, getLightTipsUnsafe(tip, targetGroup))
+      tryMergeUnsafe(HardFork.Rhone, targetGroup, flowTips, getLightTipsUnsafe(tip, targetGroup))
+    }
+  }
+
+  def tryExtendBlockFlowSkeletonUnsafe(
+      flow: BlockFlowSkeleton,
+      group: GroupIndex,
+      tip: BlockHash
+  ): Option[BlockFlowSkeleton] = {
+    val currentGroupTip = flow.intraGroupTips(group.value)
+    if (tip != currentGroupTip && isExtendingUnsafe(tip, currentGroupTip)) {
+      val builder   = BlockFlowSkeleton.Builder(groups)
+      var canExtend = true
+
+      builder.setTip(group, tip, getOutTipsUnsafe(tip))
+
+      val tipHeader = getBlockHeaderUnsafe(tip)
+      brokerConfig.cliqueGroups.filter(_ != group).foreach { g =>
+        if (canExtend) {
+          val intraGroupTipOfTip  = getGroupTip(tipHeader, g)
+          val intraGroupTipOfFlow = flow.intraGroupTips(g.value)
+          if (isExtendingUnsafe(intraGroupTipOfFlow, intraGroupTipOfTip)) {
+            builder.setTip(g, intraGroupTipOfFlow, getOutTipsUnsafe(intraGroupTipOfFlow))
+          } else if (isExtendingUnsafe(intraGroupTipOfTip, intraGroupTipOfFlow)) {
+            builder.setTip(g, intraGroupTipOfTip, getOutTipsUnsafe(intraGroupTipOfTip))
+          } else {
+            canExtend = false
+          }
+        }
+      }
+
+      if (canExtend) {
+        Some(builder.getResult())
+      } else {
+        None
+      }
+    } else {
+      None
     }
   }
 
   private[core] def tryMergeUnsafe(
+      hardFork: HardFork,
       targetGroup: GroupIndex,
       flowTips: FlowTips,
       newTips: FlowTips.Light
   ): Option[FlowTips] = {
     for {
       newInTips  <- mergeInTips(flowTips.inTips, newTips.inTips)
-      newOutTips <- mergeOutTips(targetGroup, flowTips.outTips, newTips.outTip)
+      newOutTips <- mergeOutTips(hardFork, targetGroup, flowTips.outTips, newTips.outTip)
     } yield FlowTips(flowTips.targetGroup, newInTips, newOutTips)
   }
 
@@ -300,6 +352,7 @@ trait FlowTipsUtil {
   }
 
   private[core] def mergeOutTips(
+      hardFork: HardFork,
       targetGroup: GroupIndex,
       outTips: AVector[BlockHash],
       newTip: BlockHash
@@ -312,13 +365,17 @@ trait FlowTipsUtil {
     } else {
       val newOutTips = getOutTipsUnsafe(newTip)
       mergeTips(outTips, newOutTips).flatMap { mergedDeps =>
-        val intraDep0 = outTips(targetGroup.value)
-        val intraDep1 = getOutTip(getBlockHeaderUnsafe(newTip), targetGroup)
-        val commonIntraDep =
-          if (getHeightUnsafe(intraDep0) <= getHeightUnsafe(intraDep1)) intraDep0 else intraDep1
-        val commonOutTips = getOutTips(getBlockHeaderUnsafe(commonIntraDep))
-        val diffs         = getTipsDiffUnsafe(mergedDeps, commonOutTips)
-        Option.when(diffs.isEmpty || (!isConflicted(diffs, getBlockUnsafe)))(mergedDeps)
+        if (hardFork.isDanubeEnabled()) {
+          Some(mergedDeps)
+        } else {
+          val intraDep0 = outTips(targetGroup.value)
+          val intraDep1 = getOutTip(getBlockHeaderUnsafe(newTip), targetGroup)
+          val commonIntraDep =
+            if (getHeightUnsafe(intraDep0) <= getHeightUnsafe(intraDep1)) intraDep0 else intraDep1
+          val commonOutTips = getOutTips(getBlockHeaderUnsafe(commonIntraDep))
+          val diffs         = getTipsDiffUnsafe(mergedDeps, commonOutTips)
+          Option.when(diffs.isEmpty || (!isConflicted(diffs, getBlockUnsafe)))(mergedDeps)
+        }
       }
     }
   }

@@ -16,10 +16,13 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{ContractId, NoIndexModelGenerators}
+import akka.util.ByteString
+
+import org.alephium.crypto.SecP256K1PublicKey
+import org.alephium.protocol.{Checksum, Hash}
+import org.alephium.protocol.model.{ContractId, GroupIndex, NoIndexModelGenerators, ScriptHint}
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, DjbHash, Hex}
 
 class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde correctly" in {
@@ -74,5 +77,71 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     val lock4 = Hex.unsafe(s"010000")
     deserialize[LockupScript](lock4).leftValue.getMessage
       .startsWith(s"Invalid m in m-of-n multisig") is true
+  }
+
+  it should "validate p2pk" in {
+    val lockupScript = p2pkLockupGen(GroupIndex.unsafe(1)).sample.get
+    lockupScript.groupIndex is lockupScript.scriptHint.groupIndex
+    val publicKeyBytes = serialize(lockupScript.publicKey)
+    val checksum       = Checksum.calcAndSerialize(publicKeyBytes)
+    val groupByte      = ByteString(lockupScript.groupIndex.value.toByte)
+    val bytes =
+      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ checksum ++ groupByte)}")
+    serialize[LockupScript](lockupScript) is bytes
+    deserialize[LockupScript](bytes) isE lockupScript
+
+    (0 until groupConfig.groups).foreach { value =>
+      val groupIndex = GroupIndex.unsafe(value)
+      val p2pk       = LockupScript.p2pk(lockupScript.publicKey, groupIndex)
+      p2pk.groupIndex is groupIndex
+    }
+
+    val invalidChecksum = bytesGen(Checksum.checksumLength).sample.get
+    val invalidBytes =
+      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ invalidChecksum ++ groupByte)}")
+    deserialize[LockupScript](invalidBytes).leftValue.getMessage
+      .startsWith("Wrong checksum") is true
+  }
+
+  it should "calculate correct script hint for p2pk address" in {
+    forAll(groupIndexGen) { groupIndex =>
+      forAll(p2pkLockupGen(groupIndex)) { lockupScript0 =>
+        val publicKey = lockupScript0.publicKey
+        lockupScript0.groupIndex is groupIndex
+        lockupScript0.scriptHint.groupIndex is groupIndex
+        lockupScript0.scriptHint.groupIndex.value.toByte is lockupScript0.groupByte
+
+        val defaultGroupIndex = publicKey.defaultGroup
+        val lockupScript1     = LockupScript.p2pk(publicKey, defaultGroupIndex)
+        lockupScript1.scriptHint.groupIndex is defaultGroupIndex
+        lockupScript1.scriptHint.groupIndex.value.toByte is lockupScript1.groupByte
+      }
+    }
+  }
+
+  it should "only modify the MSB of the public key's script hint" in {
+    val publicKey   = PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)
+    val initialHint = ScriptHint.fromHash(DjbHash.intHash(publicKey.rawBytes))
+    (0 until groupConfig.groups).foreach { groupIndex =>
+      val lockupScript = LockupScript.p2pk(publicKey, GroupIndex.unsafe(groupIndex))
+      lockupScript.scriptHint.groupIndex.value is groupIndex
+      (lockupScript.scriptHint.value & 0x00ffffff) is (initialHint.value & 0x00ffffff)
+    }
+  }
+
+  it should "decode from base58 string" in {
+    import LockupScript._
+    decodeFromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3") is a[ValidLockupScript]
+    decodeFromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa") is a[ValidLockupScript]
+    decodeFromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr") is a[ValidLockupScript]
+    decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L") is a[HalfDecodedP2PK]
+    decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0") is
+      a[ValidLockupScript]
+    decodeFromBase58(":1") is InvalidLockupScript
+    decodeFromBase58("1C2:1") is InvalidLockupScript
+    decodeFromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0") is InvalidLockupScript
+    decodeFromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa:0") is InvalidLockupScript
+    decodeFromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr:0") is InvalidLockupScript
+    decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3") is InvalidLockupScript
   }
 }

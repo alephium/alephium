@@ -24,6 +24,7 @@ import sttp.tapir._
 import sttp.tapir.EndpointIO.Example
 import sttp.tapir.EndpointOutput.OneOfVariant
 import sttp.tapir.generic.auto._
+import sttp.tapir.oneOfVariantValueMatcher
 
 import org.alephium.api.TapirCodecs
 import org.alephium.api.TapirSchemasLike
@@ -32,7 +33,7 @@ import org.alephium.api.model._
 import org.alephium.json.Json.ReadWriter
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Transaction => _, _}
+import org.alephium.protocol.model.{Balance => _, Transaction => _, _}
 import org.alephium.protocol.vm.StatefulContract
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -286,9 +287,9 @@ trait Endpoints
       .out(jsonBody[Boolean])
       .summary("Check if the block is in main chain")
 
-  val getBalance: BaseEndpoint[(Address, Option[Boolean]), Balance] =
+  val getBalance: BaseEndpoint[(AddressLike, Option[Boolean]), Balance] =
     addressesEndpoint.get
-      .in(path[Address]("address"))
+      .in(path[AddressLike]("address"))
       .in("balance")
       .in(query[Option[Boolean]]("mempool"))
       .out(jsonBodyWithAlph[Balance])
@@ -340,22 +341,22 @@ trait Endpoints
       .summary("Build an unsigned transfer transaction to a number of recipients")
 
   val buildTransferFromOneToManyGroups
-      : BaseEndpoint[BuildTransferTx, AVector[BuildTransferTxResult]] =
+      : BaseEndpoint[BuildTransferTx, AVector[BuildSimpleTransferTxResult]] =
     transactionsEndpoint.post
       .in("build-transfer-from-one-to-many-groups")
       .in(jsonBodyWithAlph[BuildTransferTx])
-      .out(jsonBody[AVector[BuildTransferTxResult]])
+      .out(jsonBody[AVector[BuildSimpleTransferTxResult]])
       .summary(
         "Build unsigned transfer transactions from an address of one group to addresses of many groups. " +
           "Each target group requires a dedicated transaction or more in case large number of outputs needed to be split."
       )
 
   val buildMultiAddressesTransaction
-      : BaseEndpoint[BuildMultiAddressesTransaction, BuildTransferTxResult] =
+      : BaseEndpoint[BuildMultiAddressesTransaction, BuildSimpleTransferTxResult] =
     transactionsEndpoint.post
       .in("build-multi-addresses")
       .in(jsonBodyWithAlph[BuildMultiAddressesTransaction])
-      .out(jsonBody[BuildTransferTxResult])
+      .out(jsonBody[BuildSimpleTransferTxResult])
       .summary(
         "Build an unsigned transaction with multiple addresses to a number of recipients"
       )
@@ -405,11 +406,11 @@ trait Endpoints
       .out(jsonBody[BuildMultisigAddressResult])
       .summary("Create the multisig address and unlock script")
 
-  val buildMultisig: BaseEndpoint[BuildMultisig, BuildTransferTxResult] =
+  val buildMultisig: BaseEndpoint[BuildMultisig, BuildSimpleTransferTxResult] =
     multisigEndpoint.post
       .in("build")
       .in(jsonBody[BuildMultisig])
-      .out(jsonBody[BuildTransferTxResult])
+      .out(jsonBody[BuildSimpleTransferTxResult])
       .summary("Build a multisig unsigned transaction")
 
   val buildSweepMultisig: BaseEndpoint[BuildSweepMultisig, BuildSweepAddressTransactionsResult] =
@@ -739,5 +740,19 @@ object Endpoints {
           s"Format 2: `x.y ALPH`, where `1 ALPH = ${ALPH.oneAlph}\n\n" +
           s"Field fromPublicKeyType can be  `default` or `bip340-schnorr`"
       )
+  }
+
+  def jsonBodyEither[A: ReadWriter: Schema, B: ReadWriter: Schema](implicit
+      aExamples: List[Example[A]],
+      bExamples: List[Example[B]]
+  ): EndpointOutput.OneOf[Either[A, B], Either[A, B]] = {
+    val leftBody =
+      jsonBody[A].map(Left(_))(_.swap.getOrElse(throw new RuntimeException("Expect Left value")))
+    val rightBody = jsonBody[B].map(Right(_))(_.value)
+
+    oneOf[Either[A, B]](
+      oneOfVariantValueMatcher(StatusCode.Ok, leftBody) { case Left(_) => true },
+      oneOfVariantValueMatcher(StatusCode.Ok, rightBody) { case Right(_) => true }
+    )
   }
 }

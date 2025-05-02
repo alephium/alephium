@@ -146,6 +146,7 @@ case object InvalidMethod                    extends ExeFailure
 case object InvalidMethodModifierBeforeLeman extends ExeFailure
 case object InvalidMethodModifierBeforeRhone extends ExeFailure
 case object InvalidMethodModifierSinceRhone  extends ExeFailure
+case object InvalidMethodModifierPreDanube   extends ExeFailure
 
 final case class InvalidMethodIndex(index: Int, methodLength: Int) extends ExeFailure {
   override def toString: String = s"Invalid method index $index, method length: $methodLength"
@@ -235,6 +236,16 @@ case object NoBalanceAvailable extends ExeFailure {
   }
 }
 
+case object TxCallerBalanceNotAvailable extends ExeFailure {
+  override def toString: String = "Transaction caller balance is not available"
+}
+
+final case class InsufficientFundsForUTXODustAmount(required: U256) extends ExeFailure {
+  override def toString: String =
+    "Insufficient funds to cover the minimum amount for contract UTXO (0.1 ALPH) or asset UTXO (0.001 ALPH). " +
+      s"You are short by ${ALPH.prettifyAmount(required)}. Please ensure transaction caller approves enough ALPH."
+}
+
 final case class NotEnoughApprovedBalance(
     lockupScript: LockupScript,
     tokenId: TokenId,
@@ -247,8 +258,18 @@ final case class NotEnoughApprovedBalance(
   }
 }
 
-final case class NoAssetsApproved(address: Address.Asset) extends ExeFailure {
-  override def toString: String = s"No assets approved from address ${address.toBase58}"
+final case class NoAssetsApproved(address: Option[Address.Asset]) extends ExeFailure {
+  override def toString: String = {
+    address match {
+      case Some(address) => s"No assets approved from address ${address.toBase58}"
+      case None          => "No assets approved"
+    }
+  }
+}
+
+final case class ChainCallerOutputsFailed(address: Address) extends ExeFailure {
+  override def toString: String =
+    s"Failed to chain output assets for transaction caller ${address.toBase58}"
 }
 
 case object BalanceOverflow extends ExeFailure
@@ -261,6 +282,10 @@ final case class NoTokenBalanceForTheAddress(tokenId: TokenId, address: Address)
     extends ExeFailure {
   override def toString: String =
     s"No balance for token ${tokenId.toHexString} for the address ${address.toBase58}"
+}
+
+case object InvalidSelfTransfer extends ExeFailure {
+  override def toString: String = "Contract self transfer is not allowed"
 }
 
 case object InvalidBalances                    extends ExeFailure
@@ -355,6 +380,21 @@ case object NoCaller extends ExeFailure {
   override def toString: String = "The current method does not have a caller"
 }
 
+case object ExternalCallerNotAvailable extends ExeFailure {
+  override def toString: String =
+    "Failed to get external caller: no external contract caller found in the call chain"
+}
+
+case object ExternalCallerIsNotContract extends ExeFailure {
+  override def toString: String =
+    "Failed to get external caller: external caller is not a contract"
+}
+
+case object CurrentFrameIsNotContract extends ExeFailure {
+  override def toString: String =
+    "Failed to get external caller: current frame is not a contract frame"
+}
+
 final case class NegativeTimeStamp(millis: Long) extends ExeFailure {
   override def toString: String = s"Negative timestamp $millis"
 }
@@ -426,6 +466,9 @@ final case class AssertionFailedWithErrorCode(contractIdOpt: Option[ContractId],
     }
   }
 }
+
+final case class InvalidWebAuthnPayload(error: SerdeError) extends ExeFailure
+final case class InvalidPublicKeyType(tpe: ByteString)     extends ExeFailure
 
 sealed trait IOFailure extends Product {
   def error: IOError

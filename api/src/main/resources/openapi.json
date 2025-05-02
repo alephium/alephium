@@ -6571,6 +6571,7 @@
                   "$ref": "#/components/schemas/BuildTransferTxResult"
                 },
                 "example": {
+                  "type": "BuildSimpleTransferTxResult",
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
@@ -6849,11 +6850,12 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/BuildTransferTxResult"
+                    "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
                   }
                 },
                 "example": [
                   {
+                    "type": "BuildSimpleTransferTxResult",
                     "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                     "gasAmount": 20000,
                     "gasPrice": "100000000000",
@@ -6989,9 +6991,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildTransferTxResult"
+                  "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
                 },
                 "example": {
+                  "type": "BuildSimpleTransferTxResult",
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
@@ -9026,65 +9029,80 @@
                   "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
                 },
                 "example": {
-                  "fromGroup": 2,
-                  "toGroup": 2,
-                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
-                  "gasAmount": 20000,
-                  "gasPrice": "100000000000",
-                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                  "simulationResult": {
-                    "contractInputs": [
-                      {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "attoAlphAmount": "1000000000000000",
-                        "tokens": [
-                          {
-                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                            "amount": "1000000000000000000"
-                          }
-                        ]
-                      },
-                      {
-                        "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
-                        "attoAlphAmount": "100000000000000000",
-                        "tokens": [
-                          {
-                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                            "amount": "100000000000000000000"
-                          },
-                          {
-                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                            "amount": "100000000000000000000"
-                          }
-                        ]
-                      }
-                    ],
-                    "generatedOutputs": [
-                      {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "attoAlphAmount": "1000000000000000",
-                        "tokens": [
-                          {
-                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                            "amount": "1000000000000000000"
-                          }
-                        ]
-                      },
-                      {
-                        "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
-                        "attoAlphAmount": "100000000000000000",
-                        "tokens": [
-                          {
-                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                            "amount": "99000000000000000000"
-                          },
-                          {
-                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                            "amount": "101000000000000000000"
-                          }
-                        ]
-                      }
-                    ]
+                  "type": "BuildGrouplessExecuteScriptTxResult",
+                  "transferTxs": [
+                    {
+                      "type": "BuildSimpleTransferTxResult",
+                      "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "gasAmount": 20000,
+                      "gasPrice": "100000000000",
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "fromGroup": 2,
+                      "toGroup": 1
+                    }
+                  ],
+                  "executeScriptTx": {
+                    "type": "BuildSimpleExecuteScriptTxResult",
+                    "fromGroup": 2,
+                    "toGroup": 2,
+                    "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000",
+                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                    "simulationResult": {
+                      "contractInputs": [
+                        {
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "attoAlphAmount": "1000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "1000000000000000000"
+                            }
+                          ]
+                        },
+                        {
+                          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "attoAlphAmount": "100000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "100000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "100000000000000000000"
+                            }
+                          ]
+                        }
+                      ],
+                      "generatedOutputs": [
+                        {
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "attoAlphAmount": "1000000000000000",
+                          "tokens": [
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000000000000000000"
+                            }
+                          ]
+                        },
+                        {
+                          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "attoAlphAmount": "100000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "99000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "101000000000000000000"
+                            }
+                          ]
+                        }
+                      ]
+                    }
                   }
                 }
               }
@@ -9802,13 +9820,28 @@
                   "$ref": "#/components/schemas/BuildDeployContractTxResult"
                 },
                 "example": {
-                  "fromGroup": 2,
-                  "toGroup": 2,
-                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
-                  "gasAmount": 20000,
-                  "gasPrice": "100000000000",
-                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                  "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
+                  "type": "BuildGrouplessDeployContractTxResult",
+                  "transferTxs": [
+                    {
+                      "type": "BuildSimpleTransferTxResult",
+                      "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "gasAmount": 20000,
+                      "gasPrice": "100000000000",
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "fromGroup": 2,
+                      "toGroup": 1
+                    }
+                  ],
+                  "deployContractTx": {
+                    "type": "BuildSimpleDeployContractTxResult",
+                    "fromGroup": 2,
+                    "toGroup": 2,
+                    "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000",
+                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                    "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
+                  }
                 }
               }
             }
@@ -10014,6 +10047,7 @@
                   {
                     "type": "Transfer",
                     "value": {
+                      "type": "BuildSimpleTransferTxResult",
                       "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "gasAmount": 20000,
                       "gasPrice": "100000000000",
@@ -10025,6 +10059,7 @@
                   {
                     "type": "ExecuteScript",
                     "value": {
+                      "type": "BuildSimpleExecuteScriptTxResult",
                       "fromGroup": 2,
                       "toGroup": 2,
                       "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
@@ -11883,9 +11918,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildTransferTxResult"
+                  "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
                 },
                 "example": {
+                  "type": "BuildSimpleTransferTxResult",
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
@@ -14126,7 +14162,7 @@
         ],
         "properties": {
           "value": {
-            "$ref": "#/components/schemas/BuildDeployContractTxResult"
+            "$ref": "#/components/schemas/BuildSimpleDeployContractTxResult"
           },
           "type": {
             "type": "string"
@@ -14158,7 +14194,7 @@
         ],
         "properties": {
           "value": {
-            "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
+            "$ref": "#/components/schemas/BuildSimpleExecuteScriptTxResult"
           },
           "type": {
             "type": "string"
@@ -14190,7 +14226,7 @@
         ],
         "properties": {
           "value": {
-            "$ref": "#/components/schemas/BuildTransferTxResult"
+            "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
           },
           "type": {
             "type": "string"
@@ -14287,6 +14323,10 @@
             "type": "string",
             "format": "uint256"
           },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
+          },
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
@@ -14295,43 +14335,19 @@
       },
       "BuildDeployContractTxResult": {
         "title": "BuildDeployContractTxResult",
-        "type": "object",
-        "required": [
-          "fromGroup",
-          "toGroup",
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "contractAddress"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BuildGrouplessDeployContractTxResult"
+          },
+          {
+            "$ref": "#/components/schemas/BuildSimpleDeployContractTxResult1"
+          }
         ],
-        "properties": {
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "contractAddress": {
-            "type": "string",
-            "format": "address"
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "BuildGrouplessDeployContractTxResult": "#/components/schemas/BuildGrouplessDeployContractTxResult",
+            "BuildSimpleDeployContractTxResult": "#/components/schemas/BuildSimpleDeployContractTxResult1"
           }
         }
       },
@@ -14377,6 +14393,10 @@
             "type": "string",
             "format": "block-hash"
           },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
+          },
           "gasEstimationMultiplier": {
             "type": "number",
             "format": "double"
@@ -14385,42 +14405,88 @@
       },
       "BuildExecuteScriptTxResult": {
         "title": "BuildExecuteScriptTxResult",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BuildGrouplessExecuteScriptTxResult"
+          },
+          {
+            "$ref": "#/components/schemas/BuildSimpleExecuteScriptTxResult1"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "BuildGrouplessExecuteScriptTxResult": "#/components/schemas/BuildGrouplessExecuteScriptTxResult",
+            "BuildSimpleExecuteScriptTxResult": "#/components/schemas/BuildSimpleExecuteScriptTxResult1"
+          }
+        }
+      },
+      "BuildGrouplessDeployContractTxResult": {
+        "title": "BuildGrouplessDeployContractTxResult",
         "type": "object",
         "required": [
-          "fromGroup",
-          "toGroup",
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "simulationResult"
+          "transferTxs",
+          "deployContractTx",
+          "type"
         ],
         "properties": {
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
+          "transferTxs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
+            }
           },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
+          "deployContractTx": {
+            "$ref": "#/components/schemas/BuildSimpleDeployContractTxResult"
           },
-          "unsignedTx": {
+          "type": {
             "type": "string"
+          }
+        }
+      },
+      "BuildGrouplessExecuteScriptTxResult": {
+        "title": "BuildGrouplessExecuteScriptTxResult",
+        "type": "object",
+        "required": [
+          "transferTxs",
+          "executeScriptTx",
+          "type"
+        ],
+        "properties": {
+          "transferTxs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
+            }
           },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
+          "executeScriptTx": {
+            "$ref": "#/components/schemas/BuildSimpleExecuteScriptTxResult"
           },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildGrouplessTransferTxResult": {
+        "title": "BuildGrouplessTransferTxResult",
+        "type": "object",
+        "required": [
+          "transferTxs",
+          "transferTx",
+          "type"
+        ],
+        "properties": {
+          "transferTxs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
+            }
           },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+          "transferTx": {
+            "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
           },
-          "simulationResult": {
-            "$ref": "#/components/schemas/SimulationResult"
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -14530,6 +14596,258 @@
           "address": {
             "type": "string",
             "format": "address"
+          }
+        }
+      },
+      "BuildSimpleDeployContractTxResult": {
+        "title": "BuildSimpleDeployContractTxResult",
+        "type": "object",
+        "required": [
+          "fromGroup",
+          "toGroup",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "contractAddress"
+        ],
+        "properties": {
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "contractAddress": {
+            "type": "string",
+            "format": "address"
+          }
+        }
+      },
+      "BuildSimpleDeployContractTxResult1": {
+        "title": "BuildSimpleDeployContractTxResult",
+        "type": "object",
+        "required": [
+          "fromGroup",
+          "toGroup",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "contractAddress",
+          "type"
+        ],
+        "properties": {
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "contractAddress": {
+            "type": "string",
+            "format": "address"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildSimpleExecuteScriptTxResult": {
+        "title": "BuildSimpleExecuteScriptTxResult",
+        "type": "object",
+        "required": [
+          "fromGroup",
+          "toGroup",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "simulationResult"
+        ],
+        "properties": {
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "simulationResult": {
+            "$ref": "#/components/schemas/SimulationResult"
+          }
+        }
+      },
+      "BuildSimpleExecuteScriptTxResult1": {
+        "title": "BuildSimpleExecuteScriptTxResult",
+        "type": "object",
+        "required": [
+          "fromGroup",
+          "toGroup",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "simulationResult",
+          "type"
+        ],
+        "properties": {
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "simulationResult": {
+            "$ref": "#/components/schemas/SimulationResult"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildSimpleTransferTxResult": {
+        "title": "BuildSimpleTransferTxResult",
+        "type": "object",
+        "required": [
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "fromGroup",
+          "toGroup"
+        ],
+        "properties": {
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "BuildSimpleTransferTxResult1": {
+        "title": "BuildSimpleTransferTxResult",
+        "type": "object",
+        "required": [
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "fromGroup",
+          "toGroup",
+          "type"
+        ],
+        "properties": {
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -14686,6 +15004,10 @@
             "type": "string",
             "format": "uint256"
           },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
+          },
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
@@ -14694,38 +15016,19 @@
       },
       "BuildTransferTxResult": {
         "title": "BuildTransferTxResult",
-        "type": "object",
-        "required": [
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "fromGroup",
-          "toGroup"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BuildGrouplessTransferTxResult"
+          },
+          {
+            "$ref": "#/components/schemas/BuildSimpleTransferTxResult1"
+          }
         ],
-        "properties": {
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "BuildGrouplessTransferTxResult": "#/components/schemas/BuildGrouplessTransferTxResult",
+            "BuildSimpleTransferTxResult": "#/components/schemas/BuildSimpleTransferTxResult1"
           }
         }
       },
@@ -17045,6 +17348,10 @@
             "items": {
               "$ref": "#/components/schemas/TestInputAsset"
             }
+          },
+          "dustAmount": {
+            "type": "string",
+            "format": "uint256"
           }
         }
       },

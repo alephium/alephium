@@ -20,9 +20,12 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, ContractId, TransactionId, UnsignedTransaction}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
-import org.alephium.util.Hex
+import org.alephium.util.{AVector, Hex}
 
-final case class BuildDeployContractTxResult(
+sealed trait BuildDeployContractTxResult extends Product with Serializable
+
+@upickle.implicits.key("BuildSimpleDeployContractTxResult")
+final case class BuildSimpleDeployContractTxResult(
     fromGroup: Int,
     toGroup: Int,
     unsignedTx: String,
@@ -30,17 +33,18 @@ final case class BuildDeployContractTxResult(
     gasPrice: GasPrice,
     txId: TransactionId,
     contractAddress: Address.Contract
-) extends GasInfo
+) extends BuildDeployContractTxResult
+    with GasInfo
     with ChainIndexInfo
     with TransactionInfo
 
-object BuildDeployContractTxResult {
+object BuildSimpleDeployContractTxResult {
   def from(
       unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildDeployContractTxResult = {
+  )(implicit groupConfig: GroupConfig): BuildSimpleDeployContractTxResult = {
     val contractId =
       ContractId.from(unsignedTx.id, unsignedTx.fixedOutputs.length, unsignedTx.fromGroup)
-    BuildDeployContractTxResult(
+    BuildSimpleDeployContractTxResult(
       unsignedTx.fromGroup.value,
       unsignedTx.toGroup.value,
       Hex.toHexString(serialize(unsignedTx)),
@@ -51,3 +55,9 @@ object BuildDeployContractTxResult {
     )
   }
 }
+
+@upickle.implicits.key("BuildGrouplessDeployContractTxResult")
+final case class BuildGrouplessDeployContractTxResult(
+    transferTxs: AVector[BuildSimpleTransferTxResult],
+    deployContractTx: BuildSimpleDeployContractTxResult
+) extends BuildDeployContractTxResult

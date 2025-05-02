@@ -23,16 +23,27 @@ class HardForkSpec extends AlephiumSpec {
     (HardFork.Leman > HardFork.Mainnet) is true
     (HardFork.Rhone > HardFork.Leman) is true
     (HardFork.Rhone > HardFork.Mainnet) is true
+    (HardFork.Danube > HardFork.Mainnet) is true
+    (HardFork.Danube > HardFork.Leman) is true
+    (HardFork.Danube > HardFork.Rhone) is true
+
     HardFork.Mainnet.version is 0
     HardFork.Leman.version is 1
     HardFork.Rhone.version is 2
+    HardFork.Danube.version is 3
 
     HardFork.Leman.isLemanEnabled() is true
     HardFork.Leman.isRhoneEnabled() is false
+    HardFork.Leman.isDanubeEnabled() is false
     HardFork.Mainnet.isLemanEnabled() is false
     HardFork.Mainnet.isRhoneEnabled() is false
+    HardFork.Mainnet.isDanubeEnabled() is false
     HardFork.Rhone.isRhoneEnabled() is true
+    HardFork.Rhone.isDanubeEnabled() is false
+    HardFork.Danube.isDanubeEnabled() is true
 
-    Seq(HardFork.Leman, HardFork.Rhone).contains(HardFork.SinceLemanForTest) is true
+    Seq(HardFork.Leman, HardFork.Rhone, HardFork.Danube).contains(
+      HardFork.SinceLemanForTest
+    ) is true
   }
 }
