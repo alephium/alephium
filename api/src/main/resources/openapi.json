@@ -17349,14 +17349,6 @@
               "$ref": "#/components/schemas/TestInputAsset"
             }
           },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
           "dustAmount": {
             "type": "string",
             "format": "uint256"
