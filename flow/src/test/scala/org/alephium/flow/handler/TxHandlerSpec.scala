@@ -518,8 +518,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val (_, pubKey1, _)  = genesisKeys(1)
     val genesisAddress0  = getGenesisLockupScript(index.from)
     val genesisAddress1  = getGenesisLockupScript(index.to)
-    val balance0         = blockFlow.getBalance(genesisAddress0, Int.MaxValue, true).rightValue._1
-    val balance1         = blockFlow.getBalance(genesisAddress1, Int.MaxValue, true).rightValue._1
+    val balance0 = blockFlow.getBalance(genesisAddress0, Int.MaxValue, true).rightValue.totalAlph
+    val balance1 = blockFlow.getBalance(genesisAddress1, Int.MaxValue, true).rightValue.totalAlph
 
     val block = transfer(blockFlow, privKey0, pubKey1, ALPH.oneAlph)
     val tx    = block.transactions.head
@@ -543,8 +543,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val blockHash = confirmed.index.hash
     blockFlow.getBestDepsPreDanube(index.from).deps.contains(blockHash) is true
 
-    val balance01 = blockFlow.getBalance(genesisAddress0, Int.MaxValue, true).rightValue._1
-    val balance11 = blockFlow.getBalance(genesisAddress1, Int.MaxValue, true).rightValue._1
+    val balance01 = blockFlow.getBalance(genesisAddress0, Int.MaxValue, true).rightValue.totalAlph
+    val balance11 = blockFlow.getBalance(genesisAddress1, Int.MaxValue, true).rightValue.totalAlph
     (balance01 < balance0.subUnsafe(ALPH.oneAlph)) is true // due to gas fee
     balance11 is balance1.addUnsafe(ALPH.oneAlph)
 
@@ -552,8 +552,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val block1 = transfer(blockFlow, ChainIndex.unsafe(1, 1))
     addAndCheck(blockFlow, block0)
     addAndCheck(blockFlow, block1)
-    val balance02 = blockFlow.getBalance(genesisAddress0, Int.MaxValue, true).rightValue._1
-    val balance12 = blockFlow.getBalance(genesisAddress1, Int.MaxValue, true).rightValue._1
+    val balance02 = blockFlow.getBalance(genesisAddress0, Int.MaxValue, true).rightValue.totalAlph
+    val balance12 = blockFlow.getBalance(genesisAddress1, Int.MaxValue, true).rightValue.totalAlph
     balance02 is balance01.subUnsafe(ALPH.oneAlph)
     balance12 is balance11.subUnsafe(ALPH.oneAlph)
   }

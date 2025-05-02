@@ -525,6 +525,7 @@ class ContextSpec
       if (output.lockupScript == inputLockupScript) acc.addUnsafe(output.amount) else acc
     }
     balanceState.alphRemaining(inputLockupScript).value is alphAmount
+
     balanceState.tokenRemaining(inputLockupScript, randomTokenId) is Some(U256.MaxValue)
 
     addOutputBalance(inputLockupScript, ALPH.oneAlph, AVector(randomTokenId -> 1))

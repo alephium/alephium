@@ -1093,7 +1093,6 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(y << 1 == 2, 0)
          |    assert!(y >> 1 == 0, 0)
          |    assert!(y << 255 != 0, 0)
-         |    assert!(y << 256 == 0, 0)
          |    assert!(x & x == 0, 0)
          |    assert!(x & y == 0, 0)
          |    assert!(y & y == 1, 0)
@@ -3950,7 +3949,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |  @using(${if (useAssets) "assetsInContract = true, " else ""}updateFields = true)
          |  pub fn bar() -> () {
-         |    ${if (useAssets) s"transferTokenFromSelf!(@$genesisAddress, ALPH, 1 alph)" else ""}
+         |    ${if (useAssets) s"assert!(tokenRemaining!(selfAddress!(), ALPH) == 1 alph, 0)" else ""}
          |    n = n + 1
          |  }
          |}
@@ -7658,48 +7657,6 @@ class VMSpec extends AlephiumSpec with Generators {
     balance is initialAlphAmount.addUnsafe(ALPH.oneAlph)
   }
 
-  it should "support assetInContract function followed by preapprovedAssets + assetInContract function" in new ContractFixture {
-    val (_, publicKey) = chainIndex.from.generateKey
-    val lockupScript   = LockupScript.p2pkh(publicKey)
-    val address        = Address.from(lockupScript)
-
-    val contract =
-      s"""
-         |Contract Foo() {
-         |  @using(assetsInContract = true)
-         |  pub fn payWithContract() -> () {
-         |    payWithContractInner{selfAddress!() -> ALPH: 2 alph}()
-         |  }
-         |
-         |  @using(preapprovedAssets = true, assetsInContract = true)
-         |  fn payWithContractInner() -> () {
-         |    transferToken!(selfAddress!(), @$address, ALPH, 2 alph)
-         |  }
-         |}
-         |""".stripMargin
-
-    val contractId = createContract(contract, initialAttoAlphAmount = ALPH.alph(10))._1
-
-    var balance = getContractAsset(contractId).amount
-    balance is ALPH.alph(10)
-
-    val script =
-      s"""
-         |TxScript Main {
-         |  let contract = Foo(#${contractId.toHexString})
-         |  contract.payWithContract()
-         |}
-         |$contract
-         |""".stripMargin
-
-    callTxScript(script)
-
-    balance = getContractAsset(contractId).amount
-    balance is ALPH.alph(8)
-    balance = getAlphBalance(blockFlow, lockupScript)
-    balance is ALPH.alph(2)
-  }
-
   it should "support chained contract calls in TxScript after danube hard fork" in new ChainedContractCallsFixture {
     override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
     val chainedSwapBlock = payableCall(
@@ -8198,6 +8155,63 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(code)
   }
 
+  trait UseContractAssetFixture extends ContractFixture {
+    def danubeHardForkTimestamp: Long
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
+    )
+
+    val (_, publicKey) = chainIndex.from.generateKey
+    val lockupScript   = LockupScript.p2pkh(publicKey)
+    val address        = Address.from(lockupScript)
+
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn payWithContract() -> () {
+         |    payWithContractInner{selfAddress!() -> ALPH: 2 alph}()
+         |  }
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  fn payWithContractInner() -> () {
+         |    transferToken!(selfAddress!(), @$address, ALPH, 2 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(contract, initialAttoAlphAmount = ALPH.alph(10))._1
+
+    var balance = getContractAsset(contractId).amount
+    balance is ALPH.alph(10)
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let contract = Foo(#${contractId.toHexString})
+         |  contract.payWithContract()
+         |}
+         |$contract
+         |""".stripMargin
+  }
+
+  it should "test assetInContract function followed by preapprovedAssets + assetInContract function: before Danube" in new UseContractAssetFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+
+    intercept[AssertionError](callTxScript(script)).getMessage is "Right(InvalidAlphBalance)"
+  }
+
+  it should "test assetInContract function followed by preapprovedAssets + assetInContract function: after Danube" in new UseContractAssetFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    callTxScript(script)
+
+    balance = getContractAsset(contractId).amount
+    balance is ALPH.alph(8)
+    balance = getAlphBalance(blockFlow, lockupScript)
+    balance is ALPH.alph(2)
+  }
+
   it should "be able to use assets for the newly created contract" in new ContractFixture {
     val fancyTokenCode =
       s"""
@@ -8314,61 +8328,55 @@ class VMSpec extends AlephiumSpec with Generators {
     output.lockTime is lockTimestamp
   }
 
-  trait UseContractAssetFixture extends ContractFixture {
-    def danubeHardForkTimestamp: Long
-    override val configValues: Map[String, Any] = Map(
-      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
-    )
-
-    val (_, publicKey) = chainIndex.from.generateKey
-    val lockupScript   = LockupScript.p2pkh(publicKey)
-    val address        = Address.from(lockupScript)
-
-    val contract =
+  trait U256SHLFixture extends ContractFixture {
+    def code(a: U256, b: U256, res: U256) =
       s"""
-         |Contract Foo() {
-         |  @using(assetsInContract = true)
-         |  pub fn payWithContract() -> () {
-         |    payWithContractInner{selfAddress!() -> ALPH: 2 alph}()
-         |  }
-         |
-         |  @using(preapprovedAssets = true, assetsInContract = true)
-         |  fn payWithContractInner() -> () {
-         |    transferToken!(selfAddress!(), @$address, ALPH, 2 alph)
-         |  }
-         |}
-         |""".stripMargin
-
-    val contractId = createContract(contract, initialAttoAlphAmount = ALPH.alph(10))._1
-
-    var balance = getContractAsset(contractId).amount
-    balance is ALPH.alph(10)
-
-    val script =
-      s"""
+         |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  let contract = Foo(#${contractId.toHexString})
-         |  contract.payWithContract()
+         |  assert!($a << $b == $res, 0)
          |}
-         |$contract
          |""".stripMargin
   }
 
-  it should "test assetInContract function followed by preapprovedAssets + assetInContract function: before Danube" in new UseContractAssetFixture {
-    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
-
-    intercept[AssertionError](callTxScript(script)).getMessage is "Right(InvalidAlphBalance)"
+  it should "test U256SHL before Danube" in new U256SHLFixture {
+    setHardFork(HardFork.Rhone)
+    testSimpleScript(code(U256.HalfMaxValue, 1, U256.HalfMaxValue shlDeprecated 1))
+    testSimpleScript(code(U256.MaxValue, 1, U256.MaxValue shlDeprecated 1))
   }
 
-  it should "test assetInContract function followed by preapprovedAssets + assetInContract function: after Danube" in new UseContractAssetFixture {
-    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+  it should "test U256SHL since Danube" in new U256SHLFixture {
+    setHardForkSince(HardFork.Danube)
+    testSimpleScript(code(U256.HalfMaxValue, 1, U256.HalfMaxValue.shl(1).get))
+    val script = Compiler.compileTxScript(code(U256.MaxValue, 1, 0)).rightValue
+    intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage.startsWith(
+      "Right(TxScriptExeFailed(ArithmeticError"
+    ) is true
+  }
 
-    callTxScript(script)
+  trait I256BitwiseFixture extends ContractFixture {
+    val code =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  assert!(0i >> 1 == 0i, 0)
+         |  assert!(1i << 1 == 2i, 1)
+         |  assert!(0xffi & 0xf0i == 0xf0i, 2)
+         |  assert!(0xffi | 0xf0i == 0xffi, 3)
+         |  assert!(0xffi ^ 0xf0i == 0x0fi, 4)
+         |}
+         |""".stripMargin
+  }
 
-    balance = getContractAsset(contractId).amount
-    balance is ALPH.alph(8)
-    balance = getAlphBalance(blockFlow, lockupScript)
-    balance is ALPH.alph(2)
+  it should "test bitwise operators for I256 before Danube" in new I256BitwiseFixture {
+    setHardForkBefore(HardFork.Danube)
+    intercept[AssertionError](testSimpleScript(code)).getMessage.contains(
+      "is not enabled before Danube"
+    ) is true
+  }
+
+  it should "test bitwise operators for I256 since Danube" in new I256BitwiseFixture {
+    setHardForkSince(HardFork.Danube)
+    testSimpleScript(code)
   }
 
   private def getEvents(

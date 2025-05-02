@@ -13,20 +13,26 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
-package org.alephium.api.model
 
-sealed trait BuildChainedTxResult {
-  val value: GasInfo with ChainIndexInfo with TransactionInfo
+package org.alephium.app
+
+import java.net.InetSocketAddress
+
+import org.alephium.protocol.ALPH
+import org.alephium.util.{AVector, Duration, SocketUtil}
+
+trait ApiConfigFixture extends SocketUtil {
+  val peerPort             = generatePort()
+  val address              = new InetSocketAddress("127.0.0.1", peerPort)
+  val blockflowFetchMaxAge = Duration.zero
+  implicit val apiConfig: ApiConfig = ApiConfig(
+    networkInterface = address.getAddress,
+    blockflowFetchMaxAge = blockflowFetchMaxAge,
+    askTimeout = Duration.ofMinutesUnsafe(1),
+    AVector.empty,
+    ALPH.oneAlph,
+    ALPH.MaxTxInputNum * 2,
+    128,
+    enableHttpMetrics = true
+  )
 }
-
-@upickle.implicits.key("Transfer")
-final case class BuildChainedTransferTxResult(value: BuildSimpleTransferTxResult)
-    extends BuildChainedTxResult
-
-@upickle.implicits.key("DeployContract")
-final case class BuildChainedDeployContractTxResult(value: BuildSimpleDeployContractTxResult)
-    extends BuildChainedTxResult
-
-@upickle.implicits.key("ExecuteScript")
-final case class BuildChainedExecuteScriptTxResult(value: BuildSimpleExecuteScriptTxResult)
-    extends BuildChainedTxResult

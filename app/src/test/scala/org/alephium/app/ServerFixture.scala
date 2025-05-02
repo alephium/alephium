@@ -43,7 +43,8 @@ import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
 import org.alephium.json.Json._
 import org.alephium.protocol._
-import org.alephium.protocol.model._
+import org.alephium.protocol.model
+import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
@@ -111,7 +112,7 @@ trait ServerFixture
     dummyTx.toGroup.value
   )
   def dummyBuildTransactionResult(tx: Transaction) =
-    BuildTransferTxResult.from(tx.unsigned)
+    BuildSimpleTransferTxResult.from(tx.unsigned)
   def dummySweepAddressBuildTransactionsResult(
       tx: Transaction,
       fromGroup: GroupIndex,
@@ -275,10 +276,10 @@ object ServerFixture {
         lockupScript: LockupScript,
         utxosLimit: Int,
         getMempoolUtxos: Boolean
-    ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
+    ): IOResult[model.Balance] = {
       val tokens       = AVector((TokenId.hash("token1"), U256.One))
       val lockedTokens = AVector((TokenId.hash("token2"), U256.Two))
-      Right((U256.Zero, U256.Zero, tokens, lockedTokens, 0))
+      Right(model.Balance(U256.Zero, U256.Zero, tokens, lockedTokens, 0))
     }
 
     override def getUTXOs(

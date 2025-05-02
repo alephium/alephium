@@ -85,16 +85,16 @@ case object InvalidPoLWChangeOutputLockupScript extends InvalidPoLWStatus
 case object InvalidPoLWCoinbaseFormat           extends InvalidPoLWStatus
 case object InvalidPoLWBeforeRhoneHardFork      extends InvalidPoLWStatus
 
-sealed trait InvalidGhostUncleStatus              extends InvalidBlockStatus
-case object InvalidGhostUnclesBeforeRhoneHardFork extends InvalidGhostUncleStatus
-case object InvalidGhostUncleSize                 extends InvalidGhostUncleStatus
-case object UnsortedGhostUncles                   extends InvalidGhostUncleStatus
-case object InvalidGhostUncleDeps                 extends InvalidGhostUncleStatus
-case object NotGhostUnclesForTheBlock             extends InvalidGhostUncleStatus
-case object GhostUncleHashConflictWithParentHash  extends InvalidGhostUncleStatus
-case object GhostUnclesAlreadyUsed                extends InvalidGhostUncleStatus
-case object GhostUncleDoesNotExist                extends InvalidGhostUncleStatus
-case object InvalidGhostUncleMiner                extends InvalidGhostUncleStatus
+sealed trait InvalidGhostUncleStatus                          extends InvalidBlockStatus
+case object InvalidGhostUnclesBeforeRhoneHardFork             extends InvalidGhostUncleStatus
+case object InvalidGhostUncleSize                             extends InvalidGhostUncleStatus
+case object UnsortedGhostUncles                               extends InvalidGhostUncleStatus
+case object InvalidGhostUncleDeps                             extends InvalidGhostUncleStatus
+case object NotGhostUnclesForTheBlock                         extends InvalidGhostUncleStatus
+case object GhostUncleHashConflictWithParentHash              extends InvalidGhostUncleStatus
+case object GhostUnclesAlreadyUsed                            extends InvalidGhostUncleStatus
+final case class GhostUncleDoesNotExist(uncleHash: BlockHash) extends InvalidGhostUncleStatus
+case object InvalidGhostUncleMiner                            extends InvalidGhostUncleStatus
 final case class DuplicateGhostUncleSinceDanube(uncleHash: BlockHash)
     extends InvalidGhostUncleStatus
 

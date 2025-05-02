@@ -23,7 +23,7 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto.Byte64
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, TokenId}
+import org.alephium.protocol.model.{Address, ContractId, TokenId}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -9894,6 +9894,57 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
     }
   }
 
+  it should "derive contract address from script" in {
+    val contractId      = ContractId.generate
+    val contractAddress = Address.contract(contractId)
+
+    {
+      val script =
+        s"""
+           |TxScript Main {
+           |  assert!(1 == 1, 0)
+           |}
+      """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is None
+
+    }
+
+    {
+      val script =
+        s"""
+           |TxScript Main() {
+           |  Bar(#${contractId.toHexString}).bar()
+           |}
+           |
+           |Contract Bar() {
+           |  pub fn bar() -> () {}
+           |}
+    """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is Some(contractAddress)
+    }
+
+    {
+      val script =
+        s"""
+           |TxScript Main() {
+           |  callBar()
+           |
+           |  fn callBar() -> () {
+           |    Bar(#${contractId.toHexString}).bar()
+           |  }
+           |}
+           |
+           |Contract Bar() {
+           |  pub fn bar() -> () {}
+           |}
+    """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is Some(contractAddress)
+    }
+  }
+
   it should "skip preapproved assets check for contract creation" in {
     val noAnnotation   = ""
     val withAnnotation = ", preapprovedAssets = true"
@@ -9932,5 +9983,38 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
       )
       compileContract(replace(code(withAnnotation))).isRight is true
     }
+  }
+
+  it should "support bitwise operators for I256" in {
+    def code(expr: String, retTpe: String) =
+      s"""
+         |Contract Foo(@unused a: I256, @unused b: I256, @unused c: U256) {
+         |  pub fn foo() -> $retTpe {
+         |    return $expr
+         |  }
+         |}
+         |""".stripMargin
+
+    val exprs0 = Seq("a & b", "a | b", "a ^ b", "a << c", "a >> c")
+    exprs0.foreach(expr => compileContract(code(expr, "I256")).isRight is true)
+    exprs0.foreach(expr =>
+      compileContract(code(expr, "U256")).leftValue.message is
+        s"""Invalid return types "List(I256)" for func foo, expected "List(U256)""""
+    )
+    val exprs1 = Seq("a & c", "a | c", "a ^ c")
+    exprs1.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(I256, U256) for ${expr.slice(2, 3)} operator"""
+    )
+    val exprs2 = Seq("a << b", "a >> b")
+    exprs2.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(I256, I256) for ${expr.slice(2, 4)} operator"""
+    )
+    val exprs3 = Seq("c << b", "c >> b")
+    exprs3.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(U256, I256) for ${expr.slice(2, 4)} operator"""
+    )
   }
 }

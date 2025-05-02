@@ -977,7 +977,7 @@ class BlockValidationSpec extends AlephiumSpec {
         blockTemplate.setGhostUncles(AVector(SelectedGhostUncle(block10.hash, miner, 1)))
       )
     block11.parentHash is block0.hash
-    checkBlock(block11, blockFlow).left.value isE GhostUncleDoesNotExist
+    checkBlock(block11, blockFlow).left.value isE GhostUncleDoesNotExist(block10.hash)
 
     addAndCheck(blockFlow, block10)
     checkBlock(block11, blockFlow).left.value isE GhostUncleHashConflictWithParentHash

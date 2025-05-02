@@ -65,4 +65,10 @@ class ExeFailureSpec extends AlephiumSpec {
     EmptyContractAsset(contractAddress).toString is
       s"No assets for contract 22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr, a minimum of 0.1 ALPH is required"
   }
+
+  it should "test InsufficientFundsForUTXODustAmount" in {
+    InsufficientFundsForUTXODustAmount(dustUtxoAmount).toString is
+      s"Insufficient funds to cover the minimum amount for contract UTXO (0.1 ALPH) or asset UTXO (0.001 ALPH). " +
+      s"You are short by 0.001 ALPH. Please ensure transaction caller approves enough ALPH."
+  }
 }

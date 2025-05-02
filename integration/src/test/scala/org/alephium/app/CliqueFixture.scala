@@ -151,11 +151,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       privateKey: String,
       restPort: Int
   ): SubmitTxResult = eventually {
-    val buildTx    = buildTransaction(fromPubKey, destinations)
-    val unsignedTx = request[BuildTransferTxResult](buildTx, restPort)
-    val submitTx   = submitTransaction(unsignedTx, privateKey)
-    val res        = request[SubmitTxResult](submitTx, restPort)
-    res
+    val buildTx     = buildTransaction(fromPubKey, destinations)
+    val unsignedTxs = request[BuildTransferTxResult](buildTx, restPort)
+    val txs         = submitTransaction(unsignedTxs, privateKey)
+    submitTxs(txs, restPort)
   }
 
   def transferChained(
@@ -163,11 +162,15 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       privateKeys: AVector[String],
       restPort: Int
   ): SubmitTxResult = eventually {
-    val buildTx          = buildChainedTransaction(inputs)
-    val unsignedTx       = request[BuildTransferTxResult](buildTx, restPort)
-    val submitMultisigTx = signAndSubmitMultisigTransaction(unsignedTx, privateKeys)
-    val res              = request[SubmitTxResult](submitMultisigTx, restPort)
-    res
+    val buildTx      = buildChainedTransaction(inputs)
+    val unsignedTxs  = request[BuildTransferTxResult](buildTx, restPort)
+    val txs          = signAndSubmitMultisigTransaction(unsignedTxs, privateKeys)
+    submitTxs(txs, restPort)
+  }
+
+  private def submitTxs(txs: AVector[Int => HttpRequest], restPort: Int) = {
+    txs.init.foreach(request[SubmitTxResult](_, restPort))
+    request[SubmitTxResult](txs.last, restPort)
   }
 
   def mineAndAndOneBlock(server: Server, index: ChainIndex): Block = {
@@ -590,9 +593,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def submitTransaction(
-      buildTransactionResult: BuildTransferTxResult,
-      privateKey: String
+  private def submitTransaction(
+    buildTransactionResult: BuildSimpleTransferTxResult,
+    privateKey: String
   ) = {
     val signature: Signature = SignatureSchema.sign(
       buildTransactionResult.txId.bytes,
@@ -606,12 +609,38 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
+  def submitTransaction(
+      buildTransactionResult: BuildTransferTxResult,
+      privateKey: String
+  ): AVector[Int => HttpRequest] = {
+    signAndSubmitTransaction(buildTransactionResult, submitTransaction(_, privateKey))
+  }
+
   def submitTransaction(query: String) = {
     httpPost("/transactions/submit", Some(query))
   }
 
+  def signAndSubmitTransaction(
+    buildTransactionResult: BuildTransferTxResult,
+    signAndSubmitFunc: BuildSimpleTransferTxResult => Int => HttpRequest
+  ) = {
+    buildTransactionResult match {
+      case result: BuildSimpleTransferTxResult =>
+        AVector(signAndSubmitFunc(result))
+      case result: BuildGrouplessTransferTxResult =>
+        (result.transferTxs :+ result.transferTx).map(signAndSubmitFunc)
+    }
+  }
+
   def signAndSubmitMultisigTransaction(
-      buildTransactionResult: BuildTransferTxResult,
+    buildTransactionResult: BuildTransferTxResult,
+    privateKeys: AVector[String]
+  ): AVector[Int => HttpRequest] = {
+    signAndSubmitTransaction(buildTransactionResult, signAndSubmitMultisigTransaction(_, privateKeys))
+  }
+
+  private def signAndSubmitMultisigTransaction(
+      buildTransactionResult: BuildSimpleTransferTxResult,
       privateKeys: AVector[String]
   ) = {
     val signatures: AVector[Signature] = privateKeys.map { p =>
@@ -627,7 +656,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def submitMultisigTransaction(
-      buildTransactionResult: BuildTransferTxResult,
+      buildTransactionResult: BuildSimpleTransferTxResult,
       signatures: AVector[Signature]
   ) = {
     val body =
@@ -828,7 +857,13 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   ): BuildExecuteScriptTxResult = {
     val buildResult =
       buildExecuteScriptTxWithPort(code, restPort, attoAlphAmount, tokens, gas, gasPrice)
-    submitTxWithPort(buildResult.unsignedTx, buildResult.txId, restPort)
+    buildResult match {
+      case result: BuildSimpleExecuteScriptTxResult =>
+        submitTxWithPort(result.unsignedTx, result.txId, restPort)
+      case result: BuildGrouplessExecuteScriptTxResult =>
+        result.transferTxs.foreach(tx => submitTxWithPort(tx.unsignedTx, tx.txId, restPort))
+        submitTxWithPort(result.executeScriptTx.unsignedTx, result.executeScriptTx.txId, restPort)
+    }
     buildResult
   }
 

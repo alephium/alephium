@@ -173,9 +173,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       blockchain: BlockChain,
       ghostUncleHashes: AVector[BlockHash]
   ): BlockValidationResult[AVector[Block]] = {
-    ghostUncleHashes.mapE(blockchain.getBlock) match {
-      case Left(IOError.KeyNotFound(_)) => invalidBlock(GhostUncleDoesNotExist)
-      case result                       => from(result)
+    ghostUncleHashes.mapE { uncleHash =>
+      blockchain.getBlock(uncleHash) match {
+        case Left(IOError.KeyNotFound(_)) => invalidBlock(GhostUncleDoesNotExist(uncleHash))
+        case result                       => from(result)
+      }
     }
   }
 

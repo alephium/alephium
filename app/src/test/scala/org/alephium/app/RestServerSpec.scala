@@ -45,7 +45,7 @@ import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.mining.HashRate
-import org.alephium.protocol.model.{Transaction => _, _}
+import org.alephium.protocol.model.{Balance => _, Transaction => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.ralph.Compiler

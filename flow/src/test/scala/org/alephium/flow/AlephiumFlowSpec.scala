@@ -147,6 +147,7 @@ trait FlowFixture
     mineWithTxs(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALPH.alph(1) / 100))
   }
 
+  // scalastyle:off method.length
   def prepareUtxos(
       fromPrivateKey: PrivateKey,
       fromPublicKey: PublicKey,
@@ -158,7 +159,10 @@ trait FlowFixture
       .rightValue
       .asUnsafe[AssetOutputInfo]
     def getBalance =
-      blockFlow.getBalance(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, false).rightValue._1
+      blockFlow
+        .getBalance(LockupScript.p2pkh(fromPublicKey), Int.MaxValue, false)
+        .rightValue
+        .totalAlph
     outputsLimitOpt match {
       case None => initialUtxos -> getBalance
       case Some(outputsLimit) =>
@@ -197,6 +201,7 @@ trait FlowFixture
         }
     }
   }
+  // scalastyle:on method.length
 
   def transfer(
       blockFlow: BlockFlow,
@@ -822,7 +827,7 @@ trait FlowFixture
     outs.fold((0, U256.Zero)) { case ((utxoCount, balance), output) =>
       val balanceInfo =
         blockFlow.getBalance(output.lockupScript, Int.MaxValue, false).rightValue
-      (utxoCount + balanceInfo._5, balance + balanceInfo._1)
+      (utxoCount + balanceInfo.utxosNum, balance + balanceInfo.totalAlph)
     }
   }
 
@@ -1097,7 +1102,26 @@ trait FlowFixture
     val webauthn          = WebAuthn.createForTest(authenticatorData, WebAuthn.GET)
     val messageHash       = webauthn.messageHash(unsignedTx.id)
     val signature         = Byte64.from(SecP256R1.sign(messageHash, priKey))
-    (webauthn, Transaction.from(unsignedTx, webauthn.encodeForTest() :+ signature))
+    val inputSignatures   = webauthn.encodeForTest() :+ signature
+    unsignedTx.scriptOpt match {
+      case None =>
+        (webauthn, Transaction.from(unsignedTx, inputSignatures))
+      case Some(script) =>
+        val txTemplate = TransactionTemplate(unsignedTx, inputSignatures, AVector.empty)
+        val (contractInputs, generatedOutputs) =
+          genInputsOutputs(blockFlow, unsignedTx.fromGroup, txTemplate, script)
+        (
+          webauthn,
+          Transaction(
+            unsignedTx,
+            true,
+            contractInputs,
+            generatedOutputs,
+            inputSignatures,
+            AVector.empty
+          )
+        )
+    }
   }
 
   def mineBlock(parentHash: BlockHash, block: Block, height: Int): Block = {

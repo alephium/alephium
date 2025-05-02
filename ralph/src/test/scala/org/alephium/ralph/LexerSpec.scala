@@ -20,6 +20,7 @@ import fastparse.{EagerOps, Parsed}
 
 import org.alephium.crypto.Byte32
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.protocol.vm.{LockupScript, PublicKeyLike, Val}
 import org.alephium.ralph.ArithOperator._
@@ -75,6 +76,15 @@ abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parsePositioned(s"@${address1.toBase58}", Lexer.address(_)).get.value.v is Val.Address(
       address1.lockupScript
     )
+
+    val groupConfig = new GroupConfig { override def groups: Int = 4 }
+    groupConfig.cliqueGroups.foreach { group =>
+      val lockupScript = LockupScript.p2pk(pubKeyLike, group)
+      val address      = Address.Asset(lockupScript)
+      parsePositioned(s"@${address.toBase58}", Lexer.address(_)).get.value.v is Val.Address(
+        lockupScript
+      )
+    }
 
     val address2Base58 = address2.toBase58
     parsePositioned(s"@$address2Base58", Lexer.address(_)).get.value.v is Val.Address(

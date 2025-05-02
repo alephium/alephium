@@ -23,9 +23,11 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.setting.Platform
-import org.alephium.flow.validation.{BlockValidation, BlockValidationResult}
+import org.alephium.flow.validation.{BlockValidation, BlockValidationResult, GhostUncleDoesNotExist}
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.util.{Files => AFiles, TimeStamp}
+import org.alephium.protocol.model.{Block, BlockHash, GroupIndex}
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.util.{Files => AFiles}
 
 class ReplayBlockFlow(
     val sourceBlockFlow: BlockFlow,
@@ -34,12 +36,50 @@ class ReplayBlockFlow(
     with StrictLogging {
   private val validator = BlockValidation.build(targetBlockFlow)
 
-  def start(): BlockValidationResult[Boolean] = {
+  def start(updateFlowSkeleton: Boolean): BlockValidationResult[Boolean] = {
     for {
       _      <- from(init())
-      _      <- replay()
+      _      <- if (updateFlowSkeleton) replayAndUpdateFlowSkeleton() else replay()
       isSame <- from(isStateHashesSame)
     } yield isSame
+  }
+
+  private def printReplayProgress(): Unit = {
+    replayedBlockCount += 1
+    if (replayedBlockCount % ReplayState.LogInterval == 0) {
+      val (speed, cycleSpeed) = calcSpeed()
+      print(s"Replayed #$replayedBlockCount blocks, #$speed BPS, #$cycleSpeed cycle BPS\n")
+    }
+  }
+
+  private def validateAndAddBlock(hash: BlockHash): BlockValidationResult[Unit] = {
+    for {
+      block <- from(sourceBlockFlow.getBlock(hash))
+      _     <- validateAndAddBlock(block)
+    } yield ()
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def validateAndAddBlock(block: Block): BlockValidationResult[Unit] = {
+    (for {
+      sideEffect <- validator.validate(block, targetBlockFlow)
+      _          <- from(targetBlockFlow.add(block, sideEffect))
+    } yield ()) match {
+      case Left(Right(GhostUncleDoesNotExist(uncleHash))) =>
+        for {
+          _ <- validateAndAddBlock(uncleHash)
+          _ <- validateAndAddBlock(block)
+        } yield ()
+      case result => result
+    }
+  }
+
+  private def handleBlock(block: Block, height: Int): BlockValidationResult[Unit] = {
+    for {
+      exist <- from(targetBlockFlow.contains(block.hash))
+      _     <- if (!exist) validateAndAddBlock(block) else Right(())
+      _     <- from(IOUtils.tryExecute(loadMoreBlocksUnsafe(block.chainIndex, height)))
+    } yield ()
   }
 
   private def replay(): BlockValidationResult[Unit] = {
@@ -47,22 +87,37 @@ class ReplayBlockFlow(
 
     while (blockQueue.nonEmpty && result.isRight) {
       val (block, blockHeight) = blockQueue.dequeue()
-      val chainIndex           = block.chainIndex
+      result = handleBlock(block, blockHeight)
+      printReplayProgress()
+    }
 
-      var endValidationTs = TimeStamp.zero
-      result = for {
-        sideEffect <- validator.validate(block, targetBlockFlow)
-        _ <- from(targetBlockFlow.add(block, sideEffect)).map(_ =>
-          endValidationTs = TimeStamp.now()
-        )
-        _ <- from(IOUtils.tryExecute(loadMoreBlocksUnsafe(chainIndex, blockHeight)))
-      } yield ()
+    result
+  }
 
-      replayedBlockCount += 1
-      if (replayedBlockCount % ReplayState.LogInterval == 0) {
-        val (speed, cycleSpeed) = calcSpeed()
-        print(s"Replayed #$replayedBlockCount blocks, #$speed BPS, #$cycleSpeed cycle BPS\n")
-      }
+  private lazy val miners = Array.tabulate(brokerConfig.groups) { group =>
+    val groupIndex = GroupIndex.unsafe(group)(brokerConfig)
+    LockupScript.p2pkh(groupIndex.generateKey(brokerConfig)._2)
+  }
+
+  private def handleBlockAndUpdateFlowSkeleton(
+      block: Block,
+      height: Int
+  ): BlockValidationResult[Unit] = {
+    val chainIndex = block.chainIndex
+    for {
+      _ <- handleBlock(block, height)
+      _ <- from(targetBlockFlow.updateBestFlowSkeleton())
+      _ <- from(targetBlockFlow.prepareBlockFlow(chainIndex, miners(chainIndex.to.value)))
+    } yield ()
+  }
+
+  private def replayAndUpdateFlowSkeleton(): BlockValidationResult[Unit] = {
+    var result = Right(()): BlockValidationResult[Unit]
+
+    while (blockQueue.nonEmpty && result.isRight) {
+      val (block, blockHeight) = blockQueue.dequeue()
+      result = handleBlockAndUpdateFlowSkeleton(block, blockHeight)
+      printReplayProgress()
     }
 
     result
@@ -74,6 +129,15 @@ class ReplayBlockFlow(
 }
 
 object ReplayBlockFlow extends App with StrictLogging {
+  private val updateFlowSkeleton = if (args.length == 0) {
+    false
+  } else if (args.length == 1 && args(0) == "updateFlowSkeleton") {
+    true
+  } else {
+    logger.error(s"Invalid args $args")
+    sys.exit(1)
+  }
+
   private val sourcePath = Platform.getRootPath()
   private val targetPath = {
     val path = AFiles.homeDir.resolve(".alephium-replay")
@@ -94,7 +158,7 @@ object ReplayBlockFlow extends App with StrictLogging {
     targetStorages.closeUnsafe()
   }))
 
-  new ReplayBlockFlow(sourceBlockFlow, targetBlockFlow).start() match {
+  new ReplayBlockFlow(sourceBlockFlow, targetBlockFlow).start(updateFlowSkeleton) match {
     case Right(valid) =>
       if (valid) {
         print("Replay blocks succeeded\n")

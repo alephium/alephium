@@ -29,7 +29,7 @@ trait ReplayState {
   def sourceBlockFlow: BlockFlow
   def targetBlockFlow: BlockFlow
 
-  private val brokerConfig: BrokerConfig        = sourceBlockFlow.brokerConfig
+  protected val brokerConfig: BrokerConfig      = sourceBlockFlow.brokerConfig
   private val chainIndexes: AVector[ChainIndex] = brokerConfig.chainIndexes
 
   private val startLoadingHeight        = 1
