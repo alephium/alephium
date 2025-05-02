@@ -22,6 +22,8 @@ The Danube upgrade represents a major milestone for the Alephium blockchain, del
 - **Chained Contract Calls**: TxScripts can now call multiple contracts and chain asset outputs, enabling more sophisticated contract interactions and better composability for building complex DApps and DeFi protocols.
 - **Enhanced VM Instructions**: Added new VM instruction to identify the external caller of a function, complementing the existing instruction that identifies the immediate caller. This improves contract security and enables more advanced permission models.
 - **Simplified Contract Creation**: Automated contract deposit management from the transaction caller by the VM, eliminating the need for developers to specify deposit amounts in contract code, reducing complexity and potential errors in smart contract development.
+- **Bitwise Operations for I256**: Added bitwise operations to the VM for I256, enabling more efficient and flexible contract interactions.
+- **Flexible New Contract Access**: Both the assets and contract states are now accessible for the new contract, allowing for more flexible and powerful contract interactions.
 
 ### References
 
