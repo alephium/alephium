@@ -73,6 +73,10 @@ object MinerApiController {
     val targetBytes = headerBlob.takeRight(Target.byteLength)
     headerBlob.dropRight(length) ++ targetBytes
   }
+
+  private[mining] def calcJobIndex(chainIndex: ChainIndex)(implicit config: BrokerConfig): Int = {
+    chainIndex.from.value / config.brokerNum * config.groups + chainIndex.to.value
+  }
 }
 
 class MinerApiController(allHandlers: AllHandlers)(implicit
@@ -93,7 +97,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       terminateSystem()
   }
 
-  var latestJobs: Option[AVector[Job]]                                   = None
+  var latestJobs: Option[AVector[(Job, BlockFlowTemplate)]]              = None
   val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
   val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
   val jobCache: Cache[ByteString, (BlockFlowTemplate, ByteString)] =
@@ -115,7 +119,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
           connections.addOne(connectionHandler)
           latestJobs.foreach(jobs =>
             connectionHandler ! ConnectionHandler.Send(
-              ServerMessage.serialize(ServerMessage.from(Jobs(jobs)))
+              ServerMessage.serialize(ServerMessage.from(Jobs(jobs.map(_._1))))
             )
           )
         }
@@ -144,6 +148,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     mutable.HashMap.empty
   def handleAPI: Receive = {
     case ViewHandler.NewTemplates(templates)                 => publishTemplates(templates)
+    case ViewHandler.NewTemplate(template)                   => publishTemplate(template)
     case MinerApiController.Received(message: ClientMessage) => handleClientMessage(message)
     case BlockChainHandler.BlockAdded(hash) => handleSubmittedBlock(hash, succeeded = true)
     case BlockChainHandler.InvalidBlock(hash, reason) =>
@@ -152,23 +157,40 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   }
 
   def publishTemplates(templatess: IndexedSeq[IndexedSeq[BlockFlowTemplate]]): Unit = {
-    log.info(
+    val jobs = templatess.foldLeft(
+      AVector.ofCapacity[(Job, BlockFlowTemplate)](templatess.length * brokerConfig.groups)
+    ) { case (acc, templates) =>
+      acc ++ AVector.from(templates.view.map(t => Job.fromWithoutTxs(t) -> t))
+    }
+    latestJobs = Some(jobs)
+    publishLatestJobs()
+  }
+
+  def publishTemplate(template: BlockFlowTemplate): Unit = {
+    val job = Job.fromWithoutTxs(template)
+    val newJobs = latestJobs.map { existingJobs =>
+      val jobIndex = MinerApiController.calcJobIndex(template.index)
+      existingJobs.replace(jobIndex, job -> template)
+    }
+    latestJobs = newJobs
+    publishLatestJobs()
+  }
+
+  def publishLatestJobs(): Unit = {
+    log.debug(
       s"Sending block templates to subscribers: #${connections.length} connections, #${pendings.length} pending connections"
     )
-    val jobs =
-      templatess.foldLeft(AVector.ofCapacity[Job](templatess.length * brokerConfig.groups)) {
-        case (acc, templates) =>
-          acc ++ AVector.from(templates.view.map(Job.fromWithoutTxs))
-      }
-    connections.foreach(
-      _ ! ConnectionHandler.Send(ServerMessage.serialize(ServerMessage.from(Jobs(jobs))))
-    )
+    latestJobs.foreach { jobs =>
+      connections.foreach(
+        _ ! ConnectionHandler.Send(
+          ServerMessage.serialize(ServerMessage.from(Jobs(jobs.map(_._1))))
+        )
+      )
 
-    latestJobs = Some(jobs)
-    jobs.foreachWithIndex { case (job, index) =>
-      val template = templatess(index / brokerConfig.groups)(index % brokerConfig.groups)
-      val txsBlob  = serialize(template.transactions)
-      jobCache.put(MinerApiController.getCacheKey(job.headerBlob), template -> txsBlob)
+      jobs.foreach { case (job, template) =>
+        val txsBlob = serialize(template.transactions)
+        jobCache.put(MinerApiController.getCacheKey(job.headerBlob), template -> txsBlob)
+      }
     }
   }
 

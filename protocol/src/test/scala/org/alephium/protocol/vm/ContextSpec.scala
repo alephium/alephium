@@ -58,9 +58,11 @@ class ContextSpec
       ) is balances
       context.generatedOutputs.size is 1
 
-      context.checkIfBlocked(contractId).leftValue isE ContractLoadDisallowed(contractId)
-      if (unblock) {
-        context.contractBlockList.remove(contractId)
+      if (!context.getHardFork().isDanubeEnabled()) {
+        context.checkIfBlocked(contractId).leftValue isE ContractLoadDisallowed(contractId)
+        if (unblock) {
+          context.contractBlockList.remove(contractId)
+        }
       }
       contractId
     }
@@ -114,11 +116,62 @@ class ContextSpec
     context.generatedOutputs.size is 2
   }
 
-  it should "not generate contract output when the contract is loaded from Rhone upgrade" in new Fixture {
+  trait GenerateContractOutputDanubeFixture extends Fixture with NetworkConfigFixture.DanubeT {
+    context.getHardFork() is HardFork.Danube
+
+    val contractId = createContract()
+    context.loadContractObj(contractId).isRight is true
+    context.useContractAssets(contractId, 0).isRight is true
+    context.generatedOutputs.size is 1
+    context.contractInputs.size is 1
+
+    val halfAmount            = context.generatedOutputs(0).amount.divUnsafe(2)
+    val contractOutput        = context.generatedOutputs(0).asInstanceOf[ContractOutput]
+    val contractOutputUpdated = contractOutput.copy(amount = halfAmount)
+    val assetOutput = assetOutputGen(GroupIndex.unsafe(0))(
+      _amountGen = Gen.const(halfAmount)
+    ).sample.get
+  }
+
+  it should "generate contract output correctly when assets from newly created contract is used in Danube" in new GenerateContractOutputDanubeFixture {
+    context.generatedOutputs.addOne(assetOutput)
+    context.generatedOutputs.size is 2
+    context.contractInputs.size is 1
+
+    context.generateContractOutputDanube(contractId, contractOutputUpdated, 0) isE ()
+    context.generatedOutputs.size is 2
+    context.generatedOutputs(0) is contractOutputUpdated
+    context.generatedOutputs(1) is assetOutput
+    context.contractInputs.size is 0
+  }
+
+  it should "generate contract output correctly when assets from existing contract is used in Danube" in new GenerateContractOutputDanubeFixture {
+    context.generatedOutputs.clear()
+    context.generatedOutputs.addOne(assetOutput)
+    context.generatedOutputs.size is 1
+    context.contractInputs.size is 1
+
+    context.generateContractOutputDanube(contractId, contractOutputUpdated, 0) isE ()
+    context.generatedOutputs.size is 2
+    context.generatedOutputs(0) is assetOutput
+    context.generatedOutputs(1) is contractOutputUpdated
+    context.contractInputs.size is 1
+  }
+
+  it should "not use contract output when the contract is just created in Rhone" in new Fixture
+    with NetworkConfigFixture.RhoneT {
     context.getHardFork() is HardFork.Rhone
     val contractId = createContract()
     context.loadContractObj(contractId).isRight is true
     context.useContractAssets(contractId, 0).leftValue.rightValue is ContractAssetAlreadyFlushed
+  }
+
+  it should "be able to use contract output when the contract is just created in Danube" in new Fixture
+    with NetworkConfigFixture.SinceDanubeT {
+    context.getHardFork().isDanubeEnabled() is true
+    val contractId = createContract()
+    context.loadContractObj(contractId).isRight is true
+    context.useContractAssets(contractId, 0).isRight is true
   }
 
   it should "not cache new contract before Rhone upgrade" in new Fixture
@@ -129,11 +182,20 @@ class ContextSpec
     context.contractPool.contains(contractId) is false
   }
 
-  it should "cache new contract from Rhone upgrade" in new Fixture {
+  it should "cache new contract in Rhone upgrade" in new Fixture with NetworkConfigFixture.RhoneT {
     context.getHardFork() is HardFork.Rhone
     val contractId = createContract(unblock = false)
     context.contractBlockList.contains(contractId) is true
     context.contractPool.contains(contractId) is true
+    context.loadContractObj(contractId).isRight is true
+  }
+
+  it should "not use blocklist for new contracts in Danube upgrade" in new Fixture
+    with NetworkConfigFixture.SinceDanubeT {
+    context.getHardFork().isDanubeEnabled() is true
+    val contractId = createContract(unblock = false)
+    context.contractBlockList.contains(contractId) is false
+    context.contractPool.contains(contractId) is false
     context.loadContractObj(contractId).isRight is true
   }
 
@@ -193,7 +255,7 @@ class ContextSpec
 
   it should "charge gas based on leman hardfork" in new Fixture
     with NetworkConfigFixture.SinceLemanT {
-    Seq(HardFork.Leman, HardFork.Rhone).contains(context.getHardFork()) is true
+    Seq(HardFork.Leman, HardFork.Rhone, HardFork.Danube).contains(context.getHardFork()) is true
 
     context.chargeGasWithSizeLeman(ByteVecEq, 7)
     val expected0 = initialGas.use(GasBox.unsafe(4)).rightValue
@@ -263,7 +325,7 @@ class ContextSpec
   trait LemanContractOutputFixture
       extends ContractOutputFixture
       with NetworkConfigFixture.SinceLemanT {
-    Seq(HardFork.Leman, HardFork.Rhone).contains(context.getHardFork()) is true
+    Seq(HardFork.Leman, HardFork.Rhone, HardFork.Danube).contains(context.getHardFork()) is true
   }
 
   it should "generate output when the output is the same as input for Mainnet hardfork" in new MainnetContractOutputFixture {
@@ -317,7 +379,7 @@ class ContextSpec
   }
 
   trait LemanAssetOutputFixture extends AssetOutputFixture with NetworkConfigFixture.SinceLemanT {
-    Seq(HardFork.Leman, HardFork.Rhone).contains(context.getHardFork()) is true
+    Seq(HardFork.Leman, HardFork.Rhone, HardFork.Danube).contains(context.getHardFork()) is true
   }
 
   it should "generate single output when token number <= maxTokenPerUTXO for Mainnet hardfork" in new MainnetAssetOutputFixture {
@@ -361,7 +423,9 @@ class ContextSpec
 
   it should "output remaining contract assets since Rhone" in new OutputRemainingContractAssetsFixture
     with NetworkConfigFixture.SinceRhoneT {
-    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Rhone
+    Seq(HardFork.Rhone, HardFork.Danube).contains(
+      networkConfig.getHardFork(TimeStamp.now())
+    ) is true
 
     prepare()
     context.outputRemainingContractAssetsForRhone() isE ()
@@ -378,5 +442,114 @@ class ContextSpec
     prepare()
     context.outputRemainingContractAssetsForRhone() isE ()
     context.outputBalances.all.length is 0
+  }
+
+  it should "set and get tx caller balance" in new Fixture {
+    context.getTxCallerBalance().leftValue isE TxCallerBalanceNotAvailable
+
+    val callerBalance = MutBalanceState.empty
+    context.setTxCallerBalance(callerBalance)
+    context.getTxCallerBalance() isE callerBalance
+  }
+
+  it should "get all input addresses" in new Fixture {
+    forAll(genStatefulContext()) { context =>
+      val addresses  = context.allInputAddresses
+      val expected   = context.txEnv.prevOutputs.map(o => Address.from(o.lockupScript)).toSet
+      val addressSet = addresses.toSet
+      addresses.length is addressSet.size
+      expected is addressSet
+    }
+  }
+
+  trait ChainCallerOutputsFixture extends Fixture {
+    val ctx           = genStatefulContext()
+    val randomTokenId = TokenId.random
+
+    def txOutput(
+        lockupScript: LockupScript.Asset,
+        alphAmount: U256,
+        tokens: AVector[(TokenId, U256)]
+    ) = {
+      AssetOutput(alphAmount, lockupScript, TimeStamp.zero, tokens, ByteString.empty)
+    }
+
+    def addOutputBalance(
+        lockupScript: LockupScript.Asset,
+        alphAmount: U256,
+        tokens: AVector[(TokenId, U256)]
+    ) = {
+      ctx.outputBalances.add(
+        lockupScript,
+        MutBalancesPerLockup.from(txOutput(lockupScript, alphAmount, tokens))
+      ) is Some(())
+    }
+
+    def getMutBalanceState(txOutputs: AVector[AssetOutput]): MutBalanceState = {
+      MutBalanceState.from(MutBalances.from(txOutputs, AVector.empty).get)
+    }
+  }
+
+  it should "call chainCallerOutputs with no balance state" in new ChainCallerOutputsFixture {
+    ctx.chainCallerOutputs(None) isE ()
+  }
+
+  it should "call chainCallerOutputs and update input address balance from output balances" in new ChainCallerOutputsFixture {
+    val inputLockupScript    = ctx.txEnv.prevOutputs.head.lockupScript
+    val balanceState         = getMutBalanceState(ctx.txEnv.prevOutputs)
+    val initialAlphRemaining = balanceState.alphRemaining(inputLockupScript)
+
+    ctx.chainCallerOutputs(Some(balanceState)) isE ()
+
+    balanceState.alphRemaining(inputLockupScript) is initialAlphRemaining
+    balanceState.tokenRemaining(inputLockupScript, randomTokenId) is None
+
+    addOutputBalance(inputLockupScript, ALPH.oneAlph, AVector(randomTokenId -> 1))
+    ctx.chainCallerOutputs(Some(balanceState)) isE ()
+
+    balanceState.alphRemaining(inputLockupScript) is initialAlphRemaining.value.add(ALPH.oneAlph)
+    balanceState.tokenRemaining(inputLockupScript, randomTokenId) is Some(U256.One)
+  }
+
+  it should "call chainCallerOutputs and fail when the amount overflows" in new ChainCallerOutputsFixture {
+    val inputLockupScript = ctx.txEnv.prevOutputs.head.lockupScript
+    val updatedPrevOutputs = ctx.txEnv.prevOutputs.replace(
+      0,
+      txOutput(inputLockupScript, ALPH.oneAlph, AVector(randomTokenId -> U256.MaxValue))
+    )
+    val balanceState = getMutBalanceState(updatedPrevOutputs)
+
+    ctx.chainCallerOutputs(Some(balanceState)) isE ()
+
+    val alphAmount = ctx.txEnv.prevOutputs.tail.fold(ALPH.oneAlph) { case (acc, output) =>
+      if (output.lockupScript == inputLockupScript) acc.addUnsafe(output.amount) else acc
+    }
+    balanceState.alphRemaining(inputLockupScript).value is alphAmount
+
+    balanceState.tokenRemaining(inputLockupScript, randomTokenId) is Some(U256.MaxValue)
+
+    addOutputBalance(inputLockupScript, ALPH.oneAlph, AVector(randomTokenId -> 1))
+    ctx.chainCallerOutputs(Some(balanceState)).leftValue isE ChainCallerOutputsFailed(
+      Address.from(inputLockupScript)
+    )
+  }
+
+  it should "call chainCallerOutputs and ensure non-input address balances remain unchanged" in new ChainCallerOutputsFixture {
+    val lockupScript         = assetLockupGen(GroupIndex.unsafe(0)).sample.value
+    val randomTxOutput       = txOutput(lockupScript, ALPH.oneAlph, AVector(randomTokenId -> 1))
+    val balanceState         = getMutBalanceState(ctx.txEnv.prevOutputs :+ randomTxOutput)
+    val initialAlphRemaining = balanceState.alphRemaining(lockupScript)
+    balanceState.tokenRemaining(lockupScript, randomTokenId) is Some(U256.One)
+
+    ctx.chainCallerOutputs(Some(balanceState)) isE ()
+
+    balanceState.alphRemaining(lockupScript) is initialAlphRemaining
+    balanceState.tokenRemaining(lockupScript, randomTokenId) is Some(U256.One)
+
+    addOutputBalance(lockupScript, ALPH.oneAlph.mulUnsafe(2), AVector(randomTokenId -> 10))
+    ctx.chainCallerOutputs(Some(balanceState)) isE ()
+
+    balanceState.alphRemaining(lockupScript) is initialAlphRemaining
+    balanceState.tokenRemaining(lockupScript, randomTokenId) is Some(U256.One)
   }
 }

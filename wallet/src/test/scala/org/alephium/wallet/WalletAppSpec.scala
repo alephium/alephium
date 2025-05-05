@@ -469,7 +469,7 @@ object WalletAppSpec extends {
       } else {
         complete(
           ctx,
-          BuildTransferTxResult(
+          BuildSimpleTransferTxResult(
             Hex.toHexString(serialize(unsignedTx)),
             unsignedTx.gasAmount,
             unsignedTx.gasPrice,

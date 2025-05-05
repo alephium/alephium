@@ -8,6 +8,7 @@ on:
 jobs:
   itest:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
     strategy:
       matrix:
         os: [ macos-latest, windows-latest, ubuntu-latest ]

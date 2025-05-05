@@ -19,9 +19,8 @@ package org.alephium.flow.handler
 import akka.actor.ActorSystem
 
 import org.alephium.crypto.Byte32
-import org.alephium.flow.core.{maxForkDepth, BlockFlow}
+import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.Storages
-import org.alephium.flow.mining.MiningDispatcher
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
 import org.alephium.io.IOError
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
@@ -35,7 +34,8 @@ final case class AllHandlers(
     dependencyHandler: ActorRefT[DependencyHandler.Command],
     viewHandler: ActorRefT[ViewHandler.Command],
     blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
-    headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
+    headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]],
+    accountViewHandler: ActorRefT[AccountViewHandler.Command]
 )(implicit brokerConfig: BrokerConfig) {
   def orderedHandlers: Seq[ActorRefT[_]] = {
     (blockHandlers.values ++ headerHandlers.values ++ Seq(txHandler, flowHandler)).toSeq
@@ -117,21 +117,14 @@ object AllHandlers {
       memPoolSetting: MemPoolSetting,
       logConfig: LogConfig
   ): AllHandlers = {
-    val txProps   = TxHandler.props(blockFlow, storages.pendingTxStorage, eventBus)
-    val txHandler = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
+    val txHandler =
+      TxHandler.build(system, blockFlow, storages.pendingTxStorage, eventBus, namePostfix)
     val blockHandlers  = buildBlockHandlers(system, blockFlow, eventBus, namePostfix)
     val headerHandlers = buildHeaderHandlers(system, blockFlow, namePostfix)
-
-    val dependencyHandlerProps = DependencyHandler.props(blockFlow, blockHandlers, headerHandlers)
-    val dependencyHandler = ActorRefT
-      .build[DependencyHandler.Command](
-        system,
-        dependencyHandlerProps,
-        s"DependencyHandler$namePostfix"
-      )
-
-    val viewHandlerProps = ViewHandler.props(blockFlow).withDispatcher(MiningDispatcher)
-    val viewHandler      = ActorRefT.build[ViewHandler.Command](system, viewHandlerProps)
+    val dependencyHandler =
+      DependencyHandler.build(system, blockFlow, blockHandlers, headerHandlers, namePostfix)
+    val viewHandler        = ViewHandler.build(system, blockFlow, namePostfix)
+    val accountViewHandler = AccountViewHandler.build(system, blockFlow, namePostfix)
 
     AllHandlers(
       flowHandler,
@@ -139,7 +132,8 @@ object AllHandlers {
       dependencyHandler,
       viewHandler,
       blockHandlers,
-      headerHandlers
+      headerHandlers,
+      accountViewHandler
     )
   }
 
@@ -160,11 +154,7 @@ object AllHandlers {
       chainIndex = ChainIndex.unsafe(from, to)
       if chainIndex.relateTo(brokerConfig)
     } yield {
-      val handler = ActorRefT.build[BlockChainHandler.Command](
-        system,
-        BlockChainHandler.props(blockFlow, chainIndex, eventBus, maxForkDepth),
-        s"BlockChainHandler-$from-$to$namePostfix"
-      )
+      val handler = BlockChainHandler.build(system, blockFlow, chainIndex, eventBus, namePostfix)
       chainIndex -> handler
     }
     handlers.toMap

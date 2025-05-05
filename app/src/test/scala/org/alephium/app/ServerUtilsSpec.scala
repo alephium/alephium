@@ -29,7 +29,7 @@ import org.alephium.api.{ApiError, Try}
 import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.api.model.BuildDeployContractTx.Code
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
-import org.alephium.flow.FlowFixture
+import org.alephium.flow.{FlowFixture, GhostUncleFixture}
 import org.alephium.flow.core.{maxForkDepth, AMMContract, BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
@@ -37,7 +37,12 @@ import org.alephium.flow.validation.TxScriptExeFailed
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => ModelContractOutput, _}
+import org.alephium.protocol.model.{
+  AssetOutput => _,
+  Balance => _,
+  ContractOutput => ModelContractOutput,
+  _
+}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.{Compiler, SourceIndex}
@@ -75,10 +80,21 @@ class ServerUtilsSpec extends AlephiumSpec {
     implicit def flowImplicit: BlockFlow = blockFlow
 
     def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
+
+    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
+      addAndCheck(blockFlow, block)
+      block
+    }
+
+    lazy val hardFork = networkConfig.getHardFork(TimeStamp.now())
   }
 
   trait TransferFromOneToManyGroupsFixture extends FlowFixtureWithApi with GetTxFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
 
     implicit val serverUtils: ServerUtils = new ServerUtils
 
@@ -126,6 +142,9 @@ class ServerUtilsSpec extends AlephiumSpec {
               chainIndex,
               fromPrivateKey
             )
+          if (hardFork.isDanubeEnabled()) {
+            addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+          }
           val block = mineFromMemPool(blockFlow, chainIndex)
           addAndCheck(blockFlow, block)
           if (!chainIndex.isIntraGroup) {
@@ -212,6 +231,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, AVector(destination))
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
+
     val unsignedTransaction =
       serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
 
@@ -241,6 +262,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -303,6 +325,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -479,6 +502,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "support Schnorr address" in new Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
 
     val chainIndex                        = ChainIndex.unsafe(0, 0)
     val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
@@ -511,6 +535,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
+
     val unsignedTransaction =
       serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
 
@@ -523,6 +549,9 @@ class ServerUtilsSpec extends AlephiumSpec {
         .rightValue
     blockFlow.getGrandPool().add(txTemplate.chainIndex, AVector(txTemplate), TimeStamp.now())
 
+    if (hardFork.isDanubeEnabled() && !txTemplate.chainIndex.isIntraGroup) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, txTemplate.chainIndex))
+    }
     val block1 = mineFromMemPool(blockFlow, txTemplate.chainIndex)
     block1.nonCoinbase.map(_.id).contains(txTemplate.id) is true
     addAndCheck(blockFlow, block1)
@@ -550,6 +579,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -632,6 +662,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -673,6 +704,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
 
       val sweepAddressChainIndex = ChainIndex(chainIndex.to, chainIndex.to)
+      addAndCheck(blockFlow, emptyBlock(blockFlow, sweepAddressChainIndex))
       val sweepAddressTxTemplate = signAndAddToMemPool(
         sweepAddressTransaction.txId,
         sweepAddressTransaction.unsignedTx,
@@ -855,6 +887,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, destinations)
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
 
     val decodedUnsignedTx =
       serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
@@ -879,6 +912,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, selfDestinations)
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
+
     val txTemplate = signAndAddToMemPool(
       buildTransferTransaction.txId,
       buildTransferTransaction.unsignedTx,
@@ -1212,29 +1247,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Too many transaction outputs, maximal value: 256"
   }
 
-  it should "check the minimal amount deposit for contract creation" in new Fixture {
-    val serverUtils = new ServerUtils
-    serverUtils.getInitialAttoAlphAmount(None, HardFork.Leman) isE minimalAlphInContractPreRhone
-    serverUtils.getInitialAttoAlphAmount(
-      Some(minimalAlphInContractPreRhone),
-      HardFork.Leman
-    ) isE minimalAlphInContractPreRhone
-    serverUtils
-      .getInitialAttoAlphAmount(Some(minimalAlphInContractPreRhone - 1), HardFork.Leman)
-      .leftValue
-      .detail is "Expect 1 ALPH deposit to deploy a new contract"
-
-    serverUtils.getInitialAttoAlphAmount(None, HardFork.Rhone) isE minimalAlphInContract
-    serverUtils.getInitialAttoAlphAmount(
-      Some(minimalAlphInContract),
-      HardFork.Rhone
-    ) isE minimalAlphInContract
-    serverUtils
-      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1), HardFork.Rhone)
-      .leftValue
-      .detail is "Expect 0.1 ALPH deposit to deploy a new contract"
-  }
-
   it should "fail when outputs belong to different groups" in new FlowFixtureWithApi {
     val serverUtils = new ServerUtils
 
@@ -1275,6 +1287,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, AVector(destination))
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
 
     val txSeenAt = TimeStamp.now()
     val txTemplate = signAndAddToMemPool(
@@ -1551,6 +1564,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       ("alephium.broker.broker-num", 1),
       ("alephium.node.indexes.tx-output-ref-index", "true")
     )
+    setHardForkSince(HardFork.Rhone)
 
     val chainIndex                        = ChainIndex.unsafe(0, 0)
     val lockupScript                      = getGenesisLockupScript(chainIndex)
@@ -1592,6 +1606,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           )
         )
         .rightValue
+        .asInstanceOf[BuildSimpleDeployContractTxResult]
 
       val deployContractTx =
         deserialize[UnsignedTransaction](Hex.unsafe(deployContractTxResult.unsignedTx)).rightValue
@@ -1606,6 +1621,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       )(serverUtils, blockFlow)
 
       confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
+      if (hardFork.isDanubeEnabled()) {
+        confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+      }
       confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
       serverUtils.getTransaction(blockFlow, deployContractTxResult.txId, None, None).rightValue
 
@@ -1614,12 +1632,6 @@ class ServerUtilsSpec extends AlephiumSpec {
         deployContractTx.gasPrice * deployContractTx.gasAmount + initialAttoAlphAmount.value
       )
       deployContractTxResult.contractAddress
-    }
-
-    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
-      val block = mineFromMemPool(blockFlow, chainIndex)
-      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
-      addAndCheck(blockFlow, block)
     }
 
     def createContract(
@@ -1887,7 +1899,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       result0.contracts.head.asset.attoAlphAmount is minimalAlphInContract * 2
       result0.txOutputs
         .find(_.address == callerAddress)
-        .exists(_.attoAlphAmount.value == ALPH.cent(40)) is true
+        .exists(_.attoAlphAmount.value == ALPH.cent(90)) is true
       result0.txOutputs
         .find(_.address == fooAddress)
         .exists(_.attoAlphAmount.value == ALPH.cent(20)) is true
@@ -1901,7 +1913,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       result1.contracts.head.asset.attoAlphAmount is minimalAlphInContract * 3
       result1.txOutputs
         .find(_.address == callerAddress)
-        .exists(_.attoAlphAmount.value == ALPH.cent(40)) is true
+        .exists(_.attoAlphAmount.value == ALPH.cent(90)) is true
       result1.txOutputs
         .find(_.address == fooAddress)
         .exists(_.attoAlphAmount.value == ALPH.cent(30)) is true
@@ -2053,9 +2065,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts(1).address is Address.contract(barContractId)
     val assetOutput = result.txOutputs(1)
     assetOutput.address is assetAddress
-    assetOutput.attoAlphAmount is Amount(
-      ALPH.alph(2).subUnsafe(nonCoinbaseMinGasPrice * maximalGasPerTx)
-    )
+    assetOutput.attoAlphAmount is Amount(ALPH.alph(2))
   }
 
   it should "test destroying self" in new Fixture {
@@ -2238,8 +2248,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts(1).address is Address.contract(barContractId)
     val assetOutput = result.txOutputs(1)
     assetOutput.address is assetAddress
-    val totalGas = nonCoinbaseMinGasPrice * maximalGasPerTx
-    assetOutput.attoAlphAmount is Amount(ALPH.oneAlph.subUnsafe(totalGas))
+    assetOutput.attoAlphAmount is Amount(ALPH.oneAlph)
     val contractOutput = result.txOutputs(0)
     contractOutput.address is Address.contract(fooCallerContractId)
     contractOutput.attoAlphAmount.value is ALPH.alph(2)
@@ -2477,7 +2486,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
-      Amount(500000000000000000L),
+      Amount(1000000000000000000L),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2530,7 +2539,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
-      Amount(500000000000000000L),
+      Amount(1000000000000000000L),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2584,7 +2593,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(2) is AssetOutput(
       result0.txOutputs(2).hint,
       emptyKey(2),
-      Amount(ALPH.nanoAlph(90500000000L) - dustUtxoAmount),
+      Amount(ALPH.nanoAlph(91000000000L) - dustUtxoAmount),
       buyer,
       AVector.empty,
       TimeStamp.zero,
@@ -2633,7 +2642,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
-      Amount(ALPH.nanoAlph(110500000000L)),
+      Amount(ALPH.nanoAlph(111000000000L)),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2678,7 +2687,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
-      Amount(ALPH.nanoAlph(105500000000L)),
+      Amount(ALPH.nanoAlph(106000000000L)),
       buyer,
       AVector.empty,
       TimeStamp.zero,
@@ -2736,7 +2745,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(2) is AssetOutput(
       result1.txOutputs(2).hint,
       emptyKey(2),
-      Amount(ALPH.nanoAlph(95500000000L) - dustUtxoAmount),
+      Amount(ALPH.nanoAlph(96000000000L) - dustUtxoAmount),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -3075,6 +3084,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contract              = Compiler.compileContract(rawCode).rightValue
     val (_, fromPublicKey, _) = genesisKeys(0)
     val fromAddress           = Address.p2pkh(fromPublicKey)
+    val fromAddressStr        = fromAddress.toBase58
     val (_, toPublicKey, _)   = genesisKeys(1)
     val toAddress             = Address.p2pkh(toPublicKey)
 
@@ -3087,14 +3097,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContract!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00)
+           |  createContract!{@$fromAddressStr -> ALPH: 10}(#$codeRaw, #$stateRaw, #00)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),
@@ -3112,15 +3122,15 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50, @$toAddress)
-           |  transferToken!{@$fromAddress -> ALPH: dustAmount!()}(@$fromAddress, @$toAddress, ALPH, dustAmount!())
+           |  createContractWithToken!{@$fromAddressStr -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50, @$toAddress)
+           |  transferToken!{@$fromAddressStr -> ALPH: dustAmount!()}(@$fromAddressStr, @$toAddress, ALPH, dustAmount!())
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),
@@ -3140,14 +3150,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> ALPH: 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, #00, 50)
+           |  createContractWithToken!{@$fromAddressStr -> ALPH: 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, #00, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),
@@ -3165,14 +3175,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50)
+           |  createContractWithToken!{@$fromAddressStr -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),
@@ -3200,35 +3210,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       .runTestContract(blockFlow, testContract)
       .leftValue
       .detail is "The number of parameters is different from the number specified by the target method"
-  }
-
-  it should "report error when gas fee is not enough from the asset input" in new Fixture {
-    val contract =
-      s"""
-         |Contract Foo() {
-         |  pub fn foo() -> () {
-         |    assert!(1 == 1, 0)
-         |  }
-         |}
-         |""".stripMargin
-    val code = Compiler.compileContract(contract).toOption.get
-
-    val serverUtils = new ServerUtils()
-    val caller      = Address.p2pkh(PublicKey.generate)
-
-    val testContract0 = TestContract(bytecode = code).toComplete().rightValue
-    serverUtils.runTestContract(blockFlow, testContract0).rightValue
-
-    val inputAssets1  = AVector(TestInputAsset(caller, AssetState(ALPH.oneAlph / 2)))
-    val testContract1 = testContract0.copy(inputAssets = inputAssets1)
-    serverUtils.runTestContract(blockFlow, testContract1).rightValue
-
-    val inputAssets2  = AVector(TestInputAsset(caller, AssetState(ALPH.oneAlph / 2 - 1)))
-    val testContract2 = testContract0.copy(inputAssets = inputAssets2)
-    serverUtils
-      .runTestContract(blockFlow, testContract2)
-      .leftValue
-      .detail is "First input asset should have at least 0.5 ALPH to cover gas"
   }
 
   it should "test utxo splits for generated outputs" in new Fixture {
@@ -3283,6 +3264,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   trait ScriptTxFixture extends Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
 
     implicit val serverUtils: ServerUtils = new ServerUtils
 
@@ -3312,6 +3294,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .asInstanceOf[BuildSimpleDeployContractTxResult]
 
     def deployContract() = {
       val deployContractTx =
@@ -3328,12 +3311,6 @@ class ServerUtilsSpec extends AlephiumSpec {
         chainIndex,
         testPriKey
       )
-    }
-
-    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
-      val block = mineFromMemPool(blockFlow, chainIndex)
-      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
-      addAndCheck(blockFlow, block)
     }
   }
 
@@ -3355,7 +3332,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     def executeTxScript(
         buildExecuteScript: BuildExecuteScriptTx
     ): BuildExecuteScriptTxResult = {
-      serverUtils.buildExecuteScriptTx(blockFlow, buildExecuteScript).rightValue
+      serverUtils
+        .buildExecuteScriptTx(blockFlow, buildExecuteScript)
+        .rightValue
+        .asInstanceOf[BuildSimpleExecuteScriptTxResult]
     }
 
     def failedExecuteTxScript(
@@ -3844,6 +3824,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    if (hardFork.isDanubeEnabled()) {
+      confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    }
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
   }
 
@@ -3856,15 +3839,19 @@ class ServerUtilsSpec extends AlephiumSpec {
       .add(block.chainIndex, blockTx, TimeStamp.now())
     checkAddressBalance(testAddress, ALPH.alph(2))
     deployContract()
+
     blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 0))
     blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
     // TODO: improve the calculation of bestDeps to get rid of the following line
     confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
-    blockFlow.getGrandPool().get(blockTx.id).isEmpty is true
+    blockFlow.getMemPool(GroupIndex.unsafe(1)).contains(blockTx.id) is false
 
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    if (hardFork.isDanubeEnabled()) {
+      confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    }
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
   }
 
@@ -3884,8 +3871,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     implicit val serverUtils: ServerUtils = new ServerUtils()
     def buildDeployContractTx(
         query: BuildDeployContractTx
-    ): BuildDeployContractTxResult = {
-      val result = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
+    ): BuildSimpleDeployContractTxResult = {
+      val result = serverUtils
+        .buildDeployContractTx(blockFlow, query)
+        .rightValue
+        .asInstanceOf[BuildSimpleDeployContractTxResult]
       signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
       val block = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
@@ -3898,10 +3888,10 @@ class ServerUtilsSpec extends AlephiumSpec {
         tokenId: TokenId,
         expectedTokenBalance: Option[U256]
     ) = {
-      val (alphAmount, _, tokens, _, _) =
+      val balance =
         blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-      expectedAlphBalance is alphAmount
-      tokens.find(_._1 == tokenId).map(_._2) is expectedTokenBalance
+      balance.totalAlph is expectedAlphBalance
+      balance.totalTokens.find(_._1 == tokenId).map(_._2) is expectedTokenBalance
     }
   }
 
@@ -3923,9 +3913,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     val tokenId = TokenId.from(createToken(10))
-    val (_, _, tokens0, _, _) =
+    val balance =
       blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-    tokens0.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(10))
+    balance.totalTokens.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(10))
 
     val query = BuildDeployContractTx(
       fromPublicKey = publicKey.bytes,
@@ -3992,9 +3982,9 @@ class ServerUtilsSpec extends AlephiumSpec {
         lockupScript: LockupScript,
         expectedAlphBalance: U256
     ) = {
-      val (alphAmount, _, _, _, _) =
+      val balance =
         blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-      expectedAlphBalance is alphAmount
+      expectedAlphBalance is balance.totalAlph
     }
 
     def checkTokenBalance(
@@ -4002,9 +3992,12 @@ class ServerUtilsSpec extends AlephiumSpec {
         tokenId: TokenId,
         expectedTokenBalance: U256
     ) = {
-      val (_, _, tokenAmounts, _, _) =
+      val balance =
         blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-      tokenAmounts.find(_._1 == tokenId).map(_._2).getOrElse(U256.Zero) is expectedTokenBalance
+      balance.totalTokens
+        .find(_._1 == tokenId)
+        .map(_._2)
+        .getOrElse(U256.Zero) is expectedTokenBalance
     }
 
     def signAndAndToMemPool(
@@ -4096,6 +4089,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
+
     signAndAndToMemPool(transferToAddress0, genesisPrivateKey)
     confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
     checkAlphBalance(groupInfo0.address.lockupScript, address0InitBalance)
@@ -4291,9 +4286,20 @@ class ServerUtilsSpec extends AlephiumSpec {
     signAndAndToMemPool(buildTransferTransaction.value, groupInfo0.privateKey)
     signAndAndToMemPool(buildExecuteScriptTransaction1.value, groupInfo1.privateKey)
     signAndAndToMemPool(buildExecuteScriptTransaction0.value, groupInfo0.privateKey)
-    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 1))
-    confirmNewBlock(blockFlow, buildExecuteScriptTransaction1.value.chainIndex().value)
-    confirmNewBlock(blockFlow, buildExecuteScriptTransaction0.value.chainIndex().value)
+    if (hardFork.isDanubeEnabled()) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 1)))
+    }
+    val block0 = confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    block0.nonCoinbaseLength is 1
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0)))
+    if (hardFork.isDanubeEnabled()) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(1, 1)))
+    }
+    val block1 = confirmNewBlock(blockFlow, buildExecuteScriptTransaction1.value.chainIndex().value)
+    val block2 = confirmNewBlock(blockFlow, buildExecuteScriptTransaction0.value.chainIndex().value)
+    block1.nonCoinbaseLength is 1
+    block2.nonCoinbaseLength is 1
 
     checkAlphBalance(
       groupInfo0.address.lockupScript,
@@ -4670,48 +4676,33 @@ class ServerUtilsSpec extends AlephiumSpec {
     simulatedGeneratedOutputs(1).amount is ALPH.alph(4)
   }
 
-  it should "get ghost uncles" in new Fixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block0     = emptyBlock(blockFlow, chainIndex)
-    val block1     = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block0, block1)
-    val block2 = mineBlockTemplate(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block2)
-    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 2
-
-    val ghostUncleHash  = blockFlow.getHashes(chainIndex, 1).rightValue.last
+  it should "get ghost uncles" in new Fixture with GhostUncleFixture {
+    val chainIndex      = ChainIndex.unsafe(0, 0)
+    val ghostUncleHash  = mineUncleBlocks(blockFlow, chainIndex, 1).head
     val ghostUncleBlock = blockFlow.getBlock(ghostUncleHash).rightValue
-    val serverUtils     = new ServerUtils()
-    serverUtils.getBlock(blockFlow, block2.hash).rightValue.ghostUncles is
+    val block           = mineBlockTemplate(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+
+    val serverUtils = new ServerUtils()
+    serverUtils.getBlock(blockFlow, block.hash).rightValue.ghostUncles is
       AVector(
         GhostUncleBlockEntry(ghostUncleHash, Address.Asset(ghostUncleBlock.minerLockupScript))
       )
   }
 
-  it should "get mainchain block by ghost uncle hash" in new Fixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block0     = emptyBlock(blockFlow, chainIndex)
-    val block1     = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block0, block1)
-    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 1
+  it should "get mainchain block by ghost uncle hash" in new Fixture with GhostUncleFixture {
+    val chainIndex     = ChainIndex.unsafe(0, 0)
+    val ghostUncleHash = mineUncleBlocks(blockFlow, chainIndex, 1).head
 
-    val serverUtils    = new ServerUtils()
-    val ghostUncleHash = blockFlow.getHashes(chainIndex, 1).rightValue.last
-    val blockNum       = Random.between(0, ALPH.MaxGhostUncleAge)
-    (0 until blockNum).foreach { _ =>
-      val block = emptyBlock(blockFlow, chainIndex)
-      block.ghostUncleHashes.rightValue.isEmpty is true
-      addAndCheck(blockFlow, block)
-    }
+    val serverUtils = new ServerUtils()
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).leftValue.detail is
       s"The mainchain block that references the ghost uncle block ${ghostUncleHash.toHexString} not found"
 
     val block = mineBlockTemplate(blockFlow, chainIndex)
     block.ghostUncleHashes.rightValue is AVector(ghostUncleHash)
     addAndCheck(blockFlow, block)
-    val blockHeight = blockNum + 2
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).rightValue is
-      BlockEntry.from(block, blockHeight).rightValue
+      BlockEntry.from(block, blockFlow.getHeightUnsafe(block.hash)).rightValue
 
     val invalidBlockHash = randomBlockHash(chainIndex)
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, invalidBlockHash).leftValue.detail is
@@ -4982,15 +4973,16 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (fromPrivateKey, fromPublicKey) = chainIndex.to.generateKey
     val (_, toPublicKey)                = chainIndex.to.generateKey
     val lockupScript                    = LockupScript.p2pkh(fromPublicKey)
+    val blockTs = TimeStamp.now().minusUnsafe(networkConfig.coinbaseLockupPeriod)
     val block0 = mine(
       blockFlow,
       chainIndex,
       AVector.empty[Transaction],
       lockupScript,
-      Some(ALPH.LaunchTimestamp.plusMillisUnsafe(1))
+      Some(blockTs)
     )
     addAndCheck(blockFlow, block0)
-    val block1 = transfer(blockFlow, fromPrivateKey, toPublicKey, ALPH.oneAlph)
+    val block1 = transfer(blockFlow, fromPrivateKey, toPublicKey, dustUtxoAmount)
     addAndCheck(blockFlow, block1)
 
     block1.nonCoinbase.length is 1
@@ -5068,6 +5060,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .asInstanceOf[BuildSimpleExecuteScriptTxResult]
+
     val result1 = serverUtils
       .buildExecuteScriptTx(
         blockFlow,
@@ -5079,11 +5073,13 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .asInstanceOf[BuildSimpleExecuteScriptTxResult]
+
     result1.gasAmount.value > result0.gasAmount.value is true
 
     executeScript(script, Some((genesisPrivateKey, genesisPublicKey)))
 
-    def createTxTemplate(result: BuildExecuteScriptTxResult): TransactionTemplate = {
+    def createTxTemplate(result: BuildSimpleExecuteScriptTxResult): TransactionTemplate = {
       val signature = SecP256K1.sign(result.txId.bytes, privateKey)
       serverUtils.createTxTemplate(SubmitTransaction(result.unsignedTx, signature)).rightValue
     }
@@ -5303,12 +5299,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue is richTransaction
 
+    val height = if (hardFork.isDanubeEnabled()) 4 else 3
     val richBlockAndEvents = {
       val richTxs = scriptBlock.transactions
         .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, scriptBlock.hash))
         .rightValue
       RichBlockAndEvents(
-        RichBlockEntry.from(scriptBlock, 3, richTxs).rightValue,
+        RichBlockEntry.from(scriptBlock, height, richTxs).rightValue,
         AVector(ContractEventByBlockHash(scriptTransaction.id, contractAddress, 0, AVector.empty))
       )
     }
@@ -5615,35 +5612,37 @@ class ServerUtilsSpec extends AlephiumSpec {
       val block = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(1))
       addAndCheck(blockFlow, block)
     }
-    val lockupScript = LockupScript.p2pkh(publicKey)
+    val lockupScript     = LockupScript.p2pkh(publicKey)
+    val assetAddress     = Address.from(lockupScript)
+    val assetAddressLike = AddressLike.from(lockupScript)
     blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 10
 
     val serverUtils0 = createServerUtils(9)
-    serverUtils0.getBalance(blockFlow, Address.from(lockupScript), true).leftValue.detail is
+    serverUtils0.getBalance(blockFlow, assetAddressLike, true).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
     serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
 
     val serverUtils1 = createServerUtils(10)
     serverUtils1
-      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .getBalance(blockFlow, assetAddressLike, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
     serverUtils1
-      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .getUTXOsIncludePool(blockFlow, assetAddress)
       .rightValue
       .utxos
       .length is 10
 
     val serverUtils2 = createServerUtils(11)
     serverUtils2
-      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .getBalance(blockFlow, assetAddressLike, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
     serverUtils2
-      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .getUTXOsIncludePool(blockFlow, assetAddress)
       .rightValue
       .utxos
       .length is 10
@@ -5687,6 +5686,108 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"Contract code hash: ${codeHash.toHexString} not found"
     createContract(code, AVector.empty, AVector.empty)._2
     serverUtils.getContractCode(blockFlow, codeHash) is Right(statefulContract)
+  }
+
+  it should "test auto fund" in {
+    new Fixture {
+      info("success if the dust amount is not specified")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+           |  pub fn foo() -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 0.1 alph)
+           |    map.insert!(0, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val testContractParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      serverUtils.runTestContract(blockFlow, testContractParams).isRight is true
+    }
+
+    new Fixture {
+      info("fail if the dust amount is not enough")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn foo() -> () {
+           |    map.insert!(0, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val testContractParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneNanoAlph)))),
+        dustAmount = Some(Amount(ALPH.oneNanoAlph))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      serverUtils
+        .runTestContract(blockFlow, testContractParams)
+        .leftValue
+        .detail
+        .contains(
+          "Insufficient funds to cover the minimum amount for contract UTXO"
+        ) is true
+    }
+
+    new Fixture {
+      info("fail if exceeds max retry times")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+           |  pub fn foo(num: U256) -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 0.1 alph)
+           |    for (let mut i = 0; i < num; i += 1) {
+           |      map.insert!(i, i)
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val baseParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.alph(2)))))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      (0 to 3).map(v => AVector[Val](ValU256(U256.unsafe(v)))).foreach { args =>
+        val params = baseParams.copy(testArgs = args)
+        serverUtils.runTestContract(blockFlow, params).isRight is true
+      }
+      (4 to 6).map(v => AVector[Val](ValU256(U256.unsafe(v)))).foreach { args =>
+        val params = baseParams.copy(testArgs = args)
+        val errorString =
+          "Test failed due to insufficient funds to cover the dust amount. We tried increasing the dust amount to 0.3 ALPH, " +
+            "but at least 0.1 ALPH is still required. Please figure out the exact dust amount needed and specify it using the dustAmount parameter."
+        serverUtils
+          .runTestContract(blockFlow, params)
+          .leftValue
+          .detail
+          .contains(errorString) is true
+      }
+    }
   }
 
   @scala.annotation.tailrec
@@ -5743,7 +5844,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    serverUtils.getBalance(blockFlow, address, true) isE Balance.from(
+    serverUtils
+      .getBalance(blockFlow, AddressLike.from(address.lockupScript), true) isE Balance.from(
       Amount(amount),
       Amount.Zero,
       None,

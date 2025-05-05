@@ -23,8 +23,11 @@ import org.alephium.io.{IOResult, RocksDBSource, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
-import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
+import org.alephium.protocol.vm.nodeindexes.{
+  ConflictedTxsStorage,
+  NodeIndexesStorage,
+  TxOutputLocator
+}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.serde.{avectorSerde, eitherSerde, intSerde}
 import org.alephium.util.{AlephiumSpec, AVector}
@@ -51,6 +54,13 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       newDB(dbSource, RocksDBSource.ColumnFamily.ParentContract),
       newDB(dbSource, RocksDBSource.ColumnFamily.SubContract),
       newDB(dbSource, RocksDBSource.ColumnFamily.SubContractCounter)
+    )
+  }
+
+  def newConflictedTxsStorage(dbSource: RocksDBSource): ConflictedTxsStorage = {
+    ConflictedTxsStorage(
+      newDB(dbSource, RocksDBSource.ColumnFamily.ConflictedTxs),
+      newDB(dbSource, RocksDBSource.ColumnFamily.ConflictedTxs)
     )
   }
 
@@ -181,7 +191,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       NodeIndexesStorage(
         newLogStorage(storage),
         Some(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex)),
-        Some(newSubContractIndexStorage(storage))
+        Some(newSubContractIndexStorage(storage)),
+        newConflictedTxsStorage(storage)
       )
     )
     val cached = persisted.cached()
@@ -313,7 +324,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       NodeIndexesStorage(
         newLogStorage(storage),
         Some(newDB(storage, RocksDBSource.ColumnFamily.TxOutputRefIndex)),
-        Some(newSubContractIndexStorage(storage))
+        Some(newSubContractIndexStorage(storage)),
+        newConflictedTxsStorage(storage)
       )
     )
     val staging = worldState.staging()

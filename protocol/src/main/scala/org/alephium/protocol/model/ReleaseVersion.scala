@@ -24,6 +24,7 @@ import org.alephium.util.TimeStamp
 
 final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
     extends Ordered[ReleaseVersion] {
+
   override def compare(that: ReleaseVersion): Int = {
     major.compare(that.major) match {
       case 0 =>
@@ -38,19 +39,24 @@ final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
   override def toString: String = s"v$major.$minor.$patch"
 
   // scalastyle:off magic.number
-  def checkRhoneUpgrade()(implicit networkConfig: NetworkConfig): Boolean = {
-    if (networkConfig.getHardFork(TimeStamp.now()).isRhoneEnabled()) {
-      if (networkConfig.networkId == NetworkId.AlephiumMainNet) {
-        this >= ReleaseVersion(3, 0, 0)
-      } else if (networkConfig.networkId == NetworkId.AlephiumTestNet) {
-        this >= ReleaseVersion(2, 14, 6)
-      } else {
-        true
-      }
-    } else {
-      true
+  def checkUpgrade()(implicit networkConfig: NetworkConfig): Boolean = {
+    networkConfig.getHardFork(TimeStamp.now()) match {
+      case HardFork.Danube =>
+        // TODO: Update this once we release the version for the Danube upgrade
+        networkConfig.networkId != NetworkId.AlephiumMainNet
+      case HardFork.Rhone =>
+        if (networkConfig.networkId == NetworkId.AlephiumMainNet) {
+          this >= ReleaseVersion(3, 0, 0)
+        } else if (networkConfig.networkId == NetworkId.AlephiumTestNet) {
+          this >= ReleaseVersion(2, 14, 6)
+        } else {
+          true
+        }
+      case HardFork.Leman | HardFork.Mainnet => true
+      case _                                 => false
     }
   }
+  // scalastyle:on magic.number
 }
 
 object ReleaseVersion {
@@ -68,8 +74,8 @@ object ReleaseVersion {
       clientId: String
   )(implicit networkConfig: NetworkConfig): Option[ReleaseVersion] = {
     fromClientIdStr(clientId) match {
-      case Some(version) if version.checkRhoneUpgrade() => Some(version)
-      case _                                            => None
+      case Some(version) if version.checkUpgrade() => Some(version)
+      case _                                       => None
     }
   }
 

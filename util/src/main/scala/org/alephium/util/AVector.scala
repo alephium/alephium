@@ -257,6 +257,20 @@ final class AVector[@sp A](
     slice(0, length - m)
   }
 
+  def remove(k: Int): AVector[A] = {
+    assume(k >= 0 && k < length)
+    if (k == 0) {
+      this.tail
+    } else if (k == length - 1) {
+      this.init
+    } else {
+      val arr = new Array[A](length - 1)
+      Array.copy(elems, 0, arr, 0, k)
+      Array.copy(elems, k + 1, arr, k, length - k - 1)
+      AVector.unsafe(arr)
+    }
+  }
+
   def reverse: AVector[A] = {
     if (length < 2) this else _reverse
   }
@@ -588,6 +602,12 @@ final class AVector[@sp A](
     AVector.unsafe(arr)
   }
 
+  def stableSortBy[B](f: A => B)(implicit ord: Ordering[B]): AVector[A] = {
+    val arr = toArray
+    scala.util.Sorting.stableSort(arr)(ord.on(f))
+    AVector.unsafe(arr)
+  }
+
   def sum(implicit num: Numeric[A]): A = fold(num.zero)(num.plus)
 
   def sumBy[B](f: A => B)(implicit num: Numeric[B]): B = {
@@ -882,6 +902,10 @@ object AVector {
   }
 
   def from[@sp A: ClassTag](elems: IterableOnce[A]): AVector[A] = {
+    unsafe(elems.iterator.toArray)
+  }
+
+  def from[@sp A: ClassTag](elems: Iterable[A]): AVector[A] = {
     unsafe(elems.iterator.toArray)
   }
 

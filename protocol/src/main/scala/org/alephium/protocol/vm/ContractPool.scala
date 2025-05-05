@@ -65,7 +65,10 @@ trait ContractPool extends CostStrategy {
   }
 
   def cacheNewContractIfNecessary(contractId: ContractId): ExeResult[Unit] = {
-    if (getHardFork().isRhoneEnabled()) {
+    val hardFork = getHardFork()
+    if (hardFork.isDanubeEnabled()) {
+      okay
+    } else if (getHardFork().isRhoneEnabled()) {
       for {
         obj <- loadFromWorldState(contractId)
         _   <- add(contractId, obj)

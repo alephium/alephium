@@ -27,8 +27,8 @@ import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
-import org.alephium.crypto.Byte32
-import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo, UtxoSelectionAlgo}
+import org.alephium.crypto.{Byte32, Byte64}
+import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo}
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
 import org.alephium.flow.core.TxUtils.InputData
@@ -39,8 +39,8 @@ import org.alephium.flow.mempool.MemPool._
 import org.alephium.io.IOError
 import org.alephium.protocol.{vm, ALPH, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
-import org.alephium.protocol.model.{ContractOutput => ProtocolContractOutput, _}
-import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
+import org.alephium.protocol.model.{Balance => _, ContractOutput => ProtocolContractOutput, _}
+import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
 import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
@@ -51,13 +51,14 @@ import org.alephium.util._
 // scalastyle:off number.of.methods
 // scalastyle:off file.size.limit number.of.types
 class ServerUtils(implicit
-    brokerConfig: BrokerConfig,
+    val brokerConfig: BrokerConfig,
     consensusConfigs: ConsensusConfigs,
-    networkConfig: NetworkConfig,
-    apiConfig: ApiConfig,
+    val networkConfig: NetworkConfig,
+    val apiConfig: ApiConfig,
     logConfig: LogConfig,
     executionContext: ExecutionContext
-) extends StrictLogging {
+) extends GrouplessUtils
+    with StrictLogging {
   import ServerUtils._
 
   def getHeightedBlocks(
@@ -154,20 +155,29 @@ class ServerUtils(implicit
     }
   }
 
-  def getBalance(blockFlow: BlockFlow, address: Address, getMempoolUtxos: Boolean): Try[Balance] = {
+  def getBalance(
+      blockFlow: BlockFlow,
+      address: AddressLike,
+      getMempoolUtxos: Boolean
+  ): Try[Balance] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
-    for {
-      _ <- checkGroup(address.lockupScript)
-      balance <- blockFlow
-        .getBalance(
-          address.lockupScript,
-          utxosLimit,
-          getMempoolUtxos
-        )
-        .map(Balance.from)
-        .left
-        .flatMap(tooManyUtxos)
-    } yield balance
+    address.lockupScriptResult match {
+      case LockupScript.CompleteLockupScript(lockupScript) =>
+        for {
+          _ <- checkGroup(lockupScript)
+          balance <- blockFlow
+            .getBalance(
+              lockupScript,
+              utxosLimit,
+              getMempoolUtxos
+            )
+            .map(Balance.from)
+            .left
+            .flatMap(tooManyUtxos)
+        } yield balance
+      case halfDecodedP2PK: LockupScript.HalfDecodedP2PK =>
+        getGrouplessBalance(blockFlow, halfDecodedP2PK, getMempoolUtxos)
+    }
   }
 
   def getUTXOsIncludePool(blockFlow: BlockFlow, address: Address): Try[UTXOs] = {
@@ -242,7 +252,7 @@ class ServerUtils(implicit
   def buildTransferFromOneToManyGroups(
       blockFlow: BlockFlow,
       transferRequest: BuildTransferTx
-  ): Try[AVector[BuildTransferTxResult]] =
+  ): Try[AVector[BuildSimpleTransferTxResult]] =
     for {
       _ <- Either.cond(
         transferRequest.gasAmount.isEmpty,
@@ -276,7 +286,7 @@ class ServerUtils(implicit
         .left
         .map(failed)
       txs <- unsignedTxs.mapE(validateUnsignedTransaction)
-    } yield txs.map(BuildTransferTxResult.from)
+    } yield txs.map(BuildSimpleTransferTxResult.from)
 
   def buildTransferUnsignedTransaction(
       blockFlow: BlockFlow,
@@ -306,27 +316,44 @@ class ServerUtils(implicit
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildTransferTxResult] = {
     for {
-      unsignedTx <- buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
-    } yield BuildTransferTxResult.from(unsignedTx)
+      lockupPair <- query.getLockPair(query.group)
+      result <- lockupPair._1 match {
+        case lockupScript: LockupScript.P2PK =>
+          for {
+            txs <- buildTransferTxWithFallbackAddresses(
+              blockFlow,
+              lockupPair,
+              otherGroupsLockupPairs(lockupScript),
+              query.destinations,
+              query.gasPrice,
+              query.targetBlockHash
+            )
+            result <- BuildGrouplessTransferTxResult.from(txs)
+          } yield result
+        case _ =>
+          buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
+            .map(BuildSimpleTransferTxResult.from)
+      }
+    } yield result
   }
 
   def buildMultiInputsTransaction(
       blockFlow: BlockFlow,
       query: BuildMultiAddressesTransaction
-  ): Try[BuildTransferTxResult] = {
+  ): Try[BuildSimpleTransferTxResult] = {
     for {
       unsignedTx <- prepareMultiInputsUnsignedTransactionFromQuery(
         blockFlow,
         query
       )
     } yield {
-      BuildTransferTxResult.from(unsignedTx)
+      BuildSimpleTransferTxResult.from(unsignedTx)
     }
   }
   def buildMultisig(
       blockFlow: BlockFlow,
       query: BuildMultisig
-  ): Try[BuildTransferTxResult] = {
+  ): Try[BuildSimpleTransferTxResult] = {
     for {
       _ <- checkGroup(query.fromAddress.lockupScript)
       unlockScript <- buildMultisigUnlockScript(
@@ -344,7 +371,7 @@ class ServerUtils(implicit
         ExtraUtxosInfo.empty
       )
     } yield {
-      BuildTransferTxResult.from(unsignedTx)
+      BuildSimpleTransferTxResult.from(unsignedTx)
     }
   }
 
@@ -468,7 +495,7 @@ class ServerUtils(implicit
   ): TransactionTemplate = {
     TransactionTemplate(
       unsignedTx,
-      signatures,
+      signatures.map(Byte64.from),
       scriptSignatures = AVector.empty
     )
   }
@@ -893,7 +920,7 @@ class ServerUtils(implicit
     }
   }
 
-  private def prepareOutputInfos(destinations: AVector[Destination]): AVector[TxOutputInfo] = {
+  protected def prepareOutputInfos(destinations: AVector[Destination]): AVector[TxOutputInfo] = {
     destinations.map { destination =>
       val tokensInfo = destination.tokens match {
         case Some(tokens) =>
@@ -1233,27 +1260,25 @@ class ServerUtils(implicit
   private def unsignedTxFromScript(
       blockFlow: BlockFlow,
       script: StatefulScript,
-      amount: U256,
-      tokens: AVector[(TokenId, U256)],
+      amounts: BuildTxCommon.ScriptTxAmounts,
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       gasEstimationMultiplier: Option[GasEstimationMultiplier],
-      extraUtxosInfo: ExtraUtxosInfo
+      utxos: AVector[AssetOutputInfo]
   ): Try[(UnsignedTransaction, AVector[TxInputWithAsset])] = {
     for {
       selectedUtxos <- buildSelectedUtxos(
         blockFlow,
         script,
-        amount,
-        tokens,
+        amounts,
         fromLockupScript,
         fromUnlockScript,
         gas,
         gasPrice,
         gasEstimationMultiplier,
-        extraUtxosInfo
+        utxos
       )
       inputs = selectedUtxos.assets.map(asset => (asset.ref, asset.output))
       unsignedTx <- wrapError {
@@ -1262,8 +1287,8 @@ class ServerUtils(implicit
           fromLockupScript,
           fromUnlockScript,
           inputs,
-          amount,
-          tokens,
+          amounts.approvedAlph,
+          amounts.tokens,
           gas.getOrElse(selectedUtxos.gas),
           gasPrice.getOrElse(nonCoinbaseMinGasPrice)
         )
@@ -1278,45 +1303,42 @@ class ServerUtils(implicit
   final def buildSelectedUtxos(
       blockFlow: BlockFlow,
       script: StatefulScript,
-      amount: U256,
-      tokens: AVector[(TokenId, U256)],
+      amounts: BuildTxCommon.ScriptTxAmounts,
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       gasEstimationMultiplier: Option[GasEstimationMultiplier],
-      extraUtxosInfo: ExtraUtxosInfo
+      utxos: AVector[AssetOutputInfo]
   ): Try[Selected] = {
     val result = tryBuildSelectedUtxos(
       blockFlow,
       script,
-      amount,
-      tokens,
+      amounts,
       fromLockupScript,
       fromUnlockScript,
       gas,
       gasPrice,
       gasEstimationMultiplier,
-      extraUtxosInfo
+      utxos
     )
     result match {
       case Right(res) =>
         val alphAmount = res.assets.fold(U256.Zero)(_ addUnsafe _.output.amount)
         val gasFee     = gasPrice.getOrElse(nonCoinbaseMinGasPrice) * res.gas
 
-        val remainingAmount = alphAmount.subUnsafe(gasFee).subUnsafe(amount)
+        val remainingAmount = alphAmount.subUnsafe(gasFee).subUnsafe(amounts.approvedAlph)
         if (remainingAmount < dustUtxoAmount) {
           tryBuildSelectedUtxos(
             blockFlow,
             script,
-            amount.addUnsafe(dustUtxoAmount),
-            tokens,
+            amounts.copy(estimatedAlph = amounts.estimatedAlph.addUnsafe(dustUtxoAmount)),
             fromLockupScript,
             fromUnlockScript,
             Some(res.gas),
             gasPrice,
             None,
-            extraUtxosInfo
+            utxos
           )
         } else {
           Right(res)
@@ -1328,42 +1350,62 @@ class ServerUtils(implicit
   private def tryBuildSelectedUtxos(
       blockFlow: BlockFlow,
       script: StatefulScript,
-      amount: U256,
-      tokens: AVector[(TokenId, U256)],
+      amounts: BuildTxCommon.ScriptTxAmounts,
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       gasEstimationMultiplier: Option[GasEstimationMultiplier],
-      extraUtxosInfo: ExtraUtxosInfo
+      utxos: AVector[AssetOutputInfo]
   ): Try[Selected] = {
-    val utxosLimit               = apiConfig.defaultUtxosLimit
-    val estimatedTxOutputsLength = tokens.length + 1
-    // Allocate extra dust amounts for potential fixed outputs as well as generated outputs
-    val estimatedTotalDustAmount =
-      dustUtxoAmount.mulUnsafe(U256.unsafe(estimatedTxOutputsLength * 2))
-
-    for {
-      utxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
-      totalSelectAmount <- amount
-        .add(estimatedTotalDustAmount)
-        .toRight(failed("ALPH amount overflow"))
-      selectedUtxos <- wrapError(
-        UtxoSelectionAlgo
-          .Build(
-            ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice), gasEstimationMultiplier)
-          )
-          .select(
-            AssetAmounts(totalSelectAmount, tokens),
-            fromUnlockScript,
-            extraUtxosInfo.merge(utxos),
-            txOutputsLength = estimatedTxOutputsLength,
-            Some(script),
-            AssetScriptGasEstimator.Default(blockFlow),
-            TxScriptEmulator.Default(blockFlow)
-          )
+    wrapError(
+      blockFlow.selectUtxos(
+        fromLockupScript,
+        fromUnlockScript,
+        utxos,
+        TotalAmountNeeded(amounts.estimatedAlph, amounts.tokens, amounts.tokens.length + 1),
+        gasEstimationMultiplier,
+        Some(script),
+        gas,
+        gasPrice.getOrElse(nonCoinbaseMinGasPrice)
       )
-    } yield selectedUtxos
+    )
+  }
+
+  @inline private def getAllUtxos(
+      blockFlow: BlockFlow,
+      fromLockupScript: LockupScript.Asset,
+      extraUtxosInfo: ExtraUtxosInfo
+  ): Try[AVector[AssetOutputInfo]] = {
+    blockFlow
+      .getUsableUtxos(fromLockupScript, apiConfig.defaultUtxosLimit)
+      .left
+      .map(failedInIO)
+      .map(extraUtxosInfo.merge)
+  }
+
+  final protected def buildDeployContractTxScript(
+      query: BuildTxCommon.DeployContractTx,
+      contractDeposit: U256,
+      tokens: AVector[(TokenId, U256)],
+      lockupScript: LockupScript.Asset
+  ): Try[StatefulScript] = {
+    for {
+      tokenIssuanceInfo <- BuildTxCommon
+        .getTokenIssuanceInfo(query.issueTokenAmount, query.issueTokenTo)
+        .left
+        .map(badRequest)
+      code <- query.decodeBytecode()
+      script <- buildDeployContractTxWithParsedState(
+        code.contract,
+        Address.Asset(lockupScript),
+        code.initialImmFields,
+        code.initialMutFields,
+        contractDeposit,
+        tokens,
+        tokenIssuanceInfo
+      )
+    } yield script
   }
 
   def buildDeployContractUnsignedTx(
@@ -1371,42 +1413,27 @@ class ServerUtils(implicit
       query: BuildDeployContractTx,
       extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
-    val hardfork = blockFlow.networkConfig.getHardFork(TimeStamp.now())
     for {
-      amounts <- BuildTxCommon
-        .getAlphAndTokenAmounts(query.initialAttoAlphAmount, query.initialTokenAmounts)
-        .left
-        .map(badRequest)
-      tokenIssuanceInfo <- BuildTxCommon
-        .getTokenIssuanceInfo(query.issueTokenAmount, query.issueTokenTo)
-        .left
-        .map(badRequest)
-      initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1, hardfork)
-      code                  <- query.decodeBytecode()
-      lockPair              <- query.getLockPair()
-      script <- buildDeployContractTxWithParsedState(
-        code.contract,
-        Address.Asset(lockPair._1),
-        code.initialImmFields,
-        code.initialMutFields,
-        initialAttoAlphAmount,
-        amounts._2,
-        tokenIssuanceInfo
+      amounts <- query.getAmounts.left.map(badRequest)
+      (contractDeposit, scriptTxAmounts) = amounts
+      lockPair <- query.getLockPair()
+      script <- buildDeployContractTxScript(
+        query,
+        contractDeposit,
+        scriptTxAmounts.tokens,
+        lockPair._1
       )
-      totalAttoAlphAmount <- initialAttoAlphAmount
-        .add(query.issueTokenTo.map(_ => dustUtxoAmount).getOrElse(U256.Zero))
-        .toRight(failed("ALPH amount overflow"))
+      utxos <- getAllUtxos(blockFlow, lockPair._1, extraUtxosInfo)
       result <- unsignedTxFromScript(
         blockFlow,
         script,
-        totalAttoAlphAmount,
-        amounts._2,
+        scriptTxAmounts,
         lockPair._1,
         lockPair._2,
         query.gasAmount,
         query.gasPrice,
         None,
-        extraUtxosInfo
+        utxos
       )
     } yield result._1
   }
@@ -1418,8 +1445,23 @@ class ServerUtils(implicit
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildDeployContractTxResult] = {
     for {
-      utx <- buildDeployContractUnsignedTx(blockFlow, query, extraUtxosInfo)
-    } yield BuildDeployContractTxResult.from(utx)
+      lockupPair <- query.getLockPair()
+      result <- lockupPair._1 match {
+        case lockupScript: LockupScript.P2PK =>
+          buildDeployContractTxWithFallbackAddresses(
+            blockFlow,
+            lockupPair,
+            otherGroupsLockupPairs(lockupScript),
+            query,
+            query.gasAmount,
+            query.gasPrice,
+            query.targetBlockHash
+          )
+        case _ =>
+          buildDeployContractUnsignedTx(blockFlow, query, extraUtxosInfo)
+            .map(BuildSimpleDeployContractTxResult.from)
+      }
+    } yield result
   }
 
   def buildChainedTransactions(
@@ -1463,7 +1505,7 @@ class ServerUtils(implicit
             extraUtxosInfo
           )
         } yield (
-          BuildChainedTransferTxResult(BuildTransferTxResult.from(unsignedTx)),
+          BuildChainedTransferTxResult(BuildSimpleTransferTxResult.from(unsignedTx)),
           extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
         )
       case buildExecuteScript: BuildChainedExecuteScriptTx =>
@@ -1487,7 +1529,7 @@ class ServerUtils(implicit
           val simulationResult = SimulationResult.from(txScriptExecution)
           (
             BuildChainedExecuteScriptTxResult(
-              BuildExecuteScriptTxResult.from(
+              BuildSimpleExecuteScriptTxResult.from(
                 unsignedTx,
                 simulationResult
               )
@@ -1506,24 +1548,10 @@ class ServerUtils(implicit
           )
         } yield (
           BuildChainedDeployContractTxResult(
-            BuildDeployContractTxResult.from(unsignedTx)
+            BuildSimpleDeployContractTxResult.from(unsignedTx)
           ),
           extraUtxosInfo.updateWithUnsignedTx(unsignedTx)
         )
-    }
-  }
-
-  def getInitialAttoAlphAmount(amountOption: Option[U256], hardfork: HardFork): Try[U256] = {
-    val minimalContractDeposit = minimalContractStorageDeposit(hardfork)
-    amountOption match {
-      case Some(amount) =>
-        if (amount >= minimalContractDeposit) { Right(amount) }
-        else {
-          val error =
-            s"Expect ${Amount.toAlphString(minimalContractDeposit)} deposit to deploy a new contract"
-          Left(failed(error))
-        }
-      case None => Right(minimalContractDeposit)
     }
   }
 
@@ -1547,33 +1575,27 @@ class ServerUtils(implicit
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def buildExecuteScriptUnsignedTx(
+  protected def buildExecuteScriptTx(
       blockFlow: BlockFlow,
-      query: BuildExecuteScriptTx,
-      extraUtxosInfo: ExtraUtxosInfo
+      amounts: BuildTxCommon.ScriptTxAmounts,
+      lockPair: (LockupScript.Asset, UnlockScript),
+      script: StatefulScript,
+      utxos: AVector[AssetOutputInfo],
+      multiplier: Option[GasEstimationMultiplier],
+      gasOpt: Option[GasBox],
+      gasPrice: Option[GasPrice]
   ): Try[(UnsignedTransaction, TxScriptExecution)] = {
     for {
-      _          <- query.check().left.map(badRequest)
-      multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
-      amounts <- BuildTxCommon
-        .getAlphAndTokenAmounts(query.attoAlphAmount, query.tokens)
-        .left
-        .map(badRequest)
-      lockPair <- query.getLockPair()
-      script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
-        badRequest(serdeError.getMessage)
-      )
       buildUnsignedTxResult <- unsignedTxFromScript(
         blockFlow,
         script,
-        amounts._1.getOrElse(U256.Zero),
-        amounts._2,
+        amounts,
         lockPair._1,
         lockPair._2,
-        query.gasAmount,
-        query.gasPrice,
+        gasOpt,
+        gasPrice,
         multiplier,
-        extraUtxosInfo
+        utxos
       )
       (unsignedTx, inputWithAssets) = buildUnsignedTxResult
       emulationResult <- TxScriptEmulator
@@ -1592,6 +1614,31 @@ class ServerUtils(implicit
     }
   }
 
+  def buildExecuteScriptUnsignedTx(
+      blockFlow: BlockFlow,
+      query: BuildExecuteScriptTx,
+      extraUtxosInfo: ExtraUtxosInfo
+  ): Try[(UnsignedTransaction, TxScriptExecution)] = {
+    for {
+      _          <- query.check().left.map(badRequest)
+      multiplier <- GasEstimationMultiplier.from(query.gasEstimationMultiplier).left.map(badRequest)
+      amounts    <- query.getAmounts.left.map(badRequest)
+      lockPair   <- query.getLockPair()
+      script     <- query.decodeStatefulScript().left.map(badRequest)
+      utxos      <- getAllUtxos(blockFlow, lockPair._1, extraUtxosInfo)
+      result <- buildExecuteScriptTx(
+        blockFlow,
+        amounts,
+        lockPair,
+        script,
+        utxos,
+        multiplier,
+        query.gasAmount,
+        query.gasPrice
+      )
+    } yield result
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def buildExecuteScriptTx(
       blockFlow: BlockFlow,
@@ -1599,11 +1646,31 @@ class ServerUtils(implicit
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildExecuteScriptTxResult] = {
     for {
-      buildUnsignedTxResult <- buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
-    } yield BuildExecuteScriptTxResult.from(
-      buildUnsignedTxResult._1,
-      SimulationResult.from(buildUnsignedTxResult._2)
-    )
+      lockupPair <- query.getLockPair(query.group)
+      result <- lockupPair._1 match {
+        case lockupScript: LockupScript.P2PK =>
+          for {
+            amounts <- query.getAmounts.left.map(badRequest)
+            script  <- query.decodeStatefulScript().left.map(badRequest)
+            result <- buildExecuteScriptTxWithFallbackAddresses(
+              blockFlow,
+              lockupPair,
+              otherGroupsLockupPairs(lockupScript),
+              script,
+              amounts,
+              query.gasEstimationMultiplier,
+              query.gasAmount,
+              query.gasPrice,
+              query.targetBlockHash
+            )
+          } yield result
+        case _ =>
+          buildExecuteScriptUnsignedTx(blockFlow, query, extraUtxosInfo)
+            .map(res =>
+              BuildSimpleExecuteScriptTxResult.from(res._1, SimulationResult.from(res._2))
+            )
+      }
+    } yield result
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -1736,9 +1803,11 @@ class ServerUtils(implicit
     for {
       groupIndex <- params.validate()
       _          <- checkGroup(groupIndex)
-      blockHash = params.worldStateBlockHash.getOrElse(
-        blockFlow.getBestDeps(groupIndex).uncleHash(groupIndex)
-      )
+      blockHash = params.worldStateBlockHash.getOrElse {
+        val hardFork = networkConfig.getHardFork(TimeStamp.now())
+        val bestDeps = blockFlow.getBestDeps(ChainIndex(groupIndex, groupIndex), hardFork)
+        bestDeps.uncleHash(groupIndex)
+      }
       worldState <- wrapResult(
         blockFlow.getPersistedWorldState(blockHash).map(_.cached().staging())
       )
@@ -1753,9 +1822,9 @@ class ServerUtils(implicit
   }
 
   def callTxScript(blockFlow: BlockFlow, params: CallTxScript): Try[CallTxScriptResult] = {
-    val txId        = params.txId.getOrElse(TransactionId.random)
-    val inputAssets = params.inputAssets.getOrElse(AVector.empty)
+    val txId = params.txId.getOrElse(TransactionId.random)
     for {
+      inputAssets <- inputAssetsWithGasFee(params.inputAssets.getOrElse(AVector.empty))
       script <- deserialize[StatefulScript](params.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
@@ -1808,7 +1877,7 @@ class ServerUtils(implicit
   @inline private def mockupTxEnv(txId: TransactionId, inputAssets: AVector[TestInputAsset]) = {
     TxEnv.mockup(
       txId = txId,
-      signatures = Stack.popOnly(AVector.empty[Signature]),
+      signatures = Stack.popOnly(AVector.empty[Byte64]),
       prevOutputs = inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
       gasPrice = nonCoinbaseMinGasPrice,
@@ -1850,18 +1919,25 @@ class ServerUtils(implicit
     for {
       contractObj <- wrapResult(worldState.getContractObj(contractId))
       method      <- wrapExeResult(contractObj.code.getMethod(params.methodIndex))
-      result <- executeContractMethod(
+      args = params.args.getOrElse(AVector.empty)
+      _           <- checkArgs(args, method)
+      inputAssets <- inputAssetsWithGasFee(params.inputAssets.getOrElse(AVector.empty))
+      txEnv = mockupTxEnv(txId, inputAssets)
+      result <- fromExeResult(
         worldState,
-        groupIndex,
-        contractId,
-        params.callerAddress.map(_.contractId),
-        txId,
-        blockHash,
-        TimeStamp.now(),
-        params.inputAssets.getOrElse(AVector.empty),
-        params.methodIndex,
-        params.args.getOrElse(AVector.empty),
-        method
+        executeContractMethod(
+          worldState,
+          groupIndex,
+          contractId,
+          params.callerAddress.map(_.contractId),
+          txEnv,
+          blockHash,
+          TimeStamp.now(),
+          inputAssets,
+          params.methodIndex,
+          args,
+          method
+        )
       )
     } yield result
   }
@@ -1877,9 +1953,10 @@ class ServerUtils(implicit
         failed(s"The number of contract calls exceeds the maximum limit($maxCallsInMultipleCall)")
       )
     } else {
-      val bestDepss = blockFlow.brokerConfig.groupRange.map(group =>
-        blockFlow.getBestDeps(GroupIndex.unsafe(group))
-      )
+      val bestDepss = blockFlow.brokerConfig.groupRange.map { group =>
+        val hardFork = networkConfig.getHardFork(TimeStamp.now())
+        blockFlow.getBestDeps(ChainIndex.unsafe(group, group), hardFork)
+      }
       params.calls
         .mapE { call =>
           call.validate().map { groupIndex =>
@@ -1893,40 +1970,136 @@ class ServerUtils(implicit
     }
   }
 
+  private def inputAssetsWithGasFee(
+      inputAssets: AVector[TestInputAsset]
+  ): Try[AVector[TestInputAsset]] = {
+    if (inputAssets.isEmpty) {
+      Right(inputAssets)
+    } else {
+      val asset  = inputAssets.head.asset
+      val gasFee = nonCoinbaseMinGasPrice * maximalGasPerTx
+      asset.attoAlphAmount
+        .add(gasFee)
+        .toRight(badRequest("ALPH amount overflow"))
+        .map { amount =>
+          val newAsset = asset.copy(attoAlphAmount = amount)
+          val newInput = inputAssets.head.copy(asset = newAsset)
+          inputAssets.replace(0, newInput)
+        }
+    }
+  }
+
+  private def inputAssetsWithDustAmount(
+      inputAssets: AVector[TestInputAsset],
+      dustAmount: U256
+  ): AVector[TestInputAsset] = {
+    if (inputAssets.isEmpty || dustAmount.isZero) {
+      inputAssets
+    } else {
+      val address   = inputAssets.head.address
+      val dustInput = TestInputAsset(address, AssetState(dustAmount, None))
+      inputAssets :+ dustInput
+    }
+  }
+
   def runTestContract(
       blockFlow: BlockFlow,
       testContract: TestContract.Complete
   ): Try[TestContractResult] = {
-    val contractId = testContract.contractId
+    val dustAmountProvided = testContract.dustAmount.value.nonZero
+    val maxRetryTimes      = if (!dustAmountProvided) 3 else 0
     for {
       groupIndex <- testContract.groupIndex
-      worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
-      _ <- testContract.existingContracts.foreachE(
-        createContract(worldState, _, testContract.blockHash, testContract.txId)
+      method     <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
+      _          <- checkArgs(testContract.testArgs, method)
+      result <- tryRunTestContract(
+        blockFlow,
+        testContract,
+        groupIndex,
+        method,
+        maxRetryTimes,
+        dustAmountProvided
       )
-      _      <- createContract(worldState, contractId, testContract)
-      method <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
-      executionResultPair <- executeContractMethod(
+    } yield result
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def tryRunTestContract(
+      blockFlow: BlockFlow,
+      testContract: TestContract.Complete,
+      groupIndex: GroupIndex,
+      method: Method[StatefulContext],
+      retryTimes: Int,
+      dustAmountProvided: Boolean
+  ): Try[TestContractResult] = {
+    val contractId = testContract.contractId
+    val txId       = testContract.txId
+    val blockHash  = testContract.blockHash
+    for {
+      worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
+      _ <- testContract.existingContracts.foreachE(createContract(worldState, _, blockHash, txId))
+      _ <- createContract(worldState, contractId, testContract)
+      inputAssets <- inputAssetsWithGasFee(testContract.inputAssets)
+      allInputs = inputAssetsWithDustAmount(inputAssets, testContract.dustAmount.value)
+      txEnv     = mockupTxEnv(txId, allInputs)
+      result <- executeContractMethod(
         worldState,
         groupIndex,
         contractId,
         testContract.callerContractIdOpt,
-        testContract.txId,
-        testContract.blockHash,
+        txEnv,
+        blockHash,
         testContract.blockTimeStamp,
-        testContract.inputAssets,
+        inputAssets,
         testContract.testMethodIndex,
         testContract.testArgs,
         method
-      )
-      events = fetchContractEvents(worldState)
+      ) match {
+        case Right(result) =>
+          fromRunTestContractResult(txEnv, worldState, testContract, result._1, result._2)
+        case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
+        case Left(Right(error: InsufficientFundsForUTXODustAmount)) =>
+          if (retryTimes > 0) {
+            val newDustAmount = Amount(testContract.dustAmount.value.addUnsafe(error.required))
+            tryRunTestContract(
+              blockFlow,
+              testContract.copy(dustAmount = newDustAmount),
+              groupIndex,
+              method,
+              retryTimes - 1,
+              dustAmountProvided
+            )
+          } else {
+            if (!dustAmountProvided) {
+              val dustAmount = ALPH.prettifyAmount(testContract.dustAmount.value)
+              val required   = ALPH.prettifyAmount(error.required)
+              val errorString =
+                s"Test failed due to insufficient funds to cover the dust amount. We tried increasing the dust amount to $dustAmount, " +
+                  s"but at least $required is still required. Please figure out the exact dust amount needed and specify it using the dustAmount parameter."
+              fromErrorString(worldState, errorString)
+            } else {
+              fromExeFailure(worldState, error)
+            }
+          }
+        case Left(Right(exeFailure)) => fromExeFailure(worldState, exeFailure)
+      }
+    } yield result
+  }
+
+  private def fromRunTestContractResult(
+      txEnv: TxEnv,
+      worldState: WorldState.Staging,
+      testContract: TestContract.Complete,
+      executionOutputs: AVector[vm.Val],
+      executionResult: StatefulVM.TxScriptExecution
+  ): Try[TestContractResult] = {
+    val events = fetchContractEvents(worldState)
+    for {
       contractIds <- getCreatedAndDestroyedContractIds(events)
       postState   <- fetchContractsState(worldState, testContract, contractIds._1, contractIds._2)
       eventsSplit <- extractDebugMessages(events)
     } yield {
-      val executionOutputs = executionResultPair._1
-      val executionResult  = executionResultPair._2
-      val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
+      val gasUsed = txEnv.gasAmount.subUnsafe(executionResult.gasBox)
       TestContractResult(
         address = Address.contract(testContract.contractId),
         codeHash = postState._2,
@@ -2052,40 +2225,55 @@ class ServerUtils(implicit
     wrapResult(result)
   }
 
-  // scalastyle:off method.length parameter.number
+  // scalastyle:off parameter.number
   private def executeContractMethod(
       worldState: WorldState.Staging,
       groupIndex: GroupIndex,
       contractId: ContractId,
       callerContractIdOpt: Option[ContractId],
-      txId: TransactionId,
+      txEnv: TxEnv,
       blockHash: BlockHash,
       blockTimeStamp: TimeStamp,
       inputAssets: AVector[TestInputAsset],
       methodIndex: Int,
       args: AVector[Val],
       method: Method[StatefulContext]
-  ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
-    val blockEnv   = mockupBlockEnv(groupIndex, blockHash, blockTimeStamp)
-    val testGasFee = nonCoinbaseMinGasPrice * maximalGasPerTx
-    val txEnv      = mockupTxEnv(txId, inputAssets)
-    val context    = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
-    for {
-      _ <- checkArgs(args, method)
-      _ <- checkGasFee(testGasFee, inputAssets)
-      result <- runWithDebugError(
-        context,
-        contractId,
-        callerContractIdOpt,
-        inputAssets,
-        methodIndex,
-        args,
-        method,
-        testGasFee
-      )
-    } yield result
+  ): ExeResult[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    val blockEnv = mockupBlockEnv(groupIndex, blockHash, blockTimeStamp)
+    val context  = StatefulContext(blockEnv, txEnv, worldState, txEnv.gasAmount)
+    runWithDebugError(
+      context,
+      contractId,
+      callerContractIdOpt,
+      inputAssets,
+      methodIndex,
+      args,
+      method,
+      txEnv.gasFeeUnsafe
+    )
   }
-  // scalastyle:on method.length parameter.number
+  // scalastyle:on parameter.number
+
+  private def fromExeResult[T](worldState: WorldState.Staging, exeResult: ExeResult[T]): Try[T] = {
+    exeResult match {
+      case Right(result)           => Right(result)
+      case Left(Left(ioFailure))   => Left(failedInIO(ioFailure.error))
+      case Left(Right(exeFailure)) => fromExeFailure(worldState, exeFailure)
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  private def fromExeFailure[T](worldState: WorldState.Staging, exeFailure: ExeFailure): Try[T] = {
+    fromErrorString(worldState, s"VM execution error: ${exeFailure.toString()}")
+  }
+
+  private def fromErrorString[T](worldState: WorldState.Staging, errorString: String): Try[T] = {
+    val events = fetchContractEvents(worldState)
+    extractDebugMessages(events).flatMap { case (_, debugMessages) =>
+      val detail = showDebugMessages(debugMessages) ++ errorString
+      Left(failed(detail))
+    }
+  }
 
   private def checkArgs(args: AVector[Val], method: Method[StatefulContext]): Try[Unit] = {
     if (args.sumBy(_.flattenSize()) != method.argsLength) {
@@ -2099,21 +2287,7 @@ class ServerUtils(implicit
     }
   }
 
-  private def checkGasFee(testGasFee: U256, inputAssets: AVector[TestInputAsset]): Try[Unit] = {
-    inputAssets.headOption match {
-      case Some(inputAsset) if inputAsset.asset.attoAlphAmount < testGasFee =>
-        Left(
-          failed(
-            s"First input asset should have at least ${ALPH.prettifyAmount(testGasFee)} to cover gas"
-          )
-        )
-      case _ =>
-        Right(())
-    }
-  }
-
   // scalastyle:off method.length
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def runWithDebugError(
       context: StatefulContext,
       contractId: ContractId,
@@ -2123,8 +2297,8 @@ class ServerUtils(implicit
       args: AVector[Val],
       method: Method[StatefulContext],
       testGasFee: U256
-  ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
-    val executionResult = callerContractIdOpt match {
+  ): ExeResult[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    callerContractIdOpt match {
       case None =>
         val script = StatefulScript.unsafe(
           AVector(
@@ -2133,6 +2307,7 @@ class ServerUtils(implicit
               usePreapprovedAssets = inputAssets.nonEmpty,
               useContractAssets = false,
               usePayToContractOnly = false,
+              useRoutePattern = false,
               argsLength = 0,
               localsLength = 0,
               returnLength = method.returnLength,
@@ -2156,6 +2331,7 @@ class ServerUtils(implicit
               usePreapprovedAssets = inputAssets.nonEmpty,
               useContractAssets = false,
               usePayToContractOnly = false,
+              useRoutePattern = false,
               argsLength = 0,
               localsLength = 0,
               returnLength = method.returnLength,
@@ -2174,17 +2350,6 @@ class ServerUtils(implicit
           mockCallerContract,
           callerContractId
         )
-    }
-    executionResult match {
-      case Right(result)         => Right(result)
-      case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
-      case Left(Right(exeFailure)) =>
-        val errorString = s"VM execution error: ${exeFailure.toString()}"
-        val events      = fetchContractEvents(context.worldState)
-        extractDebugMessages(events).flatMap { case (_, debugMessages) =>
-          val detail = showDebugMessages(debugMessages) ++ errorString
-          Left(failed(detail))
-        }
     }
   }
   // scalastyle:on method.length
@@ -2349,7 +2514,7 @@ object ServerUtils {
 
   def buildDeployContractScriptRawWithParsedState(
       codeRaw: String,
-      address: Address,
+      address: String,
       initialImmFields: AVector[vm.Val],
       initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
@@ -2400,7 +2565,7 @@ object ServerUtils {
   ): Try[StatefulScript] = {
     val scriptRaw = buildDeployContractScriptRawWithParsedState(
       codeRaw,
-      address,
+      address.toBase58,
       initialImmFields,
       initialMutFields,
       initialAttoAlphAmount,

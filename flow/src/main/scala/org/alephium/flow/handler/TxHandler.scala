@@ -19,7 +19,7 @@ package org.alephium.flow.handler
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import akka.actor.Props
+import akka.actor.{ActorSystem, Props}
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
@@ -42,16 +42,28 @@ import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.util._
 
 object TxHandler {
-  def props(
+  // scalastyle:off parameter.number
+  def build(
+      system: ActorSystem,
       blockFlow: BlockFlow,
       txStorage: PendingTxStorage,
-      eventBus: ActorRefT[EventBus.Message]
+      eventBus: ActorRefT[EventBus.Message],
+      namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
       memPoolSetting: MemPoolSetting,
       networkSetting: NetworkSetting,
       logConfig: LogConfig
-  ): Props = Props(new TxHandler(blockFlow, txStorage, eventBus))
+  ): ActorRefT[Command] = {
+    val actor = ActorRefT.build[Command](
+      system,
+      Props(new TxHandler(blockFlow, txStorage, eventBus)),
+      s"TxHandler$namePostfix"
+    )
+    system.eventStream.subscribe(actor.ref, classOf[InterCliqueManager.SyncedResult])
+    actor
+  }
+  // scalastyle:on parameter.number
 
   sealed trait Command
   final case class AddToMemPool(
@@ -125,8 +137,12 @@ object TxHandler {
           _ <- mineTxForDev(blockFlow, chainIndex, publishBlock)
           addToMemPoolResult <-
             if (!chainIndex.isIntraGroup) {
-              mineTxForDev(blockFlow, ChainIndex(chainIndex.from, chainIndex.from), publishBlock)
-                .map(_ => MemPool.AddedToMemPool(seenAt))
+              val intraChain = ChainIndex(chainIndex.from, chainIndex.from)
+              for {
+                result <- mineTxForDev(blockFlow, intraChain, publishBlock).map(_ =>
+                  MemPool.AddedToMemPool
+                )
+              } yield result
             } else {
               Right(MemPool.AddedToMemPool(seenAt))
             }
@@ -176,6 +192,7 @@ object TxHandler {
     val (_, minerPubKey) = chainIndex.to.generateKey
     val miner            = LockupScript.p2pkh(minerPubKey)
     val result = for {
+      _            <- blockFlow.updateViewPerChainIndexDanube(chainIndex).left.map(_.toString)
       flowTemplate <- blockFlow.prepareBlockFlow(chainIndex, miner).left.map(_.getMessage)
       block = Miner.mineForDev(chainIndex, flowTemplate)
       _ <- validateAndAddBlock(blockFlow, block)
@@ -214,8 +231,12 @@ object TxHandler {
         blockFlow.add(block, worldStateOpt) match {
           case Left(error) => Left(s"Failed in add the mined block: $error")
           case Right(_) =>
-            blockFlow.updateBestDepsUnsafe()
-            Right(())
+            val result = for {
+              _ <- blockFlow.updateViewPerChainIndexDanube(block.chainIndex)
+              _ <- blockFlow.updateAccountView(block)
+              _ <- blockFlow.updateViewPreDanube()
+            } yield ()
+            result.left.map(_.getMessage)
         }
     }
   }

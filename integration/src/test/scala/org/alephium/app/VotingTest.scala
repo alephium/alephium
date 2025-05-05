@@ -362,7 +362,7 @@ trait WalletFixture extends CliqueFixture {
         issueTokenAmount = issueTokenAmount
       ),
       restPort
-    )
+    ).asInstanceOf[BuildSimpleDeployContractTxResult]
     val txResult = submitTx(buildResult.unsignedTx, buildResult.txId, wallet.creation.walletName)
     val Confirmed(blockHash, _, _, _, _) =
       request[TxStatus](getTransactionStatus(txResult), restPort)
@@ -393,7 +393,7 @@ trait WalletFixture extends CliqueFixture {
         tokens = tokens
       ),
       restPort
-    )
+    ).asInstanceOf[BuildSimpleExecuteScriptTxResult]
     submitTx(buildResult.unsignedTx, buildResult.txId, walletName)
   }
 

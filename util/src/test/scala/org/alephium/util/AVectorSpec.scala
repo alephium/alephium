@@ -494,6 +494,15 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "remove" in new Fixture {
+    forAll(vectorGen.filter(_.nonEmpty)) { vector =>
+      vector.remove(0) is vector.tail
+      vector.remove(vector.length - 1) is vector.init
+      val index = Random.nextInt(vector.length)
+      vector.remove(index) is vector.slice(0, index) ++ vector.slice(index + 1, vector.length)
+    }
+  }
+
   it should "iterator" in new Fixture {
     forAll(vectorGen) { vc =>
       vc.iterator.toSeq is vc.toSeq
@@ -854,6 +863,12 @@ class SpecialAVectorSpec extends AlephiumSpec {
     converted(0).asInstanceOf[Bar] is Bar(1)
     converted(1).asInstanceOf[Bar] is Bar(2)
     converted(2).asInstanceOf[Bar] is Bar(3)
+  }
+
+  it should "stableSortBy" in {
+    val avector = AVector.from((0 until 30).map((_, 1)))
+    avector.stableSortBy(_._2) is avector
+    avector.sortBy(_._2) isnot avector
   }
 }
 //scalastyle:on file.size.limit
