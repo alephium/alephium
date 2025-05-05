@@ -31,7 +31,10 @@ import org.alephium.ws._
 import org.alephium.ws.WsParams._
 import org.alephium.ws.WsParams.ContractEventsSubscribeParams.{AddressesField, EventIndexField}
 
-class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
+class WsProtocolSpec
+    extends AlephiumSpec
+    with WsSubscriptionFixture
+    with WsParams.WsNotificationParamsCodec {
 
   private val contractAddressLimit = config.network.wsMaxContractEventAddresses
 
@@ -332,7 +335,7 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
     val blockNotificationJson = write(blockNotificationParams)
     read[WsNotificationParams](blockNotificationJson) is blockNotificationParams
 
-    val blockNotificationRpc = blockNotificationParams.asJsonRpcNotification
+    val blockNotificationRpc = asJsonRpcNotification(blockNotificationParams)
     blockNotificationRpc("method") is WsMethod.SubscriptionMethod
     blockNotificationRpc("params") is writeJs(blockNotificationParams)
 
@@ -343,7 +346,7 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
     val txNotificationJson = write(txNotificationParams)
     read[WsNotificationParams](txNotificationJson) is txNotificationParams
 
-    val txNotificationRpc = txNotificationParams.asJsonRpcNotification
+    val txNotificationRpc = asJsonRpcNotification(txNotificationParams)
     txNotificationRpc("method") is WsMethod.SubscriptionMethod
     txNotificationRpc("params") is writeJs(txNotificationParams)
 
@@ -354,14 +357,14 @@ class WsProtocolSpec extends AlephiumSpec with WsSubscriptionFixture {
     val contractEventNotificationJson = write(contractEventNotificationParams)
     read[WsNotificationParams](contractEventNotificationJson) is contractEventNotificationParams
 
-    val contractEventNotificationRpc = contractEventNotificationParams.asJsonRpcNotification
+    val contractEventNotificationRpc = asJsonRpcNotification(contractEventNotificationParams)
     contractEventNotificationRpc("method") is WsMethod.SubscriptionMethod
     contractEventNotificationRpc("params") is writeJs(contractEventNotificationParams)
 
     val allNotifications =
       AVector(blockNotificationParams, txNotificationParams, contractEventNotificationParams)
     allNotifications.foreach { notification =>
-      val serialized   = write(notification)(WsNotificationParams.wsSubscriptionParamsWriter)
+      val serialized   = write(notification)(wsSubscriptionParamsWriter)
       val deserialized = read[WsNotificationParams](serialized)
       deserialized is notification
     }

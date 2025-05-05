@@ -18,7 +18,6 @@ package org.alephium.app.ws
 
 import akka.actor.{ActorSystem, Props}
 
-import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.{
   BlockAndEvents,
   BlockEntry,
@@ -33,7 +32,7 @@ import org.alephium.util.{ActorRefT, BaseActor, EventBus}
 import org.alephium.ws.WsParams.{WsBlockNotificationParams, WsTxNotificationParams}
 import org.alephium.ws.WsSubscriptionHandler.{NotificationPublished, SubscriptionMsg}
 
-object WsEventHandler extends ApiModelCodec {
+object WsEventHandler {
 
   def getSubscribedEventHandler(
       eventBusRef: ActorRefT[EventBus.Message],
@@ -53,8 +52,7 @@ object WsEventHandler extends ApiModelCodec {
 
 class WsEventHandler(subscriptionHandlerRef: ActorRefT[SubscriptionMsg])(implicit
     val networkConfig: NetworkConfig
-) extends BaseActor
-    with ApiModelCodec {
+) extends BaseActor {
 
   def receive: Receive = {
     case TxNotify(tx, seenAt) =>

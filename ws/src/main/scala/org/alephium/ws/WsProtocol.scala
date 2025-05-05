@@ -165,20 +165,21 @@ object WsParams {
       }
     }
   }
-
+  //
   sealed trait WsNotificationParams extends WsParams {
     def subscription: WsSubscriptionId
-    def asJsonRpcNotification: ujson.Obj = {
-      ujson
-        .Obj(
-          "method" -> WsMethod.SubscriptionMethod,
-          "params" -> writeJs(this)
-        )
-    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  object WsNotificationParams extends ApiModelCodec {
+  trait WsNotificationParamsCodec extends ApiModelCodec {
+    def asJsonRpcNotification(notification: WsNotificationParams): ujson.Obj = {
+      ujson
+        .Obj(
+          "method" -> WsMethod.SubscriptionMethod,
+          "params" -> writeJs(notification)
+        )
+    }
+
     implicit val blockSubscriptionWriter: ReadWriter[WsBlockNotificationParams]            = macroRW
     implicit val txSubscriptionWriter: ReadWriter[WsTxNotificationParams]                  = macroRW
     implicit val contractSubscriptionWriter: ReadWriter[WsContractEventNotificationParams] = macroRW
@@ -226,7 +227,7 @@ object WsParams {
 }
 
 final case class WsRequest(id: WsCorrelationId, params: WsSubscriptionParams)
-object WsRequest extends ApiModelCodec {
+object WsRequest { // extends ApiModelCodec {
   import WsParams._
 
   implicit val wsRequestWriter: Writer[WsRequest] = writer[Request].comap[WsRequest] { req =>

@@ -29,7 +29,7 @@ import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket, WebSo
 
 import org.alephium.flow.client.Node
 import org.alephium.http.HttpServerLike
-import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.util.{ActorRefT, Duration, EventBus}
 import org.alephium.ws._
 import org.alephium.ws.WsParams.WsId
@@ -52,7 +52,8 @@ object WsServer extends StrictLogging {
       pingFrequency: Duration,
       options: HttpServerOptions
   )(implicit
-      networkConfig: NetworkConfig
+      networkConfig: NetworkConfig,
+      groupConfig: GroupConfig
   ): WsServer = {
     val vertx  = Vertx.vertx()
     val server = vertx.createHttpServer(options)

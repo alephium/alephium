@@ -28,7 +28,8 @@ import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.{Message, MessageConsumer}
 import io.vertx.core.http.ServerWebSocketHandshake
 
-import org.alephium.json.Json.write
+import org.alephium.json.Json._
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Error, Response}
 import org.alephium.util.{discard, ActorRefT, AVector, BaseActor}
@@ -45,7 +46,7 @@ object WsSubscriptionHandler {
       maxSubscriptionsPerConnection: Int,
       maxContractEventAddresses: Int,
       pingFrequency: FiniteDuration
-  ): ActorRefT[SubscriptionMsg] = {
+  )(implicit groupConfig: GroupConfig): ActorRefT[SubscriptionMsg] = {
     ActorRefT
       .build[WsSubscriptionHandler.SubscriptionMsg](
         system,
@@ -121,13 +122,17 @@ object WsSubscriptionHandler {
   private case object KeepAlive
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.ToString"))
 class WsSubscriptionHandler(
     vertx: Vertx,
     maxConnections: Int,
     maxSubscriptionsPerConnection: Int,
     maxContractEventAddresses: Int,
     pingFrequency: FiniteDuration
-) extends BaseActor {
+)(implicit val groupConfig: GroupConfig)
+    extends BaseActor
+    with WsNotificationParamsCodec {
+
   import org.alephium.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
 
@@ -206,7 +211,9 @@ class WsSubscriptionHandler(
   // scalastyle:on cyclomatic.complexity method.length
 
   private def publishNotification(params: WsNotificationParams): Unit = {
-    vertx.eventBus().publish(params.subscription.toHexString, params.asJsonRpcNotification.render())
+    vertx
+      .eventBus()
+      .publish(params.subscription.toHexString, asJsonRpcNotification(params).render())
     ()
   }
 

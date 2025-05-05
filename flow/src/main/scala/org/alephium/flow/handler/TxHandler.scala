@@ -140,7 +140,7 @@ object TxHandler {
               val intraChain = ChainIndex(chainIndex.from, chainIndex.from)
               for {
                 result <- mineTxForDev(blockFlow, intraChain, publishBlock).map(_ =>
-                  MemPool.AddedToMemPool
+                  MemPool.AddedToMemPool(seenAt)
                 )
               } yield result
             } else {
