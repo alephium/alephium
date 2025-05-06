@@ -25,8 +25,6 @@ import org.alephium.util.{AVector, BaseActor}
 
 object Utils {
 
-  val PoolDispatcher = "akka.actor.pool-dispatcher"
-
   def showDigest[T <: RandomBytes](elems: AVector[T]): String = {
     if (elems.isEmpty) "[]" else s"[ ${elems.head.shortHex} .. ${elems.last.shortHex} ]"
   }
@@ -52,6 +50,8 @@ object Utils {
       case Right(t) => t
       case Left(e)  => throw e
     }
+
+  val PoolDispatcher = "akka.actor.pool-dispatcher"
 
   trait BaseActorWithPoolExecutor extends BaseActor {
     implicit lazy val poolEC: ExecutionContext =

@@ -16,9 +16,10 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.Props
+import akka.actor.{ActorSystem, Props}
 import io.prometheus.client.{Counter, Gauge, Histogram}
 
+import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
@@ -28,15 +29,24 @@ import org.alephium.protocol.model.{BlockHash, BlockHeader, ChainIndex}
 import org.alephium.util.ActorRefT
 
 object HeaderChainHandler {
-  def props(
+  def build(
+      system: ActorSystem,
       blockFlow: BlockFlow,
-      chainIndex: ChainIndex
+      chainIndex: ChainIndex,
+      namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
       consensusConfigs: ConsensusConfigs,
       networkConfig: NetworkConfig
-  ): Props =
-    Props(new HeaderChainHandler(blockFlow, chainIndex))
+  ): ActorRefT[Command] = {
+    val props = Props(new HeaderChainHandler(blockFlow, chainIndex))
+      .withDispatcher(Utils.PoolDispatcher)
+    ActorRefT.build[HeaderChainHandler.Command](
+      system,
+      props,
+      s"HeaderChainHandler-${chainIndex.from.value}-${chainIndex.to.value}$namePostfix"
+    )
+  }
 
   sealed trait Command
   final case class Validate(
