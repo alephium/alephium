@@ -41,7 +41,7 @@ object MinerApiController {
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting
   ): Props =
-    Props(new MinerApiController(allHandlers)).withDispatcher(MiningDispatcher)
+    Props(new MinerApiController(allHandlers))
 
   sealed trait Command
   final case class Received(message: ClientMessage) extends Command
@@ -50,7 +50,7 @@ object MinerApiController {
       groupConfig: GroupConfig,
       networkSetting: NetworkSetting
   ): Props = {
-    Props(new MyConnectionHandler(remote, connection)).withDispatcher(MiningDispatcher)
+    Props(new MyConnectionHandler(remote, connection))
   }
 
   class MyConnectionHandler(

@@ -36,7 +36,7 @@ object CpuMiner {
       brokerConfig: BrokerConfig,
       miningConfig: MiningSetting
   ): Props = {
-    Props(new CpuMiner(allHandlers)).withDispatcher(MiningDispatcher)
+    Props(new CpuMiner(allHandlers))
   }
 }
 

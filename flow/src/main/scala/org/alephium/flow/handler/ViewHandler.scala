@@ -17,13 +17,12 @@
 package org.alephium.flow.handler
 
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.{ActorRef, ActorSystem, Cancellable, Props}
 import akka.pattern.pipe
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.mining.{Miner, MiningDispatcher}
+import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
@@ -42,8 +41,7 @@ object ViewHandler {
     val props = Props(
       new ViewHandler(blockFlow, miningSetting.minerAddresses.map(_.map(_.lockupScript)))
     )
-    val actor = ActorRefT
-      .build[Command](system, props.withDispatcher(MiningDispatcher), s"ViewHandler$namePostfix")
+    val actor = ActorRefT.build[Command](system, props, s"ViewHandler$namePostfix")
     system.eventStream.subscribe(actor.ref, classOf[InterCliqueManager.SyncedResult])
     system.eventStream.subscribe(actor.ref, classOf[ChainHandler.FlowDataAdded])
     actor
@@ -102,8 +100,7 @@ class ViewHandler(
     with BlockFlowUpdaterDanubeState
     with Publisher
     with InterCliqueManager.NodeSyncStatus {
-  override def receive: Receive                   = handle orElse updateNodeSyncStatus
-  implicit def executionContext: ExecutionContext = context.dispatcher
+  override def receive: Receive = handle orElse updateNodeSyncStatus
 
   // scalastyle:off cyclomatic.complexity
   def handle: Receive = {
@@ -273,11 +270,12 @@ trait BlockFlowUpdaterPreDanubeState extends IOBaseActor {
   def blockFlow: BlockFlow
   protected[handler] val preDanubeUpdateState: AsyncUpdateState = AsyncUpdateState()
 
-  implicit def executionContext: ExecutionContext
-
   def tryUpdateBestViewPreDanube(): Unit = {
+    if (preDanubeUpdateState.isUpdating) {
+      log.debug("Skip updating pre-danube best deps due to pending updates")
+    }
     if (preDanubeUpdateState.tryUpdate()) {
-      Future[ViewHandler.Command] {
+      poolAsync[ViewHandler.Command] {
         val now          = TimeStamp.now()
         val hardForkSoon = blockFlow.networkConfig.getHardFork(now.plusSecondsUnsafe(10))
         val updateResult = if (hardForkSoon.isDanubeEnabled()) {
@@ -297,16 +295,12 @@ trait BlockFlowUpdaterPreDanubeState extends IOBaseActor {
       }.pipeTo(self)
       ()
     }
-    if (preDanubeUpdateState.isUpdating) {
-      log.debug("Skip updating pre-danube best deps due to pending updates")
-    }
   }
 }
 
 trait BlockFlowUpdaterDanubeState extends IOBaseActor {
   def blockFlow: BlockFlow
   implicit def brokerConfig: BrokerConfig
-  implicit def executionContext: ExecutionContext
   def minerAddressesOpt: Option[AVector[LockupScript.Asset]]
   def subscribers: scala.collection.Seq[ActorRef]
 
@@ -323,10 +317,13 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def tryUpdateBestViewDanube(chainIndex: ChainIndex): Unit = {
     val statePerChain = danubeUpdateStates(chainIndex.flattenIndex)
+    if (statePerChain.isUpdating) {
+      log.debug("Skip updating danube best deps due to pending updates")
+    }
     if (statePerChain.tryUpdate()) {
       val minerAddress   = minerAddressesOpt.map(_.apply(chainIndex.to.value))
       val allSubscribers = AVector.from(subscribers)
-      Future[ViewHandler.Command] {
+      poolAsync[ViewHandler.Command] {
         val result = for {
           _ <- blockFlow.updateViewPerChainIndexDanube(chainIndex)
           needToUpdate = brokerConfig.contains(chainIndex.from)
@@ -344,9 +341,7 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
             ViewHandler.BestDepsUpdateFailedDanube(chainIndex)
         }
       }.pipeTo(self)
-    }
-    if (statePerChain.isUpdating) {
-      log.debug("Skip updating danube best deps due to pending updates")
+      ()
     }
   }
 
