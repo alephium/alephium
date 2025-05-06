@@ -226,8 +226,10 @@ trait ViewHandlerState extends IOBaseActor {
   def updateSubscribersDanube(chainIndex: ChainIndex): Unit = {
     if (minerAddressesOpt.nonEmpty && subscribers.nonEmpty) {
       val minerAddress = minerAddressesOpt.get(chainIndex.to.value)
-      escapeIOError(blockFlow.prepareBlockFlow(chainIndex, minerAddress)) { template =>
-        subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
+      poolAsync {
+        escapeIOError(blockFlow.prepareBlockFlow(chainIndex, minerAddress)) { template =>
+          subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
+        }
       }
       scheduleUpdateDanube(chainIndex)
     }

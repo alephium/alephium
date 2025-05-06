@@ -177,14 +177,17 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
       case Right(true) =>
         log.debug(s"Block/Header ${data.shortHex} exists already")
       case Right(false) =>
-        addDataToBlockFlow(data, validationSideEffect) match {
-          case Left(error) => handleIOError(error)
-          case Right(_) =>
-            publishEvent(ChainHandler.FlowDataAdded(data, origin, TimeStamp.now()))
-            notifyBroker(broker, data)
-            log.info(show(data))
-            measure(data)
+        poolAsync {
+          addDataToBlockFlow(data, validationSideEffect) match {
+            case Left(error) => handleIOError(error)
+            case Right(_) =>
+              publishEvent(ChainHandler.FlowDataAdded(data, origin, TimeStamp.now()))
+              notifyBroker(broker, data)
+              log.info(show(data))
+              measure(data)
+          }
         }
+        ()
       case Left(error) => handleIOError(error)
     }
   }

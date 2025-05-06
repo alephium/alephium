@@ -69,9 +69,12 @@ class FlowHandler(blockFlow: BlockFlow) extends IOBaseActor with Stash {
         sender() ! SyncLocators(locators)
       }
     case GetSyncInventories(requestId, locators, peerBrokerInfo) =>
-      escapeIOError(blockFlow.getSyncInventories(locators, peerBrokerInfo)) { inventories =>
-        sender() ! SyncInventories(Some(requestId), inventories)
+      poolAsync {
+        escapeIOError(blockFlow.getSyncInventories(locators, peerBrokerInfo)) { inventories =>
+          sender() ! SyncInventories(Some(requestId), inventories)
+        }
       }
+      ()
     case GetIntraSyncInventories =>
       escapeIOError(blockFlow.getIntraSyncInventories()) { inventories =>
         sender() ! SyncInventories(None, inventories)

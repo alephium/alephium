@@ -17,7 +17,6 @@
 package org.alephium.flow.mining
 
 import scala.annotation.tailrec
-import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 import akka.util.ByteString

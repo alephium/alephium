@@ -16,10 +16,10 @@
 
 package org.alephium.flow.network.broker
 
-import org.alephium.util.BaseActor
+import org.alephium.flow.Utils
 import org.alephium.util.EventStream.Publisher
 
-trait BaseHandler extends BaseActor with Publisher {
+trait BaseHandler extends Utils.BaseActorWithPoolExecutor with Publisher {
 
   def handleMisbehavior(misbehavior: MisbehaviorManager.Misbehavior): Unit = {
     publishEvent(misbehavior)
