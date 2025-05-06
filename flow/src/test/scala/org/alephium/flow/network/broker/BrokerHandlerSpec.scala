@@ -31,7 +31,7 @@ import org.alephium.flow.validation.{InvalidHeaderFlow, InvalidTestnetMiner}
 import org.alephium.protocol.{Generators, Signature, SignatureSchema}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BlockHash, BrokerInfo, ChainIndex, CliqueId}
+import org.alephium.protocol.model.{BlockHash, BrokerInfo, ChainIndex, CliqueId, HardFork}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, TimeStamp}
 
 class BrokerHandlerSpec extends AlephiumActorSpec {
@@ -54,6 +54,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
 
   it should "stop when handshake message contains invalid client id" in new Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.network.network-id", 1))
+    setHardFork(HardFork.Rhone)
 
     networkConfig.networkId.id is 1.toByte
     networkConfig.getHardFork(TimeStamp.now()).isRhoneEnabled() is true
