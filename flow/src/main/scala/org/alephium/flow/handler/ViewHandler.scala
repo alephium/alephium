@@ -162,8 +162,8 @@ trait ViewHandlerState extends IOBaseActor {
   def minerAddressesOpt: Option[AVector[LockupScript.Asset]]
   def isNodeSynced: Boolean
 
-  var updateScheduled: Option[Cancellable] = None
-  val subscribers: ArrayBuffer[ActorRef]   = ArrayBuffer.empty
+  var updateScheduledPreDanube: Option[Cancellable] = None
+  val subscribers: ArrayBuffer[ActorRef]            = ArrayBuffer.empty
 
   def subscribe(): Unit = {
     if (subscribers.contains(sender())) {
@@ -176,7 +176,7 @@ trait ViewHandlerState extends IOBaseActor {
         case Some(_) =>
           subscribers.addOne(sender())
           updateSubscribers()
-          scheduleUpdate()
+          scheduleUpdatePreDanube()
           sender() ! ViewHandler.SubscribeResult(true)
         case None =>
           failedInSubscribe(s"Unable to subscribe the miner, as miner addresses are not set")
@@ -189,22 +189,25 @@ trait ViewHandlerState extends IOBaseActor {
     sender() ! ViewHandler.SubscribeResult(false)
   }
 
-  def scheduleUpdate(): Unit = {
-    updateScheduled.foreach(_.cancel())
-    updateScheduled = Some(
-      scheduleCancellableOnce(
-        self,
-        ViewHandler.UpdateSubscribers,
-        miningSetting.pollingInterval
+  def scheduleUpdatePreDanube(): Unit = {
+    updateScheduledPreDanube.foreach(_.cancel())
+    val hardFork = getHardForkNow()
+    if (!hardFork.isDanubeEnabled()) {
+      updateScheduledPreDanube = Some(
+        scheduleCancellableOnce(
+          self,
+          ViewHandler.UpdateSubscribers,
+          miningSetting.pollingInterval
+        )
       )
-    )
+    }
   }
 
   def unsubscribe(): Unit = {
     subscribers.filterInPlace(_ != sender())
     if (subscribers.isEmpty) {
-      updateScheduled.foreach(_.cancel())
-      updateScheduled = None
+      updateScheduledPreDanube.foreach(_.cancel())
+      updateScheduledPreDanube = None
     }
   }
 
@@ -216,7 +219,7 @@ trait ViewHandlerState extends IOBaseActor {
         escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
           subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
         }
-        scheduleUpdate()
+        scheduleUpdatePreDanube()
       }
     } else if (subscribers.nonEmpty) {
       log.warning(s"The node is not synced, unsubscribe all actors")

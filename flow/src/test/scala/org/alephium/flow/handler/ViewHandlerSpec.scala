@@ -76,7 +76,6 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     EventFilter.warning("Unable to subscribe the miner, as miner addresses are not set").intercept {
       viewHandler ! ViewHandler.Subscribe
       viewHandler.underlyingActor.subscribers.isEmpty is true
-      viewHandler.underlyingActor.updateScheduled is None
       expectMsg(ViewHandler.SubscribeResult(succeeded = false))
     }
 
@@ -84,14 +83,12 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     viewHandler ! ViewHandler.Subscribe
     eventually {
       viewHandler.underlyingActor.subscribers.nonEmpty is true
-      viewHandler.underlyingActor.updateScheduled.nonEmpty is true
       expectMsg(ViewHandler.SubscribeResult(succeeded = true))
     }
 
     viewHandler ! ViewHandler.Unsubscribe
     eventually {
       viewHandler.underlyingActor.subscribers.isEmpty is true
-      viewHandler.underlyingActor.updateScheduled is None
     }
   }
 
@@ -125,18 +122,28 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
       mempool.isReady(tx0.id) is false
       mempool.isReady(tx1.id) is true
     }
+  }
 
+  it should "schedule update pre-danube" in new Fixture {
+    setHardForkBefore(HardFork.Danube)
+    setSynced()
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
-    viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
+    viewHandler ! ViewHandler.Subscribe
+    eventually(viewHandler.underlyingActor.updateScheduledPreDanube.nonEmpty is true)
+    eventually(expectMsgType[ViewHandler.NewTemplates])
+    Thread.sleep(miningSetting.pollingInterval.millis)
     eventually(expectMsgType[ViewHandler.NewTemplates])
   }
 
-  it should "update templates automatically" in new SyncedFixture {
+  it should "not schedule update since-danube" in new Fixture {
+    setHardForkSince(HardFork.Danube)
+    setSynced()
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
     viewHandler ! ViewHandler.Subscribe
-
-    Thread.sleep(miningSetting.pollingInterval.millis)
+    eventually(viewHandler.underlyingActor.updateScheduledPreDanube.isEmpty is true)
     eventually(expectMsgType[ViewHandler.NewTemplates])
+    Thread.sleep(miningSetting.pollingInterval.millis)
+    eventually(expectNoMessage())
   }
 
   it should "subscribe and unsubscribe actors" in new Fixture {
