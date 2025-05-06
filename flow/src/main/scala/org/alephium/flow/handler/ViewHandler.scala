@@ -56,7 +56,8 @@ object ViewHandler {
   final case class BestDepsUpdateFailedDanube(chainIndex: ChainIndex)      extends Command
   case object Subscribe                                                    extends Command
   case object Unsubscribe                                                  extends Command
-  case object UpdateSubscribers                                            extends Command
+  case object UpdateSubscribersPreDanube                                   extends Command
+  final case class UpdateSubscribersDanube(chainIndex: ChainIndex)         extends Command
   case object GetMinerAddresses                                            extends Command
   final case class UpdateMinerAddresses(addresses: AVector[Address.Asset]) extends Command
 
@@ -123,7 +124,7 @@ class ViewHandler(
       }
     case ViewHandler.BestDepsUpdatedPreDanube =>
       preDanubeUpdateState.setCompleted()
-      updateSubscribers()
+      updateSubscribersPreDanube()
       if (isNodeSynced) {
         // Handle pending updates
         tryUpdateBestViewPreDanube()
@@ -135,16 +136,18 @@ class ViewHandler(
     case ViewHandler.BestDepsUpdatedDanube(chainIndex) =>
       setDanubeUpdateCompleted(chainIndex)
       if (isNodeSynced) {
+        scheduleUpdateDanube(chainIndex)
         tryUpdateBestViewDanube(chainIndex)
       }
     case ViewHandler.BestDepsUpdateFailedDanube(chainIndex) =>
       setDanubeUpdateCompleted(chainIndex)
       log.warning("Updating danube blockflow deps failed")
 
-    case ViewHandler.Subscribe         => subscribe()
-    case ViewHandler.Unsubscribe       => unsubscribe()
-    case ViewHandler.UpdateSubscribers => updateSubscribers()
-    case ViewHandler.GetMinerAddresses => sender() ! minerAddressesOpt
+    case ViewHandler.Subscribe                           => subscribe()
+    case ViewHandler.Unsubscribe                         => unsubscribe()
+    case ViewHandler.UpdateSubscribersPreDanube          => updateSubscribersPreDanube()
+    case ViewHandler.UpdateSubscribersDanube(chainIndex) => updateSubscribersDanube(chainIndex)
+    case ViewHandler.GetMinerAddresses                   => sender() ! minerAddressesOpt
     case ViewHandler.UpdateMinerAddresses(addresses) =>
       Miner.validateAddresses(addresses) match {
         case Right(_)    => minerAddressesOpt = Some(addresses.map(_.lockupScript))
@@ -162,8 +165,9 @@ trait ViewHandlerState extends IOBaseActor {
   def minerAddressesOpt: Option[AVector[LockupScript.Asset]]
   def isNodeSynced: Boolean
 
-  var updateScheduled: Option[Cancellable] = None
-  val subscribers: ArrayBuffer[ActorRef]   = ArrayBuffer.empty
+  var updateScheduledPreDanube: Option[Cancellable]     = None
+  val updateScheduledDanube: Array[Option[Cancellable]] = Array.fill(brokerConfig.chainNum)(None)
+  val subscribers: ArrayBuffer[ActorRef]                = ArrayBuffer.empty
 
   def subscribe(): Unit = {
     if (subscribers.contains(sender())) {
@@ -175,8 +179,8 @@ trait ViewHandlerState extends IOBaseActor {
       minerAddressesOpt match {
         case Some(_) =>
           subscribers.addOne(sender())
-          updateSubscribers()
-          scheduleUpdate()
+          updateSubscribersPreDanube()
+          scheduleUpdatePreDanube()
           sender() ! ViewHandler.SubscribeResult(true)
         case None =>
           failedInSubscribe(s"Unable to subscribe the miner, as miner addresses are not set")
@@ -189,34 +193,70 @@ trait ViewHandlerState extends IOBaseActor {
     sender() ! ViewHandler.SubscribeResult(false)
   }
 
-  def scheduleUpdate(): Unit = {
-    updateScheduled.foreach(_.cancel())
-    updateScheduled = Some(
-      scheduleCancellableOnce(
-        self,
-        ViewHandler.UpdateSubscribers,
-        miningSetting.pollingInterval
+  def scheduleUpdatePreDanube(): Unit = {
+    updateScheduledPreDanube.foreach(_.cancel())
+    val hardFork = getHardForkNow()
+    if (!hardFork.isDanubeEnabled()) {
+      updateScheduledPreDanube = Some(
+        scheduleCancellableOnce(
+          self,
+          ViewHandler.UpdateSubscribersPreDanube,
+          miningSetting.pollingInterval
+        )
       )
-    )
+    }
+  }
+
+  def scheduleUpdateDanube(chainIndex: ChainIndex): Unit = {
+    if (
+      brokerConfig.contains(chainIndex.from) &&
+      minerAddressesOpt.nonEmpty &&
+      subscribers.nonEmpty
+    ) {
+      val index = chainIndex.flattenIndex
+      updateScheduledDanube(index).foreach(_.cancel())
+      updateScheduledDanube(index) = Some(
+        scheduleCancellableOnce(
+          self,
+          ViewHandler.UpdateSubscribersDanube(chainIndex),
+          miningSetting.pollingInterval
+        )
+      )
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def updateSubscribersDanube(chainIndex: ChainIndex): Unit = {
+    if (minerAddressesOpt.nonEmpty && subscribers.nonEmpty) {
+      val minerAddress = minerAddressesOpt.get(chainIndex.to.value)
+      escapeIOError(blockFlow.prepareBlockFlow(chainIndex, minerAddress)) { template =>
+        subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
+      }
+      scheduleUpdateDanube(chainIndex)
+    }
   }
 
   def unsubscribe(): Unit = {
     subscribers.filterInPlace(_ != sender())
     if (subscribers.isEmpty) {
-      updateScheduled.foreach(_.cancel())
-      updateScheduled = None
+      updateScheduledPreDanube.foreach(_.cancel())
+      updateScheduledPreDanube = None
+      updateScheduledDanube.foreach(_.foreach(_.cancel()))
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        updateScheduledDanube(chainIndex.flattenIndex) = None
+      }
     }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def updateSubscribers(): Unit = {
+  def updateSubscribersPreDanube(): Unit = {
     if (isNodeSynced) {
       if (minerAddressesOpt.nonEmpty && subscribers.nonEmpty) {
         val minerAddresses = minerAddressesOpt.get
         escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
           subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
         }
-        scheduleUpdate()
+        scheduleUpdatePreDanube()
       }
     } else if (subscribers.nonEmpty) {
       log.warning(s"The node is not synced, unsubscribe all actors")
