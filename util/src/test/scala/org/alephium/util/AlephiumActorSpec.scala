@@ -112,10 +112,14 @@ object AlephiumActorSpec {
          |      throughput = 1
          |    }
          |
-         |    mining-dispatcher {
-         |      parallelism-min = 1
-         |      parallelism-max = 4
-         |      parallelism-factor = 0.5
+         |    pool-dispatcher {
+         |      type = Dispatcher
+         |      executor = "thread-pool-executor"
+         |      thread-pool-executor {
+         |        core-pool-size-min = 4
+         |        core-pool-size-max = 32
+         |      }
+         |      throughput = 1
          |    }
          |  }
          |}

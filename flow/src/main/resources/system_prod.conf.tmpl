@@ -154,11 +154,10 @@ akka {
   actor {
     mining-dispatcher {
       type = Dispatcher
-      executor = "fork-join-executor"
-      fork-join-executor {
-        parallelism-min = 4
-        parallelism-max = 4
-        parallelism-factor = 1
+      executor = "thread-pool-executor"
+      thread-pool-executor {
+        core-pool-size-min = 4
+        core-pool-size-max = 32
       }
       throughput = 1
     }
