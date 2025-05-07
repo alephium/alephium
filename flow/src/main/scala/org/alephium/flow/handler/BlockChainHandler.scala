@@ -20,6 +20,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.util.ByteString
 import io.prometheus.client.{Counter, Gauge, Histogram}
 
+import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxForkDepth, BlockFlow}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.flow.model.DataOrigin
@@ -49,9 +50,11 @@ object BlockChainHandler {
       networkSetting: NetworkSetting,
       logConfig: LogConfig
   ): ActorRefT[Command] = {
+    val props = Props(new BlockChainHandler(blockFlow, chainIndex, eventBus, maxForkDepth))
+      .withDispatcher(Utils.PoolDispatcher)
     val actor = ActorRefT.build[Command](
       system,
-      Props(new BlockChainHandler(blockFlow, chainIndex, eventBus, maxForkDepth)),
+      props,
       s"BlockChainHandler-${chainIndex.from.value}-${chainIndex.to.value}$namePostfix"
     )
     system.eventStream.subscribe(actor.ref, classOf[InterCliqueManager.SyncedResult])

@@ -25,6 +25,7 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
+import org.alephium.flow.Utils
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.broker.ConnectionHandler
@@ -41,7 +42,7 @@ object MinerApiController {
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting
   ): Props =
-    Props(new MinerApiController(allHandlers)).withDispatcher(MiningDispatcher)
+    Props(new MinerApiController(allHandlers)).withDispatcher(Utils.PoolDispatcher)
 
   sealed trait Command
   final case class Received(message: ClientMessage) extends Command
@@ -50,7 +51,7 @@ object MinerApiController {
       groupConfig: GroupConfig,
       networkSetting: NetworkSetting
   ): Props = {
-    Props(new MyConnectionHandler(remote, connection)).withDispatcher(MiningDispatcher)
+    Props(new MyConnectionHandler(remote, connection))
   }
 
   class MyConnectionHandler(

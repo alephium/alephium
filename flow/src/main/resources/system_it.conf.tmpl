@@ -128,13 +128,12 @@ akka {
   io.tcp.register-timeout = 1m
 
   actor {
-    mining-dispatcher {
+    pool-dispatcher {
       type = Dispatcher
-      executor = "fork-join-executor"
-      fork-join-executor {
-        parallelism-min = 1
-        parallelism-max = 4
-        parallelism-factor = 0.5
+      executor = "thread-pool-executor"
+      thread-pool-executor {
+        core-pool-size-min = 4
+        core-pool-size-max = 32
       }
       throughput = 1
     }

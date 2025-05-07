@@ -174,10 +174,11 @@ object AllHandlers {
       chainIndex = ChainIndex.unsafe(from, to)
       if !chainIndex.relateTo(brokerConfig)
     } yield {
-      val headerHander = ActorRefT.build[HeaderChainHandler.Command](
+      val headerHander = HeaderChainHandler.build(
         system,
-        HeaderChainHandler.props(blockFlow, chainIndex),
-        s"HeaderChainHandler-$from-$to$namePostfix"
+        blockFlow,
+        chainIndex,
+        namePostfix
       )
       chainIndex -> headerHander
     }

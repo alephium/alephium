@@ -16,10 +16,11 @@
 
 package org.alephium.flow.handler
 
+import org.alephium.flow.Utils
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.util.BaseActor
 
-trait IOBaseActor extends BaseActor {
+trait IOBaseActor extends Utils.BaseActorWithPoolExecutor {
+
   // TODO: improve error handling
   def handleIOError(error: IOError): Unit = {
     log.error(s"IO failed: ${error.toString}")
