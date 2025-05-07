@@ -179,7 +179,6 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     brokerConfig.contains(chainIndex0.from) is true
     brokerConfig.contains(chainIndex1.from) is false
 
-    isolatedBlockFlow()
     val block0 = emptyBlock(blockFlow, chainIndex0)
     val block1 = blockFlow.genesisBlocks(chainIndex1.from.value)(chainIndex1.to.value)
     viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
@@ -196,9 +195,8 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
 
     viewHandler ! ViewHandler.Subscribe
     eventually(viewHandler.underlyingActor.subscribers.nonEmpty is true)
-    viewHandler ! ChainHandler.FlowDataAdded(block1.header, DataOrigin.Local, TimeStamp.now())
-    eventually(tasks.forall(_.isEmpty) is true)
     viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
+    viewHandler ! ChainHandler.FlowDataAdded(block1.header, DataOrigin.Local, TimeStamp.now())
     eventually {
       tasks.head.nonEmpty is true
       tasks.tail.forall(_.isEmpty) is true

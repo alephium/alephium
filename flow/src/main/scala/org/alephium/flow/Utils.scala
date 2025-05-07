@@ -16,12 +16,15 @@
 
 package org.alephium.flow
 
+import scala.concurrent.{ExecutionContext, Future}
+
 import org.alephium.io.IOResult
 import org.alephium.protocol.model.{ChainIndex, FlowData, TransactionId, TransactionTemplate}
 import org.alephium.serde.RandomBytes
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, BaseActor}
 
 object Utils {
+
   def showDigest[T <: RandomBytes](elems: AVector[T]): String = {
     if (elems.isEmpty) "[]" else s"[ ${elems.head.shortHex} .. ${elems.last.shortHex} ]"
   }
@@ -47,4 +50,15 @@ object Utils {
       case Right(t) => t
       case Left(e)  => throw e
     }
+
+  val PoolDispatcher = "akka.actor.pool-dispatcher"
+
+  trait BaseActorWithPoolExecutor extends BaseActor {
+    implicit lazy val poolEC: ExecutionContext =
+      context.system.dispatchers.lookup(Utils.PoolDispatcher)
+
+    def poolAsync[T](f: => T): Future[T] = {
+      Future[T](f)(poolEC)
+    }
+  }
 }
