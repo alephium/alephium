@@ -112,7 +112,9 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
       if (!isSyncingUsingV2 || isNodeSynced) handleBlockAnnouncement(hash)
 
     case AddFlowData(datas, dataOrigin) =>
-      if (!isSyncingUsingV2) {
+      // When the node is synced, it should download new blocks only through block announcements.
+      // Ignoring them may trigger a new round of synchronization using v2.
+      if (!isSyncingUsingV2 || isNodeSynced) {
         val message = DependencyHandler.AddFlowData(datas, dataOrigin)
         allHandlers.dependencyHandler.tell(message, sender())
       }
