@@ -8244,7 +8244,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     callTxScript(script(true))
-    intercept[AssertionError](callTxScript(script(false))).getMessage is "Right(InvalidAlphBalance)"
+    callTxScript(script(false))
   }
 
   it should "be able to use assets for the newly created contract" in new ContractFixture {
