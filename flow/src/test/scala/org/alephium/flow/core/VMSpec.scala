@@ -8212,6 +8212,41 @@ class VMSpec extends AlephiumSpec with Generators {
     balance is ALPH.alph(2)
   }
 
+  it should "merge back contract balance when it is approved through `preapprovedAssets` even if it is not spent" in new ContractFixture {
+    val contract =
+      s"""
+         |Contract TestInsertMap() {
+         |  mapping[U256, U256] map
+         |
+         |  @using(assetsInContract = true, checkExternalCaller = false)
+         |  pub fn maybeInsertMap(insert: Bool) -> () {
+         |    insertMap{ selfAddress!() -> ALPH: mapEntryDeposit!() }(selfAddress!(), insert)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  fn insertMap(contractAddr: Address, insert: Bool) -> () {
+         |    if (insert) {
+         |      map.insert!(contractAddr, 0, 0)
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(contract, initialAttoAlphAmount = ALPH.alph(99))._1
+    println(s"contractId: $contractId")
+    def script(insert: Boolean) =
+      s"""
+         |TxScript Main {
+         |  let contract = TestInsertMap(#${contractId.toHexString})
+         |  contract.maybeInsertMap($insert)
+         |}
+         |$contract
+         |""".stripMargin
+
+    callTxScript(script(true))
+    intercept[AssertionError](callTxScript(script(false))).getMessage is "Right(InvalidAlphBalance)"
+  }
+
   it should "be able to use assets for the newly created contract" in new ContractFixture {
     val fancyTokenCode =
       s"""
