@@ -257,6 +257,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   }
 
   it should "forward flow data to dependency handler" in new BlockFlowSynchronizerV2Fixture {
+    blockFlowSynchronizerActor.isNodeSynced is false
     blockFlowSynchronizerActor.isSyncingUsingV2 is false
     val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
     blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
@@ -269,6 +270,15 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.isSyncingUsingV2 = true
     blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
     allProbes.dependencyHandler.expectNoMessage()
+
+    blockFlowSynchronizer ! InterCliqueManager.SyncedResult(true)
+    eventually(blockFlowSynchronizerActor.isNodeSynced is true)
+    blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
+    eventually(
+      allProbes.dependencyHandler.expectMsg(
+        DependencyHandler.AddFlowData(AVector(block), DataOrigin.Local)
+      )
+    )
   }
 
   it should "sample v1 peers from v1 brokers" in new BlockFlowSynchronizerV2Fixture {
