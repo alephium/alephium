@@ -231,8 +231,12 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     viewHandler ! ViewHandler.UpdateSubscribersDanube(chainIndex)
     eventually(updateTasks(taskIndex).nonEmpty is true)
     val task0 = updateTasks(taskIndex)
-    eventually(expectMsgType[ViewHandler.NewTemplate])
-    eventually(expectMsgType[ViewHandler.NewTemplate])
+    eventually(expectMsgPF() { case msg: ViewHandler.NewTemplate =>
+      msg.lazyBroadcast is true
+    })
+    eventually(expectMsgPF() { case msg: ViewHandler.NewTemplate =>
+      msg.lazyBroadcast is true
+    })
     val task1 = updateTasks(taskIndex)
     task0 isnot task1
   }
@@ -329,7 +333,9 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     val probe = createSubscriber()
     val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
     viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
-    eventually(probe.expectMsgType[ViewHandler.NewTemplate])
+    eventually(probe.expectMsgPF() { case msg: ViewHandler.NewTemplate =>
+      msg.lazyBroadcast is false
+    })
   }
 
   it should "not notify subscribers when the best view is updated since danube" in new DanubeFixture {

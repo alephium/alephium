@@ -148,8 +148,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   val submittingBlocks: mutable.HashMap[BlockHash, ActorRefT[ConnectionHandler.Command]] =
     mutable.HashMap.empty
   def handleAPI: Receive = {
-    case ViewHandler.NewTemplates(templates)                 => publishTemplates(templates)
-    case ViewHandler.NewTemplate(template)                   => publishTemplate(template)
+    case ViewHandler.NewTemplates(templates) => publishTemplates(templates)
+    case ViewHandler.NewTemplate(template, lazyBroadcast) =>
+      publishTemplate(template, lazyBroadcast)
     case MinerApiController.Received(message: ClientMessage) => handleClientMessage(message)
     case BlockChainHandler.BlockAdded(hash) => handleSubmittedBlock(hash, succeeded = true)
     case BlockChainHandler.InvalidBlock(hash, reason) =>
@@ -167,14 +168,16 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     publishLatestJobs()
   }
 
-  def publishTemplate(template: BlockFlowTemplate): Unit = {
+  def publishTemplate(template: BlockFlowTemplate, lazyBroadcast: Boolean): Unit = {
     val job = Job.fromWithoutTxs(template)
     val newJobs = latestJobs.map { existingJobs =>
       val jobIndex = MinerApiController.calcJobIndex(template.index)
       existingJobs.replace(jobIndex, job -> template)
     }
     latestJobs = newJobs
-    publishLatestJobs()
+    if (!lazyBroadcast) {
+      publishLatestJobs()
+    }
   }
 
   def publishLatestJobs(): Unit = {

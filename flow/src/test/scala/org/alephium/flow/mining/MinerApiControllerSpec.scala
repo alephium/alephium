@@ -303,7 +303,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val chainIndex  = chainIndexGenForBroker(brokerConfig).sample.get
     val block       = emptyBlock(blockFlow, chainIndex)
     val newTemplate = BlockFlowTemplate.from(block, 1)
-    minerApiController ! ViewHandler.NewTemplate(newTemplate)
+    minerApiController ! ViewHandler.NewTemplate(newTemplate, false)
     probe.expectMsgPF() { case Tcp.Received(data) =>
       ServerMessage.deserialize(data).rightValue.value.payload is a[Jobs]
     }
@@ -312,6 +312,45 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
       val newTemplates = templates0.replace(index, newTemplate)
       minerApiControllerActor.latestJobs.isEmpty is false
       minerApiControllerActor.latestJobs.value.map(_._2) is newTemplates
+    }
+  }
+
+  it should "not publish jobs if using lazy broadcast" in new SyncedFixture {
+    val minerApiControllerActor = minerApiController.underlyingActor
+    val templates               = ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
+    minerApiController ! ViewHandler.NewTemplates(templates)
+    val jobs = AVector.from(templates.flatten)
+    eventually(minerApiControllerActor.latestJobs.value.map(_._2) is jobs)
+    val probe = TestProbe()
+    connectToServer(probe)
+    probe.expectMsgPF() { case Tcp.Received(data) =>
+      ServerMessage.deserialize(data).rightValue.value.payload is a[Jobs]
+    }
+
+    val chainIndex0  = ChainIndex.unsafe(0, 0)
+    val block0       = emptyBlock(blockFlow, chainIndex0)
+    val newTemplate0 = BlockFlowTemplate.from(block0, 1)
+    minerApiController ! ViewHandler.NewTemplate(newTemplate0, true)
+    eventually {
+      val index   = MinerApiController.calcJobIndex(chainIndex0)
+      val newJobs = jobs.replace(index, newTemplate0)
+      minerApiControllerActor.latestJobs.value.map(_._2) is newJobs
+    }
+    probe.expectNoMessage()
+
+    val chainIndex1  = ChainIndex.unsafe(0, 1)
+    val block1       = emptyBlock(blockFlow, chainIndex1)
+    val newTemplate1 = BlockFlowTemplate.from(block1, 1)
+    minerApiController ! ViewHandler.NewTemplate(newTemplate1, false)
+    eventually {
+      val index0  = MinerApiController.calcJobIndex(chainIndex0)
+      val index1  = MinerApiController.calcJobIndex(chainIndex1)
+      val newJobs = jobs.replace(index0, newTemplate0).replace(index1, newTemplate1)
+      minerApiControllerActor.latestJobs.value.map(_._2) is newJobs
+    }
+    probe.expectMsgPF() { case Tcp.Received(data) =>
+      val jobs = ServerMessage.deserialize(data).rightValue.value.payload.asInstanceOf[Jobs]
+      jobs is Jobs(minerApiControllerActor.latestJobs.value.map(_._1))
     }
   }
 }
