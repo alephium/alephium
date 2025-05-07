@@ -8233,7 +8233,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     val contractId = createContract(contract, initialAttoAlphAmount = ALPH.alph(99))._1
-    println(s"contractId: $contractId")
+
     def script(insert: Boolean) =
       s"""
          |TxScript Main {
