@@ -8212,7 +8212,12 @@ class VMSpec extends AlephiumSpec with Generators {
     balance is ALPH.alph(2)
   }
 
-  it should "merge back contract balance when it is approved through `preapprovedAssets` even if it is not spent" in new ContractFixture {
+  trait MergeBackContractBalanceFixture extends ContractFixture {
+    def danubeHardForkTimestamp: Long
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
+    )
+
     val contract =
       s"""
          |Contract TestInsertMap() {
@@ -8242,6 +8247,17 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |$contract
          |""".stripMargin
+  }
+
+  it should "merge back contract balance when it is approved only through `preapprovedAssets` before Danube" in new MergeBackContractBalanceFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+
+    callTxScript(script(true))
+    callTxScript(script(false))
+  }
+
+  it should "merge back contract balance when it is approved only through `preapprovedAssets` since Danube" in new MergeBackContractBalanceFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
 
     callTxScript(script(true))
     callTxScript(script(false))

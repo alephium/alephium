@@ -377,7 +377,7 @@ final class StatefulVM(
 
       if (hardFork.isDanubeEnabled()) {
         if (balancesPerLockup.scopeDepth <= 0) {
-          mergeBackScopeDepthLessThanZero(keepContractBalances, lockupScript, balancesPerLockup)
+          mergeBackScopeDepthLessThanOne(keepContractBalances, lockupScript, balancesPerLockup)
         } else {
           if (keepContractBalances && useContractAssets) {
             Some(())
@@ -387,7 +387,7 @@ final class StatefulVM(
         }
       } else {
         if (balancesPerLockup.scopeDepth <= 0) {
-          mergeBackScopeDepthLessThanZero(keepContractBalances, lockupScript, balancesPerLockup)
+          mergeBackScopeDepthLessThanOne(keepContractBalances, lockupScript, balancesPerLockup)
         } else {
           previous.add(lockupScript, balancesPerLockup)
         }
@@ -395,7 +395,7 @@ final class StatefulVM(
     }
   }
 
-  private def mergeBackScopeDepthLessThanZero(
+  private def mergeBackScopeDepthLessThanOne(
       keepContractBalances: Boolean,
       lockupScript: LockupScript,
       balancesPerLockup: MutBalancesPerLockup
