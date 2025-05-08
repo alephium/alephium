@@ -359,11 +359,9 @@ final class StatefulVM(
   @inline private def shouldKeepContractBalances(
       hardFork: HardFork,
       isApproved: Boolean,
-      lockupScript: LockupScript,
-      useContractAssets: Boolean
+      lockupScript: LockupScript
   ): Boolean = {
-    hardFork.isRhoneEnabled() && !isApproved && lockupScript
-      .isInstanceOf[LockupScript.P2C] && useContractAssets
+    hardFork.isRhoneEnabled() && !isApproved && lockupScript.isInstanceOf[LockupScript.P2C]
   }
 
   protected def mergeBack(
@@ -375,22 +373,37 @@ final class StatefulVM(
     val hardFork = ctx.getHardFork()
 
     OptionF.foreach(current.all) { case (lockupScript, balancesPerLockup) =>
-      val keepContractBalances =
-        shouldKeepContractBalances(hardFork, isApproved, lockupScript, useContractAssets)
+      val keepContractBalances = shouldKeepContractBalances(hardFork, isApproved, lockupScript)
 
-      if (balancesPerLockup.scopeDepth <= 0) {
-        if (keepContractBalances) {
-          Some(())
+      if (hardFork.isDanubeEnabled()) {
+        if (balancesPerLockup.scopeDepth <= 0) {
+          mergeBackScopeDepthLessThanZero(keepContractBalances, lockupScript, balancesPerLockup)
         } else {
-          ctx.outputBalances.add(lockupScript, balancesPerLockup)
+          if (keepContractBalances && useContractAssets) {
+            Some(())
+          } else {
+            previous.add(lockupScript, balancesPerLockup)
+          }
         }
       } else {
-        if (keepContractBalances && hardFork.isDanubeEnabled()) {
-          Some(())
+        if (balancesPerLockup.scopeDepth <= 0) {
+          mergeBackScopeDepthLessThanZero(keepContractBalances, lockupScript, balancesPerLockup)
         } else {
           previous.add(lockupScript, balancesPerLockup)
         }
       }
+    }
+  }
+
+  private def mergeBackScopeDepthLessThanZero(
+      keepContractBalances: Boolean,
+      lockupScript: LockupScript,
+      balancesPerLockup: MutBalancesPerLockup
+  ): Option[Unit] = {
+    if (keepContractBalances) {
+      Some(())
+    } else {
+      ctx.outputBalances.add(lockupScript, balancesPerLockup)
     }
   }
 
