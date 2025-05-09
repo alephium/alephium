@@ -25,6 +25,7 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
+import org.alephium.flow.Utils
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.broker.ConnectionHandler
@@ -41,7 +42,7 @@ object MinerApiController {
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting
   ): Props =
-    Props(new MinerApiController(allHandlers)).withDispatcher(MiningDispatcher)
+    Props(new MinerApiController(allHandlers)).withDispatcher(Utils.PoolDispatcher)
 
   sealed trait Command
   final case class Received(message: ClientMessage) extends Command
@@ -50,7 +51,7 @@ object MinerApiController {
       groupConfig: GroupConfig,
       networkSetting: NetworkSetting
   ): Props = {
-    Props(new MyConnectionHandler(remote, connection)).withDispatcher(MiningDispatcher)
+    Props(new MyConnectionHandler(remote, connection))
   }
 
   class MyConnectionHandler(
@@ -147,8 +148,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   val submittingBlocks: mutable.HashMap[BlockHash, ActorRefT[ConnectionHandler.Command]] =
     mutable.HashMap.empty
   def handleAPI: Receive = {
-    case ViewHandler.NewTemplates(templates)                 => publishTemplates(templates)
-    case ViewHandler.NewTemplate(template)                   => publishTemplate(template)
+    case ViewHandler.NewTemplates(templates) => publishTemplates(templates)
+    case ViewHandler.NewTemplate(template, lazyBroadcast) =>
+      publishTemplate(template, lazyBroadcast)
     case MinerApiController.Received(message: ClientMessage) => handleClientMessage(message)
     case BlockChainHandler.BlockAdded(hash) => handleSubmittedBlock(hash, succeeded = true)
     case BlockChainHandler.InvalidBlock(hash, reason) =>
@@ -166,14 +168,16 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     publishLatestJobs()
   }
 
-  def publishTemplate(template: BlockFlowTemplate): Unit = {
+  def publishTemplate(template: BlockFlowTemplate, lazyBroadcast: Boolean): Unit = {
     val job = Job.fromWithoutTxs(template)
     val newJobs = latestJobs.map { existingJobs =>
       val jobIndex = MinerApiController.calcJobIndex(template.index)
       existingJobs.replace(jobIndex, job -> template)
     }
     latestJobs = newJobs
-    publishLatestJobs()
+    if (!lazyBroadcast) {
+      publishLatestJobs()
+    }
   }
 
   def publishLatestJobs(): Unit = {

@@ -36,7 +36,7 @@ object CpuMiner {
       brokerConfig: BrokerConfig,
       miningConfig: MiningSetting
   ): Props = {
-    Props(new CpuMiner(allHandlers)).withDispatcher(MiningDispatcher)
+    Props(new CpuMiner(allHandlers))
   }
 }
 
@@ -67,7 +67,7 @@ class CpuMiner(val allHandlers: AllHandlers)(implicit
       if (miningStarted) {
         updateAndStartTasks(templates)
       }
-    case ViewHandler.NewTemplate(template) =>
+    case ViewHandler.NewTemplate(template, _) =>
       if (miningStarted) {
         updateAndStartTask(template)
       }

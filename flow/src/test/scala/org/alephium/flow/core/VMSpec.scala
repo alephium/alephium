@@ -8212,6 +8212,57 @@ class VMSpec extends AlephiumSpec with Generators {
     balance is ALPH.alph(2)
   }
 
+  trait MergeBackContractBalanceFixture extends ContractFixture {
+    def danubeHardForkTimestamp: Long
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
+    )
+
+    val contract =
+      s"""
+         |Contract TestInsertMap() {
+         |  mapping[U256, U256] map
+         |
+         |  @using(assetsInContract = true, checkExternalCaller = false)
+         |  pub fn maybeInsertMap(insert: Bool) -> () {
+         |    insertMap{ selfAddress!() -> ALPH: mapEntryDeposit!() }(selfAddress!(), insert)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  fn insertMap(contractAddr: Address, insert: Bool) -> () {
+         |    if (insert) {
+         |      map.insert!(contractAddr, 0, 0)
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(contract, initialAttoAlphAmount = ALPH.alph(99))._1
+
+    def script(insert: Boolean) =
+      s"""
+         |TxScript Main {
+         |  let contract = TestInsertMap(#${contractId.toHexString})
+         |  contract.maybeInsertMap($insert)
+         |}
+         |$contract
+         |""".stripMargin
+  }
+
+  it should "merge back contract balance when it is approved only through `preapprovedAssets` before Danube" in new MergeBackContractBalanceFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+
+    callTxScript(script(true))
+    callTxScript(script(false))
+  }
+
+  it should "merge back contract balance when it is approved only through `preapprovedAssets` since Danube" in new MergeBackContractBalanceFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    callTxScript(script(true))
+    callTxScript(script(false))
+  }
+
   it should "be able to use assets for the newly created contract" in new ContractFixture {
     val fancyTokenCode =
       s"""

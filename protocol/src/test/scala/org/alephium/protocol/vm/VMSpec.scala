@@ -776,7 +776,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
             }
           } else {
             if (
-              previousBalanceType == NoBalance && (currentUseAsset == UsePreapproved || currentBalanceType == ApprovedBalanceOnly)
+              previousBalanceType == NoBalance && (currentUseAsset == UsePreapproved || currentUseAsset == UsePayToContractOnly || currentBalanceType == ApprovedBalanceOnly)
             ) {
               addAndCheckBalance(ALPH.oneAlph, isContract = currentUseAsset != UsePreapproved)
             } else {
