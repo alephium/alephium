@@ -197,7 +197,7 @@
     "name": "destroySelf",
     "category": "Contract",
     "signature": "fn destroySelf!(refundAddress:Address) -> ()",
-    "doc": "Destroys the contract and transfer the remaining assets to a designated address.",
+    "doc": "Destroys the contract and transfer the remaining assets to a designated address. The function will return immediately once the contract is destroyed. Returning value following the contract destruction is not supported.",
     "params": [
       "@param refundAddress the address to receive the remaining assets in the contract"
     ],
@@ -402,7 +402,7 @@
     "name": "transferTokenFromSelf",
     "category": "Asset",
     "signature": "fn transferTokenFromSelf!(toAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
-    "doc": "Transfers the contract's token from the input assets of the function.",
+    "doc": "Transfers the contract's token from the input assets of the function. The toAddress must not be the same as the contract address.",
     "params": [
       "@param toAddress the address to transfer token to",
       "@param tokenId the token to be transferred",
@@ -414,7 +414,7 @@
     "name": "transferTokenToSelf",
     "category": "Asset",
     "signature": "fn transferTokenToSelf!(fromAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
-    "doc": "Transfers token to the contract from the input assets of the function.",
+    "doc": "Transfers token to the contract from the input assets of the function. The fromAddress must not be the same as the contract address.",
     "params": [
       "@param fromAddress the address to transfer token from",
       "@param tokenId the token to be transferred",
