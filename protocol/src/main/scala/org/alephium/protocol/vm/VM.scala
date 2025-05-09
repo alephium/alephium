@@ -292,17 +292,38 @@ final class StatefulVM(
       currentFrame: Frame[StatefulContext],
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
+    val useContractAssets = currentFrame.method.useContractAssets
     (currentFrame.balanceStateOpt, previousFrame.balanceStateOpt) match {
       case (None, _) => okay
       case (Some(currentBalances), None) =>
         wrap(for {
-          _ <- mergeBack(ctx.outputBalances, currentBalances.remaining, isApproved = false)
-          _ <- mergeBack(ctx.outputBalances, currentBalances.approved, isApproved = true)
+          _ <- mergeBack(
+            ctx.outputBalances,
+            currentBalances.remaining,
+            useContractAssets,
+            isApproved = false
+          )
+          _ <- mergeBack(
+            ctx.outputBalances,
+            currentBalances.approved,
+            useContractAssets,
+            isApproved = true
+          )
         } yield ())
       case (Some(currentBalances), Some(previousBalances)) =>
         wrap(for {
-          _ <- mergeBack(previousBalances.remaining, currentBalances.remaining, isApproved = false)
-          _ <- mergeBack(previousBalances.remaining, currentBalances.approved, isApproved = true)
+          _ <- mergeBack(
+            previousBalances.remaining,
+            currentBalances.remaining,
+            useContractAssets,
+            isApproved = false
+          )
+          _ <- mergeBack(
+            previousBalances.remaining,
+            currentBalances.approved,
+            useContractAssets,
+            isApproved = true
+          )
         } yield ())
     }
   }
@@ -312,11 +333,22 @@ final class StatefulVM(
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
     if (currentFrame.method.usesAssetsFromInputs()) {
+      val useContractAssets = currentFrame.method.useContractAssets
       wrap(for {
         currentBalances  <- currentFrame.balanceStateOpt
         previousBalances <- previousFrame.balanceStateOpt
-        _ <- mergeBack(previousBalances.remaining, currentBalances.remaining, isApproved = false)
-        _ <- mergeBack(previousBalances.remaining, currentBalances.approved, isApproved = true)
+        _ <- mergeBack(
+          previousBalances.remaining,
+          currentBalances.remaining,
+          useContractAssets,
+          isApproved = false
+        )
+        _ <- mergeBack(
+          previousBalances.remaining,
+          currentBalances.approved,
+          useContractAssets,
+          isApproved = true
+        )
       } yield ())
     } else {
       okay
@@ -335,6 +367,7 @@ final class StatefulVM(
   protected def mergeBack(
       previous: MutBalances,
       current: MutBalances,
+      useContractAssets: Boolean,
       isApproved: Boolean
   ): Option[Unit] = {
     val hardFork = ctx.getHardFork()
@@ -342,19 +375,35 @@ final class StatefulVM(
     OptionF.foreach(current.all) { case (lockupScript, balancesPerLockup) =>
       val keepContractBalances = shouldKeepContractBalances(hardFork, isApproved, lockupScript)
 
-      if (balancesPerLockup.scopeDepth <= 0) {
-        if (keepContractBalances) {
-          Some(())
+      if (hardFork.isDanubeEnabled()) {
+        if (balancesPerLockup.scopeDepth <= 0) {
+          mergeBackScopeDepthLessThanOne(keepContractBalances, lockupScript, balancesPerLockup)
         } else {
-          ctx.outputBalances.add(lockupScript, balancesPerLockup)
+          if (keepContractBalances && useContractAssets) {
+            Some(())
+          } else {
+            previous.add(lockupScript, balancesPerLockup)
+          }
         }
       } else {
-        if (keepContractBalances && hardFork.isDanubeEnabled()) {
-          Some(())
+        if (balancesPerLockup.scopeDepth <= 0) {
+          mergeBackScopeDepthLessThanOne(keepContractBalances, lockupScript, balancesPerLockup)
         } else {
           previous.add(lockupScript, balancesPerLockup)
         }
       }
+    }
+  }
+
+  private def mergeBackScopeDepthLessThanOne(
+      keepContractBalances: Boolean,
+      lockupScript: LockupScript,
+      balancesPerLockup: MutBalancesPerLockup
+  ): Option[Unit] = {
+    if (keepContractBalances) {
+      Some(())
+    } else {
+      ctx.outputBalances.add(lockupScript, balancesPerLockup)
     }
   }
 
