@@ -64,8 +64,10 @@ object ViewHandler {
       templates: IndexedSeq[IndexedSeq[BlockFlowTemplate]]
   ) extends Event
       with EventStream.Event
-  final case class NewTemplate(template: BlockFlowTemplate) extends Event with EventStream.Event
-  final case class SubscribeResult(succeeded: Boolean)      extends Event
+  final case class NewTemplate(template: BlockFlowTemplate, lazyBroadcast: Boolean)
+      extends Event
+      with EventStream.Event
+  final case class SubscribeResult(succeeded: Boolean) extends Event
 
   def needUpdatePreDanube(chainIndex: ChainIndex)(implicit brokerConfig: BrokerConfig): Boolean = {
     brokerConfig.contains(chainIndex.from)
@@ -228,7 +230,7 @@ trait ViewHandlerState extends IOBaseActor {
       val minerAddress = minerAddressesOpt.get(chainIndex.to.value)
       poolAsync {
         escapeIOError(blockFlow.prepareBlockFlow(chainIndex, minerAddress)) { template =>
-          subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
+          subscribers.foreach(_ ! ViewHandler.NewTemplate(template, lazyBroadcast = true))
         }
       }
       scheduleUpdateDanube(chainIndex)
@@ -354,7 +356,7 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
   ): IOResult[Unit] = {
     assume(minerAddress.groupIndex == chainIndex.to)
     blockFlow.prepareBlockFlow(chainIndex, minerAddress).map { template =>
-      subscribers.foreach(_ ! ViewHandler.NewTemplate(template))
+      subscribers.foreach(_ ! ViewHandler.NewTemplate(template, lazyBroadcast = false))
     }
   }
 }
