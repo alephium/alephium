@@ -2687,7 +2687,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(sum(rate(alephium_uncle_blocks_received_total[5m])) / sum(rate(alephium_transactions_received_total[5m]))) * 100",
+          "expr": "(sum(rate(alephium_uncle_blocks_received_total[5m])) / sum(rate(alephium_blocks_received_total[5m]))) * 100",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
