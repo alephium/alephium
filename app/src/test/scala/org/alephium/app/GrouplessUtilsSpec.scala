@@ -196,6 +196,33 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       }
     }
 
+    def failTransfer(
+        alphTransferAmount: U256,
+        tokenTransferAmount: Option[U256],
+        group: Option[GroupIndex],
+        destinationSize: Int,
+        expectedError: String
+    ) = {
+      val groupIndex = groupIndexGen.sample.get
+      val destinations = AVector.fill(destinationSize) {
+        val toAddress = Address.Asset(assetLockupGen(groupIndex).sample.get)
+        Destination(
+          toAddress,
+          Some(Amount(alphTransferAmount)),
+          tokenTransferAmount.map(amount => AVector(Token(tokenId, amount)))
+        )
+      }
+
+      val query = BuildTransferTx(
+        fromPublicKey.bytes,
+        fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
+        group = group,
+        destinations = destinations
+      )
+
+      serverUtils.buildTransferTransaction(blockFlow, query).leftValue.detail is expectedError
+    }
+
     implicit def toAmount(amount: U256): Amount = Amount(amount)
 
     implicit class RichUnsignedTransaction(tx: UnsignedTransaction) {
@@ -203,14 +230,46 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "build a transfer tx without cross-group transfers" in new Fixture {
-    prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
-    testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 1)
+  it should "build a transfer tx without cross-group transfers" in {
+    new Fixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 1)
+    }
+
+    new Fixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(0))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 1)
+    }
+
+    new Fixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(0))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 1)
+    }
   }
 
-  it should "build a transfer tx without cross-group transfers with explict group with enough balance " in new Fixture {
-    prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
-    testTransfer(ALPH.oneAlph, ALPH.oneAlph, Some(chainIndex.from), 1)
+  it should "build a transfer tx without cross-group transfers with explicit group with enough balance" in {
+    new Fixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, Some(fromLockupScript.groupIndex), 1)
+    }
+
+    new Fixture {
+      val lockupScript = allLockupScripts(0)
+      prepare(ALPH.alph(2), ALPH.alph(2), lockupScript)
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, Some(lockupScript.groupIndex), 1)
+    }
+
+    new Fixture {
+      val lockupScript = allLockupScripts(1)
+      prepare(ALPH.alph(2), ALPH.alph(2), lockupScript)
+      failTransfer(
+        ALPH.oneAlph,
+        Some(ALPH.oneAlph),
+        Some(fromLockupScript.groupIndex),
+        1,
+        "Not enough balance: got 0, expected 1000000000000000000"
+      )
+    }
   }
 
   it should "build a transfer tx with one cross-group transfer when the from address has no balance" in new Fixture {
@@ -219,14 +278,29 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 2)
   }
 
+  it should "build a transfer tx with minimal cross-group transfers" in new Fixture {
+    val indices = AVector(0, 1, 2).shuffle()
+    prepare(ALPH.alph(2) / 10, ALPH.alph(1) / 10, allLockupScripts(indices(0)))
+    prepare(ALPH.alph(2), ALPH.alph(1) / 2, allLockupScripts(indices(1)))
+    prepare(ALPH.alph(2), ALPH.alph(1) / 2, allLockupScripts(indices(2)))
+    testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 2)
+  }
+
   it should "build a transfer tx with one cross-group transfer when the from address does not have enough balance" in new Fixture {
     allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
     testTransfer(ALPH.alph(2), ALPH.alph(4), None, 2)
   }
 
-  it should "build a transfer tx with multiple cross-group transfers" in new Fixture {
-    allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
-    testTransfer(ALPH.alph(4), ALPH.alph(5), None, 3)
+  it should "build a transfer tx with multiple cross-group transfers" in {
+    new Fixture {
+      allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+      testTransfer(ALPH.alph(4), ALPH.alph(5), None, 3)
+    }
+
+    new Fixture {
+      allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+      failTransfer(ALPH.alph(4), Some(ALPH.alph(7)), None, 3, "Not enough balance")
+    }
   }
 
   it should "transfer to multiple destinations" in new Fixture {
@@ -236,76 +310,18 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
   it should "fail if the from address does not have enough balance when building transfer txs" in new Fixture {
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
-    val toAddress = Address.Asset(assetLockupGen(groupIndexGen.sample.get).sample.get)
-    val destination0 =
-      Destination(
-        toAddress,
-        Some(Amount(ALPH.alph(2))),
-        Some(AVector(Token(tokenId, ALPH.alph(2))))
-      )
-    val query0 = BuildTransferTx(
-      fromPublicKey.bytes,
-      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
-      group = None,
-      destinations = AVector(destination0)
-    )
-    serverUtils
-      .buildTransferTransaction(blockFlow, query0)
-      .leftValue
-      .detail is "Not enough balance"
-
-    val destination1 =
-      Destination(
-        toAddress,
-        Some(Amount(ALPH.oneAlph)),
-        Some(AVector(Token(tokenId, ALPH.alph(3))))
-      )
-    val query1 = BuildTransferTx(
-      fromPublicKey.bytes,
-      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
-      group = None,
-      destinations = AVector(destination1)
-    )
-    serverUtils
-      .buildTransferTransaction(blockFlow, query1)
-      .leftValue
-      .detail is s"Not enough balance"
+    failTransfer(ALPH.alph(2), Some(ALPH.alph(2)), None, 1, "Not enough balance")
+    failTransfer(ALPH.oneAlph, Some(ALPH.alph(3)), None, 1, "Not enough balance")
   }
 
   it should "fail if the balance is locked" in new Fixture {
-    val toAddress = Address.Asset(assetLockupGen(groupIndexGen.sample.get).sample.get)
-
     val lockTime = TimeStamp.now().plusHoursUnsafe(1)
+
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript, Some(lockTime))
-    val destination0 = Destination(toAddress, Some(Amount(ALPH.oneAlph)), None)
-    val query0 = BuildTransferTx(
-      fromPublicKey.bytes,
-      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
-      group = None,
-      destinations = AVector(destination0)
-    )
-    serverUtils
-      .buildTransferTransaction(blockFlow, query0)
-      .leftValue
-      .detail is "Not enough balance"
+    failTransfer(ALPH.alph(2), ALPH.alph(0), None, 1, "Not enough balance")
 
     prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts.head)
-    val destination1 =
-      Destination(
-        toAddress,
-        Some(Amount(ALPH.oneAlph)),
-        Some(AVector(Token(tokenId, ALPH.alph(2))))
-      )
-    val query1 = BuildTransferTx(
-      fromPublicKey.bytes,
-      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
-      group = None,
-      destinations = AVector(destination1)
-    )
-    serverUtils
-      .buildTransferTransaction(blockFlow, query1)
-      .leftValue
-      .detail is s"Not enough balance"
+    failTransfer(ALPH.alph(2), Some(ALPH.alph(2)), None, 1, "Not enough balance")
   }
 
   trait BuildExecuteScriptTxFixture extends Fixture {
