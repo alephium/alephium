@@ -91,8 +91,11 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       buildGrouplessTransferTx(blockFlow, query, lockupScript).flatMap {
         case Right(result) =>
           Right(result)
-        case Left(_) =>
-          Left(failed(s"Not enough balance")) // TODO: Better error message
+        case Left(buildingTxsInProgress) =>
+          val buildingTxInProgress = buildingTxsInProgress.sortBy(_.remainingAmounts._1).head
+          val remmainingAlph       = buildingTxInProgress.remainingAmounts._1
+          val remainingTokens      = buildingTxInProgress.remainingAmounts._2
+          Left(failed(notEnoughBalanceError(remmainingAlph, remainingTokens)))
       }
     } else {
       for {
@@ -154,15 +157,15 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       targetBlockHash: Option[BlockHash],
       outputInfos: AVector[UnsignedTransaction.TxOutputInfo],
       totalAmountNeeded: UnsignedTransaction.TotalAmountNeeded,
-      buildTxsSoFar: AVector[BuildingGrouplessTransferTx]
+      currentBuildingGrouplessTransferTxs: AVector[BuildingGrouplessTransferTx]
   ): TryBuildGrouplessTransferTx = {
-    val buildTxSoFarLength = buildTxsSoFar.length
-    val nextBuildTxsSoFar  = ArrayBuffer.empty[BuildingGrouplessTransferTx]
+    val currentBuildingGrouplessTransferTxsLength = currentBuildingGrouplessTransferTxs.length
+    val nextBuildingGrouplessTransferTxs          = ArrayBuffer.empty[BuildingGrouplessTransferTx]
 
     def rec(index: Int): TryBuildGrouplessTransferTx = {
-      if (index == buildTxSoFarLength) {
-        if (nextBuildTxsSoFar.isEmpty) {
-          Right(Left(buildTxsSoFar))
+      if (index == currentBuildingGrouplessTransferTxsLength) {
+        if (nextBuildingGrouplessTransferTxs.isEmpty) {
+          Right(Left(currentBuildingGrouplessTransferTxs))
         } else {
           tryBuildGrouplessTransferTx(
             blockFlow,
@@ -170,23 +173,23 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
             targetBlockHash,
             outputInfos,
             totalAmountNeeded,
-            AVector.from(nextBuildTxsSoFar)
+            AVector.from(nextBuildingGrouplessTransferTxs)
           )
         }
       } else {
-        val buildTxSoFar = buildTxsSoFar(index)
+        val currentBuildingGrouplessTransferTx = currentBuildingGrouplessTransferTxs(index)
         tryBuildGrouplessTransferTx(
           blockFlow,
           gasPrice,
           targetBlockHash,
           outputInfos,
           totalAmountNeeded,
-          buildTxSoFar
+          currentBuildingGrouplessTransferTx
         ) match {
           case Right(Right(result)) =>
             Right(Right(result))
-          case Right(Left(inProgresses)) =>
-            nextBuildTxsSoFar ++= inProgresses
+          case Right(Left(buildingGrouplessTransferTxs)) =>
+            nextBuildingGrouplessTransferTxs ++= buildingGrouplessTransferTxs
             rec(index + 1)
           case Left(error) =>
             Left(error)
@@ -204,60 +207,64 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       targetBlockHash: Option[BlockHash],
       outputInfos: AVector[UnsignedTransaction.TxOutputInfo],
       totalAmountNeeded: UnsignedTransaction.TotalAmountNeeded,
-      buildTxsSoFar: BuildingGrouplessTransferTx
+      currentBuildingGrouplessTx: BuildingGrouplessTransferTx
   ): TryBuildGrouplessTransferTx = {
-    val inProgresses                 = ArrayBuffer.empty[BuildingGrouplessTransferTx]
-    val remainingLockupScriptsLength = buildTxsSoFar.remainingLockupScripts.length
+    val buildingGrouplessTransferTxs = ArrayBuffer.empty[BuildingGrouplessTransferTx]
+    val remainingLockupScriptsLength = currentBuildingGrouplessTx.remainingLockupScripts.length
 
     @tailrec
     def rec(index: Int): TryBuildGrouplessTransferTx = {
       if (index == remainingLockupScriptsLength) {
-        Right(Left(AVector.from(inProgresses)))
+        Right(Left(AVector.from(buildingGrouplessTransferTxs)))
       } else {
-        val selectedLockupScript = buildTxsSoFar.remainingLockupScripts(index)
-        val remainingAmounts     = buildTxsSoFar.remainingAmounts
+        val selectedLockupScript = currentBuildingGrouplessTx.remainingLockupScripts(index)
+        val remainingAmounts     = currentBuildingGrouplessTx.remainingAmounts
 
         transferFromFallbackAddress(
           blockFlow,
           (selectedLockupScript, UnlockScript.P2PK),
-          buildTxsSoFar.from,
+          currentBuildingGrouplessTx.from,
           remainingAmounts._1,
           remainingAmounts._2,
           gasPrice,
           targetBlockHash
         ) match {
           case Left(_) =>
-            inProgresses += buildTxsSoFar.copy(
-              remainingLockupScripts = buildTxsSoFar.remainingLockupScripts.remove(index)
+            buildingGrouplessTransferTxs += currentBuildingGrouplessTx.copy(
+              remainingLockupScripts =
+                currentBuildingGrouplessTx.remainingLockupScripts.remove(index)
             )
             rec(index + 1)
           case Right((unsignedTx, newRemainingAlph, newRemainingTokens)) =>
             if (newRemainingAlph.isZero && newRemainingTokens.isEmpty) {
-              val crossGroupTxs = buildTxsSoFar.builtUnsignedTxsSoFar :+ unsignedTx
+              val crossGroupTxs = currentBuildingGrouplessTx.builtUnsignedTxsSoFar :+ unsignedTx
               blockFlow
                 .transfer(
-                  buildTxsSoFar.from,
+                  currentBuildingGrouplessTx.from,
                   UnlockScript.P2PK,
                   outputInfos,
                   totalAmountNeeded,
-                  buildTxsSoFar.utxos ++ getExtraUtxos(buildTxsSoFar.from, crossGroupTxs),
+                  currentBuildingGrouplessTx.utxos ++ getExtraUtxos(
+                    currentBuildingGrouplessTx.from,
+                    crossGroupTxs
+                  ),
                   None,
                   gasPrice
                 )
                 .left
-                .map(badRequest)
-                .flatMap { unsignedTx => // notEnoughAlph
+                .map(failed)
+                .flatMap { unsignedTx =>
+                  val allUnsignedTxs = crossGroupTxs :+ unsignedTx
                   BuildGrouplessTransferTxResult
-                    .from(
-                      (crossGroupTxs :+ unsignedTx).map(BuildSimpleTransferTxResult.from)
-                    )
+                    .from(allUnsignedTxs.map(BuildSimpleTransferTxResult.from))
                     .map(Right(_))
                 }
-
             } else {
-              inProgresses += buildTxsSoFar.copy(
-                builtUnsignedTxsSoFar = buildTxsSoFar.builtUnsignedTxsSoFar :+ unsignedTx,
-                remainingLockupScripts = buildTxsSoFar.remainingLockupScripts.remove(index),
+              buildingGrouplessTransferTxs += currentBuildingGrouplessTx.copy(
+                builtUnsignedTxsSoFar =
+                  currentBuildingGrouplessTx.builtUnsignedTxsSoFar :+ unsignedTx,
+                remainingLockupScripts =
+                  currentBuildingGrouplessTx.remainingLockupScripts.remove(index),
                 remainingAmounts = (newRemainingAlph, newRemainingTokens)
               )
               rec(index + 1)
@@ -281,14 +288,14 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       gasPrice: GasPrice,
       targetBlockHashOpt: Option[BlockHash]
   ): TryBuildGrouplessTransferTx = {
-    val allLockupScripts       = allGroupedLockupScripts(lockupScript)
-    val allLockupScriptsLength = allLockupScripts.length
-    val buildingTxs            = ArrayBuffer.empty[BuildingGrouplessTransferTx]
+    val allLockupScripts             = allGroupedLockupScripts(lockupScript)
+    val allLockupScriptsLength       = allLockupScripts.length
+    val buildingGrouplessTransferTxs = ArrayBuffer.empty[BuildingGrouplessTransferTx]
 
     @tailrec
     def rec(index: Int): TryBuildGrouplessTransferTx = {
       if (index == allLockupScriptsLength) {
-        Right(Left(AVector.from(buildingTxs)))
+        Right(Left(AVector.from(buildingGrouplessTransferTxs)))
       } else {
         val lockup = allLockupScripts(index)
         blockFlow.getUsableUtxos(
@@ -319,7 +326,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
                   .getOrElse(U256.Zero)
                 val (remainTokens, _) = calcTokenAmount(tokenBalances, totalAmountNeeded.tokens)
 
-                buildingTxs += BuildingGrouplessTransferTx(
+                buildingGrouplessTransferTxs += BuildingGrouplessTransferTx(
                   lockup,
                   utxos,
                   allLockupScripts.remove(index),
@@ -337,4 +344,27 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     rec(0)
   }
   // scalastyle:on method.length
+
+  private def notEnoughBalanceError(
+      alphBalance: U256,
+      tokenBalances: AVector[(TokenId, U256)]
+  ): String = {
+    val notEnoughAssets = ArrayBuffer.empty[String]
+
+    if (!alphBalance.isZero) {
+      notEnoughAssets += Amount.toAlphString(alphBalance)
+    }
+
+    for ((tokenId, amount) <- tokenBalances) {
+      if (!amount.isZero) {
+        notEnoughAssets += s"${tokenId.toHexString}: $amount"
+      }
+    }
+
+    if (notEnoughAssets.isEmpty) {
+      "Not enough balance"
+    } else {
+      s"Not enough balance: ${notEnoughAssets.mkString(", ")}"
+    }
+  }
 }

@@ -299,7 +299,13 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
     new Fixture {
       allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
-      failTransfer(ALPH.alph(4), Some(ALPH.alph(7)), None, 3, "Not enough balance")
+      failTransfer(
+        ALPH.alph(4),
+        Some(ALPH.alph(7)),
+        None,
+        3,
+        s"Not enough balance: 7.502 ALPH, ${tokenId.toHexString}: 15000000000000000000"
+      )
     }
   }
 
@@ -310,18 +316,30 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
   it should "fail if the from address does not have enough balance when building transfer txs" in new Fixture {
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
-    failTransfer(ALPH.alph(2), Some(ALPH.alph(2)), None, 1, "Not enough balance")
-    failTransfer(ALPH.oneAlph, Some(ALPH.alph(3)), None, 1, "Not enough balance")
+    failTransfer(ALPH.alph(2), Some(ALPH.alph(2)), None, 1, "Not enough balance: 0.502 ALPH")
+    failTransfer(
+      ALPH.oneAlph,
+      Some(ALPH.alph(3)),
+      None,
+      1,
+      s"Not enough balance: ${tokenId.toHexString}: 1000000000000000000"
+    )
   }
 
   it should "fail if the balance is locked" in new Fixture {
     val lockTime = TimeStamp.now().plusHoursUnsafe(1)
 
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript, Some(lockTime))
-    failTransfer(ALPH.alph(2), ALPH.alph(0), None, 1, "Not enough balance")
+    failTransfer(ALPH.alph(2), ALPH.alph(0), None, 1, "Not enough balance: 2.502 ALPH")
 
     prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts.head)
-    failTransfer(ALPH.alph(2), Some(ALPH.alph(2)), None, 1, "Not enough balance")
+    failTransfer(
+      ALPH.alph(2),
+      Some(ALPH.alph(2)),
+      None,
+      1,
+      s"Not enough balance: 0.502 ALPH, ${tokenId.toHexString}: 1000000000000000000"
+    )
   }
 
   trait BuildExecuteScriptTxFixture extends Fixture {
