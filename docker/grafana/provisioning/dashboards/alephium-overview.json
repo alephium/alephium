@@ -2644,7 +2644,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": null,
-      "description": "Percentage of Uncle Blocks",
+      "description": "Percentage of Uncle Blocks (Approximated)",
       "fieldConfig": {
         "defaults": {
           "custom": {}
@@ -2697,7 +2697,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Uncle Blocks Rate",
+      "title": "Uncle Blocks Rate (Approximated)",
       "tooltip": {
         "shared": true,
         "sort": 0,
