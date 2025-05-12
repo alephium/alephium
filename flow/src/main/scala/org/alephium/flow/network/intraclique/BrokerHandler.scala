@@ -23,7 +23,7 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{CliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.{BlocksRequest, HeadersRequest, NewInv, RequestId, TxsResponse}
+import org.alephium.protocol.message._
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, Duration}
 
@@ -32,7 +32,11 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 
-  override def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
+  override def handleHandshakeInfo(
+      _remoteBrokerInfo: BrokerInfo,
+      clientInfo: String,
+      p2pVersion: P2PVersion
+  ): Unit = {
     if (_remoteBrokerInfo.cliqueId == selfCliqueInfo.id) {
       remoteBrokerInfo = _remoteBrokerInfo
       cliqueManager ! IntraCliqueManager.HandShaked(_remoteBrokerInfo, connectionType, clientInfo)
@@ -42,7 +46,9 @@ trait BrokerHandler extends BaseBrokerHandler {
     }
   }
 
-  override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents
+  override def exchangingV1: Receive = exchangingCommon orElse syncing orElse flowEvents
+
+  def exchangingV2: Receive = exchangingV1
 
   def syncing: Receive = {
     schedule(self, BrokerHandler.IntraSync, Duration.zero, Duration.ofMinutesUnsafe(1))

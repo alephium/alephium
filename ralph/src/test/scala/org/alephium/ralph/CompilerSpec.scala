@@ -22,8 +22,9 @@ import scala.util.Random
 import akka.util.ByteString
 import org.scalatest.Assertion
 
+import org.alephium.crypto.Byte64
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, TokenId}
+import org.alephium.protocol.model.{Address, ContractId, TokenId}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -457,6 +458,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    }
          |  }
          |}
+         |""".stripMargin,
+      s"""
+         |Contract Foo() {
+         |  fn foo0() -> U256 {
+         |    return (0)
+         |  }
+         |  fn foo1() -> (U256, U256) {
+         |    return (0, 1)
+         |  }
+         |}
          |""".stripMargin
     )
     succeed.foreach { code =>
@@ -568,7 +579,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         contractIndex: Int = 0
     ): Assertion = {
       val compiled = compileContractFull(input, contractIndex).rightValue
-      compiled.code is compiled.debugCode
+      if (compiled.ast.inlineFuncs.isEmpty) {
+        compiled.code is compiled.debugCode
+      } else {
+        compiled.code.methods is compiled.debugCode.methods.slice(0, compiled.code.methods.length)
+      }
       val contract = compiled.code
 
       deserialize[StatefulContract](serialize(contract)) isE contract
@@ -634,9 +649,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     deserialize[StatelessScript](serialize(script)) isE script
 
     val args             = AVector[Val](Val.ByteVec.from(pubKey))
-    val statelessContext = genStatelessContext(signatures = AVector(Signature.zero))
-    val signature        = SignatureSchema.sign(statelessContext.txId.bytes, priKey)
-    statelessContext.signatures.pop().rightValue is Signature.zero
+    val statelessContext = genStatelessContext(signatures = AVector(Byte64.from(Signature.zero)))
+    val signature        = Byte64.from(SignatureSchema.sign(statelessContext.txId.bytes, priKey))
+    statelessContext.signatures.pop().rightValue is Byte64.from(Signature.zero)
     statelessContext.signatures.push(signature) isE ()
     StatelessVM.execute(statelessContext, script.toObject, args).isRight is true
     StatelessVM.execute(statelessContext, script.toObject, args) is
@@ -1401,11 +1416,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val contract = compileContract(code).rightValue
     // format: off
-    contract.methods(0) is Method[StatefulContext](
+    contract.methods(0) is Method.testDefault[StatefulContext](
       isPublic = false,
-      usePreapprovedAssets = false,
-      useContractAssets = false,
-      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 6,
       returnLength = 0,
@@ -1422,11 +1434,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-21)
       )
     )
-    contract.methods(1) is Method[StatefulContext](
+    contract.methods(1) is Method.testDefault(
       isPublic = false,
-      usePreapprovedAssets = false,
-      useContractAssets = false,
-      usePayToContractOnly = false,
       argsLength = 0,
       localsLength = 14,
       returnLength = 0,
@@ -1865,11 +1874,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     compileContract(code).rightValue.methods.head is
-      Method[StatefulContext](
+      Method.testDefault(
         isPublic = true,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 5,
         returnLength = 0,
@@ -2914,7 +2920,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  fn foo() -> U256 {
-           |    if ($$0$$) {
+           |    if $$(0)$$ {
            |      return 0
            |    } else {
            |      return 1
@@ -2997,6 +3003,27 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code,
         "If ... else if constructs should be terminated with an else statement"
       )
+    }
+
+    {
+      info("If branch without parens")
+      def code(cond: String) =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> () {
+           |    if $cond {
+           |      return
+           |    } else if ($cond) {
+           |      return
+           |    } else {
+           |      return
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      Seq("x < 1", "(x < 1)", "(x + 1) < 1", "(x + 1) * (x + 2) < 1").foreach { cond =>
+        compileContract(code(cond)).isRight is true
+      }
     }
 
     new Fixture {
@@ -3114,7 +3141,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  fn foo() -> U256 {
-           |    return if ($$0$$) 0 else 1
+           |    return if $$(0)$$ 0 else 1
            |  }
            |}
            |""".stripMargin
@@ -3122,19 +3149,136 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       testContractError(code, "Invalid type of condition expr: List(U256)")
     }
 
+    {
+      info("If branch without parens")
+      def code(cond: String) =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> U256 {
+           |    return if $cond 0 else if ($cond) 1 else 2
+           |  }
+           |}
+           |""".stripMargin
+      Seq("x < 1", "(x < 1)", "(x + 1) < 1", "(x + 1) * (x + 2) < 1").foreach { cond =>
+        compileContract(code(cond)).isRight is true
+      }
+    }
+
+    {
+      info("Optional parens and braces")
+      val code =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo0() -> U256 {
+           |    let _ = if x > 1 foo1() else foo2()
+           |    let _ = if (x > 1) { foo3() 1 } else 2
+           |    let _ = if x > 1 1 else { foo3() 2 }
+           |    return if x > 1 {
+           |      foo3()
+           |      1
+           |    } else if x < 3 {
+           |      foo3()
+           |      2
+           |    } else {
+           |      foo3()
+           |      3
+           |    }
+           |  }
+           |
+           |  pub fn foo1() -> U256 {
+           |    return if x > 1 1 else 2
+           |  }
+           |  pub fn foo2() -> U256 {
+           |    return if x > 1 1 else if x < 3 2 else 3
+           |  }
+           |  pub fn foo3() -> () { return }
+           |}
+           |""".stripMargin
+      compileContract(code).isRight is true
+    }
+
+    {
+      info("Check statements in if branch")
+      val code =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> U256 {
+           |    return if x > 1 {
+           |      $$x = 1$$
+           |      0
+           |    } else {
+           |      1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Cannot assign to immutable variable x.")
+    }
+
+    {
+      info("Check statements in else-if branch")
+      val code =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> U256 {
+           |    return if x > 1 {
+           |      0
+           |    } else if x < 3 {
+           |      $$x = 1$$
+           |      1
+           |    } else {
+           |      2
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Cannot assign to immutable variable x.")
+    }
+
+    {
+      info("Check statements in else branch")
+      val code =
+        s"""
+           |Contract Foo(x: U256) {
+           |  pub fn foo() -> U256 {
+           |    return if x > 1 {
+           |      0
+           |    } else {
+           |      $$x = 1$$
+           |      1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Cannot assign to immutable variable x.")
+    }
+
     new Fixture {
       val code =
         s"""
            |Contract Foo() {
-           |  pub fn foo(x: U256) -> U256 {
-           |    return if (x == 1) 1 else if (x == 0) 10 else 100
+           |  pub fn foo0(x: U256) -> U256 {
+           |    let mut a = 0
+           |    return if (x == 1) {
+           |      a = foo1(x)
+           |      a + 1
+           |    } else if (x == 0) {
+           |      a = foo1(x)
+           |      a + 10
+           |    } else {
+           |      a = foo1(x)
+           |      a + 100
+           |    }
+           |  }
+           |  fn foo1(x: U256) -> U256 {
+           |    return x
            |  }
            |}
            |""".stripMargin
 
       test(code, args = AVector(Val.U256(U256.Zero)), output = AVector(Val.U256(U256.unsafe(10))))
-      test(code, args = AVector(Val.U256(U256.One)), output = AVector(Val.U256(U256.unsafe(1))))
-      test(code, args = AVector(Val.U256(U256.Two)), output = AVector(Val.U256(U256.unsafe(100))))
+      test(code, args = AVector(Val.U256(U256.One)), output = AVector(Val.U256(U256.unsafe(2))))
+      test(code, args = AVector(Val.U256(U256.Two)), output = AVector(Val.U256(U256.unsafe(102))))
     }
   }
 
@@ -3924,7 +4068,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Warning for functions which does not update fields but has @using(updateFields = true)")
+      info(
+        "Warning for contract functions which does not update fields but has @using(updateFields = true)"
+      )
       val code =
         s"""
            |Contract Foo() {
@@ -3937,6 +4083,27 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val warnings = compileContractFull(code, 0).rightValue.warnings.map(_.message)
       warnings is AVector(
         s"""Function "Foo.foo" does not update fields. Please remove "@using(updateFields = true)" for the function."""
+      )
+    }
+
+    {
+      info(
+        "Warning for script functions which does not update fields but has @using(updateFields = true)"
+      )
+      val code =
+        s"""
+           |@using(updateFields = true)
+           |TxScript Main {
+           |  foo()
+           |
+           |  @using(updateFields = true)
+           |  fn foo() -> () {}
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileTxScriptFull(code, 0).rightValue.warnings.map(_.message)
+      warnings is AVector(
+        s"""Function "Main.main" does not update fields. Please remove "@using(updateFields = true)" for the function.""",
+        s"""Function "Main.foo" does not update fields. Please remove "@using(updateFields = true)" for the function."""
       )
     }
   }
@@ -4046,15 +4213,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     contract is StatefulContract(
       6,
       methods = AVector(
-        Method[StatefulContext](
+        Method.testDefault[StatefulContext](
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
-          1,
-          1,
-          0,
-          AVector[Instr[StatefulContext]](
+          argsLength = 1,
+          localsLength = 1,
+          returnLength = 0,
+          instrs = AVector[Instr[StatefulContext]](
             methodSelectorOf("foo(I256)->()"),
             U256Const0,
             StoreMutField(0.toByte),
@@ -4068,15 +4232,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           ) ++
             AVector(LoadLocal(0.toByte), I256Const0, I256Neq, U256Const0, AssertWithErrorCode)
         ),
-        Method[StatefulContext](
+        Method.testDefault[StatefulContext](
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
-          1,
-          1,
-          0,
-          AVector[Instr[StatefulContext]](
+          argsLength = 1,
+          localsLength = 1,
+          returnLength = 0,
+          instrs = AVector[Instr[StatefulContext]](
             methodSelectorOf("bar(ByteVec)->()"),
             LoadImmField(2.toByte),
             U256Const0,
@@ -4115,11 +4276,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     contract is StatefulContract(
       6,
       methods = AVector(
-        Method[StatefulContext](
+        Method.testDefault(
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
           argsLength = 2,
           localsLength = 2,
           returnLength = 0,
@@ -4146,15 +4304,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           ) ++
             AVector(LoadLocal(0.toByte), I256Const0, I256Neq, U256Const0, AssertWithErrorCode)
         ),
-        Method[StatefulContext](
+        Method.testDefault(
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
-          2,
-          2,
-          0,
-          AVector[Instr[StatefulContext]](
+          argsLength = 2,
+          localsLength = 2,
+          returnLength = 0,
+          instrs = AVector[Instr[StatefulContext]](
             methodSelectorOf("bar(ByteVec,U256)->()"),
             LoadLocal(1.toByte),
             U256Const1,
@@ -4249,11 +4404,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     warnings.isEmpty is true
     script is StatelessScript.unsafe(
       AVector(
-        Method[StatelessContext](
+        Method.testDefault[StatelessContext](
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,
@@ -5778,7 +5930,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         code("address, #00"),
         "Invalid args type List(Address, ByteVec), expected List(Address, U256)"
       )
-      testContractError(code("f1(address)"), "Invalid args length, expected 2, got 1")
+      testContractError(
+        code("f1(address)"),
+        "Invalid args type List(Address, U256), expected List(U256)"
+      )
       testContractError(code("address, 1, 1"), "Invalid args length, expected 2, got 3")
     }
 
@@ -6081,10 +6236,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         Seq("map.insert!(address, 0, 0)", "map.remove!(address, 0)", "map[0] = 0")
       updateStatements.foreach { statement =>
         compileContractFull(
-          code(statement, "@using(preapprovedAssets = true)")
+          code(statement, "@using(preapprovedAssets = true, updateFields = true)")
         ).rightValue.warnings.map(_.message) is warnings
         compileContractFull(
-          code(statement, "@using(preapprovedAssets = true, checkExternalCaller = false)")
+          code(
+            statement,
+            "@using(preapprovedAssets = true, updateFields = true, checkExternalCaller = false)"
+          )
         ).rightValue.warnings.map(_.message) is AVector.empty[String]
       }
       compileContractFull(code("let _ = map[0]")).rightValue.warnings.map(_.message) is
@@ -6119,6 +6277,46 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "Global variables have the same name: counters")
+    }
+  }
+
+  it should "check the updateFields annotation for the map call" in new Fixture {
+    def code(statement: String, annotation: String = "") =
+      s"""
+         |Contract Foo(@unused address: Address) {
+         |  mapping[U256, U256] map
+         |  $annotation
+         |  pub fn foo() -> () {
+         |    $statement
+         |  }
+         |}
+         |""".stripMargin
+
+    val noUpdateFieldsWarning = AVector(Warnings.noUpdateFieldsCheck("Foo", "foo"))
+    val unnecessaryUpdateFieldsWarning =
+      AVector(Warnings.unnecessaryUpdateFieldsCheck("Foo", "foo"))
+
+    val updateStatements =
+      Seq("map.insert!(address, 0, 0)", "map.remove!(address, 0)", "map[0] = 0", "map[0] += 1")
+    updateStatements.foreach { statement =>
+      compileContractFull(
+        code(statement, "@using(preapprovedAssets = true, checkExternalCaller = false)")
+      ).rightValue.warnings.map(_.message) is noUpdateFieldsWarning
+      compileContractFull(
+        code(
+          statement,
+          "@using(preapprovedAssets = true, checkExternalCaller = false, updateFields = true)"
+        )
+      ).rightValue.warnings.map(_.message) is AVector.empty[String]
+    }
+
+    val loadStatements =
+      Seq("let _ = map[0]", "let _ = map.contains!(0)")
+    loadStatements.foreach { statement =>
+      compileContractFull(code(statement)).rightValue.warnings.map(_.message).isEmpty is true
+      compileContractFull(
+        code(statement, "@using(checkExternalCaller = false, updateFields = true)")
+      ).rightValue.warnings.map(_.message) is unnecessaryUpdateFieldsWarning
     }
   }
 
@@ -6630,18 +6828,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "assign correct method index to interface functions" in {
     def createFunc(name: String, methodIndex: Option[Int] = None): Ast.FuncDef[StatefulContext] =
       Ast.FuncDef(
-        Seq.empty,
-        Ast.FuncId(name, false),
+        annotations = Seq.empty,
+        id = Ast.FuncId(name, false),
         isPublic = false,
         usePreapprovedAssets = false,
-        Ast.NotUseContractAssets,
+        useAssetsInContract = Ast.NotUseContractAssets,
         usePayToContractOnly = false,
         useCheckExternalCaller = false,
+        useRoutePattern = false,
         useUpdateFields = false,
-        methodIndex,
-        Seq.empty,
-        Seq.empty,
-        None
+        useMethodIndex = methodIndex,
+        inline = false,
+        args = Seq.empty,
+        rtypes = Seq.empty,
+        bodyOpt = None
       )
 
     def checkFuncIndexes(funcs: Seq[Ast.FuncDef[StatefulContext]], indexes: Map[String, Byte]) = {
@@ -7343,7 +7543,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     foo.funcs(0).methodSelector = Some(foo.funcs(1).getMethodSelector(multiContracts.globalState))
 
     val state = Compiler.State.buildFor(multiContracts, 0)(CompilerOptions.Default)
-    val error = intercept[Compiler.Error](foo.genMethods(state))
+    val error = intercept[Compiler.Error](foo.genMethodsForNonInlineFuncs(state))
     error.message is "Function bar's method selector conflicts with function foo's method selector. Please use a new function name."
     error.position is code.indexOf("$")
   }
@@ -8753,5 +8953,1137 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       testContractError(code, "These functions are implemented multiple times: p")
       compileCode(code, "These functions are implemented multiple times: p")
     }
+  }
+
+  it should "check inline functions" in {
+    {
+      info("Inline functions cannot be public")
+      def code(modifier: String) =
+        s"""
+           |Contract Foo(count: U256) {
+           |  @inline $modifier fn $$foo$$() -> U256 {
+           |    return count
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code("pub"), "Inline functions cannot be public")
+      Compiler.compileContract(replace(code(""))).isRight is true
+    }
+
+    {
+      info("Return an error if the inline function signature is inconsistent")
+      def code(annotation: String) = {
+        s"""
+           |Contract Foo() extends Bar() {
+           |  $$${annotation}fn bar() -> U256 {
+           |    return 0
+           |  }$$
+           |  pub fn foo() -> U256 {
+           |    return bar()
+           |  }
+           |}
+           |Abstract Contract Bar() {
+           |  @inline fn bar() -> U256
+           |}
+           |""".stripMargin
+      }
+
+      testContractError(code(""), "Function \"bar\" is implemented with wrong signature")
+      Compiler.compileContract(replace(code("@inline "))).isRight is true
+    }
+
+    {
+      info("Unused inline functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @inline fn foo() -> () {}
+           |  pub fn bar() -> () {}
+           |}
+           |""".stripMargin
+      val compiled = compileContractFull(code).rightValue
+      compiled.warnings is AVector(
+        Warning(
+          "Found unused private function in Foo: foo",
+          compiled.ast.funcs.find(_.name == "foo").flatMap(_.id.sourceIndex)
+        )
+      )
+    }
+
+    {
+      info("Check the updateFields annotation")
+      val code0 =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  @inline fn foo() -> () {
+           |    v = v + 1
+           |  }
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      val compiled0 = compileContractFull(code0).rightValue
+      compiled0.warnings is AVector(
+        Warning(
+          s"""Function "Foo.foo" updates fields. Please use "@using(updateFields = true)" for the function.""",
+          compiled0.ast.funcs.find(_.name == "foo").flatMap(_.id.sourceIndex)
+        )
+      )
+
+      val code1 =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  @using(updateFields = true)
+           |  @inline fn foo() -> () {
+           |    v = v + 1
+           |  }
+           |
+           |  @using(checkExternalCaller = false, updateFields = true)
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      val compiled1 = compileContractFull(code1).rightValue
+      compiled1.warnings is AVector(
+        Warning(
+          s"""Function "Foo.bar" does not update fields. Please remove "@using(updateFields = true)" for the function.""",
+          compiled1.ast.funcs.find(_.name == "bar").flatMap(_.id.sourceIndex)
+        )
+      )
+
+      val code2 =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  @using(updateFields = true)
+           |  @inline fn foo() -> () {
+           |    v = v + 1
+           |  }
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      val compiled2 = compileContractFull(code2).rightValue
+      compiled2.warnings.isEmpty is true
+    }
+
+    {
+      info("Check the brace syntax for inline function call")
+      val code: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  @using(preapprovedAssets = true)
+           |  @inline fn foo() -> () {
+           |    transferToken!(callerAddress!(), address, ALPH, 1 alph)
+           |  }
+           |
+           |  pub fn bar() -> () {
+           |    $$foo()$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Function `foo` needs preapproved assets, please use braces syntax")
+    }
+
+    {
+      info("Check the usePreapprovedAssets annotation")
+      val code0: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  $$@inline fn foo() -> () {
+           |    transferToken!(callerAddress!(), address, ALPH, 1 alph)
+           |  }$$
+           |
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code0,
+        "Function \"Foo.foo\" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"
+      )
+
+      val code1: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  @using(preapprovedAssets = true)
+           |  @inline fn foo() -> () {
+           |    transferToken!(callerAddress!(), address, ALPH, 1 alph)
+           |  }
+           |
+           |  $$pub fn bar() -> () {
+           |    foo{callerAddress!() -> ALPH: 1 alph}()
+           |  }$$
+           |}
+           |""".stripMargin
+      testContractError(
+        code1,
+        "Function \"Foo.bar\" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"
+      )
+
+      val code2: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  @using(preapprovedAssets = true)
+           |  @inline fn foo() -> () {
+           |    transferToken!(callerAddress!(), address, ALPH, 1 alph)
+           |  }
+           |
+           |  @using(preapprovedAssets = true)
+           |  pub fn bar() -> () {
+           |    foo{callerAddress!() -> ALPH: 1 alph}()
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code2).isRight is true
+    }
+
+    {
+      info("Check the assetsInContract annotation")
+      val code0: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  $$@inline fn foo() -> () {
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }$$
+           |
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code0,
+        "Function \"Foo.foo\" uses contract assets, please use annotation `assetsInContract = true`."
+      )
+
+      val code1: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  @using(assetsInContract = true)
+           |  @inline fn foo() -> () {
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |
+           |  $$@using(assetsInContract = true)
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }$$
+           |}
+           |""".stripMargin
+      testContractError(
+        code1,
+        "Function \"Foo.bar\" does not use contract assets, but the annotation `assetsInContract` is enabled. Please remove the `assetsInContract` annotation or set it to `enforced`"
+      )
+
+      val code2: String =
+        s"""
+           |Contract Foo(address: Address) {
+           |  @using(assetsInContract = true)
+           |  @inline fn foo() -> () {
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |
+           |  @using(assetsInContract = enforced)
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code2).isRight is true
+    }
+
+    {
+      info("Check the checkExternalCaller annotation")
+      val code0: String =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  @using(updateFields = true)
+           |  @inline fn foo() -> () {
+           |    v = v + 1
+           |  }
+           |
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      val compiled0 = compileContractFull(code0).rightValue
+      compiled0.warnings is AVector(
+        Warning(
+          s"""No external caller check for function "Foo.bar". Please use "checkCaller!(...)" in the function or its callees, or disable it with "@using(checkExternalCaller = false)".""",
+          compiled0.ast.funcs.find(_.name == "bar").flatMap(_.id.sourceIndex)
+        )
+      )
+
+      val code1: String =
+        s"""
+           |Contract Foo(mut v: U256, owner: Address) {
+           |  @using(updateFields = true)
+           |  @inline fn foo() -> () {
+           |    checkCaller!(callerAddress!() == owner, 0)
+           |    v = v + 1
+           |  }
+           |
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+      val compiled1 = compileContractFull(code1).rightValue
+      compiled1.warnings.isEmpty is true
+    }
+
+    {
+      info("Return an error if there are conflict variable names")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @inline fn f0() -> () {
+           |    let a = 1
+           |    f1(a)
+           |    let $$a$$ = 2
+           |  }
+           |
+           |  @inline fn f1(v: U256) -> () {
+           |    let a = v
+           |    let _ = a
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Local variables have the same name: a")
+    }
+  }
+
+  it should "generate code for inline func calls" in new Fixture {
+    def check(code: String, expected: AVector[Instr[StatefulContext]]) = {
+      val compiled = Compiler.compileContractFull(code).rightValue
+      val ast      = compiled.ast
+      compiled.debugCode.methods.length is ast.orderedFuncs.length
+      ast.orderedFuncs.slice(0, ast.nonInlineFuncs.length).foreach(_.inline is false)
+      ast.orderedFuncs
+        .slice(ast.nonInlineFuncs.length, ast.orderedFuncs.length)
+        .foreach(_.inline is true)
+
+      val methods = compiled.code.methods
+      methods.length is compiled.ast.nonInlineFuncs.length
+      val instrs = methods.head.instrs
+      instrs.head.isInstanceOf[MethodSelector] is true
+      instrs.tail is expected
+    }
+
+    {
+      info("Simple inline function")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar()
+           |  }
+           |  @inline fn bar() -> U256 {
+           |    return 1
+           |  }
+           |}
+           |""".stripMargin
+      check(code, AVector(U256Const1, Return))
+      testContract(code, AVector.empty, AVector(Val.U256(1)))
+    }
+
+    {
+      info("Calling an inline function using variables")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let a = 2
+           |    return bar(a)
+           |  }
+           |  @inline fn bar(a: U256) -> U256 {
+           |    return a + 1
+           |  }
+           |}
+           |""".stripMargin
+      check(code, AVector(U256Const2, StoreLocal(0), LoadLocal(0), U256Const1, U256Add, Return))
+      testContract(code, AVector.empty, AVector(Val.U256(3)))
+    }
+
+    {
+      info("Calling an inline function using constants")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar(2)
+           |  }
+           |  @inline fn bar(a: U256) -> U256 {
+           |    return a + 1
+           |  }
+           |}
+           |""".stripMargin
+      check(code, AVector(U256Const2, U256Const1, U256Add, Return))
+      testContract(code, AVector.empty, AVector(Val.U256(3)))
+    }
+
+    {
+      info("Inline function with local variables")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let a = 1
+           |    let b = 2
+           |    let c = bar(b, a)
+           |    return c
+           |  }
+           |  @inline fn bar(a: U256, b: U256) -> U256 {
+           |    let c = a * 2
+           |    let d = b * 3
+           |    return c + d
+           |  }
+           |}
+           |""".stripMargin
+      // format: off
+      check(
+        code, AVector(
+          U256Const1, StoreLocal(0), U256Const2, StoreLocal(1), LoadLocal(1), U256Const2, U256Mul, StoreLocal(3),
+          LoadLocal(0), U256Const3, U256Mul, StoreLocal(4), LoadLocal(3), LoadLocal(4), U256Add, StoreLocal(2), LoadLocal(2), Return
+        )
+      )
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(7)))
+    }
+
+    {
+      info("Call inline function multiple times")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let a = 1
+           |    let b = 2
+           |    let c = bar(b, a)
+           |    let d = bar(b, a)
+           |    return c + d
+           |  }
+           |  @inline fn bar(a: U256, b: U256) -> U256 {
+           |    let c = a * 2
+           |    let d = b * 3
+           |    return c + d
+           |  }
+           |}
+           |""".stripMargin
+      // format: off
+      check(
+        code, AVector(
+          U256Const1, StoreLocal(0), U256Const2, StoreLocal(1), LoadLocal(1), U256Const2, U256Mul, StoreLocal(4),
+          LoadLocal(0), U256Const3, U256Mul, StoreLocal(5), LoadLocal(4), LoadLocal(5), U256Add, StoreLocal(2),
+          LoadLocal(1), U256Const2, U256Mul, StoreLocal(6), LoadLocal(0), U256Const3, U256Mul, StoreLocal(7),
+          LoadLocal(6), LoadLocal(7), U256Add, StoreLocal(3), LoadLocal(2), LoadLocal(3), U256Add, Return
+        )
+      )
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(14)))
+    }
+
+    {
+      info("Using side-effect function call as an inline argument")
+      val code =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  pub fn foo() -> U256 {
+           |    bar(update(), v)
+           |    return v
+           |  }
+           |  fn update() -> U256 {
+           |    v = v + 1
+           |    return v
+           |  }
+           |  @inline fn bar(a: U256, b: U256) -> () {
+           |    assert!(a == v, 0)
+           |    assert!(a == b, 0)
+           |    assert!(b == v, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      testContract(code, output = AVector(Val.U256(1)), mutFields = AVector(Val.U256(0)))
+    }
+
+    {
+      info("Handle the while statement properly")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(m: U256, n: U256) -> U256 {
+           |    let v = baz(m, n)
+           |    assert!(v == n || v == m, 0)
+           |    return v
+           |  }
+           |  @inline fn baz(m: U256, n: U256) -> U256 {
+           |    let mut i = 0
+           |    let mut a = 0
+           |    while (i < n) {
+           |      a = a + 1
+           |      i = i + 1
+           |      if (a >= m) {
+           |        return a
+           |      }
+           |    }
+           |    return a
+           |  }
+           |}
+           |""".stripMargin
+
+      testContract(code, AVector(Val.U256(2), Val.U256(4)), AVector(Val.U256(2)))
+      testContract(code, AVector(Val.U256(4), Val.U256(2)), AVector(Val.U256(2)))
+    }
+
+    {
+      info("Handle the if-else statement properly")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(m: U256) -> U256 {
+           |    if (isZero(m)) {
+           |      return m + 1
+           |    } else {
+           |      return m
+           |    }
+           |  }
+           |  @inline fn isZero(m: U256) -> Bool {
+           |    if (m == 0) {
+           |      return true
+           |    } else {
+           |      return false
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      testContract(code, AVector(Val.U256(0)), AVector(Val.U256(1)))
+      testContract(code, AVector(Val.U256(1)), AVector(Val.U256(1)))
+    }
+
+    {
+      info("Inline function that returns multiple values")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let (a, b) = bar()
+           |    return (a * 2) + (b * 3)
+           |  }
+           |  @inline fn bar() -> (U256, U256) {
+           |    let a = 1
+           |    let b = 2
+           |    return b, a
+           |  }
+           |}
+           |""".stripMargin
+      // format: off
+      check(
+        code, AVector(
+          U256Const1, StoreLocal(2), U256Const2, StoreLocal(3), LoadLocal(3), LoadLocal(2), StoreLocal(1), StoreLocal(0),
+          LoadLocal(0), U256Const2, U256Mul, LoadLocal(1), U256Const3, U256Mul, U256Add, Return
+        )
+      )
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(7)))
+    }
+
+    {
+      info("Inline function that returns an array")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let array = bar()
+           |    return array[0] + array[1]
+           |  }
+           |  @inline fn bar() -> [U256; 2] {
+           |    return [1, 2]
+           |  }
+           |}
+           |""".stripMargin
+      // format: off
+      check(code, AVector(U256Const1, U256Const2, StoreLocal(1), StoreLocal(0), LoadLocal(0), LoadLocal(1), U256Add, Return))
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(3)))
+    }
+
+    {
+      info("Inline function to update contract fields")
+      val code =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  pub fn foo() -> U256 {
+           |    return bar()
+           |  }
+           |  @inline fn bar() -> U256 {
+           |    v = v + 1
+           |    return v
+           |  }
+           |}
+           |""".stripMargin
+      // format: off
+      check(code, AVector(LoadMutField(0), U256Const1, U256Add, StoreMutField(0), LoadMutField(0), Return))
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(3)), AVector.empty, AVector(Val.U256(2)))
+    }
+
+    {
+      info("Calling multiple inline functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar(1) + bar(2)
+           |  }
+           |  @inline fn bar(v: U256) -> U256 {
+           |    return v + 1
+           |  }
+           |}
+           |""".stripMargin
+
+      // format: off
+      check(code, AVector(U256Const1, U256Const1, U256Add, U256Const2, U256Const1, U256Add, U256Add, Return))
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(5)))
+    }
+
+    {
+      info("Calling an inline function within an inline function")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar0(2)
+           |  }
+           |  @inline fn bar0(a: U256) -> U256 {
+           |    let b = 1
+           |    return bar1(a, b)
+           |  }
+           |  @inline fn bar1(a: U256, b: U256) -> U256 {
+           |    return a + b
+           |  }
+           |}
+           |""".stripMargin
+
+      check(code, AVector(U256Const1, StoreLocal(0), U256Const2, LoadLocal(0), U256Add, Return))
+      testContract(code, AVector.empty, AVector(Val.U256(3)))
+    }
+
+    {
+      info("Calling a non-inline function within an inline function")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar0(2)
+           |  }
+           |  @inline fn bar0(a: U256) -> U256 {
+           |    let b = 1
+           |    return bar1(a, b)
+           |  }
+           |  fn bar1(a: U256, b: U256) -> U256 {
+           |    return a + b
+           |  }
+           |}
+           |""".stripMargin
+
+      // format: off
+      check(code, AVector(U256Const1, StoreLocal(0), U256Const2, LoadLocal(0), CallLocal(1), Return))
+      // format: on
+      testContract(code, AVector.empty, AVector(Val.U256(3)))
+    }
+
+    {
+      info("Return an error if there are recursive inline function calls")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar()
+           |  }
+           |  @inline fn $$bar$$() -> U256 {
+           |    return bar()
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Inline function \"bar\" cannot be recursive")
+    }
+
+    {
+      info("Return an error if there are mutual recursive inline function calls")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return bar0()
+           |  }
+           |  @inline fn $$bar0$$() -> U256 {
+           |    return bar1()
+           |  }
+           |  @inline fn bar1() -> U256 {
+           |    return bar0()
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Inline function \"bar0\" cannot be recursive")
+    }
+
+    {
+      info("Add local variables to the caller function")
+      val code =
+        s"""
+           |Contract Foo(v: U256) {
+           |  pub fn foo() -> () {
+           |    let a = 0
+           |    let b = 1
+           |    bar(a)
+           |  }
+           |  @inline fn bar(a: U256) -> () {
+           |    let b = 0
+           |    if (v > 1) {
+           |      let c = 1
+           |    } else {
+           |      let d = 2
+           |    }
+           |    while (v > 2) {
+           |      let e = 3
+           |      return
+           |    }
+           |    let f = 4
+           |  }
+           |}
+           |""".stripMargin
+
+      val multiContract = Compiler.compileMultiContract(code).rightValue
+      val state         = Compiler.State.buildFor(multiContract, 0)(CompilerOptions.Default)
+      state.genInlineCode = true
+      val contract = multiContract.contracts.head.asInstanceOf[Ast.Contract]
+      contract.check(state)
+      contract.genCode(state)
+      state.getLocalVarSize(Ast.FuncId("foo", false)) is 7
+    }
+
+    {
+      info("TxScript")
+      val code0 =
+        s"""
+           |TxScript Main(from: Address, to: Address) {
+           |  transfer()
+           |
+           |  $$@inline fn transfer() -> () {
+           |    transferToken!(from, to, ALPH, 1 alph)
+           |  }$$
+           |}
+           |""".stripMargin
+
+      testTxScriptError(
+        code0,
+        "Function \"Main.transfer\" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"
+      )
+
+      val code1 =
+        s"""
+           |TxScript Main(from: Address, to: Address) {
+           |  transfer{from -> ALPH: 1 alph}()
+           |
+           |  @using(preapprovedAssets = true)
+           |  @inline fn transfer() -> () {
+           |    transferToken!(from, to, ALPH, 1 alph)
+           |  }
+           |}
+           |""".stripMargin
+      val result = Compiler.compileTxScriptFull(code1).rightValue
+      result.debugCode.methods.length is 2
+      result.code.methods.length is 1
+    }
+
+    {
+      info(s"Arrays and structs as inline function parameters")
+      val code =
+        s"""
+           |struct Bar { a: U256, b: U256 }
+           |Contract Foo() {
+           |  @inline fn foo0(array: [U256; 2], bar: Bar) -> U256 {
+           |    return array[0] + array[1] + bar.a + bar.b
+           |  }
+           |  pub fn foo1(array: [U256; 2]) -> U256 {
+           |    return foo0(array, Bar { a: 1, b: 2 })
+           |  }
+           |}
+           |""".stripMargin
+      test(code, AVector[Val](Val.U256(1), Val.U256(2)), AVector(Val.U256(6)))
+    }
+
+    {
+      info("Arrays and structs as local var in inline functions")
+      val code =
+        s"""
+           |struct Bar { a: U256, b: U256 }
+           |Contract Foo() {
+           |  @inline fn foo0() -> U256 {
+           |    let c = 0
+           |    let array = [1, 2]
+           |    let b = 1
+           |    let bar = Bar { a: 1, b: 2 }
+           |    let a = 2
+           |    return array[0] + array[1] + bar.a + bar.b + a + b + c
+           |  }
+           |  pub fn foo1() -> U256 {
+           |    return foo0()
+           |  }
+           |}
+           |""".stripMargin
+      test(code, AVector.empty[Val], AVector(Val.U256(9)))
+      // format: off
+      check(code, AVector(
+        U256Const0, StoreLocal(0), U256Const1, U256Const2, StoreLocal(2), StoreLocal(1), U256Const1,
+        StoreLocal(3), U256Const1, U256Const2, StoreLocal(5), StoreLocal(4), U256Const2, StoreLocal(6),
+        LoadLocal(1), LoadLocal(2), U256Add, LoadLocal(4), U256Add, LoadLocal(5), U256Add,
+        LoadLocal(6), U256Add, LoadLocal(3), U256Add, LoadLocal(0), U256Add, Return
+      ))
+      // format: on
+    }
+  }
+
+  it should "get correct local variable size" in {
+    val code0 =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    let a = 0
+         |    let b = 1
+         |  }
+         |  pub fn fooBar() -> () {
+         |    let a = 0
+         |    let b = 1
+         |  }
+         |}
+         |""".stripMargin
+
+    val contract0 = Compiler.compileContract(code0).rightValue
+    contract0.methods.foreach(_.localsLength is 2)
+
+    val code1 =
+      s"""
+         |Contract Foo() {
+         |  fn fooBar() -> () {
+         |    let a = 0
+         |    let b = 1
+         |    foo()
+         |  }
+         |  @inline fn foo() -> () {
+         |    let a = 0
+         |    let b = 1
+         |  }
+         |}
+         |""".stripMargin
+
+    val contract1 = Compiler.compileContractFull(code1).rightValue.debugCode
+    contract1.methods.length is 2
+    contract1.methods(0).localsLength is 4
+    contract1.methods(1).localsLength is 2
+  }
+
+  it should "generate correct code for inline function caller" in {
+    {
+      info("Calc using contract assets info")
+      val code =
+        s"""
+           |Contract Foo(address: Address) {
+           |  @using(assetsInContract = true)
+           |  @inline fn f0() -> () {
+           |    transferTokenFromSelf!(address, ALPH, 1 alph)
+           |  }
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn f1() -> () { f0() }
+           |
+           |  @inline fn f2() -> () { f0() }
+           |
+           |  fn f3() -> () { f2() }
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn f4() -> () { f3() }
+           |
+           |  @using(assetsInContract = enforced)
+           |  @inline fn f5() -> () {
+           |    transferTokenFromSelf!(address, ALPH, 1 alph)
+           |  }
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn f6() -> () { f5() }
+           |
+           |  @using(payToContractOnly = true, preapprovedAssets = true)
+           |  @inline fn f7() -> () {
+           |    transferTokenToSelf!(address, ALPH, 1 alph)
+           |  }
+           |
+           |  @using(checkExternalCaller = false, preapprovedAssets = true)
+           |  pub fn f8() -> () { f7{address -> ALPH: 1 alph}() }
+           |
+           |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = enforced)
+           |  pub fn f9() -> () { f7{address -> ALPH: 1 alph}() }
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn f10() -> () { f11() }
+           |
+           |  @inline fn f11() -> () { f12() }
+           |
+           |  @using(assetsInContract = true)
+           |  @inline fn f12() -> () {
+           |    transferTokenFromSelf!(address, ALPH, 1 alph)
+           |  }
+           |}
+           |""".stripMargin
+      val compiled = compileContractFull(code).rightValue
+      compiled.warnings.isEmpty is true
+
+      def checkCompiledCode(methods: AVector[Method[StatefulContext]]) = {
+        methods(0).useContractAssets is true     // f1
+        methods(0).usePayToContractOnly is false // f1
+        methods(1).useContractAssets is true     // f3
+        methods(1).usePayToContractOnly is false // f3
+        methods(2).useContractAssets is false    // f4
+        methods(2).usePayToContractOnly is false // f4
+        methods(3).useContractAssets is true     // f6
+        methods(3).usePayToContractOnly is false // f6
+        methods(4).useContractAssets is false    // f8
+        methods(4).usePayToContractOnly is true  // f8
+        methods(5).useContractAssets is true     // f9
+        methods(5).usePayToContractOnly is false // f9
+        methods(6).useContractAssets is true     // f10
+        methods(6).usePayToContractOnly is false // f10
+      }
+
+      checkCompiledCode(compiled.debugCode.methods.dropRight(compiled.ast.inlineFuncs.length))
+      checkCompiledCode(compiled.code.methods)
+    }
+
+    {
+      info("Call multiple inline functions that use contract assets")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(checkExternalCaller = false, preapprovedAssets = true)
+           |  pub fn f0() -> () {
+           |    f2{callerAddress!() -> ALPH: 1 alph}()
+           |    f3()
+           |  }
+           |
+           |  @using(checkExternalCaller = false, preapprovedAssets = true)
+           |  pub fn f1() -> () {
+           |    f2{callerAddress!() -> ALPH: 1 alph}()
+           |    f4{callerAddress!() -> ALPH: 1 alph}()
+           |  }
+           |
+           |  @using(payToContractOnly = true, preapprovedAssets = true)
+           |  @inline fn f2() -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |
+           |  @using(assetsInContract = true)
+           |  @inline fn f3() -> () {
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |
+           |  @using(payToContractOnly = true, preapprovedAssets = true)
+           |  @inline fn f4() -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |}
+           |""".stripMargin
+
+      val compiled = compileContractFull(code).rightValue.code
+      compiled.methods.length is 2
+      compiled.methods(0).useContractAssets is true
+      compiled.methods(0).usePayToContractOnly is false
+      compiled.methods(1).useContractAssets is false
+      compiled.methods(1).usePayToContractOnly is true
+    }
+
+    {
+      info("Use the specified the contract assets annotation")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = enforced)
+           |  pub fn f0() -> () {
+           |    f1{callerAddress!() -> ALPH: 1 alph}()
+           |  }
+           |
+           |  @using(payToContractOnly = true, preapprovedAssets = true)
+           |  @inline fn f1() -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |}
+           |""".stripMargin
+
+      val compiled = compileContractFull(code).rightValue.code
+      compiled.methods.length is 1
+      compiled.methods.head.useContractAssets is true
+      compiled.methods.head.usePayToContractOnly is false
+    }
+
+    {
+      info("Not use contract assets")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(checkExternalCaller = false)
+           |  pub fn f0() -> () { f1() }
+           |
+           |  @inline fn f1() -> () { f2() }
+           |
+           |  @using(assetsInContract = true)
+           |  fn f2() -> () {
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |}
+           |""".stripMargin
+
+      val compiled = compileContractFull(code).rightValue.code
+      compiled.methods.length is 2
+      compiled.methods(0).useContractAssets is false
+      compiled.methods(0).usePayToContractOnly is false
+      compiled.methods(1).useContractAssets is true
+      compiled.methods(1).usePayToContractOnly is false
+    }
+  }
+
+  it should "derive contract address from script" in {
+    val contractId      = ContractId.generate
+    val contractAddress = Address.contract(contractId)
+
+    {
+      val script =
+        s"""
+           |TxScript Main {
+           |  assert!(1 == 1, 0)
+           |}
+      """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is None
+
+    }
+
+    {
+      val script =
+        s"""
+           |TxScript Main() {
+           |  Bar(#${contractId.toHexString}).bar()
+           |}
+           |
+           |Contract Bar() {
+           |  pub fn bar() -> () {}
+           |}
+    """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is Some(contractAddress)
+    }
+
+    {
+      val script =
+        s"""
+           |TxScript Main() {
+           |  callBar()
+           |
+           |  fn callBar() -> () {
+           |    Bar(#${contractId.toHexString}).bar()
+           |  }
+           |}
+           |
+           |Contract Bar() {
+           |  pub fn bar() -> () {}
+           |}
+    """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      StatefulScript.deriveContractAddress(compiled) is Some(contractAddress)
+    }
+  }
+
+  it should "skip preapproved assets check for contract creation" in {
+    val noAnnotation   = ""
+    val withAnnotation = ", preapprovedAssets = true"
+
+    {
+      info("Test createContract without deposit")
+
+      def code(annotation: String) =
+        s"""
+           |Contract Create() {
+           |  @using(checkExternalCaller = false$annotation)
+           |  pub fn noDeposit() -> () {
+           |    createContract!(#00, #00, #00)
+           |  }
+           |}
+           |""".stripMargin
+      compileContract(code(noAnnotation)).isRight is true
+      compileContract(code(withAnnotation)).isRight is true
+    }
+
+    {
+      info("Test createContract with deposit")
+
+      def code(annotation: String) =
+        s"""
+           |Contract Create() {
+           |  $$@using(checkExternalCaller = false$annotation)
+           |  pub fn withDeposit() -> () {
+           |    createContract!{callerAddress!() -> ALPH: 1}(#00, #00, #00)
+           |  }$$
+           |}
+           |""".stripMargin
+      testContractError(
+        code(noAnnotation),
+        """Function "Create.withDeposit" uses assets, please use annotation `preapprovedAssets = true` or `assetsInContract = true`"""
+      )
+      compileContract(replace(code(withAnnotation))).isRight is true
+    }
+  }
+
+  it should "support bitwise operators for I256" in {
+    def code(expr: String, retTpe: String) =
+      s"""
+         |Contract Foo(@unused a: I256, @unused b: I256, @unused c: U256) {
+         |  pub fn foo() -> $retTpe {
+         |    return $expr
+         |  }
+         |}
+         |""".stripMargin
+
+    val exprs0 = Seq("a & b", "a | b", "a ^ b", "a << c", "a >> c")
+    exprs0.foreach(expr => compileContract(code(expr, "I256")).isRight is true)
+    exprs0.foreach(expr =>
+      compileContract(code(expr, "U256")).leftValue.message is
+        s"""Invalid return types "List(I256)" for func foo, expected "List(U256)""""
+    )
+    val exprs1 = Seq("a & c", "a | c", "a ^ c")
+    exprs1.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(I256, U256) for ${expr.slice(2, 3)} operator"""
+    )
+    val exprs2 = Seq("a << b", "a >> b")
+    exprs2.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(I256, I256) for ${expr.slice(2, 4)} operator"""
+    )
+    val exprs3 = Seq("c << b", "c >> b")
+    exprs3.foreach(expr =>
+      compileContract(code(expr, "I256")).leftValue.message is
+        s"""Invalid param types List(U256, I256) for ${expr.slice(2, 4)} operator"""
+    )
   }
 }

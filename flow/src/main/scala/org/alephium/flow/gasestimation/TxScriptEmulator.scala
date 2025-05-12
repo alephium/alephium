@@ -16,6 +16,7 @@
 
 package org.alephium.flow.gasestimation
 
+import org.alephium.crypto.Byte64
 import org.alephium.flow.core._
 import org.alephium.flow.core.UtxoSelectionAlgo.TxInputWithAsset
 import org.alephium.protocol.Signature
@@ -25,14 +26,20 @@ import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util._
 
-trait TxScriptGasEstimator {
-  def estimate(
+final case class TxScriptEmulationResult(gasUsed: GasBox, value: TxScriptExecution)
+
+trait TxScriptEmulator {
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  def emulate(
       inputWithAssets: AVector[TxInputWithAsset],
-      script: StatefulScript
-  ): Either[String, GasBox]
+      fixedOutputs: AVector[AssetOutput],
+      script: StatefulScript,
+      gasAmountOpt: Option[GasBox] = None,
+      gasPriceOpt: Option[GasPrice] = None
+  ): Either[String, TxScriptEmulationResult]
 }
 
-object TxScriptGasEstimator {
+object TxScriptEmulator {
 
   // scalastyle:off method.length
   final case class Default(
@@ -41,11 +48,15 @@ object TxScriptGasEstimator {
       networkConfig: NetworkConfig,
       config: GroupConfig,
       logConfig: LogConfig
-  ) extends TxScriptGasEstimator {
-    def estimate(
+  ) extends TxScriptEmulator {
+
+    def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
-        script: StatefulScript
-    ): Either[String, GasBox] = {
+        fixedOutputs: AVector[AssetOutput],
+        script: StatefulScript,
+        gasAmountOpt: Option[GasBox],
+        gasPriceOpt: Option[GasPrice]
+    ): Either[String, TxScriptEmulationResult] = {
       assume(inputWithAssets.nonEmpty)
       val groupIndex      = inputWithAssets.head.input.fromGroup
       val chainIndex      = ChainIndex(groupIndex, groupIndex)
@@ -56,10 +67,18 @@ object TxScriptGasEstimator {
           groupView: BlockFlowGroupView[WorldState.Cached],
           preOutputs: AVector[AssetOutput]
       ): Either[String, TxScriptExecution] = {
+        val gasAmount = gasAmountOpt.getOrElse(minimalGas)
+        val gasPrice  = gasPriceOpt.getOrElse(nonCoinbaseMinGasPrice)
         val txTemplate = TransactionTemplate(
-          UnsignedTransaction(Some(script), inputWithAssets.map(_.input), AVector.empty),
-          inputSignatures = AVector.fill(16)(Signature.generate),
-          scriptSignatures = AVector.fill(16)(Signature.generate)
+          UnsignedTransaction(
+            Some(script),
+            gasAmount,
+            gasPrice,
+            inputWithAssets.map(_.input),
+            fixedOutputs
+          ),
+          inputSignatures = AVector.fill(16)(Byte64.from(Signature.generate)),
+          scriptSignatures = AVector.fill(16)(Byte64.from(Signature.generate))
         )
 
         val result =
@@ -77,9 +96,9 @@ object TxScriptGasEstimator {
 
         result.left.map {
           case Right(error) =>
-            s"Execution error when estimating gas for tx script or contract: $error"
+            s"Execution error when emulating tx script or contract: $error"
           case Left(error) =>
-            s"IO error when estimating gas for tx script or contract: $error"
+            s"IO error when emulating tx script or contract: $error"
         }
       }
 
@@ -88,28 +107,45 @@ object TxScriptGasEstimator {
         groupView <- flow.getMutableGroupViewIncludePool(chainIndex.from).left.map(_.toString())
         preOutputs = inputWithAssets.map(_.asset.output)
         result <- runScript(blockEnv, groupView, preOutputs)
-      } yield {
-        maximalGasPerTx.subUnsafe(result.gasBox)
-      }
+      } yield TxScriptEmulationResult(
+        maximalGasPerTx.subUnsafe(result.gasBox),
+        result
+      )
     }
   }
   // scalastyle:on method.length
 
-  object Mock extends TxScriptGasEstimator {
-    def estimate(
+  object Mock extends TxScriptEmulator {
+    def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
-        script: StatefulScript
-    ): Either[String, GasBox] = {
-      Right(defaultGasPerInput)
+        fixedOutputs: AVector[AssetOutput],
+        script: StatefulScript,
+        gasAmountOpt: Option[GasBox],
+        gasFeeOpt: Option[GasPrice]
+    ): Either[String, TxScriptEmulationResult] = {
+      Right(
+        TxScriptEmulationResult(
+          defaultGasPerInput,
+          TxScriptExecution(
+            defaultGasPerInput,
+            AVector.empty,
+            AVector.empty,
+            AVector.empty
+          )
+        )
+      )
     }
   }
 
-  object NotImplemented extends TxScriptGasEstimator {
-    def estimate(
+  object NotImplemented extends TxScriptEmulator {
+    def emulate(
         inputWithAssets: AVector[TxInputWithAsset],
-        script: StatefulScript
-    ): Either[String, GasBox] = {
-      throw new NotImplementedError("TxScriptGasEstimator not implemented")
+        fixedOutputs: AVector[AssetOutput],
+        script: StatefulScript,
+        gasAmountOpt: Option[GasBox],
+        gasFeeOpt: Option[GasPrice]
+    ): Either[String, TxScriptEmulationResult] = {
+      throw new NotImplementedError("TxScriptEmulator not implemented")
     }
   }
 }

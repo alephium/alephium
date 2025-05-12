@@ -127,7 +127,7 @@ class MemPool private (
       index: ChainIndex,
       tx: TransactionTemplate,
       timeStamp: TimeStamp
-  ): MemPool.NewTxCategory =
+  ): MemPool.AddToMemPoolResult =
     writeOnly {
       if (_contains(tx.id)) {
         MemPool.AlreadyExisted
@@ -163,7 +163,7 @@ class MemPool private (
       index: ChainIndex,
       tx: TransactionTemplate,
       timestamp: TimeStamp
-  ): MemPool.NewTxCategory = {
+  ): MemPool.AddToMemPoolResult = {
     if (sharedTxIndexes.isDoubleSpending(tx)) {
       MemPool.DoubleSpending
     } else {
@@ -301,7 +301,9 @@ class MemPool private (
   }
 
   def measureTransactionsTotalInc(index: Int): Unit = {
-    transactionsTotalLabeled(index).inc()
+    if (ChainIndex.checkFromGroup(index, group)) {
+      transactionsTotalLabeled(index).inc()
+    }
   }
 
   def measureTransactionsTotalDec(index: Int): Unit = {
@@ -339,18 +341,19 @@ object MemPool {
     )
   }
 
-  sealed trait NewTxCategory {
+  sealed trait AddToMemPoolResult {
     def addedCount: Int
   }
-  case object AddedToMemPool extends NewTxCategory {
+  case object AddedToMemPool extends AddToMemPoolResult {
     def addedCount: Int = 1
   }
-  sealed trait AddTxFailed extends NewTxCategory {
+  sealed trait AddTxFailed extends AddToMemPoolResult {
     def addedCount: Int = 0
   }
-  case object MemPoolIsFull  extends AddTxFailed
-  case object DoubleSpending extends AddTxFailed
-  case object AlreadyExisted extends AddTxFailed
+  case object MemPoolIsFull     extends AddTxFailed
+  case object DoubleSpending    extends AddTxFailed
+  case object AlreadyExisted    extends AddTxFailed
+  case object AddedToOrphanPool extends AddTxFailed
 
   val txOrdering: Ordering[TransactionTemplate] =
     Ordering

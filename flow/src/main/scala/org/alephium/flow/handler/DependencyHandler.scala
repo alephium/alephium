@@ -22,7 +22,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
 
-import akka.actor.Props
+import akka.actor.{ActorSystem, Props}
 
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.model.DataOrigin
@@ -31,15 +31,24 @@ import org.alephium.flow.setting.NetworkSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.model.{Block, BlockHash, BlockHeader, ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector, Cache, TimeStamp}
-import org.alephium.util.EventStream.Subscriber
+import org.alephium.util.EventStream
 
 object DependencyHandler {
-  def props(
+  def build(
+      system: ActorSystem,
       blockFlow: BlockFlow,
       blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
-      headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
-  )(implicit networkSetting: NetworkSetting): Props =
-    Props(new DependencyHandler(blockFlow, blockHandlers, headerHandlers))
+      headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]],
+      namePostfix: String
+  )(implicit networkSetting: NetworkSetting): ActorRefT[Command] = {
+    val actor = ActorRefT.build[Command](
+      system,
+      Props(new DependencyHandler(blockFlow, blockHandlers, headerHandlers)),
+      s"DependencyHandler$namePostfix"
+    )
+    system.eventStream.subscribe(actor.ref, classOf[ChainHandler.FlowDataAdded])
+    actor
+  }
 
   sealed trait Command
   final case class AddFlowData[T <: FlowData](datas: AVector[T], origin: DataOrigin) extends Command
@@ -49,6 +58,8 @@ object DependencyHandler {
 
   sealed trait Event
   final case class Pendings(datas: AVector[BlockHash]) extends Event
+
+  final case class FlowDataAlreadyExist(data: FlowData) extends EventStream.Event
 
   final case class PendingStatus(
       data: FlowData,
@@ -63,13 +74,11 @@ class DependencyHandler(
     blockHandlers: Map[ChainIndex, ActorRefT[BlockChainHandler.Command]],
     headerHandlers: Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]]
 )(implicit val networkSetting: NetworkSetting)
-    extends DependencyHandlerState
-    with Subscriber {
+    extends DependencyHandlerState {
   import DependencyHandler._
 
   override def preStart(): Unit = {
     super.preStart()
-    subscribeEvent(self, classOf[ChainHandler.FlowDataAdded])
     scheduleOnce(
       self,
       DependencyHandler.CleanPendings,
@@ -117,7 +126,7 @@ class DependencyHandler(
   }
 }
 
-trait DependencyHandlerState extends IOBaseActor {
+trait DependencyHandlerState extends IOBaseActor with EventStream.Publisher {
   import DependencyHandler.PendingStatus
 
   def blockFlow: BlockFlow
@@ -209,6 +218,8 @@ trait DependencyHandlerState extends IOBaseActor {
           }
           // update this at the end of this function to avoid cache invalidation issues
           pending.put(data.hash, PendingStatus(data, broker, origin, TimeStamp.now()))
+        } else {
+          publishEvent(DependencyHandler.FlowDataAlreadyExist(data))
         }
       }
     }

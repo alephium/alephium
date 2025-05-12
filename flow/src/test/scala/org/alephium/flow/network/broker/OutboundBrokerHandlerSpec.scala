@@ -30,6 +30,7 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.{AlephiumConfigFixture, NetworkSetting}
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.message.P2PVersion
 import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec}
 
@@ -83,14 +84,19 @@ class TestOutboundBrokerHandler(
     extends OutboundBrokerHandler {
   override def selfCliqueInfo: CliqueInfo =
     Generators.cliqueInfoGen(1).sample.get
-  override def exchanging: Receive                                             = exchangingCommon
+  override def exchangingV1: Receive                                           = exchangingCommon
+  override def exchangingV2: Receive                                           = exchangingV1
   override def dataOrigin: DataOrigin                                          = ???
   override def allHandlers: AllHandlers                                        = ???
   override def blockflow: BlockFlow                                            = ???
   override def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command] = ???
   override def cliqueManager: ActorRefT[CliqueManager.Command]                 = ???
 
-  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
+  def handleHandshakeInfo(
+      _remoteBrokerInfo: BrokerInfo,
+      clientInfo: String,
+      p2pVersion: P2PVersion
+  ): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
   }
 }

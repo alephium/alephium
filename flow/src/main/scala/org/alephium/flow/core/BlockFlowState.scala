@@ -22,16 +22,21 @@ import scala.reflect.ClassTag
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSettings
-import org.alephium.io.{IOError, IOResult, KeyValueStorage}
+import org.alephium.io.{IOError, IOResult, IOUtils, KeyValueStorage}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.nodeindexes.{
+  ConflictedTxsStorage,
+  TxIdTxOutputLocators,
+  TxOutputLocator
+}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStorage
 import org.alephium.util._
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods file.size.limit
 trait BlockFlowState extends FlowTipsUtil {
   import BlockFlowState._
 
@@ -57,6 +62,38 @@ trait BlockFlowState extends FlowTipsUtil {
     val deps2 = genesisBlocks(mainGroup).map(_.hash)
     BlockDeps.build(deps1 ++ deps2)
   }
+  protected[core] val bestDepsDanube = Array.tabulate(brokerConfig.groupNumPerBroker, groups) {
+    case (groupShift, _) =>
+      bestDeps(groupShift)
+  }
+  @volatile protected[core] var bestFlowSkeleton = {
+    val flow = BlockFlowSkeleton.Builder(groups)
+    brokerConfig.cliqueGroups.foreach { g =>
+      flow.setTip(g, genesisHashes(g.value)(g.value), genesisHashes(g.value))
+    }
+    flow.getResult()
+  }
+
+  @volatile private lazy val accountViews: Array[AccountView] = {
+    Array.tabulate(brokerConfig.groupNumPerBroker) { fromShift =>
+      val mainGroup  = brokerConfig.groupRange(fromShift)
+      val checkpoint = genesisBlocks(mainGroup)(mainGroup)
+      AccountView.genesis(checkpoint, genesisHashes)
+    }
+  }
+
+  @inline def getAccountView(mainGroup: GroupIndex): AccountView = {
+    val groupShift = brokerConfig.groupIndexOfBroker(mainGroup)
+    accountViews(groupShift)
+  }
+
+  @inline def updateAccountView(
+      accountView: AccountView,
+      mainGroup: GroupIndex
+  ): Unit = {
+    val groupShift = brokerConfig.groupIndexOfBroker(mainGroup)
+    accountViews(groupShift) = accountView
+  }
 
   def blockchainWithStateBuilder: (Block, BlockFlow.WorldStateUpdater) => BlockChainWithState
   def blockchainBuilder: Block => BlockChain
@@ -75,12 +112,11 @@ trait BlockFlowState extends FlowTipsUtil {
     intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.logStorage
   }
 
-  def txOutputRefIndexStorage(
-      groupIndex: GroupIndex
-  ): IOResult[KeyValueStorage[TxOutputRef.Key, TransactionId]] = {
-    getBlockChainWithState(
-      groupIndex
-    ).worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
+  lazy val txOutputRefIndexStorage
+      : IOResult[KeyValueStorage[TxOutputRef.Key, TxIdTxOutputLocators]] = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+
+    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.txOutputRefIndexStorage match {
       case Some(storage) =>
         Right(storage)
       case None =>
@@ -104,6 +140,11 @@ trait BlockFlowState extends FlowTipsUtil {
           )
         )
     }
+  }
+
+  val conflictedTxsStorage: ConflictedTxsStorage = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+    intraGroupBlockChains.head.worldStateStorage.nodeIndexesStorage.conflictedTxsStorage
   }
 
   protected[core] val outBlockChains: AVector[AVector[BlockChain]] =
@@ -182,10 +223,12 @@ trait BlockFlowState extends FlowTipsUtil {
   }
 
   def getBlockCache(groupIndex: GroupIndex, hash: BlockHash): IOResult[BlockCache] = {
-    assume(ChainIndex.from(hash).relateTo(groupIndex))
-    getGroupCache(groupIndex).getE(hash) {
-      getBlockChain(hash).getBlock(hash).map(convertBlock(_, groupIndex))
-    }
+    IOUtils.tryExecute(getBlockCacheUnsafe(groupIndex, getBlockUnsafe(hash)))
+  }
+
+  def getBlockCacheUnsafe(groupIndex: GroupIndex, block: Block): BlockCache = {
+    assume(block.chainIndex.relateTo(groupIndex))
+    getGroupCache(groupIndex).getUnsafe(block.hash)(convertBlock(block, groupIndex))
   }
 
   protected def aggregateHash[T](f: BlockHashPool => T)(op: (T, T) => T): T = {
@@ -271,9 +314,22 @@ trait BlockFlowState extends FlowTipsUtil {
     getBlockChainWithState(groupIndex).getCachedWorldState(hash)
   }
 
-  def getBestDeps(groupIndex: GroupIndex): BlockDeps = {
+  def getBestDeps(chainIndex: ChainIndex, hardFork: HardFork): BlockDeps = {
+    val groupShift = brokerConfig.groupIndexOfBroker(chainIndex.from)
+    if (hardFork.isDanubeEnabled()) {
+      bestDepsDanube(groupShift)(chainIndex.to.value)
+    } else {
+      bestDeps(groupShift)
+    }
+  }
+
+  def getBestDepsPreDanube(groupIndex: GroupIndex): BlockDeps = {
     val groupShift = brokerConfig.groupIndexOfBroker(groupIndex)
     bestDeps(groupShift)
+  }
+
+  def getBestFlowSkeleton(): BlockFlowSkeleton = {
+    bestFlowSkeleton
   }
 
   def getPersistedWorldState(hash: BlockHash): IOResult[WorldState.Persisted] = {
@@ -284,92 +340,324 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def getBestPersistedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Persisted] = {
     assume(brokerConfig.contains(groupIndex))
-    val deps = getBestDeps(groupIndex)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    val deps     = getBestDeps(ChainIndex(groupIndex, groupIndex), hardFork)
     getPersistedWorldState(deps, groupIndex)
   }
 
   def getBestCachedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
     assume(brokerConfig.contains(groupIndex))
-    val deps = getBestDeps(groupIndex)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    val deps     = getBestDeps(ChainIndex(groupIndex, groupIndex), hardFork)
     getCachedWorldState(deps, groupIndex)
   }
 
+  // This should only be used for mempool tx handling
   def getImmutableGroupView(
       mainGroup: GroupIndex
   ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
-    val blockDeps = getBestDeps(mainGroup)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    if (hardFork.isDanubeEnabled()) {
+      getImmutableGroupViewDanube(mainGroup)
+    } else {
+      val blockDeps = getBestDepsPreDanube(mainGroup)
+      getImmutableGroupViewPreDanube(mainGroup, blockDeps)
+    }
+  }
+
+  private def getImmutableGroupViewDanube(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
+    val accountView = getAccountView(mainGroup)
+    for {
+      worldState <- getPersistedWorldState(accountView.checkpoint.hash)
+      result     <- accountView.getBlockCachesAndConflictedTxs(this)
+    } yield BlockFlowGroupView.onlyBlocks(worldState, result._1, result._2)
+  }
+
+  def getImmutableGroupViewPreDanube(
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps
+  ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
     for {
       worldState  <- getPersistedWorldState(blockDeps, mainGroup)
       blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
-    } yield BlockFlowGroupView.onlyBlocks(worldState, blockCaches)
+    } yield BlockFlowGroupView.onlyBlocks(worldState, blockCaches, AVector.empty)
   }
 
+  // This should only be used for mempool tx handling
   def getMutableGroupView(
       mainGroup: GroupIndex
   ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
-    getMutableGroupView(mainGroup, getBestDeps(mainGroup))
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    if (hardFork.isDanubeEnabled()) {
+      getMutableGroupViewDanube(mainGroup)
+    } else {
+      val bestDeps = getBestDepsPreDanube(mainGroup)
+      getMutableGroupViewPreDanube(mainGroup, bestDeps)
+    }
+  }
+
+  private def getMutableGroupViewDanube(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    val accountView = getAccountView(mainGroup)
+    for {
+      worldState <- getPersistedWorldState(accountView.checkpoint.hash).map(_.cached())
+      result     <- accountView.getBlockCachesAndConflictedTxs(this)
+    } yield BlockFlowGroupView.onlyBlocks(worldState, result._1, result._2)
   }
 
   def getMemPool(mainGroup: GroupIndex): MemPool
 
+  // This should only be used for mempool tx handling
   def getImmutableGroupViewIncludePool(
       mainGroup: GroupIndex
   ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
-    getImmutableGroupViewIncludePool(mainGroup, None)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    if (hardFork.isDanubeEnabled()) {
+      getImmutableGroupViewIncludePoolDanube(mainGroup)
+    } else {
+      val bestDeps = getBestDepsPreDanube(mainGroup)
+      getImmutableGroupViewIncludePoolPreDanube(mainGroup, bestDeps)
+    }
   }
 
+  // This should only be used for mempool tx handling
   def getImmutableGroupViewIncludePool(
       mainGroup: GroupIndex,
       targetBlockHashOpt: Option[BlockHash]
   ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
-    for {
-      blockDeps <- targetBlockHashOpt match {
-        case Some(blockHash) => getBlockHeader(blockHash).map(_.blockDeps)
-        case None            => Right(getBestDeps(mainGroup))
-      }
-      worldState  <- getPersistedWorldState(blockDeps, mainGroup)
-      blockCaches <- getBlockCachesForGroupViewIncludePool(mainGroup, blockDeps)
-    } yield BlockFlowGroupView.includePool(worldState, blockCaches, getMemPool(mainGroup))
+    targetBlockHashOpt match {
+      case Some(blockHash) => getImmutableGroupViewIncludePool(mainGroup, blockHash)
+      case None            => getImmutableGroupViewIncludePool(mainGroup)
+    }
   }
 
+  private def getImmutableGroupViewIncludePool(
+      mainGroup: GroupIndex,
+      targetBlockHash: BlockHash
+  ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
+    for {
+      header <- getBlockHeader(targetBlockHash)
+      hardFork = networkConfig.getHardFork(header.timestamp)
+      groupView <-
+        if (hardFork.isDanubeEnabled()) {
+          getImmutableGroupViewIncludePoolDanube(mainGroup, header.blockDeps)
+        } else {
+          getImmutableGroupViewIncludePoolPreDanube(mainGroup, header.blockDeps)
+        }
+    } yield groupView
+  }
+
+  private def getImmutableGroupViewIncludePoolDanube(
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps
+  ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
+    getPersistedWorldState(blockDeps, mainGroup).map { worldState =>
+      BlockFlowGroupView.includePool(
+        worldState,
+        AVector.empty,
+        AVector.empty,
+        getMemPool(mainGroup)
+      )
+    }
+  }
+
+  private def getImmutableGroupViewIncludePoolDanube(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
+    val accountView = getAccountView(mainGroup)
+    for {
+      worldState <- getPersistedWorldState(accountView.checkpoint.hash)
+      result     <- accountView.getBlockCachesAndConflictedTxs(this)
+    } yield BlockFlowGroupView.includePool(worldState, result._1, result._2, getMemPool(mainGroup))
+  }
+
+  private def getImmutableGroupViewIncludePoolPreDanube(
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps
+  ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
+    for {
+      worldState  <- getPersistedWorldState(blockDeps, mainGroup)
+      blockCaches <- getBlockCachesForGroupViewIncludePool(mainGroup, blockDeps)
+    } yield BlockFlowGroupView.includePool(
+      worldState,
+      blockCaches,
+      AVector.empty,
+      getMemPool(mainGroup)
+    )
+  }
+
+  // This should only be used for mempool tx handling
   def getMutableGroupViewIncludePool(
       mainGroup: GroupIndex
   ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
-    val blockDeps = getBestDeps(mainGroup)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
+    if (hardFork.isDanubeEnabled()) {
+      getMutableGroupViewIncludePoolDanube(mainGroup)
+    } else {
+      val blockDeps = getBestDepsPreDanube(mainGroup)
+      getMutableGroupViewIncludePoolPreDanube(mainGroup, blockDeps)
+    }
+  }
+
+  private def getMutableGroupViewIncludePoolDanube(
+      mainGroup: GroupIndex
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    val accountView = getAccountView(mainGroup)
+    for {
+      worldState <- getPersistedWorldState(accountView.checkpoint.hash).map(_.cached())
+      result     <- accountView.getBlockCachesAndConflictedTxs(this)
+    } yield BlockFlowGroupView.includePool(worldState, result._1, result._2, getMemPool(mainGroup))
+  }
+
+  def getMutableGroupViewIncludePoolPreDanube(
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
     for {
       worldState  <- getCachedWorldState(blockDeps, mainGroup)
       blockCaches <- getBlockCachesForGroupViewIncludePool(mainGroup, blockDeps)
-    } yield BlockFlowGroupView.includePool(worldState, blockCaches, getMemPool(mainGroup))
+    } yield BlockFlowGroupView.includePool(
+      worldState,
+      blockCaches,
+      AVector.empty,
+      getMemPool(mainGroup)
+    )
   }
 
-  def getMutableGroupView(block: Block): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
-    getMutableGroupView(block.chainIndex.from, block.blockDeps)
+  // This should only be used for testing
+  def getMutableGroupViewForTxHandling(
+      mainGroup: GroupIndex,
+      hardFork: HardFork
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    if (hardFork.isDanubeEnabled()) {
+      getMutableGroupViewDanube(mainGroup)
+    } else {
+      getMutableGroupViewPreDanube(mainGroup, getBestDepsPreDanube(mainGroup))
+    }
   }
 
-  def getMutableGroupView(
+  def getMutableGroupViewPreDanube(
+      block: Block
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    getMutableGroupViewPreDanube(block.chainIndex.from, block.blockDeps)
+  }
+
+  def getMutableGroupViewPreDanube(
       mainGroup: GroupIndex,
       blockDeps: BlockDeps
   ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
     for {
       worldState  <- getCachedWorldState(blockDeps, mainGroup)
       blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
-    } yield BlockFlowGroupView.onlyBlocks(worldState, blockCaches)
+    } yield BlockFlowGroupView.onlyBlocks(worldState, blockCaches, AVector.empty)
+  }
+
+  private def getCheckpointHash(
+      blockDeps: BlockDeps,
+      targetGroup: GroupIndex,
+      fromGroup: GroupIndex
+  ): BlockHash = {
+    assume(fromGroup != targetGroup)
+    val index =
+      if (fromGroup.value < targetGroup.value) fromGroup.value else fromGroup.value - 1
+    blockDeps.deps(index)
+  }
+
+  private def updateWorldStateDanube(
+      worldState: WorldState.Cached,
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps,
+      outCheckpointHash: Option[BlockHash]
+  ): IOResult[Unit] = {
+    for {
+      diffs  <- getHashesForUpdates(mainGroup, blockDeps)
+      blocks <- diffs.mapE(hash => getBlockChain(hash).getBlock(hash))
+      _ <- blocks.stableSortBy(_.timestamp).foreachE { block =>
+        val chainIndex = block.chainIndex
+        val isInBlockFlow =
+          if (chainIndex.to == mainGroup && !chainIndex.isIntraGroup) {
+            val inCheckpointHash = getCheckpointHash(blockDeps, mainGroup, chainIndex.from)
+            (source: BlockHash) => isInBlockFlowUnsafe(inCheckpointHash, source)
+          } else {
+            // scalastyle:off
+            (_: BlockHash) => true
+            // scalastyle:on
+          }
+        BlockFlowState.updateState(
+          worldState,
+          outCheckpointHash,
+          block,
+          mainGroup,
+          HardFork.Danube,
+          isInBlockFlow
+        )
+      }
+    } yield ()
+  }
+
+  def getMutableGroupViewDanube(
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps,
+      outCheckpointHash: Option[BlockHash]
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    for {
+      worldState <- getCachedWorldState(blockDeps, mainGroup)
+      _          <- updateWorldStateDanube(worldState, mainGroup, blockDeps, outCheckpointHash)
+    } yield BlockFlowGroupView.onlyBlocks(worldState, AVector.empty, AVector.empty)
+  }
+
+  def getMutableGroupViewDanube(
+      chainIndex: ChainIndex,
+      blockDeps: BlockDeps,
+      outCheckpointHash: Option[BlockHash]
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    if (chainIndex.isIntraGroup) {
+      getMutableGroupViewDanube(chainIndex.from, blockDeps, outCheckpointHash)
+    } else {
+      getMutableGroupViewPreDanube(chainIndex.from, blockDeps)
+    }
   }
 
   def getMutableGroupView(
+      chainIndex: ChainIndex,
+      blockDeps: BlockDeps,
+      hardFork: HardFork,
+      checkpointHash: Option[BlockHash]
+  ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
+    if (hardFork.isDanubeEnabled()) {
+      getMutableGroupViewDanube(chainIndex, blockDeps, checkpointHash)
+    } else {
+      getMutableGroupViewPreDanube(chainIndex.from, blockDeps)
+    }
+  }
+
+  def getMutableGroupViewPreDanube(
       mainGroup: GroupIndex,
       blockDeps: BlockDeps,
       worldState: WorldState.Cached
   ): IOResult[BlockFlowGroupView[WorldState.Cached]] = {
     getBlockCachesForUpdates(mainGroup, blockDeps).map { blockCaches =>
-      BlockFlowGroupView.onlyBlocks(worldState, blockCaches)
+      BlockFlowGroupView.onlyBlocks(worldState, blockCaches, AVector.empty)
     }
   }
 
-  def updateBestDeps(mainGroup: Int, deps: BlockDeps): Unit = {
+  def updateBestDepsPreDanube(mainGroup: Int, deps: BlockDeps): Unit = {
     assume(brokerConfig.containsRaw(mainGroup))
     val groupShift = brokerConfig.groupIndexOfBrokerUnsafe(mainGroup)
     bestDeps(groupShift) = deps
+  }
+
+  def updateBestDepsDanube(chainIndex: ChainIndex, deps: BlockDeps): Unit = {
+    assume(brokerConfig.contains(chainIndex.from))
+    val groupShift = brokerConfig.groupIndexOfBrokerUnsafe(chainIndex.from.value)
+    bestDepsDanube(groupShift)(chainIndex.to.value) = deps
+  }
+
+  def updateBestFlowSkeleton(skeleton: BlockFlowSkeleton): Unit = {
+    bestFlowSkeleton = skeleton
   }
 
   def getBlocksForUpdates(block: Block): IOResult[AVector[Block]] = {
@@ -378,11 +666,11 @@ trait BlockFlowState extends FlowTipsUtil {
     for {
       diffs  <- getHashesForUpdates(chainIndex.from, block.blockDeps)
       blocks <- diffs.mapE(hash => getBlockChain(hash).getBlock(hash)).map(_ :+ block)
-    } yield blocks
+    } yield blocks.sortBy(_.timestamp)
   }
 
-  def getHashesForUpdates(groupIndex: GroupIndex): IOResult[AVector[BlockHash]] = {
-    val bestDeps = getBestDeps(groupIndex)
+  def getHashesForUpdatesPreDanube(groupIndex: GroupIndex): IOResult[AVector[BlockHash]] = {
+    val bestDeps = getBestDepsPreDanube(groupIndex)
     getHashesForUpdates(groupIndex, bestDeps)
   }
 
@@ -426,18 +714,59 @@ trait BlockFlowState extends FlowTipsUtil {
     } yield groupBlockCaches ++ incomingBlockCaches
   }
 
+  /** Checks if a given intra-group block hash is part of the block flow by verifying if the tip of
+    * the checkpoint block extends from the test block
+    *
+    * @param checkpointBlock
+    *   The block used as a reference point for checking whether the test block is part of the block
+    *   flow
+    * @param testIntraBlock
+    *   Hash of the intra-group block to test
+    * @return
+    *   true if testIntraBlock descends from the group tip at checkpointBlock, false otherwise
+    */
+  private def isInBlockFlowUnsafe(checkpointBlock: Block, testIntraBlock: BlockHash): Boolean = {
+    val testBlockIndex = ChainIndex.from(testIntraBlock)
+    assume(testBlockIndex.isIntraGroup) // Verify the test block is an intra-group block
+
+    val tip = getGroupTip(checkpointBlock.header, testBlockIndex.from)
+    isExtendingUnsafe(tip, testIntraBlock) // Check if the test block descends from the group tip
+  }
+
+  private def isInBlockFlowUnsafe(checkpointHash: BlockHash, testIntraBlock: BlockHash): Boolean = {
+    val checkpointBlock = getBlockChain(checkpointHash).getBlockUnsafe(checkpointHash)
+    isInBlockFlowUnsafe(checkpointBlock, testIntraBlock)
+  }
+
   // Note: update state only for intra group blocks
   def updateState(worldState: WorldState.Cached, block: Block): IOResult[Unit] = {
     val chainIndex = block.chainIndex
+    val hardfork   = networkConfig.getHardFork(block.timestamp)
     assume(chainIndex.isIntraGroup)
-    if (block.header.isGenesis) {
-      BlockFlowState.updateState(worldState, block, chainIndex.from)
+    if (block.header.isGenesis || hardfork.isDanubeEnabled()) {
+      // Since the Danube upgrade, we have already applied inter-blocks when calculating the group view.
+      BlockFlowState.updateState(
+        worldState,
+        Some(block.hash),
+        block,
+        chainIndex.from,
+        hardfork,
+        _ => true
+      )
     } else {
       for {
         blocks <- getBlocksForUpdates(block)
         _ <- blocks
-          .sortBy(_.timestamp)
-          .foreachE(BlockFlowState.updateState(worldState, _, chainIndex.from))
+          .foreachE(blockToUpdate =>
+            BlockFlowState.updateState(
+              worldState,
+              Some(block.hash),
+              blockToUpdate,
+              chainIndex.from,
+              hardfork,
+              sourceIntraBlock => isInBlockFlowUnsafe(block, sourceIntraBlock)
+            )
+          )
       } yield ()
     }
   }
@@ -512,61 +841,164 @@ object BlockFlowState {
     }
   }
 
-  def updateState(worldState: WorldState.Cached, block: Block, targetGroup: GroupIndex)(implicit
+  private def isTxConflicted(
+      tx: Transaction,
+      sources: AVector[nodeindexes.ConflictedTxsSource],
+      isInBlockFlowUnsafe: BlockHash => Boolean
+  ): IOResult[Boolean] = {
+    IOUtils.tryExecute(
+      sources.exists(source => source.txs.contains(tx.id) && isInBlockFlowUnsafe(source.intraBlock))
+    )
+  }
+
+  // Transaction validation for inter-group blocks:
+  // - Post-Danube upgrade: Validate transactions to ensure inputs exist and are unspent
+  // - Pre-Danube upgrade: Skip validation since it was not required in the protocol
+  // scalastyle:off method.length
+  def updateState(
+      worldState: WorldState.Cached,
+      checkpointBlock: Option[BlockHash],
+      block: Block,
+      targetGroup: GroupIndex,
+      hardfork: HardFork,
+      isInBlockFlowUnsafe: BlockHash => Boolean
+  )(implicit
       brokerConfig: GroupConfig
   ): IOResult[Unit] = {
     val chainIndex = block.chainIndex
     assume(chainIndex.relateTo(targetGroup))
     if (chainIndex.isIntraGroup) {
       // note that script execution is already done in validation
-      block.transactions.foreachE { tx =>
-        updateStateForInOutBlock(worldState, tx, targetGroup, block.timestamp)
+      block.transactions.foreachWithIndexE { case (tx, txIndex) =>
+        updateStateForInOutBlock(worldState, tx, txIndex, targetGroup, block)
       }
     } else if (chainIndex.from == targetGroup) {
-      block.transactions.foreachE(
-        updateStateForOutBlock(worldState, _, targetGroup, block.timestamp)
-      )
+      val conflictedTxs = mutable.ArrayBuffer.empty[TransactionId]
+      val resultE = block.transactions.foreachWithIndexE { case (tx, txIndex) =>
+        updateStateForOutBlock(
+          worldState,
+          tx,
+          txIndex,
+          targetGroup,
+          block,
+          hardfork,
+          conflictedTxs
+        )
+      }
+      resultE.flatMap { result =>
+        checkpointBlock match {
+          case Some(checkpointBlockHash) =>
+            if (conflictedTxs.nonEmpty) {
+              worldState.nodeIndexesState.conflictedTxsStorageCache
+                .addConflicts(
+                  checkpointBlockHash,
+                  block.hash,
+                  AVector.from(conflictedTxs)
+                )
+                .map(_ => result)
+            } else {
+              Right(result)
+            }
+          case None => Right(result)
+        }
+      }
     } else if (chainIndex.to == targetGroup) {
-      block.transactions.foreachE(
-        updateStateForInBlock(worldState, _, targetGroup, block.timestamp)
-      )
+      block.transactions.foreachWithIndexE { case (tx, txIndex) =>
+        updateStateForInBlock(
+          worldState,
+          tx,
+          txIndex,
+          targetGroup,
+          block,
+          hardfork,
+          isInBlockFlowUnsafe
+        )
+      }
     } else {
       // dead branch
       Right(())
     }
   }
+  // scalastyle:on method.length
 
+  // For intra-group blocks (blocks within the same group), we skip input validation during state updates
+  // because:
+  // 1. Input validation was already performed during block validation
+  // 2. Intra-group blocks are executed before inter-group blocks
   def updateStateForInOutBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     for {
       _ <- updateStateForInputs(worldState, tx)
-      _ <- updateStateForOutputs(worldState, tx, targetGroup, blockTs)
+      _ <- updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
     } yield ()
   }
 
+  // Outgoing blocks are executed with inputs validation
+  // All outgoing blocks are inter-group blocks
   def updateStateForOutBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block,
+      hardfork: HardFork,
+      conflictedTxs: mutable.ArrayBuffer[TransactionId]
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
-    for {
-      _ <- updateStateForInputs(worldState, tx)
-      _ <- updateStateForOutputs(worldState, tx, targetGroup, blockTs)
-    } yield ()
+    // Post-Danube upgrade, we validate that transaction inputs exist and are unspent
+    // Pre-Danube upgrade, we skip this validation since it was not required in the protocol
+    val shouldUpdateE = if (hardfork.isDanubeEnabled()) {
+      tx.unsigned.inputs.forallE(input => worldState.existOutput(input.outputRef))
+    } else {
+      Right(true)
+    }
+
+    shouldUpdateE.flatMap { shouldUpdate =>
+      if (shouldUpdate) {
+        for {
+          _ <- updateStateForInputs(worldState, tx)
+          _ <- updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
+        } yield ()
+      } else {
+        conflictedTxs += tx.id
+        Right(()) // Skip the transaction since its inputs are already spent (conflicted)
+      }
+    }
   }
 
+  // For the Danube upgrade, we need to detect transaction conflicts before processing:
+  // - For blocks from our own broker: Check the cache for conflicted transaction info
+  // - For blocks from other brokers: Peers should send conflicted transaction info
+  //
+  // Note: All incoming blocks are inter-group blocks
   def updateStateForInBlock(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block,
+      hardFork: HardFork,
+      isInBlockFlowUnsafe: BlockHash => Boolean
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
-    updateStateForOutputs(worldState, tx, targetGroup, blockTs)
+    val shouldUpdateE = if (hardFork.isDanubeEnabled()) {
+      val conflictedTxsIndex =
+        worldState.nodeIndexesState.conflictedTxsStorageCache.conflictedTxsReversedIndex
+      conflictedTxsIndex.getOpt(block.hash).flatMap {
+        case Some(sources) => isTxConflicted(tx, sources, isInBlockFlowUnsafe).map(!_)
+        case None          => Right(true)
+      }
+    } else {
+      Right(true)
+    }
+    shouldUpdateE.flatMap {
+      case true =>
+        updateStateForOutputs(worldState, tx, txIndex, targetGroup, block)
+      case false => Right(())
+    }
   }
 
   // Note: contract inputs are updated during the execution of tx script
@@ -577,16 +1009,23 @@ object BlockFlowState {
   private def updateStateForOutputs(
       worldState: WorldState.Cached,
       tx: Transaction,
+      txIndex: Int,
       targetGroup: GroupIndex,
-      blockTs: TimeStamp
+      block: Block
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
+    val blockTs = block.timestamp
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
         val outputRef = TxOutputRef.from(tx.id, index, output)
         val outputUpdated =
           if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
 
-        worldState.addAsset(outputRef, outputUpdated, tx.id)
+        worldState.addAsset(
+          outputRef,
+          outputUpdated,
+          tx.id,
+          Some(TxOutputLocator(block.hash, txIndex, index))
+        )
       case (_, _) => Right(()) // contract outputs are updated in VM
     }
   }

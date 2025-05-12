@@ -707,7 +707,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Transaction Count Per Group (Shared Pool)",
+      "title": "Transaction Count Per Group",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -806,7 +806,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Total Transaction Count (Shared Pool)",
+      "title": "Total Transaction Count",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -829,206 +829,6 @@
           "logBase": 1,
           "max": null,
           "min": null,
-          "show": true
-        },
-        {
-          "$$hashKey": "object:39",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "Prometheus",
-      "description": "Number of transactions in pending pool per group",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 18
-      },
-      "hiddenSeries": false,
-      "id": 8,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.2.1",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "sum by (group_index)(alephium_mempool_pending_pool_transactions_total{app=\"alephium\"})",
-          "interval": "",
-          "legendFormat": "Group index: {{group_index}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Transaction Count Per Group (Pending Pool)",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:38",
-          "decimals": 0,
-          "format": "none",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "$$hashKey": "object:39",
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "Prometheus",
-      "description": "Total number of transactions in pending pool",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 18
-      },
-      "hiddenSeries": false,
-      "id": 17,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.2.1",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "sum(alephium_mempool_pending_pool_transactions_total{app=\"alephium\"})",
-          "interval": "",
-          "legendFormat": "Overall",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Total Transaction Count (Pending Pool)",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:38",
-          "decimals": 0,
-          "format": "none",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": "0",
           "show": true
         },
         {
@@ -1059,7 +859,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 18
       },
       "id": 41,
       "options": {
@@ -1093,7 +893,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 29
+        "y": 21
       },
       "hiddenSeries": false,
       "id": 19,
@@ -1192,7 +992,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 29
+        "y": 21
       },
       "hiddenSeries": false,
       "id": 21,
@@ -1291,7 +1091,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 37
+        "y": 29
       },
       "hiddenSeries": false,
       "id": 23,
@@ -1388,7 +1188,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 37
+        "y": 29
       },
       "hiddenSeries": false,
       "id": 25,
@@ -1480,7 +1280,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 45
+        "y": 37
       },
       "id": 43,
       "options": {
@@ -1515,7 +1315,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 48
+        "y": 40
       },
       "hiddenSeries": false,
       "id": 27,
@@ -1615,7 +1415,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 48
+        "y": 40
       },
       "hiddenSeries": false,
       "id": 29,
@@ -1715,7 +1515,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 57
+        "y": 49
       },
       "hiddenSeries": false,
       "id": 31,
@@ -1814,7 +1614,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 57
+        "y": 49
       },
       "hiddenSeries": false,
       "id": 35,
@@ -1940,7 +1740,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 66
+        "y": 58
       },
       "hiddenSeries": false,
       "id": 33,
@@ -2052,7 +1852,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 75
+        "y": 67
       },
       "id": 49,
       "options": {
@@ -2097,7 +1897,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 78
+        "y": 70
       },
       "id": 73,
       "options": {
@@ -2160,7 +1960,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 78
+        "y": 70
       },
       "id": 75,
       "options": {
@@ -2222,7 +2022,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 87
+        "y": 79
       },
       "id": 57,
       "options": {
@@ -2279,7 +2079,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 87
+        "y": 79
       },
       "id": 59,
       "options": {
@@ -2331,7 +2131,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 96
+        "y": 88
       },
       "hiddenSeries": false,
       "id": 53,
@@ -2433,7 +2233,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 96
+        "y": 88
       },
       "hiddenSeries": false,
       "id": 55,
@@ -2535,7 +2335,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 105
+        "y": 97
       },
       "hiddenSeries": false,
       "id": 47,
@@ -2637,7 +2437,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 105
+        "y": 97
       },
       "hiddenSeries": false,
       "id": 51,
@@ -2739,7 +2539,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 114
+        "y": 106
       },
       "hiddenSeries": false,
       "id": 63,
@@ -2964,7 +2764,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 123
+        "y": 115
       },
       "id": 65,
       "options": {
@@ -3021,7 +2821,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 123
+        "y": 115
       },
       "id": 67,
       "options": {
@@ -3086,7 +2886,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 132
+        "y": 124
       },
       "hiddenSeries": false,
       "id": 69,
@@ -3186,7 +2986,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 132
+        "y": 124
       },
       "hiddenSeries": false,
       "id": 71,
@@ -3286,7 +3086,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 141
+        "y": 133
       },
       "hiddenSeries": false,
       "id": 77,
@@ -3385,7 +3185,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 141
+        "y": 133
       },
       "hiddenSeries": false,
       "id": 80,
@@ -3452,6 +3252,247 @@
         },
         {
           "$$hashKey": "object:182",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "datasource": null,
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 150
+      },
+      "id": 82,
+      "options": {
+        "content": "<div class=\"dashboard-header text-center\">\n<span>HTTP Endpoints</span>\n</div>",
+        "mode": "html"
+      },
+      "pluginVersion": "7.1.0",
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 153
+      },
+      "hiddenSeries": false,
+      "id": 84,
+      "interval": "",
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.2.1",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(irate(alephium_request_duration_seconds_bucket{app=\"alephium\"}[1m])) by (le))",
+          "interval": "",
+          "legendFormat": "P99",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(irate(alephium_request_duration_seconds_bucket{app=\"alephium\"}[1m])) by (le))",
+          "interval": "",
+          "legendFormat": "P95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(irate(alephium_request_duration_seconds_bucket{app=\"alephium\"}[1m])) by (le))",
+          "interval": "",
+          "legendFormat": "P50",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(irate(alephium_request_duration_seconds_sum{app=\"alephium\"}[1m])) / sum(irate(alephium_request_duration_seconds_count{app=\"alephium\"}[1m]))",
+          "interval": "",
+          "legendFormat": "Average",
+          "refId": "D"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Request Duration",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:209",
+          "format": "s",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:210",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Prometheus",
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 153
+      },
+      "hiddenSeries": false,
+      "id": 86,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.2.1",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "(sum(irate(alephium_request_duration_seconds_sum{app=\"alephium\"}[1m])) by (path)) / (sum(irate(alephium_request_duration_seconds_count{app=\"alephium\"}[1m])) by (path))",
+          "interval": "",
+          "legendFormat": "{{path}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Average Request Duration By Endpoint",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "s",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
           "format": "short",
           "label": null,
           "logBase": 1,

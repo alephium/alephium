@@ -35,6 +35,7 @@ import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, OutputInfo}
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mempool.MemPool
+import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.network._
 import org.alephium.flow.network.bootstrap.{InfoFixture, IntraCliqueInfo}
 import org.alephium.flow.network.broker.MisbehaviorManager
@@ -42,10 +43,12 @@ import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
 import org.alephium.json.Json._
 import org.alephium.protocol._
-import org.alephium.protocol.model._
+import org.alephium.protocol.model
+import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -109,7 +112,7 @@ trait ServerFixture
     dummyTx.toGroup.value
   )
   def dummyBuildTransactionResult(tx: Transaction) =
-    BuildTransferTxResult.from(tx.unsigned)
+    BuildSimpleTransferTxResult.from(tx.unsigned)
   def dummySweepAddressBuildTransactionsResult(
       tx: Transaction,
       fromGroup: GroupIndex,
@@ -240,7 +243,9 @@ object ServerFixture {
     }
 
     val txHandlerRef =
-      system.actorOf(AlephiumTestActors.const(TxHandler.AddSucceeded(dummyTx.id)))
+      system.actorOf(
+        AlephiumTestActors.const(TxHandler.ProcessedByMemPool(dummyTx.toTemplate, AddedToMemPool))
+      )
     val txHandler   = ActorRefT[TxHandler.Command](txHandlerRef)
     val allHandlers = _allHandlers.copy(txHandler = txHandler)(config.broker)
 
@@ -271,10 +276,10 @@ object ServerFixture {
         lockupScript: LockupScript,
         utxosLimit: Int,
         getMempoolUtxos: Boolean
-    ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
+    ): IOResult[model.Balance] = {
       val tokens       = AVector((TokenId.hash("token1"), U256.One))
       val lockedTokens = AVector((TokenId.hash("token2"), U256.Two))
-      Right((U256.Zero, U256.Zero, tokens, lockedTokens, 0))
+      Right(model.Balance(U256.Zero, U256.Zero, tokens, lockedTokens, 0))
     }
 
     override def getUTXOs(
@@ -502,7 +507,8 @@ object ServerFixture {
             AVector(vm.Val.U256(U256.Zero)),
             ContractOutputRef.unsafe(Hint.unsafe(0), TxOutputRef.unsafeKey(Hash.zero)),
             ContractOutput(U256.Zero, LockupScript.P2C(contractId), AVector()),
-            dummyTx.id
+            dummyTx.id,
+            Some(TxOutputLocator(block.hash, 0, 0))
           )
           .map(_.cached())
       } else {
@@ -539,11 +545,13 @@ object ServerFixture {
       }
     }
 
-    override def getTxIdFromOutputRef(
+    override def getTxIdTxOutputLocatorsFromOutputRef(
         outputRef: TxOutputRef
-    ): IOResult[Option[TransactionId]] = {
+    ): IOResult[Option[TxIdTxOutputLocators]] = {
       if (outputRef == dummyAssetOutputRef) {
-        Right(Some(dummyTransactionId))
+        Right(
+          Some(TxIdTxOutputLocators(dummyTransactionId, AVector(TxOutputLocator(block.hash, 0, 0))))
+        )
       } else {
         Right(None)
       }

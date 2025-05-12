@@ -13,14 +13,14 @@ alephium {
     api-interface = "127.0.0.1"
     nonce-step = 400
     batch-delay = 0 milli
-    polling-interval = 2 seconds
+    polling-interval = 4 seconds
     job-cache-size-per-chain = 100
   }
 
   network {
     max-outbound-connections-per-group = 10
     max-inbound-connections-per-group = 40
-    max-clique-from-same-ip = 3
+    max-clique-from-same-ip = 10
 
     ping-frequency = 10 second
     retry-timeout = 10 second
@@ -34,7 +34,9 @@ alephium {
 
     fast-sync-frequency = 2 second
     stable-sync-frequency = 20 second
-    sync-peer-sample-size = 5
+    sync-peer-sample-size-v1 = 3
+    sync-peer-sample-size-v2 = 5
+    enable-p2p-v2 = true
     sync-cleanup-frequency = 10 second
     sync-expiry-period = 10 second
     dependency-expiry-period = 2 minute
@@ -77,6 +79,7 @@ alephium {
     gas-fee-cap = "1000000000000000000"// 1 ALPH
     default-utxos-limit = 512
     max-form-buffered-bytes = 131072 // 128 * 1024
+    enable-http-metrics = false
   }
 
   mempool {
@@ -84,7 +87,7 @@ alephium {
     tx-max-number-per-block = 1000
     clean-mempool-frequency = 10 minutes
     unconfirmed-tx-expiry-duration = 120 minutes
-    clean-missing-inputs-tx-frequency = 5 seconds
+    clean-orphan-tx-frequency = 5 seconds
     batch-broadcast-txs-frequency = 500 milli
     batch-download-txs-frequency = 500 milli
     auto-mine-for-dev = false
@@ -125,13 +128,12 @@ akka {
   io.tcp.register-timeout = 1m
 
   actor {
-    mining-dispatcher {
+    pool-dispatcher {
       type = Dispatcher
-      executor = "fork-join-executor"
-      fork-join-executor {
-        parallelism-min = 1
-        parallelism-max = 4
-        parallelism-factor = 0.5
+      executor = "thread-pool-executor"
+      thread-pool-executor {
+        core-pool-size-min = 4
+        core-pool-size-max = 32
       }
       throughput = 1
     }

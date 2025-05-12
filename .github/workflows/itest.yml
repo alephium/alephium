@@ -8,10 +8,10 @@ on:
 jobs:
   itest:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
     strategy:
       matrix:
-        # os: [ macos-latest, windows-latest, ubuntu-latest ]
-        os: [ windows-latest, ubuntu-latest ]
+        os: [ macos-latest, ubuntu-latest ]
         java: [ '11' ]
     steps:
       - uses: actions/checkout@v2
@@ -21,5 +21,7 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: sbt
-      - run: sbt it:test
+      - name: Setup SBT
+        uses: sbt/setup-sbt@v1
+      - run: sbt integration/test
         shell: bash

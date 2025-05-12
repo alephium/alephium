@@ -31,7 +31,7 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
-import org.alephium.flow.handler.AllHandlers.BlockNotify
+import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.rpc.model.JsonRPC._
@@ -111,7 +111,11 @@ object WebSocketServer {
   object EventHandler {
     def props(
         vertxEventBus: VertxEventBus
-    )(implicit networkConfig: NetworkConfig, apiConfig: ApiConfig): Props = {
+    )(implicit
+        networkConfig: NetworkConfig,
+        groupConfig: GroupConfig,
+        apiConfig: ApiConfig
+    ): Props = {
       Props(new EventHandler(vertxEventBus))
     }
 
@@ -121,6 +125,7 @@ object WebSocketServer {
   }
   class EventHandler(vertxEventBus: VertxEventBus)(implicit
       val networkConfig: NetworkConfig,
+      val groupConfig: GroupConfig,
       apiConfig: ApiConfig
   ) extends BaseActor
       with ApiModelCodec {
@@ -150,6 +155,7 @@ object WebSocketServer {
             case _ => // this should never happen
               log.error(s"Received invalid block $block")
           }
+        case _: TxNotify =>
       }
     }
   }

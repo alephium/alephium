@@ -25,7 +25,7 @@ import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.ralph.error.FastParseExtension._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, U256}
 
 // scalastyle:off number.of.methods file.size.limit
 @SuppressWarnings(
@@ -130,12 +130,12 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
   }
 
-  def indexSelector[Unknown: P]: P[Ast.DataSelector] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
-    case (from, expr, to) =>
+  def indexSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] =
+    P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map { case (from, expr, to) =>
       Ast
         .IndexSelector(expr.overwriteSourceIndex(from, to, fileURI))
         .atSourceIndex(from, to, fileURI)
-  }
+    }
 
   // Optimize chained comparisons
   def expr[Unknown: P]: P[Ast.Expr[Ctx]]    = P(chain(andExpr, Lexer.opOr))
@@ -190,23 +190,28 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.ParenExpr.apply[Ctx](ex)
     }
 
+  private def ifElseExprBody[Unknown: P]: P[(Seq[Ast.Statement[Ctx]], Ast.Expr[Ctx])] =
+    P("{" ~ statement.rep(0) ~ expr ~ "}" | expr.map(expr => (Seq.empty[Ast.Statement[Ctx]], expr)))
   def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
-    P(Lexer.token(Keyword.`if`) ~ "(" ~ expr ~ ")" ~ expr).map { case (ifIndex, condition, expr) =>
-      val sourceIndex = SourceIndex(Some(ifIndex), expr.sourceIndex)
-      Ast.IfBranchExpr(condition, expr).atSourceIndex(sourceIndex)
+    P(Lexer.token(Keyword.`if`) ~ expr ~ ifElseExprBody).map {
+      case (ifIndex, condition, (statements, expr)) =>
+        val sourceIndex = SourceIndex(Some(ifIndex), expr.sourceIndex)
+        Ast.IfBranchExpr(condition, statements, expr).atSourceIndex(sourceIndex)
     }
   def elseIfBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
     P(Lexer.token(Keyword.`else`) ~ ifBranchExpr).map { case (elseIndex, ifBranch) =>
       val sourceIndex = SourceIndex(Some(elseIndex), ifBranch.sourceIndex)
-      Ast.IfBranchExpr(ifBranch.condition, ifBranch.expr).atSourceIndex(sourceIndex)
+      Ast
+        .IfBranchExpr(ifBranch.condition, ifBranch.statements, ifBranch.expr)
+        .atSourceIndex(sourceIndex)
     }
   def elseBranchExpr[Unknown: P]: P[Ast.ElseBranchExpr[Ctx]] =
-    P(Lexer.token(Keyword.`else`) ~ expr).map { case (elseIndex, expr) =>
+    P(Lexer.token(Keyword.`else`) ~ ifElseExprBody).map { case (elseIndex, (statements, expr)) =>
       val sourceIndex = SourceIndex(Some(elseIndex), expr.sourceIndex)
-      Ast.ElseBranchExpr(expr).atSourceIndex(sourceIndex)
+      Ast.ElseBranchExpr(statements, expr).atSourceIndex(sourceIndex)
     }
 
-  def ifelseExpr[Unknown: P]: P[Ast.IfElseExpr[Ctx]] =
+  def rawIfElseExpr[Unknown: P]: P[Ast.IfElseExpr[Ctx]] =
     P(ifBranchExpr ~ elseIfBranchExpr.rep(0) ~~ Index ~ elseBranchExpr.?).map {
       case (ifBranch, elseIfBranches, _, Some(elseBranch)) =>
         val sourceIndex = SourceIndex(ifBranch.sourceIndex, elseBranch.sourceIndex)
@@ -214,6 +219,8 @@ abstract class Parser[Ctx <: StatelessContext] {
       case (_, _, index, None) =>
         throw CompilerError.`Expected else statement`(index, fileURI)
     }
+
+  def ifElseExpr[Unknown: P]: P[Ast.IfElseExpr[Ctx]] = P(Start ~ rawIfElseExpr ~ End)
 
   def stringLiteral[Unknown: P]: P[Ast.Const[Ctx]] =
     PP("b" ~ Lexer.string) { s =>
@@ -232,8 +239,13 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
 
+  private def withOptionalParens[Unknown: P, T](parser: => P[T]) = P(parser | P("(" ~ parser ~ ")"))
+  private def returnExprs[Unknown: P] = P(
+    withOptionalParens(expr.rep(1, ",")) | Pass.map(_ => Seq.empty[Ast.Expr[Ctx]])
+  )
+
   def normalRet[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
-    P(Lexer.token(Keyword.`return`) ~/ expr.rep(0, ",")).map { case (returnIndex, returns) =>
+    P(Lexer.token(Keyword.`return`) ~/ returnExprs).map { case (returnIndex, returns) =>
       val too =
         returns.lastOption.flatMap(_.sourceIndex.map(_.endIndex)).getOrElse(returnIndex.endIndex)
       Ast.ReturnStmt.apply[Ctx](returns).atSourceIndex(returnIndex.index, too, fileURI)
@@ -286,12 +298,12 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.StructDestruction(id, vars, expr).atSourceIndex(sourceIndex)
     }
 
-  def identSelector[Unknown: P]: P[Ast.DataSelector] = P(
+  def identSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(
     "." ~ Index ~ Lexer.ident ~ Index
   ).map { case (from, ident, to) =>
     Ast.IdentSelector(ident).atSourceIndex(from, to, fileURI)
   }
-  def dataSelector[Unknown: P]: P[Ast.DataSelector] = P(identSelector | indexSelector)
+  def dataSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(identSelector | indexSelector)
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
     PP(Lexer.ident ~ dataSelector.rep(0)) { case (ident, selectors) =>
@@ -306,6 +318,14 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(assignmentTarget.rep(1, ",") ~ "=" ~ expr).map { case (targets, expr) =>
       val sourceIndex = SourceIndex(targets.headOption.flatMap(_.sourceIndex), expr.sourceIndex)
       Ast.Assign(targets, expr).atSourceIndex(sourceIndex)
+    }
+
+  def compoundAssignOperator[Unknown: P]: P[CompoundAssignmentOperator] =
+    Lexer.opAddAssign | Lexer.opSubAssign | Lexer.opMulAssign | Lexer.opDivAssign
+  def compoundAssign[Unknown: P]: P[Ast.CompoundAssign[Ctx]] =
+    P(assignmentTarget ~ compoundAssignOperator ~ expr).map { case (target, op, expr) =>
+      val sourceIndex = SourceIndex(target.sourceIndex, expr.sourceIndex)
+      Ast.CompoundAssign(target, op, expr).atSourceIndex(sourceIndex)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -372,6 +392,9 @@ abstract class Parser[Ctx <: StatelessContext] {
           )
         } else {
           val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
+          val validAnnotationIds =
+            AVector(Parser.FunctionUsingAnnotation.id, Parser.FunctionInlineAnnotation.id)
+          Parser.checkAnnotations(annotations, validAnnotationIds, "function")
           val usingAnnotation = Parser.FunctionUsingAnnotation.extractFields(
             annotations,
             Parser.FunctionUsingAnnotationFields(
@@ -379,6 +402,7 @@ abstract class Parser[Ctx <: StatelessContext] {
               assetsInContract = Ast.NotUseContractAssets,
               payToContractOnly = false,
               checkExternalCaller = true,
+              routePattern = false,
               updateFields = false,
               methodIndex = None
             )
@@ -392,6 +416,7 @@ abstract class Parser[Ctx <: StatelessContext] {
               )
             )
           }
+          val inline = Parser.FunctionInlineAnnotation.extractFields(annotations, false)
           FuncDefTmp(
             annotations,
             funcId,
@@ -400,8 +425,10 @@ abstract class Parser[Ctx <: StatelessContext] {
             usingAnnotation.assetsInContract,
             usingAnnotation.payToContractOnly,
             usingAnnotation.checkExternalCaller,
+            usingAnnotation.routePattern,
             usingAnnotation.updateFields,
             usingAnnotation.methodIndex,
+            inline,
             params,
             returnType,
             statements
@@ -417,18 +444,20 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
     Ast
       .FuncDef(
-        f.annotations,
-        f.id,
-        f.isPublic,
-        f.usePreapprovedAssets,
-        f.useContractAssets,
-        f.usePayToContractOnly,
-        f.useCheckExternalCaller,
-        f.useUpdateFields,
-        f.useMethodIndex,
-        f.args,
-        f.rtypes,
-        f.body
+        annotations = f.annotations,
+        id = f.id,
+        isPublic = f.isPublic,
+        usePreapprovedAssets = f.usePreapprovedAssets,
+        useAssetsInContract = f.useContractAssets,
+        usePayToContractOnly = f.usePayToContractOnly,
+        useCheckExternalCaller = f.useCheckExternalCaller,
+        useRoutePattern = f.useRoutePattern,
+        useUpdateFields = f.useUpdateFields,
+        useMethodIndex = f.useMethodIndex,
+        inline = f.inline,
+        args = f.args,
+        rtypes = f.rtypes,
+        bodyOpt = f.body
       )
       .atSourceIndex(f.sourceIndex)
   }
@@ -465,7 +494,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]]      = P("{" ~ statement.rep(1) ~ "}")
   def emptyBlock[Unknown: P]: P[Seq[Ast.Statement[Ctx]]] = P("{" ~ "}").map(_ => Seq.empty)
   def ifBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
-    P(Lexer.token(Keyword.`if`) ~ "(" ~ expr ~ ")" ~ block ~~ Index).map {
+    P(Lexer.token(Keyword.`if`) ~ expr ~ block ~~ Index).map {
       case (ifIndex, condition, body, endIndex) =>
         Ast.IfBranchStatement(condition, body).atSourceIndex(ifIndex.index, endIndex, fileURI)
     }
@@ -594,26 +623,62 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.EnumFieldSelector(enumId, field)
     }
 
-  def enumField[Unknown: P]: P[Ast.EnumField[Ctx]] =
-    PP(Lexer.constantIdent ~ "=" ~ (const | stringLiteral)) { case (ident, value) =>
-      Ast.EnumField(ident, value)
+  def enumField[Unknown: P]: P[Ast.RawEnumField[Ctx]] =
+    PP(Lexer.constantIdent ~ ("=" ~ (const | stringLiteral)).?) { case (ident, valueOpt) =>
+      Ast.RawEnumField(ident, valueOpt)
     }
+
+  @SuppressWarnings(
+    Array("org.wartremover.warts.OptionPartial", "org.wartremover.warts.IterableOps")
+  )
   def rawEnumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] =
     PP(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}") {
-      case (enumIndex, id, fields) =>
-        if (fields.isEmpty) {
+      case (enumIndex, id, rawFields) =>
+        if (rawFields.isEmpty) {
           val sourceIndex = SourceIndex(Some(enumIndex), id.sourceIndex)
           throw Compiler.Error(s"No field definition in Enum ${id.name}", sourceIndex)
         }
-        Ast.UniqueDef.checkDuplicates(fields, "enum fields")
-        if (fields.distinctBy(_.value.v.tpe).size != 1) {
-          throw Compiler.Error(s"Fields have different types in Enum ${id.name}", id.sourceIndex)
+
+        val firstField = rawFields.head.validateAsFirstField()
+        rawFields.tail.foreach(_.validate(id.name, firstField.value.v))
+
+        val fields = if (firstField.value.v.tpe != Val.U256) {
+          rawFields.map { case rawField @ Ast.RawEnumField(ident, valueOpt) =>
+            Ast.EnumField(ident, valueOpt.get).atSourceIndex(rawField.sourceIndex)
+          }
+        } else {
+          val (_, allFields) =
+            rawFields.tail.foldLeft(
+              (firstField.value.v.asInstanceOf[Val.U256].v, Seq(firstField))
+            ) { case ((currentValue, fields), rawField @ Ast.RawEnumField(ident, valueOpt)) =>
+              val (newValue, value) = valueOpt match {
+                case Some(v) => (v.v.asInstanceOf[Val.U256].v, v)
+                case None =>
+                  val nextValue = currentValue
+                    .add(U256.One)
+                    .getOrElse(
+                      throw Compiler.Error(
+                        s"Enum field ${ident.name} value overflows, it must not exceed ${U256.MaxValue}",
+                        ident.sourceIndex
+                      )
+                    )
+                  (
+                    nextValue,
+                    Ast.Const[Ctx](Val.U256(nextValue))
+                  )
+              }
+              (newValue, fields :+ Ast.EnumField(ident, value).atSourceIndex(rawField.sourceIndex))
+            }
+          allFields
         }
+
+        Ast.UniqueDef.checkDuplicates(fields, "enum fields")
         if (fields.distinctBy(_.value.v).size != fields.length) {
           throw Compiler.Error(s"Fields have the same value in Enum ${id.name}", id.sourceIndex)
         }
         Ast.EnumDef(id, fields)
     }
+
   def enumDef[Unknown: P]: P[Ast.EnumDef[Ctx]] = P(Start ~ rawEnumDef ~ End)
 }
 
@@ -625,8 +690,10 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     useContractAssets: Ast.ContractAssetsAnnotation,
     usePayToContractOnly: Boolean,
     useCheckExternalCaller: Boolean,
+    useRoutePattern: Boolean,
     useUpdateFields: Boolean,
     useMethodIndex: Option[Int],
+    inline: Boolean,
     args: Seq[Argument],
     rtypes: Seq[Type],
     body: Option[Seq[Statement[Ctx]]]
@@ -646,8 +713,8 @@ object Parser {
     def validate[Ctx <: StatelessContext](
         annotations: Seq[Ast.Annotation[Ctx]]
     ): Option[Annotation[Ctx]] = {
-      annotations.find(_.id.name == id) match {
-        case result @ Some(annotation) =>
+      annotations.filter(_.id.name == id) match {
+        case Seq(result @ annotation) =>
           val duplicateKeys = keys.filter(key => annotation.fields.count(_.ident.name == key) > 1)
           if (duplicateKeys.nonEmpty) {
             throw Compiler.Error(
@@ -662,8 +729,13 @@ object Parser {
               annotation.sourceIndex
             )
           }
-          result
-        case None => None
+          Some(result)
+        case Nil => None
+        case list =>
+          throw Compiler.Error(
+            s"There are duplicate annotations: $id",
+            list.headOption.flatMap(_.sourceIndex)
+          )
       }
     }
 
@@ -703,6 +775,7 @@ object Parser {
       assetsInContract: Ast.ContractAssetsAnnotation,
       payToContractOnly: Boolean,
       checkExternalCaller: Boolean,
+      routePattern: Boolean,
       updateFields: Boolean,
       methodIndex: Option[Int]
   )
@@ -713,6 +786,7 @@ object Parser {
     val useContractAssetsKey      = "assetsInContract"
     val usePayToContractOnly      = "payToContractOnly"
     val useCheckExternalCallerKey = "checkExternalCaller"
+    val useRoutePattern           = "preserveCaller"
     val useUpdateFieldsKey        = "updateFields"
     val useMethodIndexKey         = "methodIndex"
     val keys: AVector[String] = AVector(
@@ -720,6 +794,7 @@ object Parser {
       useContractAssetsKey,
       usePayToContractOnly,
       useCheckExternalCallerKey,
+      useRoutePattern,
       useUpdateFieldsKey,
       useMethodIndexKey
     )
@@ -768,9 +843,22 @@ object Parser {
           useCheckExternalCallerKey,
           Val.Bool(default.checkExternalCaller)
         ).v,
+        extractField(annotation, useRoutePattern, Val.Bool(default.routePattern)).v,
         extractField(annotation, useUpdateFieldsKey, Val.Bool(default.updateFields)).v,
         methodIndex
       )
+    }
+  }
+
+  object FunctionInlineAnnotation extends RalphAnnotation[Boolean] {
+    val id: String            = "inline"
+    val keys: AVector[String] = AVector.empty
+
+    def extractFields[Ctx <: StatelessContext](
+        annotation: Annotation[Ctx],
+        default: Boolean
+    ): Boolean = {
+      true
     }
   }
 
@@ -855,7 +943,7 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
       const | stringLiteral | alphTokenId | loadData | callExpr | contractConv |
-        structCtor | variable | parenExpr | arrayExpr | ifelseExpr
+        structCtor | variable | parenExpr | arrayExpr | rawIfElseExpr
     )
 
   private def loadDataBase[Unknown: P] = P(
@@ -869,7 +957,7 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
     P(
-      varDef | structDestruction | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret
+      varDef | structDestruction | assign | compoundAssign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret
     )
 
   private def globalDefinitions[Unknown: P]: P[Ast.GlobalDefinition] = P(
@@ -900,7 +988,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
       const | stringLiteral | alphTokenId | mapContains | contractCallOrLoadData | callExpr | contractConv |
-        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr
+        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | rawIfElseExpr
     )
 
   def mapKeyType[Unknown: P]: P[Type] = {
@@ -929,7 +1017,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     selectorOrCallAbss.foldLeft(base)((acc, selectorOrCallAbs) => {
       val sourceIndex = SourceIndex(acc.sourceIndex, selectorOrCallAbs.sourceIndex)
       val expr = selectorOrCallAbs match {
-        case selector: Ast.DataSelector =>
+        case selector: Ast.DataSelector[StatefulContext @unchecked] =>
           acc match {
             case Ast.LoadDataBySelectors(base, selectors) =>
               Ast.LoadDataBySelectors(base, selectors :+ selector)
@@ -975,7 +1063,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | structDestruction | assign | debug | mapCall | contractCall | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | structDestruction | assign | compoundAssign | debug | mapCall | contractCall | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
   def insertToMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
@@ -1040,6 +1128,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
                 assetsInContract = Ast.NotUseContractAssets,
                 payToContractOnly = false,
                 checkExternalCaller = true,
+                routePattern = false,
                 updateFields = false,
                 methodIndex = None
               )
@@ -1191,18 +1280,20 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
         case None =>
           Ast
             .FuncDef(
-              f.annotations,
-              f.id,
-              f.isPublic,
-              f.usePreapprovedAssets,
-              f.useContractAssets,
-              f.usePayToContractOnly,
-              f.useCheckExternalCaller,
-              f.useUpdateFields,
-              f.useMethodIndex,
-              f.args,
-              f.rtypes,
-              None
+              annotations = f.annotations,
+              id = f.id,
+              isPublic = f.isPublic,
+              usePreapprovedAssets = f.usePreapprovedAssets,
+              useAssetsInContract = f.useContractAssets,
+              usePayToContractOnly = f.usePayToContractOnly,
+              useCheckExternalCaller = f.useCheckExternalCaller,
+              useRoutePattern = f.useRoutePattern,
+              useUpdateFields = f.useUpdateFields,
+              useMethodIndex = f.useMethodIndex,
+              inline = f.inline,
+              args = f.args,
+              rtypes = f.rtypes,
+              bodyOpt = None
             )
             .atSourceIndex(f.sourceIndex)
         case _ =>

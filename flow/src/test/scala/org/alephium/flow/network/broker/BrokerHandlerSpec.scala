@@ -31,7 +31,7 @@ import org.alephium.flow.validation.{InvalidHeaderFlow, InvalidTestnetMiner}
 import org.alephium.protocol.{Generators, Signature, SignatureSchema}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BlockHash, BrokerInfo, ChainIndex, CliqueId}
+import org.alephium.protocol.model.{BlockHash, BrokerInfo, ChainIndex, CliqueId, HardFork}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, TimeStamp}
 
 class BrokerHandlerSpec extends AlephiumActorSpec {
@@ -54,6 +54,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
 
   it should "stop when handshake message contains invalid client id" in new Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.network.network-id", 1))
+    setHardFork(HardFork.Rhone)
 
     networkConfig.networkId.id is 1.toByte
     networkConfig.getHardFork(TimeStamp.now()).isRhoneEnabled() is true
@@ -106,18 +107,10 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     }
   }
 
-  it should "notify synchronizer when block added" in new Fixture {
-    receivedHandshakeMessage()
-    val hash = BlockHash.generate
-    brokerHandler ! BlockChainHandler.BlockAdded(hash)
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockFinalized(hash))
-  }
-
   it should "publish misbehavior if block is invalid" in new Fixture {
     receivedHandshakeMessage()
     val hash = BlockHash.generate
     brokerHandler ! BlockChainHandler.InvalidBlock(hash, InvalidHeaderFlow)
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockFinalized(hash))
     listener.expectMsg(MisbehaviorManager.InvalidFlowData(remoteAddress))
   }
 
@@ -178,7 +171,9 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     connectionHandler.expectMsg(ConnectionHandler.Send(Message.serialize(response)))
   }
 
-  it should "handle blocks response" in new Fixture {
+  it should "handle blocks response: p2pv1" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.network.enable-p2p-v2", false))
+    networkConfig.enableP2pV2 is false
     receivedHandshakeMessage()
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = emptyBlock(blockFlow, chainIndex)
@@ -189,7 +184,49 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
       allHandlerProbes.dependencyHandler.expectMsg(
         DependencyHandler.AddFlowData(AVector(block), DataOrigin.Local)
       )
+      blockFlowSynchronizer.expectNoMessage()
     }
+  }
+
+  it should "handle blocks response: p2pv2" in new Fixture {
+    networkConfig.enableP2pV2 is true
+    receivedHandshakeMessage()
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+    val response = BlocksResponse.fromBlocks(RequestId.random(), AVector(block))
+    brokerHandler ! BrokerHandler.Received(response)
+    eventually {
+      blockFlowSynchronizer.expectMsg(
+        BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
+      )
+      allHandlerProbes.dependencyHandler.expectNoMessage()
+    }
+  }
+
+  it should "not forward block validation message to BlockFlowSynchronizer" in new Fixture {
+    brokerHandler ! BlockChainHandler.BlockAdded
+    blockFlowSynchronizer.expectNoMessage()
+
+    brokerHandler ! BlockChainHandler.BlockAddingFailed
+    blockFlowSynchronizer.expectNoMessage()
+
+    brokerHandler ! BlockChainHandler.InvalidBlock(BlockHash.generate, InvalidHeaderFlow)
+    blockFlowSynchronizer.expectNoMessage()
+  }
+
+  it should "use sync protocol v1" in new Fixture {
+    override val configValues: Map[String, Any] =
+      Map(("alephium.network.enable-p2p-v2", false))
+    brokerHandlerActor.selfP2PVersion is P2PV1
+    brokerHandlerActor.handShakeMessage.asInstanceOf[Hello].clientId.endsWith("p2p-v1")
+  }
+
+  it should "use sync protocol v2" in new Fixture {
+    override val configValues: Map[String, Any] =
+      Map(("alephium.network.enable-p2p-v2", true))
+    brokerHandlerActor.selfP2PVersion is P2PV2
+    brokerHandlerActor.handShakeMessage.asInstanceOf[Hello].clientId.endsWith("p2p-v2")
   }
 
   trait Fixture extends FlowFixture with Generators {
@@ -223,7 +260,8 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
 
     def receivedHandshakeMessage() = {
-      val hello = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
+      val hello =
+        Hello.unsafe(brokerInfo.interBrokerInfo, priKey, brokerHandlerActor.selfP2PVersion)
       brokerHandler ! BrokerHandler.Received(hello)
     }
   }
@@ -268,13 +306,19 @@ class TestBrokerHandler(
 
   val brokerInfo = BrokerInfo.unsafe(CliqueId(pubKey), 0, 1, new InetSocketAddress("127.0.0.1", 0))
 
-  override val handShakeMessage: Payload = Hello.unsafe(brokerInfo.interBrokerInfo, priKey)
+  override val handShakeMessage: Payload =
+    Hello.unsafe(brokerInfo.interBrokerInfo, priKey, selfP2PVersion)
 
-  override def exchanging: Receive = exchangingCommon orElse flowEvents
+  override def exchangingV1: Receive = exchangingCommon orElse flowEvents
+  override def exchangingV2: Receive = exchangingV1
 
   override def dataOrigin: DataOrigin = DataOrigin.Local
 
-  def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
+  def handleHandshakeInfo(
+      _remoteBrokerInfo: BrokerInfo,
+      clientInfo: String,
+      p2pVersion: P2PVersion
+  ): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
   }
 }

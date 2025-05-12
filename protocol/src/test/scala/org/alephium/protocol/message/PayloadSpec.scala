@@ -18,6 +18,8 @@ package org.alephium.protocol.message
 
 import java.net.InetSocketAddress
 
+import scala.util.Random
+
 import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.compatible.Assertion
@@ -44,11 +46,12 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val (priKey2, _)       = SignatureSchema.secureGeneratePriPub()
     val validBrokerInfo    = BrokerInfo.unsafe(CliqueId(pubKey1), 0, 1, address)
 
-    val validInput  = Hello.unsafe(validBrokerInfo.interBrokerInfo, priKey1)
+    val p2pVersion  = if (Random.nextBoolean()) P2PV1 else P2PV2
+    val validInput  = Hello.unsafe(validBrokerInfo.interBrokerInfo, priKey1, p2pVersion)
     val validOutput = Hello._deserialize(Hello.serde.serialize(validInput))
     validOutput.map(_.value) isE validInput
 
-    val invalidInput  = Hello.unsafe(validBrokerInfo.interBrokerInfo, priKey2)
+    val invalidInput  = Hello.unsafe(validBrokerInfo.interBrokerInfo, priKey2, p2pVersion)
     val invalidOutput = Hello._deserialize(Hello.serde.serialize(invalidInput))
     invalidOutput.leftValue is a[SerdeError]
 
@@ -60,7 +63,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
       BrokerInfo.unsafe(CliqueId(pubKey1), 1, groupConfig.groups + 1, address),
       BrokerInfo.unsafe(CliqueId(pubKey1), 1, 2, address)
     ).foreach { invalidBrokerInfo =>
-      val invalidInput  = Hello.unsafe(invalidBrokerInfo.interBrokerInfo, priKey1)
+      val invalidInput =
+        Hello.unsafe(invalidBrokerInfo.interBrokerInfo, priKey1, p2pVersion)
       val invalidOutput = Hello._deserialize(Hello.serde.serialize(invalidInput))
       invalidOutput.leftValue is a[SerdeError]
     }
@@ -198,6 +202,189 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
         // header 2
         serialize(block2.header)
     }
+  }
+
+  it should "serialize/deserialize the ChainState payload" in {
+    import Hex._
+
+    val tips = AVector.fill(2)(
+      ChainTip(
+        blockHashGen.sample.get,
+        Gen.choose[Int](0, Int.MaxValue).sample.get,
+        Weight(nextU256(U256.Zero, U256.MaxValue).toBigInt)
+      )
+    )
+    verifySerde(ChainState(tips)) {
+      // code id
+      hex"10" ++
+        // number of tips
+        hex"02" ++
+        // tip 1
+        serialize(tips(0)) ++
+        // tip 2
+        serialize(tips(1))
+    }
+
+    Payload
+      .deserialize(
+        // code id
+        hex"10" ++
+          // number of tips
+          hex"02" ++
+          // tip 1
+          serialize(tips(0)) ++
+          // tip 2
+          serialize(tips(1).copy(height = -1))
+      )
+      .leftValue is SerdeError.validation(
+      "Invalid height in ChainState payload"
+    )
+  }
+
+  it should "serialize/deserialize the HeadersByHeightsRequest/HeadersByHeightsResponse payload" in {
+    import Hex._
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val requestId  = RequestId.unsafe(1)
+    val request =
+      HeadersByHeightsRequest(requestId, AVector((chainIndex, BlockHeightRange(1, 2, 1))))
+    verifySerde(request) {
+      // code id
+      hex"11" ++
+        // request id
+        hex"01" ++
+        // number of chains
+        hex"01" ++
+        // chain index
+        hex"0000" ++
+        // range
+        hex"010201"
+    }
+
+    val header0  = blockGen.sample.get.header
+    val header1  = blockGen.sample.get.header
+    val response = HeadersByHeightsResponse(requestId, AVector(AVector(header0, header1)))
+    verifySerde(response) {
+      // code id
+      hex"12" ++
+        // request id
+        hex"01" ++
+        // number of chains
+        hex"01" ++
+        // number of headers
+        hex"02" ++
+        // header0
+        serialize(header0) ++
+        // header1
+        serialize(header1)
+    }
+
+    Payload
+      .deserialize(
+        // code id
+        hex"11" ++
+          // request id
+          hex"01" ++
+          // number of chains
+          hex"01" ++
+          // invalid chain index
+          hex"0500" ++
+          // range
+          hex"010201"
+      )
+      .leftValue is SerdeError.validation(
+      "Invalid ChainIndex or data in HeadersByHeightsRequest payload"
+    )
+
+    Payload
+      .deserialize(
+        // code id
+        hex"11" ++
+          // request id
+          hex"01" ++
+          // number of chains
+          hex"01" ++
+          // chain index
+          hex"0000" ++
+          // invalid range
+          hex"020101"
+      )
+      .leftValue is SerdeError.validation(
+      "Invalid ChainIndex or data in HeadersByHeightsRequest payload"
+    )
+  }
+
+  it should "serialize/deserialize the BlocksAndUnclesByHeightsRequest/BlocksAndUnclesByHeightsResponse payload" in {
+    import Hex._
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val requestId  = RequestId.unsafe(1)
+    val request =
+      BlocksAndUnclesByHeightsRequest(requestId, AVector((chainIndex, BlockHeightRange(1, 2, 1))))
+    verifySerde(request) {
+      // code id
+      hex"13" ++
+        // request id
+        hex"01" ++
+        // number of chains
+        hex"01" ++
+        // chain index
+        hex"0000" ++
+        // range
+        hex"010201"
+    }
+
+    val block0   = blockGen.sample.get
+    val block1   = blockGen.sample.get
+    val response = BlocksAndUnclesByHeightsResponse(requestId, AVector(AVector(block0, block1)))
+    verifySerde(response) {
+      // code id
+      hex"14" ++
+        // request id
+        hex"01" ++
+        // number of chains
+        hex"01" ++
+        // number of headers
+        hex"02" ++
+        // block0
+        serialize(block0) ++
+        // block1
+        serialize(block1)
+    }
+
+    Payload
+      .deserialize(
+        // code id
+        hex"13" ++
+          // request id
+          hex"01" ++
+          // number of chains
+          hex"01" ++
+          // invalid chain index
+          hex"0500" ++
+          // range
+          hex"010201"
+      )
+      .leftValue is SerdeError.validation(
+      "Invalid ChainIndex or data in BlocksAndUnclesByHeightsRequest payload"
+    )
+
+    Payload
+      .deserialize(
+        // code id
+        hex"13" ++
+          // request id
+          hex"01" ++
+          // number of chains
+          hex"01" ++
+          // chain index
+          hex"0000" ++
+          // invalid range
+          hex"020101"
+      )
+      .leftValue is SerdeError.validation(
+      "Invalid ChainIndex or data in BlocksAndUnclesByHeightsRequest payload"
+    )
   }
 
   it should "serialize/deserialize the InvRequest/InvResponse payload" in {
@@ -357,11 +544,12 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           // tx2 hash
           serialize(txTemplate2.id)
       )
-      .leftValue is SerdeError.validation("Invalid ChainIndex in Tx payload")
+      .leftValue is SerdeError.validation("Invalid ChainIndex or data in NewTxHashes payload")
   }
 
   it should "seder the snapshots properly" in new BlockSnapshotsFixture {
-    override def rhoneHardForkTimestamp: TimeStamp = TimeStamp.Max
+    override def rhoneHardForkTimestamp: TimeStamp  = TimeStamp.Max
+    override def danubeHardForkTimestamp: TimeStamp = TimeStamp.Max
 
     implicit val basePath: String = "src/test/resources/message/payloads"
 

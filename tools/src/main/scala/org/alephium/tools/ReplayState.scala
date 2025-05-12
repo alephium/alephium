@@ -29,7 +29,7 @@ trait ReplayState {
   def sourceBlockFlow: BlockFlow
   def targetBlockFlow: BlockFlow
 
-  private val brokerConfig: BrokerConfig        = sourceBlockFlow.brokerConfig
+  protected val brokerConfig: BrokerConfig      = sourceBlockFlow.brokerConfig
   private val chainIndexes: AVector[ChainIndex] = brokerConfig.chainIndexes
 
   private val startLoadingHeight        = 1
@@ -98,7 +98,7 @@ trait ReplayState {
   private def updateTargetBlockFlowBestDeps(): IOResult[Unit] = {
     IOUtils.tryExecute(brokerConfig.groupRange.foreach { mainGroup =>
       val deps = targetBlockFlow.calBestDepsUnsafe(GroupIndex.unsafe(mainGroup)(brokerConfig))
-      targetBlockFlow.updateBestDeps(mainGroup, deps)
+      targetBlockFlow.updateBestDepsPreDanube(mainGroup, deps)
     })
   }
 

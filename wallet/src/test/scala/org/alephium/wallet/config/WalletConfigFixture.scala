@@ -21,7 +21,7 @@ import java.nio.file.Files
 
 import org.alephium.api.model.ApiKey
 import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
-import org.alephium.util.{AVector, Duration, SocketUtil}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, SocketUtil}
 
 trait WalletConfigFixture extends SocketUtil with NetworkConfigFixture.Default {
 
@@ -37,18 +37,21 @@ trait WalletConfigFixture extends SocketUtil with NetworkConfigFixture.Default {
 
   val tempSecretDir = Files.createTempDirectory("blockflow-wallet-spec")
   tempSecretDir.toFile.deleteOnExit
+  AlephiumSpec.addCleanTask(() => AlephiumSpec.delete(tempSecretDir))
 
   implicit val groupConfig: GroupConfig = new GroupConfig {
     override def groups: Int = config.blockflow.groups
   }
 
-  val apiKeys = AVector.empty[ApiKey]
+  val apiKeys           = AVector.empty[ApiKey]
+  val enableHttpMetrics = false
 
   lazy val config = WalletConfig(
     Some(walletPort),
     tempSecretDir,
     lockingTimeout,
     apiKeys,
+    enableHttpMetrics,
     WalletConfig.BlockFlow(
       host.getHostAddress,
       blockFlowPort,

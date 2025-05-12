@@ -357,9 +357,11 @@ object GenInstrCodec extends App {
   }
 
   private val removed = Seq(
-    typeOf[VerifySignatureMockup.type],
+    typeOf[GenericVerifySignatureMockup.type],
     typeOf[VerifyTxSignatureMockup.type],
-    typeOf[TemplateVariable]
+    typeOf[TemplateVariable],
+    typeOf[VerifySignatureMockup.type],
+    typeOf[GetSegregatedWebAuthnSignatureMockup.type]
   ).map(_.typeSymbol)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))

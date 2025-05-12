@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "3.8.8"
+    "version": "3.14.2"
   },
   "servers": [
     {
@@ -117,6 +117,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -244,6 +257,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -375,6 +401,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -476,6 +515,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       },
@@ -572,6 +624,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -659,6 +724,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -777,6 +855,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -884,6 +975,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -997,6 +1101,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -1151,6 +1268,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -1282,6 +1412,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -1419,6 +1562,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -1532,6 +1688,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -1637,6 +1806,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -1749,6 +1931,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -1865,6 +2060,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -1978,6 +2186,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -2087,6 +2308,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -2190,6 +2424,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -2288,6 +2535,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -2375,6 +2635,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -2468,6 +2741,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -2568,6 +2854,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -2674,6 +2973,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -2775,6 +3087,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -2871,6 +3196,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -2982,6 +3320,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -3073,6 +3424,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -3183,6 +3547,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -3298,6 +3675,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -3400,6 +3790,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -3487,6 +3890,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -3715,6 +4131,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -3965,6 +4394,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -4199,6 +4641,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -4410,6 +4865,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -4618,6 +5086,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -4851,6 +5332,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -5068,6 +5562,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -5164,6 +5671,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -5327,6 +5847,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -5453,6 +5986,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -5551,6 +6097,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -5677,6 +6236,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -5784,6 +6356,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -5896,6 +6481,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -5973,6 +6571,7 @@
                   "$ref": "#/components/schemas/BuildTransferTxResult"
                 },
                 "example": {
+                  "type": "BuildSimpleTransferTxResult",
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
@@ -6045,6 +6644,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -6149,6 +6761,190 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/build-transfer-from-one-to-many-groups": {
+      "post": {
+        "tags": [
+          "Transactions"
+        ],
+        "summary": "Build unsigned transfer transactions from an address of one group to addresses of many groups. Each target group requires a dedicated transaction or more in case large number of outputs needed to be split.",
+        "operationId": "postTransactionsBuild-transfer-from-one-to-many-groups",
+        "requestBody": {
+          "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000\n\nField fromPublicKeyType can be  `default` or `bip340-schnorr`",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildTransferTx"
+              },
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "destinations": [
+                      {
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                        "attoAlphAmount": "2000000000000000000"
+                      }
+                    ]
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                    "fromPublicKeyType": "bip340-schnorr",
+                    "destinations": [
+                      {
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                        "attoAlphAmount": "2000000000000000000",
+                        "tokens": [
+                          {
+                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                            "amount": "42000000000000000000"
+                          },
+                          {
+                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                            "amount": "1000000000000000000000"
+                          }
+                        ],
+                        "lockTime": 1611041396892
+                      }
+                    ],
+                    "utxos": [
+                      {
+                        "hint": 23412,
+                        "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                      }
+                    ],
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
+                  }
+                },
+                "example": [
+                  {
+                    "type": "BuildSimpleTransferTxResult",
+                    "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000",
+                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                    "fromGroup": 2,
+                    "toGroup": 1
+                  }
+                ]
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -6195,9 +6991,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildTransferTxResult"
+                  "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
                 },
                 "example": {
+                  "type": "BuildSimpleTransferTxResult",
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
@@ -6270,6 +7067,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -6402,6 +7212,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -6505,6 +7328,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -6645,6 +7481,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -6858,6 +7707,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -7055,6 +7917,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -7176,6 +8051,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -7319,6 +8207,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -7425,6 +8326,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -7571,6 +8485,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       },
@@ -7646,6 +8573,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -7740,6 +8680,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -7817,6 +8770,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -7990,6 +8956,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -8050,12 +9029,81 @@
                   "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
                 },
                 "example": {
-                  "fromGroup": 2,
-                  "toGroup": 2,
-                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
-                  "gasAmount": 20000,
-                  "gasPrice": "100000000000",
-                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"
+                  "type": "BuildGrouplessExecuteScriptTxResult",
+                  "transferTxs": [
+                    {
+                      "type": "BuildSimpleTransferTxResult",
+                      "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "gasAmount": 20000,
+                      "gasPrice": "100000000000",
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "fromGroup": 2,
+                      "toGroup": 1
+                    }
+                  ],
+                  "executeScriptTx": {
+                    "type": "BuildSimpleExecuteScriptTxResult",
+                    "fromGroup": 2,
+                    "toGroup": 2,
+                    "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000",
+                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                    "simulationResult": {
+                      "contractInputs": [
+                        {
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "attoAlphAmount": "1000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "1000000000000000000"
+                            }
+                          ]
+                        },
+                        {
+                          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "attoAlphAmount": "100000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "100000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "100000000000000000000"
+                            }
+                          ]
+                        }
+                      ],
+                      "generatedOutputs": [
+                        {
+                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                          "attoAlphAmount": "1000000000000000",
+                          "tokens": [
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000000000000000000"
+                            }
+                          ]
+                        },
+                        {
+                          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "attoAlphAmount": "100000000000000000",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "99000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "101000000000000000000"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -8122,6 +9170,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -8350,6 +9411,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -8671,6 +9745,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -8733,13 +9820,28 @@
                   "$ref": "#/components/schemas/BuildDeployContractTxResult"
                 },
                 "example": {
-                  "fromGroup": 2,
-                  "toGroup": 2,
-                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
-                  "gasAmount": 20000,
-                  "gasPrice": "100000000000",
-                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
-                  "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
+                  "type": "BuildGrouplessDeployContractTxResult",
+                  "transferTxs": [
+                    {
+                      "type": "BuildSimpleTransferTxResult",
+                      "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "gasAmount": 20000,
+                      "gasPrice": "100000000000",
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "fromGroup": 2,
+                      "toGroup": 1
+                    }
+                  ],
+                  "deployContractTx": {
+                    "type": "BuildSimpleDeployContractTxResult",
+                    "fromGroup": 2,
+                    "toGroup": 2,
+                    "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000",
+                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                    "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
+                  }
                 }
               }
             }
@@ -8806,6 +9908,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -8932,6 +10047,7 @@
                   {
                     "type": "Transfer",
                     "value": {
+                      "type": "BuildSimpleTransferTxResult",
                       "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "gasAmount": 20000,
                       "gasPrice": "100000000000",
@@ -8943,12 +10059,67 @@
                   {
                     "type": "ExecuteScript",
                     "value": {
+                      "type": "BuildSimpleExecuteScriptTxResult",
                       "fromGroup": 2,
                       "toGroup": 2,
                       "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "gasAmount": 20000,
                       "gasPrice": "100000000000",
-                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "simulationResult": {
+                        "contractInputs": [
+                          {
+                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                            "attoAlphAmount": "1000000000000000",
+                            "tokens": [
+                              {
+                                "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                "amount": "1000000000000000000"
+                              }
+                            ]
+                          },
+                          {
+                            "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                            "attoAlphAmount": "100000000000000000",
+                            "tokens": [
+                              {
+                                "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                "amount": "100000000000000000000"
+                              },
+                              {
+                                "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                "amount": "100000000000000000000"
+                              }
+                            ]
+                          }
+                        ],
+                        "generatedOutputs": [
+                          {
+                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                            "attoAlphAmount": "1000000000000000",
+                            "tokens": [
+                              {
+                                "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                "amount": "1000000000000000000"
+                              }
+                            ]
+                          },
+                          {
+                            "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                            "attoAlphAmount": "100000000000000000",
+                            "tokens": [
+                              {
+                                "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                "amount": "99000000000000000000"
+                              },
+                              {
+                                "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                "amount": "101000000000000000000"
+                              }
+                            ]
+                          }
+                        ]
+                      }
                     }
                   }
                 ]
@@ -9017,6 +10188,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -9142,6 +10326,132 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contracts/{codeHash}/code": {
+      "get": {
+        "tags": [
+          "Contracts"
+        ],
+        "summary": "Get contract code by code hash",
+        "operationId": "getContractsCodehashCode",
+        "parameters": [
+          {
+            "name": "codeHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "32-byte-hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "format": "contract"
+                },
+                "example": "00010700000000000118"
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -9403,6 +10713,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -9611,6 +10934,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -9833,6 +11169,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -9932,6 +11281,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -10057,6 +11419,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -10154,6 +11529,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -10324,6 +11712,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -10432,6 +11833,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -10504,9 +11918,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildTransferTxResult"
+                  "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
                 },
                 "example": {
+                  "type": "BuildSimpleTransferTxResult",
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
@@ -10579,6 +11994,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -10719,6 +12147,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -10827,6 +12268,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -10930,6 +12384,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -11041,6 +12508,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -11130,6 +12610,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -11223,6 +12716,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -11371,6 +12877,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -11468,6 +12987,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -11597,6 +13129,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -11723,6 +13268,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -11823,6 +13381,19 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
                 }
               }
             }
@@ -11929,6 +13500,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -12009,6 +13593,19 @@
                 }
               }
             }
+          },
+          "504": {
+            "description": "GatewayTimeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayTimeout"
+                },
+                "example": {
+                  "detail": "The network is slow"
+                }
+              }
+            }
           }
         }
       }
@@ -12016,6 +13613,30 @@
   },
   "components": {
     "schemas": {
+      "AddressAssetState": {
+        "title": "AddressAssetState",
+        "type": "object",
+        "required": [
+          "address",
+          "attoAlphAmount"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "format": "address"
+          },
+          "attoAlphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          }
+        }
+      },
       "AddressBalance": {
         "title": "AddressBalance",
         "type": "object",
@@ -12541,7 +14162,7 @@
         ],
         "properties": {
           "value": {
-            "$ref": "#/components/schemas/BuildDeployContractTxResult"
+            "$ref": "#/components/schemas/BuildSimpleDeployContractTxResult"
           },
           "type": {
             "type": "string"
@@ -12573,7 +14194,7 @@
         ],
         "properties": {
           "value": {
-            "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
+            "$ref": "#/components/schemas/BuildSimpleExecuteScriptTxResult"
           },
           "type": {
             "type": "string"
@@ -12605,7 +14226,7 @@
         ],
         "properties": {
           "value": {
-            "$ref": "#/components/schemas/BuildTransferTxResult"
+            "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
           },
           "type": {
             "type": "string"
@@ -12702,6 +14323,10 @@
             "type": "string",
             "format": "uint256"
           },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
+          },
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
@@ -12710,43 +14335,19 @@
       },
       "BuildDeployContractTxResult": {
         "title": "BuildDeployContractTxResult",
-        "type": "object",
-        "required": [
-          "fromGroup",
-          "toGroup",
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "contractAddress"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BuildGrouplessDeployContractTxResult"
+          },
+          {
+            "$ref": "#/components/schemas/BuildSimpleDeployContractTxResult1"
+          }
         ],
-        "properties": {
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "contractAddress": {
-            "type": "string",
-            "format": "address"
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "BuildGrouplessDeployContractTxResult": "#/components/schemas/BuildGrouplessDeployContractTxResult",
+            "BuildSimpleDeployContractTxResult": "#/components/schemas/BuildSimpleDeployContractTxResult1"
           }
         }
       },
@@ -12792,6 +14393,10 @@
             "type": "string",
             "format": "block-hash"
           },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
+          },
           "gasEstimationMultiplier": {
             "type": "number",
             "format": "double"
@@ -12800,38 +14405,88 @@
       },
       "BuildExecuteScriptTxResult": {
         "title": "BuildExecuteScriptTxResult",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BuildGrouplessExecuteScriptTxResult"
+          },
+          {
+            "$ref": "#/components/schemas/BuildSimpleExecuteScriptTxResult1"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "BuildGrouplessExecuteScriptTxResult": "#/components/schemas/BuildGrouplessExecuteScriptTxResult",
+            "BuildSimpleExecuteScriptTxResult": "#/components/schemas/BuildSimpleExecuteScriptTxResult1"
+          }
+        }
+      },
+      "BuildGrouplessDeployContractTxResult": {
+        "title": "BuildGrouplessDeployContractTxResult",
         "type": "object",
         "required": [
-          "fromGroup",
-          "toGroup",
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId"
+          "transferTxs",
+          "deployContractTx",
+          "type"
         ],
         "properties": {
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
+          "transferTxs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
+            }
           },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
+          "deployContractTx": {
+            "$ref": "#/components/schemas/BuildSimpleDeployContractTxResult"
           },
-          "unsignedTx": {
+          "type": {
             "type": "string"
+          }
+        }
+      },
+      "BuildGrouplessExecuteScriptTxResult": {
+        "title": "BuildGrouplessExecuteScriptTxResult",
+        "type": "object",
+        "required": [
+          "transferTxs",
+          "executeScriptTx",
+          "type"
+        ],
+        "properties": {
+          "transferTxs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
+            }
           },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
+          "executeScriptTx": {
+            "$ref": "#/components/schemas/BuildSimpleExecuteScriptTxResult"
           },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildGrouplessTransferTxResult": {
+        "title": "BuildGrouplessTransferTxResult",
+        "type": "object",
+        "required": [
+          "transferTxs",
+          "transferTx",
+          "type"
+        ],
+        "properties": {
+          "transferTxs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
+            }
           },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+          "transferTx": {
+            "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
+          },
+          "type": {
+            "type": "string"
           }
         }
       },
@@ -12944,6 +14599,258 @@
           }
         }
       },
+      "BuildSimpleDeployContractTxResult": {
+        "title": "BuildSimpleDeployContractTxResult",
+        "type": "object",
+        "required": [
+          "fromGroup",
+          "toGroup",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "contractAddress"
+        ],
+        "properties": {
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "contractAddress": {
+            "type": "string",
+            "format": "address"
+          }
+        }
+      },
+      "BuildSimpleDeployContractTxResult1": {
+        "title": "BuildSimpleDeployContractTxResult",
+        "type": "object",
+        "required": [
+          "fromGroup",
+          "toGroup",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "contractAddress",
+          "type"
+        ],
+        "properties": {
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "contractAddress": {
+            "type": "string",
+            "format": "address"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildSimpleExecuteScriptTxResult": {
+        "title": "BuildSimpleExecuteScriptTxResult",
+        "type": "object",
+        "required": [
+          "fromGroup",
+          "toGroup",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "simulationResult"
+        ],
+        "properties": {
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "simulationResult": {
+            "$ref": "#/components/schemas/SimulationResult"
+          }
+        }
+      },
+      "BuildSimpleExecuteScriptTxResult1": {
+        "title": "BuildSimpleExecuteScriptTxResult",
+        "type": "object",
+        "required": [
+          "fromGroup",
+          "toGroup",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "simulationResult",
+          "type"
+        ],
+        "properties": {
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "simulationResult": {
+            "$ref": "#/components/schemas/SimulationResult"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "BuildSimpleTransferTxResult": {
+        "title": "BuildSimpleTransferTxResult",
+        "type": "object",
+        "required": [
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "fromGroup",
+          "toGroup"
+        ],
+        "properties": {
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "BuildSimpleTransferTxResult1": {
+        "title": "BuildSimpleTransferTxResult",
+        "type": "object",
+        "required": [
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "fromGroup",
+          "toGroup",
+          "type"
+        ],
+        "properties": {
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "BuildSweepAddressTransactions": {
         "title": "BuildSweepAddressTransactions",
         "type": "object",
@@ -12979,6 +14886,10 @@
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
+          },
+          "utxosLimit": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -13093,6 +15004,10 @@
             "type": "string",
             "format": "uint256"
           },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
+          },
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
@@ -13101,38 +15016,19 @@
       },
       "BuildTransferTxResult": {
         "title": "BuildTransferTxResult",
-        "type": "object",
-        "required": [
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "fromGroup",
-          "toGroup"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BuildGrouplessTransferTxResult"
+          },
+          {
+            "$ref": "#/components/schemas/BuildSimpleTransferTxResult1"
+          }
         ],
-        "properties": {
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "BuildGrouplessTransferTxResult": "#/components/schemas/BuildGrouplessTransferTxResult",
+            "BuildSimpleTransferTxResult": "#/components/schemas/BuildSimpleTransferTxResult1"
           }
         }
       },
@@ -13993,8 +15889,7 @@
         "title": "Destination",
         "type": "object",
         "required": [
-          "address",
-          "attoAlphAmount"
+          "address"
         ],
         "properties": {
           "address": {
@@ -14223,6 +16118,18 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "GatewayTimeout": {
+        "title": "GatewayTimeout",
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string"
           }
         }
       },
@@ -15127,6 +17034,28 @@
           }
         }
       },
+      "SimulationResult": {
+        "title": "SimulationResult",
+        "type": "object",
+        "required": [
+          "contractInputs",
+          "generatedOutputs"
+        ],
+        "properties": {
+          "contractInputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddressAssetState"
+            }
+          },
+          "generatedOutputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddressAssetState"
+            }
+          }
+        }
+      },
       "Source": {
         "title": "Source",
         "type": "object",
@@ -15375,7 +17304,7 @@
             "type": "string",
             "format": "address"
           },
-          "callerAddress": {
+          "callerContractAddress": {
             "type": "string",
             "format": "address"
           },
@@ -15419,6 +17348,10 @@
             "items": {
               "$ref": "#/components/schemas/TestInputAsset"
             }
+          },
+          "dustAmount": {
+            "type": "string",
+            "format": "uint256"
           }
         }
       },

@@ -77,6 +77,18 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLocku
     getBalances(lockupScript).flatMap(_.sub(balancesPerLockup))
   }
 
+  def moveAlph(
+      lockupScript: LockupScript,
+      amount: U256,
+      targetBalance: MutBalancesPerLockup
+  ): Option[Unit] = {
+    assume(amount > U256.Zero)
+    for {
+      _ <- subAlph(lockupScript, amount)
+      _ <- targetBalance.addAlph(amount)
+    } yield ()
+  }
+
   def use(): MutBalances = {
     val newAll = all.map { case (lockupScript, balancesPerLockup) =>
       lockupScript -> balancesPerLockup.copy(scopeDepth = balancesPerLockup.scopeDepth + 1)
@@ -94,7 +106,20 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLocku
     }
   }
 
-  def useForNewContract(): Option[MutBalancesPerLockup] = {
+  // Retrieves the balance for a specific lockup script but keeps the entry in the collection
+  // with an empty balance. This preserves the original position of the entry in the collection.
+  def useForChainedInput(lockupScript: LockupScript): Option[MutBalancesPerLockup] = {
+    val index = all.indexWhere { case (ls, _) => ls == lockupScript }
+    if (index == -1) {
+      None
+    } else {
+      val result = all(index)._2
+      all(index) = lockupScript -> MutBalancesPerLockup.empty
+      Some(result)
+    }
+  }
+
+  def useAll(): Option[MutBalancesPerLockup] = {
     Option.when(all.nonEmpty) {
       val accumulator = MutBalancesPerLockup.empty
       all.foreach { balances => accumulator.add(balances._2) }
@@ -107,6 +132,7 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLocku
     @tailrec
     def iter(index: Int): Option[Unit] = {
       if (index >= balances.all.length) {
+        balances.all.clear()
         Some(())
       } else {
         val (lockupScript, balancesPerLockup) = balances.all(index)

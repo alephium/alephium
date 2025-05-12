@@ -26,37 +26,41 @@ object StaticAnalysis {
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def checkMethodsStateless[Ctx <: vm.StatelessContext](
       ast: Ast.ContractT[Ctx],
-      methods: AVector[vm.Method[Ctx]],
       state: Compiler.State[Ctx]
   ): Unit = {
-    assume(ast.funcs.length == methods.length)
     checkIfPrivateMethodsUsed(ast, state)
-    ast.funcs.zip(methods.toIterable).foreach { case (func, method) =>
-      // skip check update fields for main function
-      if (!(ast.isInstanceOf[Ast.TxScript] && (func.name == "main"))) {
-        checkUpdateFields(state, func, method)
-      }
-    }
   }
 
-  def checkMethodsStateful(
+  private def checkMethodsStateful(
       ast: Ast.ContractWithState,
       methods: AVector[vm.Method[vm.StatefulContext]],
       state: Compiler.State[vm.StatefulContext]
   ): Unit = {
-    checkMethodsStateless(ast, methods, state)
-    ast.funcs.zip(methods.toIterable).foreach { case (func, method) =>
+    val funcs = ast.nonInlineFuncs ++ ast.inlineFuncs
+    assume(funcs.length == methods.length)
+    funcs.zip(methods.toIterable).foreach { case (func, method) =>
+      checkUpdateFields(state, func, method)
       checkCodeUsingContractAssets(ast.ident, func, method)
       checkCodeUsingPayToContract(ast.ident, func, method)
       checkCodeUsingAssets(ast.ident, func, method)
     }
   }
 
-  def checkMethods(
+  def checkTxScript(
+      ast: Ast.TxScript,
+      code: vm.StatefulScript,
+      state: Compiler.State[vm.StatefulContext]
+  ): Unit = {
+    checkMethodsStateless(ast, state)
+    checkMethodsStateful(ast, code.methods, state)
+  }
+
+  def checkContract(
       ast: Ast.Contract,
       code: vm.StatefulContract,
       state: Compiler.State[vm.StatefulContext]
   ): Unit = {
+    checkMethodsStateless(ast, state)
     checkMethodsStateful(ast, code.methods, state)
   }
 
@@ -176,7 +180,7 @@ object StaticAnalysis {
       case _: vm.StoreMutField | _: vm.StoreMutFieldByIndex.type | _: vm.MigrateWithFields.type =>
         true
       case _ => false
-    }
+    } || func.updatesMap(state)
 
     if (updateFields && !func.useUpdateFields) {
       state.warnNoUpdateFieldsCheck(state.typeId, func.id)

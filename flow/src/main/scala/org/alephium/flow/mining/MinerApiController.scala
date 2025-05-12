@@ -25,15 +25,16 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 
+import org.alephium.flow.Utils
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.broker.ConnectionHandler
 import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
-import org.alephium.protocol.model.{BlockHash, ChainIndex, Nonce}
+import org.alephium.protocol.model.{BlockHash, ChainIndex, Nonce, Target}
 import org.alephium.serde.{avectorSerde, serialize, SerdeResult, Staging}
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Cache, Hex}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, Cache, Hex, TimeStamp}
 
 object MinerApiController {
   def props(allHandlers: AllHandlers)(implicit
@@ -41,7 +42,7 @@ object MinerApiController {
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting
   ): Props =
-    Props(new MinerApiController(allHandlers)).withDispatcher(MiningDispatcher)
+    Props(new MinerApiController(allHandlers)).withDispatcher(Utils.PoolDispatcher)
 
   sealed trait Command
   final case class Received(message: ClientMessage) extends Command
@@ -50,7 +51,7 @@ object MinerApiController {
       groupConfig: GroupConfig,
       networkSetting: NetworkSetting
   ): Props = {
-    Props(new MyConnectionHandler(remote, connection)).withDispatcher(MiningDispatcher)
+    Props(new MyConnectionHandler(remote, connection))
   }
 
   class MyConnectionHandler(
@@ -65,6 +66,17 @@ object MinerApiController {
     override def handleNewMessage(message: ClientMessage): Unit = {
       context.parent ! Received(message)
     }
+  }
+
+  private[mining] def getCacheKey(headerBlob: ByteString): ByteString = {
+    val length = TimeStamp.byteLength + Target.byteLength
+    assume(headerBlob.length > length)
+    val targetBytes = headerBlob.takeRight(Target.byteLength)
+    headerBlob.dropRight(length) ++ targetBytes
+  }
+
+  private[mining] def calcJobIndex(chainIndex: ChainIndex)(implicit config: BrokerConfig): Int = {
+    chainIndex.from.value / config.brokerNum * config.groups + chainIndex.to.value
   }
 }
 
@@ -86,7 +98,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       terminateSystem()
   }
 
-  var latestJobs: Option[AVector[Job]]                                   = None
+  var latestJobs: Option[AVector[(Job, BlockFlowTemplate)]]              = None
   val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
   val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
   val jobCache: Cache[ByteString, (BlockFlowTemplate, ByteString)] =
@@ -108,7 +120,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
           connections.addOne(connectionHandler)
           latestJobs.foreach(jobs =>
             connectionHandler ! ConnectionHandler.Send(
-              ServerMessage.serialize(ServerMessage.from(Jobs(jobs)))
+              ServerMessage.serialize(ServerMessage.from(Jobs(jobs.map(_._1))))
             )
           )
         }
@@ -136,7 +148,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   val submittingBlocks: mutable.HashMap[BlockHash, ActorRefT[ConnectionHandler.Command]] =
     mutable.HashMap.empty
   def handleAPI: Receive = {
-    case ViewHandler.NewTemplates(templates)                 => publishTemplates(templates)
+    case ViewHandler.NewTemplates(templates) => publishTemplates(templates)
+    case ViewHandler.NewTemplate(template, lazyBroadcast) =>
+      publishTemplate(template, lazyBroadcast)
     case MinerApiController.Received(message: ClientMessage) => handleClientMessage(message)
     case BlockChainHandler.BlockAdded(hash) => handleSubmittedBlock(hash, succeeded = true)
     case BlockChainHandler.InvalidBlock(hash, reason) =>
@@ -145,23 +159,42 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   }
 
   def publishTemplates(templatess: IndexedSeq[IndexedSeq[BlockFlowTemplate]]): Unit = {
-    log.info(
+    val jobs = templatess.foldLeft(
+      AVector.ofCapacity[(Job, BlockFlowTemplate)](templatess.length * brokerConfig.groups)
+    ) { case (acc, templates) =>
+      acc ++ AVector.from(templates.view.map(t => Job.fromWithoutTxs(t) -> t))
+    }
+    latestJobs = Some(jobs)
+    publishLatestJobs()
+  }
+
+  def publishTemplate(template: BlockFlowTemplate, lazyBroadcast: Boolean): Unit = {
+    val job = Job.fromWithoutTxs(template)
+    val newJobs = latestJobs.map { existingJobs =>
+      val jobIndex = MinerApiController.calcJobIndex(template.index)
+      existingJobs.replace(jobIndex, job -> template)
+    }
+    latestJobs = newJobs
+    if (!lazyBroadcast) {
+      publishLatestJobs()
+    }
+  }
+
+  def publishLatestJobs(): Unit = {
+    log.debug(
       s"Sending block templates to subscribers: #${connections.length} connections, #${pendings.length} pending connections"
     )
-    val jobs =
-      templatess.foldLeft(AVector.ofCapacity[Job](templatess.length * brokerConfig.groups)) {
-        case (acc, templates) =>
-          acc ++ AVector.from(templates.view.map(Job.fromWithoutTxs))
-      }
-    connections.foreach(
-      _ ! ConnectionHandler.Send(ServerMessage.serialize(ServerMessage.from(Jobs(jobs))))
-    )
+    latestJobs.foreach { jobs =>
+      connections.foreach(
+        _ ! ConnectionHandler.Send(
+          ServerMessage.serialize(ServerMessage.from(Jobs(jobs.map(_._1))))
+        )
+      )
 
-    latestJobs = Some(jobs)
-    jobs.foreachWithIndex { case (job, index) =>
-      val template = templatess(index / brokerConfig.groups)(index % brokerConfig.groups)
-      val txsBlob  = serialize(template.transactions)
-      jobCache.put(job.headerBlob, template -> txsBlob)
+      jobs.foreach { case (job, template) =>
+        val txsBlob = serialize(template.transactions)
+        jobCache.put(MinerApiController.getCacheKey(job.headerBlob), template -> txsBlob)
+      }
     }
   }
 
@@ -170,7 +203,8 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       val header    = blockBlob.dropRight(1) // remove the encoding of empty txs
       val blockHash = PoW.hash(header)
       val headerKey = header.drop(Nonce.byteLength)
-      jobCache.get(headerKey) match {
+      val cacheKey  = MinerApiController.getCacheKey(headerKey)
+      jobCache.get(cacheKey) match {
         case Some((template, txBlob)) =>
           val blockBytes = header ++ txBlob
           if (ChainIndex.from(blockHash) != template.index) {
@@ -188,6 +222,8 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
             log.info(
               s"A new block ${blockHash.toHexString} got mined for ${template.index}, tx: ${template.transactions.length}, target: ${template.target}"
             )
+            jobCache.remove(cacheKey)
+            ()
           }
         case None =>
           sendSubmitResult(blockHash, succeeded = false, ActorRefT(sender()))

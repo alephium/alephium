@@ -22,6 +22,7 @@ import org.scalatest.Assertion
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
 import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, TimeStamp}
 
 class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
@@ -42,11 +43,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
       val contractId = ContractId.generate
       val output     = ContractOutput(ALPH.alph(n), LockupScript.p2c(contractId), AVector.empty)
       val outputRef  = contractId.inaccurateFirstOutputRef()
-      val method = Method[StatefulContext](
+      val method = Method.testDefault[StatefulContext](
         isPublic = true,
-        usePreapprovedAssets = false,
-        useContractAssets = false,
-        usePayToContractOnly = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
@@ -74,7 +72,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
           fields(mutFieldLength),
           outputRef,
           output,
-          TransactionId.generate
+          TransactionId.generate,
+          Some(TxOutputLocator(BlockHash.generate, 0, 0))
         ) isE ()
       pool.worldState.getContractObj(contractId) isE
         contract
@@ -136,8 +135,9 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.loadContractObj(contracts.last._1) is failed(ContractPoolOverflow)
   }
 
-  it should "load unlimited number of contracts from Rhone" in new ContractNumFixture {
-    pool.getHardFork() is HardFork.Rhone
+  it should "load unlimited number of contracts from Rhone" in new ContractNumFixture
+    with NetworkConfigFixture.SinceRhoneT {
+    Seq(HardFork.Rhone, HardFork.Danube).contains(pool.getHardFork()) is true
     val contracts = prepare()
     pool.loadContractObj(contracts.last._1).isRight is true
   }
@@ -167,8 +167,9 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.loadContractObj(contractId2) is failed(ContractFieldOverflow)
   }
 
-  it should "load contracts with limited number of fields from Rhone" in new FieldNumFixture {
-    pool.getHardFork() is HardFork.Rhone
+  it should "load contracts with limited number of fields from Rhone" in new FieldNumFixture
+    with NetworkConfigFixture.SinceRhoneT {
+    Seq(HardFork.Rhone, HardFork.Danube).contains(pool.getHardFork()) is true
 
     val contractId2 = prepare()
     pool.loadContractObj(contractId2).isRight is true
@@ -237,7 +238,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
       AVector.empty,
       outputRef,
       output,
-      TransactionId.generate
+      TransactionId.generate,
+      Some(TxOutputLocator(BlockHash.generate, 0, 0))
     ) isE ()
 
     pool.gasRemaining is initialGas

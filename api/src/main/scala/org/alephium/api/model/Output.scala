@@ -33,7 +33,6 @@ sealed trait Output {
 }
 
 object Output {
-
   def from(output: TxOutput, txId: TransactionId, index: Int): Output = {
     output match {
       case o: model.AssetOutput =>
@@ -54,6 +53,16 @@ object Output {
           Address.Contract(o.lockupScript),
           o.tokens.map(Token.tupled)
         )
+    }
+  }
+
+  def fromGeneratedOutputs(
+      unsignedTx: model.UnsignedTransaction,
+      generatedOutputs: AVector[TxOutput]
+  ): AVector[Output] = {
+    val fixedOutputsLength = unsignedTx.fixedOutputs.length
+    generatedOutputs.mapWithIndex { case (output, index) =>
+      Output.from(output, unsignedTx.id, fixedOutputsLength + index)
     }
   }
 }

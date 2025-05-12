@@ -16,6 +16,7 @@
 
 package org.alephium.flow.gasestimation
 
+import org.alephium.crypto.Byte64
 import org.alephium.flow.core._
 import org.alephium.protocol.Signature
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
@@ -60,10 +61,10 @@ object AssetScriptGasEstimator {
       ): Either[String, AssetScriptExecution] = {
         val txTemplate = TransactionTemplate(unsignedTx, AVector.empty, AVector.empty)
 
-        val txEnv = TxEnv(
+        val txEnv = TxEnv.dryrun(
           txTemplate,
           preOutputs.getOrElse(AVector.empty),
-          Stack.popOnly(AVector.fill(16)(Signature.generate))
+          Stack.popOnly(AVector.fill(16)(Byte64.from(Signature.generate)))
         )
 
         val result = for {

@@ -18,7 +18,7 @@ package org.alephium.flow.network.broker
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.Props
+import akka.actor.{ActorSystem, Props}
 import akka.io.Tcp
 
 import org.alephium.flow.network.{DiscoveryServer, TcpController}
@@ -27,12 +27,17 @@ import org.alephium.util._
 
 // scalastyle:off number.of.methods
 object MisbehaviorManager {
-  def props(
+  def build(
+      system: ActorSystem,
       banDuration: Duration,
       penaltyForgiveness: Duration,
       penaltyFrequency: Duration
-  ): Props =
-    Props(new MisbehaviorManager(banDuration, penaltyForgiveness, penaltyFrequency))
+  ): ActorRefT[Command] = {
+    val props = Props(new MisbehaviorManager(banDuration, penaltyForgiveness, penaltyFrequency))
+    val actor = ActorRefT.build[Command](system, props)
+    system.eventStream.subscribe(actor.ref, classOf[MisbehaviorManager.Misbehavior])
+    actor
+  }
 
   sealed trait Command
   final case class ConfirmConnection(connected: Tcp.Connected, connection: ActorRefT[Tcp.Command])
@@ -78,6 +83,7 @@ object MisbehaviorManager {
   final case class InvalidPoW(remoteAddress: InetSocketAddress)              extends Critical
   final case class InvalidPingPongCritical(remoteAddress: InetSocketAddress) extends Critical
   final case class InvalidClientVersion(remoteAddress: InetSocketAddress)    extends Critical
+  final case class InvalidChainState(remoteAddress: InetSocketAddress)       extends Critical
 
   final case class Spamming(remoteAddress: InetSocketAddress)              extends Warning
   final case class InvalidFlowChainIndex(remoteAddress: InetSocketAddress) extends Warning
@@ -87,6 +93,7 @@ object MisbehaviorManager {
   final case class RequestTimeout(remoteAddress: InetSocketAddress)  extends Uncertain
   final case class InvalidPingPong(remoteAddress: InetSocketAddress) extends Uncertain
   final case class DeepForkBlock(remoteAddress: InetSocketAddress)   extends Uncertain
+  final case class InvalidResponse(remoteAddress: InetSocketAddress) extends Uncertain
 
   sealed trait MisbehaviorStatus
   final case class Penalty(value: Int, timestamp: TimeStamp) extends MisbehaviorStatus
@@ -99,17 +106,13 @@ class MisbehaviorManager(
     penaltyForgiveness: Duration,
     penaltyFrequency: Duration
 ) extends BaseActor
-    with EventStream {
+    with EventStream.Publisher {
   import MisbehaviorManager._
 
   private val misbehaviorThreshold: Int = Critical.penalty
   private val misbehaviorStorage: MisbehaviorStorage = new InMemoryMisbehaviorStorage(
     penaltyForgiveness
   )
-
-  override def preStart(): Unit = {
-    subscribeEvent(self, classOf[MisbehaviorManager.Misbehavior])
-  }
 
   private def handleMisbehavior(misbehavior: Misbehavior): Unit = {
     val peer = misbehavior.remoteAddress.getAddress

@@ -99,8 +99,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             Mul,
             Variable(Ident("x")),
             IfElseExpr(
-              Seq(IfBranchExpr(Const(Val.True), Variable(Ident("a")))),
-              ElseBranchExpr(Variable(Ident("b")))
+              Seq(IfBranchExpr(ParenExpr(Const(Val.True)), Seq.empty, Variable(Ident("a")))),
+              ElseBranchExpr(Seq.empty, Variable(Ident("b")))
             )
           )
         ),
@@ -109,8 +109,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse("[if (a) b else c; 2]", StatelessParser.expr(_)).get.value is
       CreateArrayExpr2[StatelessContext](
         IfElseExpr(
-          Seq(IfBranchExpr(Variable(Ident("a")), Variable(Ident("b")))),
-          ElseBranchExpr(Variable(Ast.Ident("c")))
+          Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Seq.empty, Variable(Ident("b")))),
+          ElseBranchExpr(Seq.empty, Variable(Ast.Ident("c")))
         ),
         Const(Val.U256(U256.Two))
       )
@@ -118,12 +118,12 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       CreateArrayExpr1[StatelessContext](
         Seq(
           IfElseExpr(
-            Seq(IfBranchExpr(Variable(Ident("a")), Variable(Ident("b")))),
-            ElseBranchExpr(Variable(Ast.Ident("c")))
+            Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Seq.empty, Variable(Ident("b")))),
+            ElseBranchExpr(Seq.empty, Variable(Ast.Ident("c")))
           ),
           IfElseExpr(
-            Seq(IfBranchExpr(Variable(Ident("a")), Variable(Ident("b")))),
-            ElseBranchExpr(Variable(Ast.Ident("c")))
+            Seq(IfBranchExpr(ParenExpr(Variable(Ident("a"))), Seq.empty, Variable(Ident("b")))),
+            ElseBranchExpr(Seq.empty, Variable(Ast.Ident("c")))
           )
         )
       )
@@ -278,7 +278,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           Seq.empty,
           Seq.empty
         ),
-        Seq(IdentSelector(Ident("d")), IndexSelector(Const(Val.U256(U256.Zero))))
+        Seq(
+          IdentSelector[StatefulContext](Ident("d")),
+          IndexSelector[StatefulContext](Const(Val.U256(U256.Zero)))
+        )
       )
     parse("a.b.foo()[0].bar().c.d[0]", StatefulParser.expr(_)).get.value is
       LoadDataBySelectors(
@@ -297,9 +300,9 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           Seq.empty
         ),
         Seq(
-          IdentSelector(Ident("c")),
-          IdentSelector(Ident("d")),
-          IndexSelector(Const(Val.U256(U256.Zero)))
+          IdentSelector[StatefulContext](Ident("c")),
+          IdentSelector[StatefulContext](Ident("d")),
+          IndexSelector[StatefulContext](Const(Val.U256(U256.Zero)))
         )
       )
   }
@@ -517,9 +520,21 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   }
 
   it should "parse return" in {
-    parse("return x, y", StatelessParser.ret(_)).isSuccess is true
-    parse("return x + y", StatelessParser.ret(_)).isSuccess is true
-    parse("return (x + y)", StatelessParser.ret(_)).isSuccess is true
+    def test(statement: String) = {
+      val result = parse(statement, StatelessParser.ret(_))
+      result.isSuccess is true
+      result.get.index is statement.length
+    }
+
+    test("return x, y")
+    test("return (x, y)")
+    test("return x + y")
+    test("return (x + y)")
+    test("return (x)")
+    test("return (x + 1) * 2")
+    test("return (x + 1) * (x + 2)")
+    test("return ((x + 1) * 2, x)")
+    test("return")
     intercept[Compiler.Error](parse("return return", StatelessParser.ret(_))).message is
       "Consecutive return statements are not allowed"
   }
@@ -614,7 +629,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .get
       .value is
       Ast.IfElseStatement[StatelessContext](
-        Seq(Ast.IfBranchStatement(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty)))),
+        Seq(Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("x"))), Seq(ReturnStmt(Seq.empty)))),
         None
       )
 
@@ -630,8 +645,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .value is
       Ast.IfElseStatement[StatelessContext](
         Seq(
-          Ast.IfBranchStatement(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty))),
-          Ast.IfBranchStatement(Variable(Ast.Ident("y")), Seq(ReturnStmt(Seq.empty)))
+          Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("x"))), Seq(ReturnStmt(Seq.empty))),
+          Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("y"))), Seq(ReturnStmt(Seq.empty)))
         ),
         Some(Ast.ElseBranchStatement(Seq.empty))
       )
@@ -644,9 +659,13 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .value is
       Ast.IfElseExpr[StatelessContext](
         Seq(
-          Ast.IfBranchExpr(Variable(Ast.Ident("cond")), Ast.Const(Val.U256(U256.Zero)))
+          Ast.IfBranchExpr(
+            ParenExpr(Variable(Ast.Ident("cond"))),
+            Seq.empty,
+            Ast.Const(Val.U256(U256.Zero))
+          )
         ),
-        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.One)))
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
       )
 
     fastparse
@@ -655,10 +674,125 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       .value is
       Ast.IfElseExpr[StatelessContext](
         Seq(
-          Ast.IfBranchExpr(Variable(Ast.Ident("cond0")), Ast.Const(Val.U256(U256.Zero))),
-          Ast.IfBranchExpr(Variable(Ast.Ident("cond1")), Ast.Const(Val.U256(U256.One)))
+          Ast.IfBranchExpr(
+            ParenExpr(Variable(Ast.Ident("cond0"))),
+            Seq.empty,
+            Ast.Const(Val.U256(U256.Zero))
+          ),
+          Ast.IfBranchExpr(
+            ParenExpr(Variable(Ast.Ident("cond1"))),
+            Seq.empty,
+            Ast.Const(Val.U256(U256.One))
+          )
         ),
-        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.Two)))
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.Two)))
+      )
+
+    fastparse
+      .parse("if cond 0 else 1", StatelessParser.expr(_))
+      .get
+      .value is
+      Ast.IfElseExpr[StatelessContext](
+        Seq(
+          Ast.IfBranchExpr(Variable(Ast.Ident("cond")), Seq.empty, Ast.Const(Val.U256(U256.Zero)))
+        ),
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
+      )
+
+    Seq(
+      "if cond0 0 else if cond1 1 else 2",
+      "if cond0 { 0 } else if cond1 { 1 } else { 2 }",
+      "if cond0 0 else if cond1 { 1 } else { 2 }",
+      "if cond0 0 else if cond1 1 else { 2 }"
+    ).foreach { expr =>
+      fastparse
+        .parse(expr, StatelessParser.expr(_))
+        .get
+        .value is
+        Ast.IfElseExpr[StatelessContext](
+          Seq(
+            Ast.IfBranchExpr(
+              Variable(Ast.Ident("cond0")),
+              Seq.empty,
+              Ast.Const(Val.U256(U256.Zero))
+            ),
+            Ast.IfBranchExpr(Variable(Ast.Ident("cond1")), Seq.empty, Ast.Const(Val.U256(U256.One)))
+          ),
+          Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.Two)))
+        )
+    }
+
+    Seq(
+      "if x < 1 0 else 1",
+      "if x < 1 { 0 } else { 1 }",
+      "if x < 1 { 0 } else 1",
+      "if x < 1 0 else { 1 }"
+    ).foreach { expr =>
+      fastparse
+        .parse(expr, StatelessParser.expr(_))
+        .get
+        .value is
+        Ast.IfElseExpr[StatelessContext](
+          Seq(
+            Ast.IfBranchExpr(
+              Binop(Lt, Variable(Ident("x")), Const(Val.U256(U256.One))),
+              Seq.empty,
+              Ast.Const(Val.U256(U256.Zero))
+            )
+          ),
+          Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
+        )
+    }
+
+    fastparse
+      .parse("if (x - 1) < 1 0 else 1", StatelessParser.expr(_))
+      .get
+      .value is
+      Ast.IfElseExpr[StatelessContext](
+        Seq(
+          Ast.IfBranchExpr(
+            Binop(
+              Lt,
+              ParenExpr(Binop(Sub, Variable(Ident("x")), Const(Val.U256(U256.One)))),
+              Const(Val.U256(U256.One))
+            ),
+            Seq.empty,
+            Ast.Const(Val.U256(U256.Zero))
+          )
+        ),
+        Ast.ElseBranchExpr(Seq.empty, Ast.Const(Val.U256(U256.One)))
+      )
+
+    val expr =
+      s"""
+         |if (x - 1) < 1 {
+         |  foo()
+         |  0
+         |} else {
+         |  bar()
+         |  1
+         |}
+         |""".stripMargin
+    fastparse
+      .parse(expr, StatelessParser.ifElseExpr(_))
+      .get
+      .value is
+      Ast.IfElseExpr[StatelessContext](
+        Seq(
+          Ast.IfBranchExpr(
+            Binop(
+              Lt,
+              ParenExpr(Binop(Sub, Variable(Ident("x")), Const(Val.U256(U256.One)))),
+              Const(Val.U256(U256.One))
+            ),
+            Seq(FuncCall(FuncId("foo", false), Seq.empty, Seq.empty)),
+            Ast.Const(Val.U256(U256.Zero))
+          )
+        ),
+        Ast.ElseBranchExpr(
+          Seq(FuncCall(FuncId("bar", false), Seq.empty, Seq.empty)),
+          Ast.Const(Val.U256(U256.One))
+        )
       )
 
     val missingElseCode = "if (cond0) 0"
@@ -684,134 +818,197 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       fastparse.parse(code, StatelessParser.func(_))
     }
 
-    val parsed0 =
-      parseFunc("fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }").get.value
-    parsed0.id is Ast.FuncId("add", false)
-    parsed0.isPublic is false
-    parsed0.usePreapprovedAssets is false
-    parsed0.useAssetsInContract is Ast.NotUseContractAssets
-    parsed0.usePayToContractOnly is false
-    parsed0.args.size is 2
-    parsed0.rtypes is Seq(Type.U256, Type.U256)
+    {
+      val parsed =
+        parseFunc("fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }").get.value
+      parsed.id is Ast.FuncId("add", false)
+      parsed.isPublic is false
+      parsed.usePreapprovedAssets is false
+      parsed.useAssetsInContract is Ast.NotUseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.useRoutePattern is false
+      parsed.inline is false
+      parsed.args.size is 2
+      parsed.rtypes is Seq(Type.U256, Type.U256)
+    }
 
-    val parsed1 = parseFunc(
-      """@using(preapprovedAssets = true, updateFields = false)
-        |pub fn add(x: U256, mut y: U256) -> (U256, U256) { return x + y, x - y }
-        |""".stripMargin
-    ).get.value
-    parsed1.id is Ast.FuncId("add", false)
-    parsed1.isPublic is true
-    parsed1.usePreapprovedAssets is true
-    parsed1.useAssetsInContract is Ast.NotUseContractAssets
-    parsed1.usePayToContractOnly is false
-    parsed1.useCheckExternalCaller is true
-    parsed1.useUpdateFields is false
-    parsed1.args.size is 2
-    parsed1.rtypes is Seq(Type.U256, Type.U256)
-    parsed1.signature is FuncSignature(
-      FuncId("add", false),
-      true,
-      true,
-      Seq((Type.U256, false), (Type.U256, true)),
-      Seq(Type.U256, Type.U256)
-    )
-
-    info("Simple return type")
-    val parsed2 =
-      parseFunc(
-        """@using(preapprovedAssets = true, assetsInContract = true)
-          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    {
+      val parsed = parseFunc(
+        """@using(preapprovedAssets = true, updateFields = false)
+          |pub fn add(x: U256, mut y: U256) -> (U256, U256) { return x + y, x - y }
+          |""".stripMargin
       ).get.value
-    parsed2.id is Ast.FuncId("add", false)
-    parsed2.isPublic is true
-    parsed2.usePreapprovedAssets is true
-    parsed2.useAssetsInContract is Ast.UseContractAssets
-    parsed2.usePayToContractOnly is false
-    parsed2.useCheckExternalCaller is true
-    parsed2.useUpdateFields is false
-    parsed2.args.size is 2
-    parsed2.rtypes is Seq(Type.U256)
-    parsed2.signature is FuncSignature(
-      FuncId("add", false),
-      true,
-      true,
-      Seq((Type.U256, false), (Type.U256, false)),
-      Seq(Type.U256)
-    )
+      parsed.id is Ast.FuncId("add", false)
+      parsed.isPublic is true
+      parsed.usePreapprovedAssets is true
+      parsed.useAssetsInContract is Ast.NotUseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.useCheckExternalCaller is true
+      parsed.useRoutePattern is false
+      parsed.useUpdateFields is false
+      parsed.inline is false
+      parsed.args.size is 2
+      parsed.rtypes is Seq(Type.U256, Type.U256)
+      parsed.signature is FuncSignature(
+        FuncId("add", false),
+        true,
+        true,
+        false,
+        Seq((Type.U256, false), (Type.U256, true)),
+        Seq(Type.U256, Type.U256)
+      )
+    }
 
-    info("More use annotation")
-    val parsed3 =
-      parseFunc(
-        """@using(assetsInContract = true, updateFields = true)
+    {
+      info("Simple return type")
+      val parsed =
+        parseFunc(
+          """@using(preapprovedAssets = true, assetsInContract = true)
+            |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+        ).get.value
+      parsed.id is Ast.FuncId("add", false)
+      parsed.isPublic is true
+      parsed.usePreapprovedAssets is true
+      parsed.useAssetsInContract is Ast.UseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.useCheckExternalCaller is true
+      parsed.useRoutePattern is false
+      parsed.useUpdateFields is false
+      parsed.inline is false
+      parsed.args.size is 2
+      parsed.rtypes is Seq(Type.U256)
+      parsed.signature is FuncSignature(
+        FuncId("add", false),
+        true,
+        true,
+        false,
+        Seq((Type.U256, false), (Type.U256, false)),
+        Seq(Type.U256)
+      )
+    }
+
+    {
+      info("More use annotation")
+      val parsed =
+        parseFunc(
+          """@using(assetsInContract = true, preserveCaller = true, updateFields = true)
+            |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+        ).get.value
+      parsed.usePreapprovedAssets is false
+      parsed.useAssetsInContract is Ast.UseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.useCheckExternalCaller is true
+      parsed.useRoutePattern is true
+      parsed.useUpdateFields is true
+      parsed.inline is false
+      parsed.signature is FuncSignature(
+        FuncId("add", false),
+        true,
+        false,
+        false,
+        Seq((Type.U256, false), (Type.U256, false)),
+        Seq(Type.U256)
+      )
+    }
+
+    {
+      info("Enforce using contract assets")
+      val code =
+        """@using(assetsInContract = enforced)
           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-      ).get.value
-    parsed3.usePreapprovedAssets is false
-    parsed3.useAssetsInContract is Ast.UseContractAssets
-    parsed3.usePayToContractOnly is false
-    parsed3.useCheckExternalCaller is true
-    parsed3.useUpdateFields is true
-    parsed3.signature is FuncSignature(
-      FuncId("add", false),
-      true,
-      false,
-      Seq((Type.U256, false), (Type.U256, false)),
-      Seq(Type.U256)
-    )
+      val parsed = parseFunc(code).get.value
+      parsed.usePreapprovedAssets is false
+      parsed.useAssetsInContract is Ast.EnforcedUseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.useCheckExternalCaller is true
+      parsed.useRoutePattern is false
+      parsed.useUpdateFields is false
+      parsed.inline is false
+      parsed.signature is FuncSignature(
+        FuncId("add", false),
+        true,
+        false,
+        false,
+        Seq((Type.U256, false), (Type.U256, false)),
+        Seq(Type.U256)
+      )
+    }
 
-    info("Enforce using contract assets")
-    val code = """@using(assetsInContract = enforced)
-                 |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-    val parsed4 = parseFunc(code).get.value
-    parsed4.usePreapprovedAssets is false
-    parsed4.useAssetsInContract is Ast.EnforcedUseContractAssets
-    parsed4.usePayToContractOnly is false
-    parsed4.useCheckExternalCaller is true
-    parsed4.useUpdateFields is false
-    parsed4.signature is FuncSignature(
-      FuncId("add", false),
-      true,
-      false,
-      Seq((Type.U256, false), (Type.U256, false)),
-      Seq(Type.U256)
-    )
+    {
+      info("Use PayToContractOnly annotation")
+      val parsed =
+        parseFunc(
+          """@using(payToContractOnly = true)
+            |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+        ).get.value
+      parsed.usePreapprovedAssets is false
+      parsed.useAssetsInContract is Ast.NotUseContractAssets
+      parsed.usePayToContractOnly is true
+      parsed.useCheckExternalCaller is true
+      parsed.useUpdateFields is false
+      parsed.inline is false
+      parsed.signature is FuncSignature(
+        FuncId("add", false),
+        true,
+        false,
+        false,
+        Seq((Type.U256, false), (Type.U256, false)),
+        Seq(Type.U256)
+      )
+    }
 
-    info("Use PayToContractOnly annotation")
-    val parsed5 =
-      parseFunc(
-        """@using(payToContractOnly = true)
+    {
+      info("Inline annotation")
+      val parsed = parseFunc("@inline fn foo() -> () {}").get.value
+      parsed.usePreapprovedAssets is false
+      parsed.useAssetsInContract is Ast.NotUseContractAssets
+      parsed.usePayToContractOnly is false
+      parsed.useCheckExternalCaller is true
+      parsed.useUpdateFields is false
+      parsed.inline is true
+      parsed.signature is FuncSignature(
+        FuncId("foo", false),
+        false,
+        false,
+        true,
+        Seq.empty,
+        Seq.empty
+      )
+    }
+
+    {
+      info("Invalid annotations")
+      val invalidCode =
+        """@using(assetsInContract = enforced, assetsInContract = false)
           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-      ).get.value
-    parsed5.usePreapprovedAssets is false
-    parsed5.useAssetsInContract is Ast.NotUseContractAssets
-    parsed5.usePayToContractOnly is true
-    parsed5.useCheckExternalCaller is true
-    parsed5.useUpdateFields is false
-    parsed5.signature is FuncSignature(
-      FuncId("add", false),
-      true,
-      false,
-      Seq((Type.U256, false), (Type.U256, false)),
-      Seq(Type.U256)
-    )
+      intercept[Compiler.Error](parseFunc(invalidCode)).message is
+        "These keys are defined multiple times: assetsInContract"
 
-    val invalidCode = """@using(assetsInContract = enforced, assetsInContract = false)
-                        |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-    intercept[Compiler.Error](parseFunc(invalidCode)).message is
-      "These keys are defined multiple times: assetsInContract"
+      val invalidAssetsInContract =
+        s"""@using($$assetsInContract = 1)
+           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+      val error = intercept[Compiler.Error](parseFunc(invalidAssetsInContract.replace("$", "")))
+      error.message is "Invalid assetsInContract annotation, expected true/false/enforced"
+      error.position is invalidAssetsInContract.indexOf("$")
 
-    val invalidAssetsInContract =
-      s"""@using($$assetsInContract = 1)
-         |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-    val error = intercept[Compiler.Error](parseFunc(invalidAssetsInContract.replace("$", "")))
-    error.message is "Invalid assetsInContract annotation, expected true/false/enforced"
-    error.position is invalidAssetsInContract.indexOf("$")
+      val conflictedAnnotations =
+        s"""@using($$assetsInContract = true, payToContractOnly = true)
+           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+      val error1 = intercept[Compiler.Error](parseFunc(conflictedAnnotations.replace("$", "")))
+      error1.message is "Can only enable one of the two annotations: @using(assetsInContract = true/enforced) or @using(payToContractOnly = true)"
+      error1.position is conflictedAnnotations.indexOf("$")
 
-    val conflictedAnnotations =
-      s"""@using($$assetsInContract = true, payToContractOnly = true)
-         |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
-    val error1 = intercept[Compiler.Error](parseFunc(conflictedAnnotations.replace("$", "")))
-    error1.message is "Can only enable one of the two annotations: @using(assetsInContract = true/enforced) or @using(payToContractOnly = true)"
-    error1.position is invalidAssetsInContract.indexOf("$")
+      val unknownAnnotations = s"""$$@unknown(field = false) fn foo() -> ()""".stripMargin
+      val error2 = intercept[Compiler.Error](parseFunc(unknownAnnotations.replace("$", "")))
+      error2.message is "Invalid annotation unknown, function only supports these annotations: using,inline"
+      error2.position is unknownAnnotations.indexOf("$")
+
+      val duplicateAnnotations =
+        s"""$$@inline @inline fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+      val error3 = intercept[Compiler.Error](parseFunc(duplicateAnnotations.replace("$", "")))
+      error3.message is "There are duplicate annotations: inline"
+      error3.position is duplicateAnnotations.indexOf("$")
+    }
   }
 
   it should "parse bytes and address" in {
@@ -960,6 +1157,33 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     exprs.foreach { case (str, expr) =>
       checkParseExpr(str, expr)
     }
+  }
+
+  it should "parse compound assign statement" in {
+    def stats(op: CompoundAssignmentOperator): List[(String, Ast.Statement[StatelessContext])] =
+      List(
+        s"a ${op.operatorName} b" -> Ast
+          .CompoundAssign(
+            AssignmentSimpleTarget(Ident("a")),
+            op,
+            Ast.Variable(Ast.Ident("b"))
+          ),
+        s"a[0] ${op.operatorName} b" -> Ast.CompoundAssign(
+          AssignmentSelectedTarget(Ident("a"), Seq(IndexSelector(constantIndex(0)))),
+          op,
+          Ast.Variable(Ast.Ident("b"))
+        ),
+        s"a.b[0] ${op.operatorName} c" -> Ast.CompoundAssign(
+          AssignmentSelectedTarget(
+            Ident("a"),
+            Seq(IdentSelector(Ident("b")), IndexSelector(constantIndex(0)))
+          ),
+          op,
+          Ast.Variable(Ast.Ident("c"))
+        )
+      )
+
+    CompoundAssignmentOperator.values.foreach { stats(_).foreach(checkParseStat.tupled) }
   }
 
   it should "parse assign statement" in {
@@ -1138,7 +1362,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
 
   it should "parse enum definitions" in {
     {
-      info("Invalid enum type")
+      info("Valid enum type")
       val definition =
         s"""
            |enum errorCodes {
@@ -1262,6 +1486,68 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         )
       )
     }
+
+    {
+      info("Enum definition with U256 fields with optional values")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = 0
+           |  Error1
+           |  Error10 = 10
+           |  Error11
+           |}
+           |""".stripMargin
+      parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
+        TypeId("ErrorCodes"),
+        Seq(
+          EnumField(Ident("Error0"), Const[StatefulContext](Val.U256(U256.Zero))),
+          EnumField(Ident("Error1"), Const[StatefulContext](Val.U256(U256.One))),
+          EnumField(Ident("Error10"), Const[StatefulContext](Val.U256(U256.unsafe(10)))),
+          EnumField(Ident("Error11"), Const[StatefulContext](Val.U256(U256.unsafe(11))))
+        )
+      )
+    }
+
+    {
+      info("First enum field value can not be optional")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0
+           |  Error10 = 10
+           |  Error11 = 11
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
+      error.message is "Enum field Error0 must have explicit value"
+    }
+
+    {
+      info("Non-U256 enum field value can not be optional")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = #00
+           |  Error10
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
+      error.message is "Enum field Error10 must have explicit value"
+    }
+
+    {
+      info("Non-U256 enum field value can not overflow")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  ErrorMax = ${U256.MaxValue}
+           |  ErrorOverflow
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](parse(definition, StatefulParser.enumDef(_)))
+      error.message is s"Enum field ErrorOverflow value overflows, it must not exceed ${U256.MaxValue}"
+    }
   }
 
   it should "parse contract inheritance" in {
@@ -1294,8 +1580,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useAssetsInContract = Ast.NotUseContractAssets,
             usePayToContractOnly = false,
             useCheckExternalCaller = true,
+            useRoutePattern = false,
             useUpdateFields = false,
             useMethodIndex = None,
+            inline = false,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -1521,8 +1809,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useAssetsInContract = Ast.NotUseContractAssets,
             usePayToContractOnly = false,
             useCheckExternalCaller = true,
+            useRoutePattern = false,
             useUpdateFields = false,
             useMethodIndex = None,
+            inline = false,
             Seq.empty,
             Seq.empty,
             None
@@ -1662,8 +1952,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useAssetsInContract = Ast.NotUseContractAssets,
             usePayToContractOnly = false,
             useCheckExternalCaller = true,
+            useRoutePattern = false,
             useUpdateFields = false,
             useMethodIndex = None,
+            inline = false,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -1703,8 +1995,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
             useAssetsInContract = Ast.NotUseContractAssets,
             usePayToContractOnly = false,
             useCheckExternalCaller = true,
+            useRoutePattern = false,
             useUpdateFields = false,
             useMethodIndex = None,
+            inline = false,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -1752,8 +2046,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         useAssetsInContract = Ast.NotUseContractAssets,
         usePayToContractOnly = false,
         checkExternalCaller,
+        useRoutePattern = false,
         useUpdateFields = false,
         useMethodIndex = None,
+        inline = false,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1768,8 +2064,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         useAssetsInContract = Ast.NotUseContractAssets,
         usePayToContractOnly = false,
         checkExternalCaller,
+        useRoutePattern = false,
         useUpdateFields = false,
         useMethodIndex = None,
+        inline = false,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1958,8 +2256,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         useAssetsInContract = Ast.NotUseContractAssets,
         usePayToContractOnly = false,
         useCheckExternalCaller = true,
+        useRoutePattern = false,
         useUpdateFields = false,
         useMethodIndex = None,
+        inline = false,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))
@@ -1992,8 +2292,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           Ast.NotUseContractAssets,
           usePayToContractOnly = false,
           useCheckExternalCaller = true,
+          useRoutePattern = false,
           useUpdateFields = false,
           useMethodIndex = None,
+          inline = false,
           Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
           Seq(Type.NamedType(TypeId("Foo"))),
           Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
@@ -2329,9 +2631,23 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Const(Val.U256(U256.Zero))
       )
     )
+    parse(
+      "map.insert!(1, 0)",
+      StatefulParser.statement(_)
+    ).get.value is Ast.InsertToMap(
+      Ident("map"),
+      Seq[Expr[StatefulContext]](
+        Const(Val.U256(U256.One)),
+        Const(Val.U256(U256.Zero))
+      )
+    )
     parse("map.remove!(address, 1)", StatefulParser.statement(_)).get.value is Ast.RemoveFromMap(
       Ident("map"),
       Seq[Expr[StatefulContext]](Variable(Ident("address")), Const(Val.U256(U256.One)))
+    )
+    parse("map.remove!(1)", StatefulParser.statement(_)).get.value is Ast.RemoveFromMap(
+      Ident("map"),
+      Seq[Expr[StatefulContext]](Const(Val.U256(U256.One)))
     )
 
     parse("map.contains!(0)", StatefulParser.expr(_)).get.value is Ast.MapContains(
@@ -2435,6 +2751,28 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq(EnumField(Ident("Red"), Const(Val.U256(U256.Zero))))
       )
     )
+  }
+
+  it should "Enum with default value shouldn't have a source index" in {
+
+    val enumWithDefault = "Second"
+
+    val code =
+      s"""
+         |enum Errors {
+         |  First = 1
+         |  $$${enumWithDefault}
+         |}""".stripMargin
+
+    val enums = parse(code.replace("$", ""), StatefulParser.enumDef(_)).get.value.fields
+
+    val second = enums.last
+    val index  = code.indexOf("$")
+
+    second.sourceIndex is Some(SourceIndex(index, enumWithDefault.size, fileURI))
+    second.ident.sourceIndex is Some(SourceIndex(index, enumWithDefault.size, fileURI))
+    // value source index is not set for default value
+    second.value.sourceIndex is None
   }
 
   it should "set the origin contract id for constants and functions" in {

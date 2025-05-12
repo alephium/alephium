@@ -24,6 +24,7 @@ final case class Header(version: WireVersion)
 object Header {
   implicit val serde: Serde[Header] = WireVersion.serde
     .validate(_version =>
+      // Fix this in the next hardfork
       if (_version == WireVersion.currentWireVersion) {
         Right(())
       } else {

@@ -13,9 +13,18 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
+package org.alephium.protocol.vm.nodeindexes
 
-package org.alephium.flow
+import org.alephium.protocol.model.TransactionId
+import org.alephium.serde.{avectorSerde, Serde}
+import org.alephium.util.AVector
 
-package object mining {
-  val MiningDispatcher = "akka.actor.mining-dispatcher"
+final case class TxIdTxOutputLocators(
+    txId: TransactionId,
+    txOutputLocators: AVector[TxOutputLocator]
+)
+
+object TxIdTxOutputLocators {
+  implicit val txIdTxOutputLocatorsSerde: Serde[TxIdTxOutputLocators] =
+    Serde.forProduct2(apply, b => (b.txId, b.txOutputLocators))
 }

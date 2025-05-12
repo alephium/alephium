@@ -41,4 +41,9 @@ object Files {
   def homeDir: Path = Paths.get(System.getProperty("user.home"))
 
   def tmpDir: Path = Paths.get(System.getProperty("java.io.tmpdir"))
+
+  def testRootPath(env: Env): Path = {
+    assume(env == Env.Test || env == Env.Integration)
+    tmpDir.resolve(s".alephium-${env.name}")
+  }
 }

@@ -19,30 +19,57 @@ package org.alephium.api.model
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{TransactionId, UnsignedTransaction}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.serde.serialize
-import org.alephium.util.Hex
+import org.alephium.util.{AVector, Hex}
 
-final case class BuildExecuteScriptTxResult(
+sealed trait BuildExecuteScriptTxResult extends Product with Serializable
+
+@upickle.implicits.key("BuildSimpleExecuteScriptTxResult")
+final case class BuildSimpleExecuteScriptTxResult(
     fromGroup: Int,
     toGroup: Int,
     unsignedTx: String,
     gasAmount: GasBox,
     gasPrice: GasPrice,
-    txId: TransactionId
-) extends GasInfo
+    txId: TransactionId,
+    simulationResult: SimulationResult
+) extends BuildExecuteScriptTxResult
+    with GasInfo
     with ChainIndexInfo
     with TransactionInfo
 
-object BuildExecuteScriptTxResult {
+object BuildSimpleExecuteScriptTxResult {
   def from(
-      unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildExecuteScriptTxResult =
-    BuildExecuteScriptTxResult(
+      unsignedTx: UnsignedTransaction,
+      simulationResult: SimulationResult
+  )(implicit groupConfig: GroupConfig): BuildSimpleExecuteScriptTxResult =
+    BuildSimpleExecuteScriptTxResult(
       unsignedTx.fromGroup.value,
       unsignedTx.toGroup.value,
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,
       unsignedTx.gasPrice,
-      unsignedTx.id
+      unsignedTx.id,
+      simulationResult
     )
 }
+
+final case class SimulationResult(
+    contractInputs: AVector[AddressAssetState],
+    generatedOutputs: AVector[AddressAssetState]
+)
+
+object SimulationResult {
+  def from(txScriptExecution: TxScriptExecution): SimulationResult = {
+    val contractInputs   = txScriptExecution.contractPrevOutputs.map(AddressAssetState.from)
+    val generatedOutputs = txScriptExecution.generatedOutputs.map(AddressAssetState.from)
+    SimulationResult(contractInputs, generatedOutputs)
+  }
+}
+
+@upickle.implicits.key("BuildGrouplessExecuteScriptTxResult")
+final case class BuildGrouplessExecuteScriptTxResult(
+    transferTxs: AVector[BuildSimpleTransferTxResult],
+    executeScriptTx: BuildSimpleExecuteScriptTxResult
+) extends BuildExecuteScriptTxResult

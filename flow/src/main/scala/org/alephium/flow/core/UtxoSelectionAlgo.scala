@@ -23,7 +23,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.flow.gasestimation._
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulScript, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.util._
 
 /*
@@ -97,21 +97,23 @@ object UtxoSelectionAlgo extends StrictLogging {
 
     def select(
         amounts: AssetAmounts,
+        lockupScript: LockupScript,
         unlockScript: UnlockScript,
         utxos: AVector[Asset],
         txOutputsLength: Int,
         txScriptOpt: Option[StatefulScript],
         assetScriptGasEstimator: AssetScriptGasEstimator,
-        txScriptGasEstimator: TxScriptGasEstimator
+        txScriptEmulator: TxScriptEmulator
     )(implicit networkConfig: NetworkConfig): Either[String, Selected] = {
       val ascendingResult = ascendingOrderSelector.select(
         amounts,
+        lockupScript,
         unlockScript,
         utxos,
         txOutputsLength,
         txScriptOpt,
         assetScriptGasEstimator,
-        txScriptGasEstimator
+        txScriptEmulator
       )
 
       ascendingResult match {
@@ -125,12 +127,13 @@ object UtxoSelectionAlgo extends StrictLogging {
 
           descendingOrderSelector.select(
             amounts,
+            lockupScript,
             unlockScript,
             utxos,
             txOutputsLength,
             txScriptOpt,
             assetScriptGasEstimator,
-            txScriptGasEstimator
+            txScriptEmulator
           )
       }
     }
@@ -142,12 +145,13 @@ object UtxoSelectionAlgo extends StrictLogging {
   ) {
     def select(
         amounts: AssetAmounts,
+        lockupScript: LockupScript,
         unlockScript: UnlockScript,
         utxos: AVector[Asset],
         txOutputsLength: Int,
         txScriptOpt: Option[StatefulScript],
         assetScriptGasEstimator: AssetScriptGasEstimator,
-        txScriptGasEstimator: TxScriptGasEstimator
+        txScriptEmulator: TxScriptEmulator
     )(implicit networkConfig: NetworkConfig): Either[String, Selected] = {
       val gasPrice = providedGas.gasPrice
       providedGas.gasOpt match {
@@ -166,7 +170,7 @@ object UtxoSelectionAlgo extends StrictLogging {
               case None =>
                 Right(GasBox.zero)
               case Some(txScript) =>
-                GasEstimation.estimate(inputWithAssets, txScript, txScriptGasEstimator).map {
+                GasEstimation.estimate(inputWithAssets, txScript, txScriptEmulator).map {
                   scriptGas =>
                     providedGas.gasEstimationMultiplier.map(_ * scriptGas).getOrElse(scriptGas)
                 }
@@ -179,6 +183,7 @@ object UtxoSelectionAlgo extends StrictLogging {
             utxosWithGas <- selectUtxos(
               amountsWithScriptGas,
               utxos,
+              lockupScript,
               unlockScript,
               txOutputsLength,
               gasPrice,
@@ -193,6 +198,7 @@ object UtxoSelectionAlgo extends StrictLogging {
     private def selectUtxos(
         assetAmounts: AssetAmounts,
         utxos: AVector[Asset],
+        lockupScript: LockupScript,
         unlockScript: UnlockScript,
         txOutputsLength: Int,
         gasPrice: GasPrice,
@@ -204,6 +210,7 @@ object UtxoSelectionAlgo extends StrictLogging {
           utxos
         )
         resultWithGas <- SelectionWithGasEstimation(gasPrice).select(
+          lockupScript,
           unlockScript,
           txOutputsLength,
           resultWithoutGas,
@@ -331,6 +338,7 @@ object UtxoSelectionAlgo extends StrictLogging {
   final case class SelectionWithGasEstimation(gasPrice: GasPrice) {
 
     def select(
+        lockupScript: LockupScript,
         unlockScript: UnlockScript,
         txOutputsLength: Int,
         selectedSoFar: SelectedSoFar,
@@ -348,7 +356,7 @@ object UtxoSelectionAlgo extends StrictLogging {
 
         val estimatedGas = GasEstimation
           .estimateWithInputScript(
-            unlockScript,
+            (lockupScript, unlockScript),
             sizeOfSelectedUTXOs + index,
             txOutputsLength,
             assetScriptGasEstimator.setInputs(inputs)

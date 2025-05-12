@@ -19,9 +19,15 @@ package org.alephium.protocol.vm
 import org.alephium.crypto.Byte32
 import org.alephium.io.{RocksDBSource, SparseMerkleTrie, StorageFixture}
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{ContractId, TransactionId, TxOutputRef}
+import org.alephium.protocol.model.{BlockHash, ContractId, TxOutputRef}
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.protocol.vm.nodeindexes.NodeIndexesStorage
+import org.alephium.protocol.vm.nodeindexes.{
+  ConflictedTxsPerBlock,
+  ConflictedTxsSource,
+  ConflictedTxsStorage,
+  NodeIndexesStorage,
+  TxIdTxOutputLocators
+}
 import org.alephium.protocol.vm.subcontractindex._
 import org.alephium.serde.{avectorSerde, eitherSerde, intSerde}
 import org.alephium.util.AVector
@@ -37,7 +43,12 @@ trait VMFactory extends StorageFixture {
     val logCounterDb = newDB[ContractId, Int](storage, RocksDBSource.ColumnFamily.LogCounter)
     val logStorage   = LogStorage(logDb, logRefDb, logCounterDb)
     val txOutputRefIndexStorage =
-      newDB[TxOutputRef.Key, TransactionId](storage, RocksDBSource.ColumnFamily.TxOutputRefIndex)
+      Some(
+        newDB[TxOutputRef.Key, TxIdTxOutputLocators](
+          storage,
+          RocksDBSource.ColumnFamily.TxOutputRefIndex
+        )
+      )
     val parentContractIndexStorage =
       newDB[ContractId, ContractId](storage, RocksDBSource.ColumnFamily.ParentContract)
     val subContractIndexStateStorage = newDB[SubContractIndexStateId, SubContractIndexState](
@@ -51,10 +62,21 @@ trait VMFactory extends StorageFixture {
       subContractIndexStateStorage,
       subContractIndexCounterStorage
     )
+    val conflictedTxsStorage = ConflictedTxsStorage(
+      newDB[BlockHash, AVector[ConflictedTxsPerBlock]](
+        storage,
+        RocksDBSource.ColumnFamily.ConflictedTxs
+      ),
+      newDB[BlockHash, AVector[ConflictedTxsSource]](
+        storage,
+        RocksDBSource.ColumnFamily.ConflictedTxs
+      )
+    )
     val nodeIndexesStorage = NodeIndexesStorage(
       logStorage,
-      Some(txOutputRefIndexStorage),
-      Some(subContractIndexStorage)
+      txOutputRefIndexStorage,
+      Some(subContractIndexStorage),
+      conflictedTxsStorage
     )
 
     WorldState.emptyCached(trieDb, trieImmutableStateStorage, nodeIndexesStorage)

@@ -19,7 +19,7 @@ package org.alephium.protocol.model
 import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.{LockupScript, StatelessScript, UnlockScript}
+import org.alephium.protocol.vm.{LockupScript, PublicKeyLike, StatelessScript, UnlockScript}
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{AVector, Base58}
 import org.alephium.util.Hex.HexStringSyntax
@@ -29,7 +29,12 @@ sealed trait Address {
 
   def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
 
-  def toBase58: String = Base58.encode(serialize(lockupScript))
+  def toBase58: String = {
+    lockupScript match {
+      case script: LockupScript.P2PK => script.toBase58
+      case _                         => Base58.encode(serialize(lockupScript))
+    }
+  }
 
   override def toString: String = toBase58
 }
@@ -51,9 +56,20 @@ object Address {
     Contract(LockupScript.p2c(contractId))
   }
 
+  def contract(input: String): Option[Address.Contract] = {
+    Base58.decode(input).flatMap(deserialize[LockupScript](_).toOption) match {
+      case Some(lockupScript: LockupScript.P2C) => Some(Address.Contract(lockupScript))
+      case _                                    => None
+    }
+  }
+
   def fromBase58(input: String): Option[Address] = {
+    fromBase58(input, None)
+  }
+
+  def fromBase58(input: String, groupIndex: Option[GroupIndex]): Option[Address] = {
     for {
-      lockupScript <- LockupScript.fromBase58(input)
+      lockupScript <- LockupScript.fromBase58(input, groupIndex)
     } yield from(lockupScript)
   }
 
@@ -99,4 +115,46 @@ final case class SchnorrAddress(publicKey: BIP340SchnorrPublicKey) {
   }
 
   lazy val address: Address.Asset = Address.Asset(lockupScript)
+}
+
+final case class AddressLike(lockupScriptResult: LockupScript.ValidLockupScript) {
+  def getAddress()(implicit config: GroupConfig): Address = {
+    lockupScriptResult match {
+      case LockupScript.CompleteLockupScript(lockupScript) =>
+        Address.from(lockupScript)
+      case LockupScript.HalfDecodedP2PK(publicKey) =>
+        val defaultGroupIndex = publicKey.defaultGroup
+        Address.Asset(LockupScript.p2pk(publicKey, defaultGroupIndex))
+    }
+  }
+
+  def toBase58: String = { // TODO: test from & to base58
+    lockupScriptResult match {
+      case LockupScript.CompleteLockupScript(lockupScript) =>
+        Address.from(lockupScript).toBase58
+      case LockupScript.HalfDecodedP2PK(publicKey) =>
+        LockupScript.p2pk(publicKey, new GroupIndex(0)).toBase58WithoutGroup
+    }
+  }
+
+  override def toString: String = toBase58
+}
+
+object AddressLike {
+  def fromBase58(input: String): Option[AddressLike] = {
+    LockupScript.decodeFromBase58(input) match {
+      case LockupScript.InvalidLockupScript =>
+        None
+      case valid: LockupScript.ValidLockupScript =>
+        Some(AddressLike(valid))
+    }
+  }
+
+  def from(lockupScript: LockupScript): AddressLike = {
+    AddressLike(LockupScript.CompleteLockupScript(lockupScript))
+  }
+
+  def fromP2PKPublicKey(publicKey: PublicKeyLike): AddressLike = {
+    AddressLike(LockupScript.HalfDecodedP2PK(publicKey))
+  }
 }

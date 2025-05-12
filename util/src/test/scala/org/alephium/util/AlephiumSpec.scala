@@ -16,14 +16,20 @@
 
 package org.alephium.util
 
+import java.io.IOException
+import java.nio.file.{Files => JFiles, FileVisitResult, Path, SimpleFileVisitor}
+import java.nio.file.attribute.BasicFileAttributes
+
 import scala.annotation.nowarn
+import scala.collection.mutable
 import scala.language.implicitConversions
 
+import akka.util.ByteString
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalacheck.Arbitrary._
 import org.scalactic.Equality
 import org.scalactic.source.Position
-import org.scalatest.{Assertion, OptionValues}
+import org.scalatest.{Assertion, BeforeAndAfterAll, OptionValues}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.dsl.ResultOfATypeInvocation
@@ -34,8 +40,47 @@ trait AlephiumSpec
     extends AnyFlatSpecLike
     with OptionValues
     with ScalaCheckDrivenPropertyChecks
-    with AlephiumFixture {
+    with AlephiumFixture
+    with BeforeAndAfterAll {
   @nowarn implicit protected def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    AlephiumSpec.clean()
+  }
+}
+
+object AlephiumSpec {
+  private val cleanTasks: mutable.ArrayBuffer[() => Unit] = mutable.ArrayBuffer.empty
+
+  def addCleanTask(task: () => Unit): Unit = cleanTasks.addOne(task)
+
+  def delete(path: Path): Unit = {
+    if (JFiles.exists(path)) {
+      JFiles.walkFileTree(
+        path,
+        new SimpleFileVisitor[Path] {
+          override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+            JFiles.delete(file)
+            FileVisitResult.CONTINUE
+          }
+          override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+            JFiles.delete(dir)
+            FileVisitResult.CONTINUE
+          }
+        }
+      )
+      ()
+    }
+  }
+
+  def clean(): Unit = {
+    cleanTasks.foreach(task => task())
+    cleanTasks.clear()
+
+    delete(Files.testRootPath(Env.Test))
+    delete(Files.testRootPath(Env.Integration))
+  }
 }
 
 trait AlephiumFutureSpec
@@ -110,4 +155,7 @@ trait AlephiumFixture extends Matchers {
 
   implicit def intToBigInteger(x: Int): BigInteger       = BigInt(x).bigInteger
   implicit def bigIntToBigInteger(x: BigInt): BigInteger = x.bigInteger
+
+  def bytesGen(size: Int): Gen[ByteString] =
+    Gen.listOfN(size, arbitrary[Byte]).map(ByteString.apply)
 }

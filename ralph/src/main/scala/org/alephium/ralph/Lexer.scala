@@ -170,12 +170,14 @@ class Lexer(fileURI: Option[java.net.URI]) {
     }
 
   def addressInternal[Unknown: P]: P[(Val.Address, Int, Int)] =
-    P(Index ~ CharsWhileIn("0-9a-zA-Z").!).map { case (index, input) =>
-      val lockupScriptOpt = Address.extractLockupScript(input)
-      lockupScriptOpt match {
-        case Some(lockupScript) => (Val.Address(lockupScript), index, input.length)
-        case None               => throw CompilerError.`Invalid address`(input, index, fileURI)
-      }
+    P(Index ~ CharsWhileIn("0-9a-zA-Z").! ~ (":" ~ digit.rep(1).!).?).map {
+      case (index, input0, groupIndexOpt) =>
+        val input = groupIndexOpt.map(groupIndex => s"$input0:${groupIndex}").getOrElse(input0)
+        val lockupScriptOpt = Address.extractLockupScript(input)
+        lockupScriptOpt match {
+          case Some(lockupScript) => (Val.Address(lockupScript), index, input.length)
+          case None               => throw CompilerError.`Invalid address`(input, index, fileURI)
+        }
     }
   def address[Ctx <: StatelessContext, Unknown: P]: P[Ast.Const[Ctx]] =
     P(Index ~ "@" ~ addressInternal).map { case (index, (address, _, addressWidth)) =>
@@ -243,6 +245,15 @@ class Lexer(fileURI: Option[java.net.URI]) {
   def opOr[Unknown: P]: P[LogicalOperator]     = P("||").map(_ => Or)
   def opNot[Unknown: P]: P[LogicalOperator]    = P("!").map(_ => Not)
   def opNegate[Unknown: P]: P[LogicalOperator] = P("-").map(_ => Negate)
+
+  def opAddAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("+=").map(_ => CompoundAssignmentOperator.AddAssign)
+  def opSubAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("-=").map(_ => CompoundAssignmentOperator.SubAssign)
+  def opMulAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("*=").map(_ => CompoundAssignmentOperator.MulAssign)
+  def opDivAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("/=").map(_ => CompoundAssignmentOperator.DivAssign)
 
   sealed trait FuncModifier
 

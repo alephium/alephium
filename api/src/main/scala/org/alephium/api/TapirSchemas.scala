@@ -37,6 +37,7 @@ trait TapirSchemasLike {
 
   implicit def optionAvectorSchema[T: Schema]: Schema[Option[AVector[T]]] = Schema.schemaForOption
 
+  implicit val addressLikeSchema: Schema[AddressLike]          = Schema(SString()).format("address")
   implicit val addressSchema: Schema[Address]                  = Schema(SString()).format("address")
   implicit val addressAssetSchema: Schema[Address.Asset]       = Schema(SString()).format("address")
   implicit val addressContractSchema: Schema[Address.Contract] = Schema(SString()).format("address")
