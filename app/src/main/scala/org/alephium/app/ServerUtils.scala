@@ -910,7 +910,9 @@ class ServerUtils(implicit
     }
   }
 
-  protected def prepareOutputInfos(destinations: AVector[Destination]): AVector[TxOutputInfo] = {
+  protected[app] def prepareOutputInfos(
+      destinations: AVector[Destination]
+  ): AVector[TxOutputInfo] = {
     destinations.map { destination =>
       val tokensInfo = destination.tokens match {
         case Some(tokens) =>
