@@ -1015,13 +1015,14 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "invalidate block if uncles' parent is not from mainchain" in new SinceRhoneGhostUncleFixture {
-    val uncleHash  = mineUncleBlocks(1).head
-    val uncleBlock = blockFlow.getBlockUnsafe(uncleHash)
-    val block0     = blockFlow.getBlockUnsafe(uncleBlock.parentHash)
-    val block1     = mine(blockFlow, chainIndex, block0.blockDeps)
+    mineBlocks(blockFlow, chainIndex, ALPH.MaxGhostUncleAge)
+    val height = blockFlow.getMaxHeightByWeight(chainIndex).rightValue
+    val hash   = blockFlow.getHashes(chainIndex, height - 2).rightValue.head
+    val block0 = blockFlow.getBlockUnsafe(hash)
+    val block1 = mine(blockFlow, chainIndex, block0.blockDeps)
     addAndCheck(blockFlow, block1)
     val index        = brokerConfig.groups - 1 + chainIndex.to.value
-    val deps         = uncleBlock.blockDeps.deps.replace(index, block1.hash)
+    val deps         = block1.blockDeps.deps.replace(index, block1.hash)
     val invalidUncle = mine(blockFlow, chainIndex, BlockDeps.unsafe(deps))
     addAndCheck(blockFlow, invalidUncle)
 
