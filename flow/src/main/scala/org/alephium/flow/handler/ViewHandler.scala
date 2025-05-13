@@ -48,9 +48,10 @@ object ViewHandler {
   }
 
   sealed trait Command
-  case object BestDepsUpdatedPreDanube                                     extends Command
-  case object BestDepsUpdateFailedPreDanube                                extends Command
-  final case class BestDepsUpdatedDanube(chainIndex: ChainIndex)           extends Command
+  case object BestDepsUpdatedPreDanube      extends Command
+  case object BestDepsUpdateFailedPreDanube extends Command
+  final case class BestDepsUpdatedDanube(chainIndex: ChainIndex, rebuildTemplates: Boolean)
+      extends Command
   final case class BestDepsUpdateFailedDanube(chainIndex: ChainIndex)      extends Command
   case object Subscribe                                                    extends Command
   case object Unsubscribe                                                  extends Command
@@ -132,10 +133,10 @@ class ViewHandler(
       preDanubeUpdateState.setCompleted()
       log.warning("Updating pre-danube blockflow deps failed")
 
-    case ViewHandler.BestDepsUpdatedDanube(chainIndex) =>
+    case ViewHandler.BestDepsUpdatedDanube(chainIndex, rebuildTemplates) =>
       setDanubeUpdateCompleted(chainIndex)
       if (isNodeSynced) {
-        scheduleUpdateDanube(chainIndex)
+        scheduleUpdateDanube(chainIndex, rebuildTemplates)
         tryUpdateBestViewDanube(chainIndex)
       }
     case ViewHandler.BestDepsUpdateFailedDanube(chainIndex) =>
@@ -206,21 +207,34 @@ trait ViewHandlerState extends IOBaseActor {
     }
   }
 
-  def scheduleUpdateDanube(chainIndex: ChainIndex): Unit = {
+  protected def scheduleUpdateDanube(chainIndex: ChainIndex): Unit = {
+    val index = chainIndex.flattenIndex
+    updateScheduledDanube(index).foreach(_.cancel())
+    updateScheduledDanube(index) = Some(
+      scheduleCancellableOnce(
+        self,
+        ViewHandler.UpdateSubscribersDanube(chainIndex),
+        miningSetting.pollingInterval
+      )
+    )
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def scheduleUpdateDanube(chainIndex: ChainIndex, rebuildTemplates: Boolean): Unit = {
     if (
       brokerConfig.contains(chainIndex.from) &&
       minerAddressesOpt.nonEmpty &&
       subscribers.nonEmpty
     ) {
-      val index = chainIndex.flattenIndex
-      updateScheduledDanube(index).foreach(_.cancel())
-      updateScheduledDanube(index) = Some(
-        scheduleCancellableOnce(
-          self,
-          ViewHandler.UpdateSubscribersDanube(chainIndex),
-          miningSetting.pollingInterval
-        )
-      )
+      if (rebuildTemplates) {
+        val minerAddresses = minerAddressesOpt.get
+        escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
+          subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
+        }
+        brokerConfig.chainIndexes.foreach(scheduleUpdateDanube)
+      } else {
+        scheduleUpdateDanube(chainIndex)
+      }
     }
   }
 
@@ -329,7 +343,7 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
       val allSubscribers = AVector.from(subscribers)
       poolAsync[ViewHandler.Command] {
         val result = for {
-          _ <- blockFlow.updateViewPerChainIndexDanube(chainIndex)
+          rebuildTemplates <- blockFlow.updateViewPerChainIndexDanube(chainIndex)
           needToUpdate = brokerConfig.contains(chainIndex.from)
           _ <-
             if (needToUpdate && minerAddress.nonEmpty && allSubscribers.nonEmpty) {
@@ -337,9 +351,10 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
             } else {
               Right(())
             }
-        } yield ()
+        } yield rebuildTemplates
         result match {
-          case Right(_) => ViewHandler.BestDepsUpdatedDanube(chainIndex)
+          case Right(rebuildTemplates) =>
+            ViewHandler.BestDepsUpdatedDanube(chainIndex, rebuildTemplates)
           case Left(error) =>
             log.error(s"Failed to update best view: $error")
             ViewHandler.BestDepsUpdateFailedDanube(chainIndex)

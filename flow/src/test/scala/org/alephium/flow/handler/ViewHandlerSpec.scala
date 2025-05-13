@@ -419,6 +419,34 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
       blockFlow.getMemPool(chainIndex.from).contains(tx.id) is false
     }
   }
+
+  it should "rebuild templates for all chains" in new DanubeFixture {
+    setSynced()
+    val probe          = createSubscriber()
+    val scheduledTasks = viewHandler.underlyingActor.updateScheduledDanube
+    val chainIndexes   = brokerConfig.chainIndexes.drop(1)
+    chainIndexes.foreach { chainIndex =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    }
+    eventually {
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        scheduledTasks(chainIndex.flattenIndex).isDefined is chainIndexes.contains(chainIndex)
+      }
+    }
+
+    viewHandler ! ViewHandler.BestDepsUpdatedDanube(
+      brokerConfig.chainIndexes.head,
+      rebuildTemplates = true
+    )
+    eventually {
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        scheduledTasks(chainIndex.flattenIndex).isDefined is true
+      }
+      probe.expectMsgType[ViewHandler.NewTemplates]
+    }
+  }
 }
 
 abstract class UpdateBestViewSpec extends ViewHandlerBaseSpec {
@@ -541,7 +569,8 @@ class DanubeUpdateBestViewSpec extends UpdateBestViewSpec {
       viewHandler.underlyingActor.danubeUpdateStates(chainIndex.flattenIndex)
     override def containBlockHashInBestDeps(blockHash: BlockHash): Boolean =
       blockFlow.getBestFlowSkeleton().intraGroupTips.contains(blockHash)
-    def bestDepsUpdatedMsg: ViewHandler.Command = ViewHandler.BestDepsUpdatedDanube(chainIndex)
+    def bestDepsUpdatedMsg: ViewHandler.Command =
+      ViewHandler.BestDepsUpdatedDanube(chainIndex, false)
     def bestDepsUpdateFailedMsg: ViewHandler.Command =
       ViewHandler.BestDepsUpdateFailedDanube(chainIndex)
   }

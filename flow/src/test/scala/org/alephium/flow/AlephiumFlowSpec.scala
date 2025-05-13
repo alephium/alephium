@@ -63,8 +63,10 @@ trait FlowFixture
 
   def addWithoutViewUpdate(blockFlow: BlockFlow, block: Block): Assertion = {
     val worldState =
-      blockFlow.getCachedWorldState(block.blockDeps, block.chainIndex.from).rightValue
-    blockFlow.add(block, Some(worldState)) isE ()
+      Option.when(block.chainIndex.isIntraGroup)(
+        blockFlow.getCachedWorldState(block.blockDeps, block.chainIndex.from).rightValue
+      )
+    blockFlow.add(block, worldState) isE ()
   }
 
   def addAndUpdateView(blockFlow: BlockFlow, block: Block): Assertion = {
