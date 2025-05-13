@@ -420,9 +420,30 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     }
   }
 
-  it should "rebuild templates for all chains" in new DanubeFixture {
+  it should "rebuild all templates when necessary" in new DanubeFixture {
     setSynced()
-    val probe          = createSubscriber()
+    val probe      = createSubscriber()
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block0     = emptyBlock(blockFlow, chainIndex)
+    val block1     = emptyBlock(blockFlow, chainIndex)
+    val blocks     = AVector(block0, block1).sortBy(_.hash.bytes)(Bytes.byteStringOrdering)
+
+    addWithoutViewUpdate(blockFlow, blocks.head)
+    viewHandler ! ChainHandler.FlowDataAdded(blocks.head, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectMsgType[ViewHandler.NewTemplate])
+
+    addWithoutViewUpdate(blockFlow, blocks.last)
+    viewHandler ! ChainHandler.FlowDataAdded(blocks.last, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      probe.expectMsgType[ViewHandler.NewTemplates]
+      viewHandler.underlyingActor.rebuildTemplatesState.isUpdating is false
+    }
+  }
+
+  it should "reschedule update tasks for all chains" in new DanubeFixture {
+    setSynced()
+    createSubscriber()
+
     val scheduledTasks = viewHandler.underlyingActor.updateScheduledDanube
     val chainIndexes   = brokerConfig.chainIndexes.drop(1)
     chainIndexes.foreach { chainIndex =>
@@ -436,15 +457,11 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
       }
     }
 
-    viewHandler ! ViewHandler.BestDepsUpdatedDanube(
-      brokerConfig.chainIndexes.head,
-      rebuildTemplates = true
-    )
+    viewHandler ! ViewHandler.RebuildTemplatesComplete
     eventually {
       brokerConfig.chainIndexes.foreach { chainIndex =>
         scheduledTasks(chainIndex.flattenIndex).isDefined is true
       }
-      probe.expectMsgType[ViewHandler.NewTemplates]
     }
   }
 }

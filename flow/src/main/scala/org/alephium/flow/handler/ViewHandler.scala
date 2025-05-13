@@ -59,6 +59,7 @@ object ViewHandler {
   final case class UpdateSubscribersDanube(chainIndex: ChainIndex)         extends Command
   case object GetMinerAddresses                                            extends Command
   final case class UpdateMinerAddresses(addresses: AVector[Address.Asset]) extends Command
+  case object RebuildTemplatesComplete                                     extends Command
 
   sealed trait Event
   final case class NewTemplates(
@@ -105,7 +106,7 @@ class ViewHandler(
     with InterCliqueManager.NodeSyncStatus {
   override def receive: Receive = handle orElse updateNodeSyncStatus
 
-  // scalastyle:off cyclomatic.complexity
+  // scalastyle:off cyclomatic.complexity method.length
   def handle: Receive = {
     case ChainHandler.FlowDataAdded(data, _, _) =>
       val hardFork = getHardForkNow()
@@ -147,14 +148,18 @@ class ViewHandler(
     case ViewHandler.Unsubscribe                         => unsubscribe()
     case ViewHandler.UpdateSubscribersPreDanube          => updateSubscribersPreDanube()
     case ViewHandler.UpdateSubscribersDanube(chainIndex) => updateSubscribersDanube(chainIndex)
-    case ViewHandler.GetMinerAddresses                   => sender() ! minerAddressesOpt
+    case ViewHandler.RebuildTemplatesComplete =>
+      rebuildTemplatesState.setCompleted()
+      rescheduleUpdateDanube()
+      if (minerAddressesOpt.isDefined && subscribers.nonEmpty) tryRebuildTemplates()
+    case ViewHandler.GetMinerAddresses => sender() ! minerAddressesOpt
     case ViewHandler.UpdateMinerAddresses(addresses) =>
       Miner.validateAddresses(addresses) match {
         case Right(_)    => minerAddressesOpt = Some(addresses.map(_.lockupScript))
         case Left(error) => log.error(s"Updating invalid miner addresses: $error")
       }
   }
-  // scalastyle:on cyclomatic.complexity
+  // scalastyle:on cyclomatic.complexity method.length
 }
 
 trait ViewHandlerState extends IOBaseActor {
@@ -168,6 +173,7 @@ trait ViewHandlerState extends IOBaseActor {
   var updateScheduledPreDanube: Option[Cancellable]     = None
   val updateScheduledDanube: Array[Option[Cancellable]] = Array.fill(brokerConfig.chainNum)(None)
   val subscribers: ArrayBuffer[ActorRef]                = ArrayBuffer.empty
+  val rebuildTemplatesState                             = AsyncUpdateState()
 
   def subscribe(): Unit = {
     if (subscribers.contains(sender())) {
@@ -220,6 +226,28 @@ trait ViewHandlerState extends IOBaseActor {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  protected def tryRebuildTemplates(): Unit = {
+    if (rebuildTemplatesState.isUpdating) {
+      log.debug("Skip rebuilding templates due to pending updates")
+    }
+    if (rebuildTemplatesState.tryUpdate()) {
+      assume(minerAddressesOpt.isDefined)
+      val minerAddresses = minerAddressesOpt.get
+      val subscribers    = AVector.from(this.subscribers)
+      poolAsync {
+        escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
+          subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
+        }
+        ViewHandler.RebuildTemplatesComplete
+      }.pipeTo(self)
+      ()
+    }
+  }
+
+  protected def rescheduleUpdateDanube(): Unit = {
+    brokerConfig.chainIndexes.foreach(scheduleUpdateDanube)
+  }
+
   def scheduleUpdateDanube(chainIndex: ChainIndex, rebuildTemplates: Boolean): Unit = {
     if (
       brokerConfig.contains(chainIndex.from) &&
@@ -227,11 +255,8 @@ trait ViewHandlerState extends IOBaseActor {
       subscribers.nonEmpty
     ) {
       if (rebuildTemplates) {
-        val minerAddresses = minerAddressesOpt.get
-        escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
-          subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
-        }
-        brokerConfig.chainIndexes.foreach(scheduleUpdateDanube)
+        rebuildTemplatesState.requestUpdate()
+        tryRebuildTemplates()
       } else {
         scheduleUpdateDanube(chainIndex)
       }
@@ -346,7 +371,9 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
           rebuildTemplates <- blockFlow.updateViewPerChainIndexDanube(chainIndex)
           needToUpdate = brokerConfig.contains(chainIndex.from)
           _ <-
-            if (needToUpdate && minerAddress.nonEmpty && allSubscribers.nonEmpty) {
+            if (
+              !rebuildTemplates && needToUpdate && minerAddress.nonEmpty && allSubscribers.nonEmpty
+            ) {
               updateBlockTemplate(chainIndex, minerAddress.get, allSubscribers)
             } else {
               Right(())
