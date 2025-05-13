@@ -5705,14 +5705,13 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
 
       serverUtils.compileProject(blockFlow, api.Compile.Project(code(now))).isRight is true
-      val invalidTs = now.plusMillisUnsafe(1)
       serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(invalidTs)))
+        .compileProject(blockFlow, api.Compile.Project(code(TimeStamp.zero)))
         .leftValue
         .detail is
         s"""|-- error (9:5): Testing error
-            |9 |    testCheck!(foo() == ${invalidTs.millis})
-            |  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |9 |    testCheck!(foo() == 0)
+            |  |    ^^^^^^^^^^^^^^^^^^^^^^
             |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed in test `Foo:foo`
             |""".stripMargin
     }
@@ -5769,7 +5768,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  test "transfer"
            |  before Self(0)
            |  after Self{ALPH: 1.1 alph}(1 alph)
-           |  ApproveAssets{@$fromAddress -> ALPH: 2 alph} {
+           |  approve{@$fromAddress -> ALPH: 2 alph} {
            |    emit Debug(`balance: $${balance}`)
            |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == $result)
            |  }

@@ -337,9 +337,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    return v
            |  }
            |  test "foo"
-           |  before
-           |    Self(1)
-           |    ApproveAssets{@$address0 -> ALPH: 1 alph; @$address1 -> ALPH: 2 alph, #${tokenId.toHexString}: 1 alph}
+           |  before Self(1)
+           |  approve{@$address0 -> ALPH: 1 alph; @$address1 -> ALPH: 2 alph, #${tokenId.toHexString}: 1 alph}
            |  {
            |    testCheck!(foo() == 1)
            |  }

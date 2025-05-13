@@ -2977,7 +2977,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
          |test "foo"
          |with Settings(group = GroupIndex)
          |before Self(10)
-         |ApproveAssets{ From -> ALPH: 1 }
+         |approve{ From -> ALPH: 1 }
          |{
          |  assert!(foo() == 10, 0)
          |}

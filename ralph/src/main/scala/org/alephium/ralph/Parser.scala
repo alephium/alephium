@@ -1388,7 +1388,7 @@ trait TestingParser { self: StatefulParser =>
 
   private def testName[Unknown: P]: P[String] = P("\"" ~ CharPred(_ != '"').rep.! ~ "\"")
   private def approveAssetsDef[Unknown: P]: P[Testing.ApprovedAssetsDef[StatefulContext]] =
-    PP("ApproveAssets" ~ approveAssets)(Testing.ApprovedAssetsDef.apply)
+    PP("approve" ~ approveAssets)(Testing.ApprovedAssetsDef.apply)
   private def contractDefs[Unknown: P](
       key: String
   ): P[Testing.CreateContractDefs[StatefulContext]] =
