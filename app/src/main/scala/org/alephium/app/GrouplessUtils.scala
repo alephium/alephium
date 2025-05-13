@@ -25,9 +25,11 @@ import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{Balance => _, _}
+import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
 import org.alephium.protocol.vm.{GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.AVector
 import org.alephium.util.U256
+import org.alephium.io.IOResult
 
 trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   import GrouplessUtils.BuildingGrouplessTransferTx
@@ -148,8 +150,8 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       blockFlow: BlockFlow,
       gasPrice: GasPrice,
       targetBlockHash: Option[BlockHash],
-      outputInfos: AVector[UnsignedTransaction.TxOutputInfo],
-      totalAmountNeeded: UnsignedTransaction.TotalAmountNeeded,
+      outputInfos: AVector[TxOutputInfo],
+      totalAmountNeeded: TotalAmountNeeded,
       currentBuildingGrouplessTransferTxs: AVector[BuildingGrouplessTransferTx]
   ): TryBuildGrouplessTransferTx = {
     val currentBuildingGrouplessTransferTxsLength = currentBuildingGrouplessTransferTxs.length
@@ -198,8 +200,8 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       blockFlow: BlockFlow,
       gasPrice: GasPrice,
       targetBlockHash: Option[BlockHash],
-      outputInfos: AVector[UnsignedTransaction.TxOutputInfo],
-      totalAmountNeeded: UnsignedTransaction.TotalAmountNeeded,
+      outputInfos: AVector[TxOutputInfo],
+      totalAmountNeeded: TotalAmountNeeded,
       currentBuildingGrouplessTx: BuildingGrouplessTransferTx
   ): TryBuildGrouplessTransferTx = {
     val buildingGrouplessTransferTxs = ArrayBuffer.empty[BuildingGrouplessTransferTx]
@@ -276,12 +278,41 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   def tryBuildGrouplessTransferTxWithSingleAddress(
       blockFlow: BlockFlow,
       lockupScript: LockupScript.P2PK,
-      outputInfos: AVector[UnsignedTransaction.TxOutputInfo],
-      totalAmountNeeded: UnsignedTransaction.TotalAmountNeeded,
+      outputInfos: AVector[TxOutputInfo],
+      totalAmountNeeded: TotalAmountNeeded,
       gasPrice: GasPrice,
       targetBlockHashOpt: Option[BlockHash]
   ): TryBuildGrouplessTransferTx = {
-    val allLockupScripts             = allGroupedLockupScripts(lockupScript)
+    val allLockupScripts = allGroupedLockupScripts(lockupScript)
+
+    sortedGroupedLockupScripts(
+      blockFlow,
+      allLockupScripts,
+      totalAmountNeeded,
+      targetBlockHashOpt
+    ) match {
+      case Right(sortedScripts) =>
+        tryBuildGrouplessTransferTxWithSingleAddress(
+          blockFlow,
+          sortedScripts.map(_._1),
+          outputInfos,
+          totalAmountNeeded,
+          gasPrice,
+          targetBlockHashOpt
+        )
+      case Left(error) =>
+        Left(failedInIO(error))
+    }
+  }
+
+  def tryBuildGrouplessTransferTxWithSingleAddress(
+      blockFlow: BlockFlow,
+      allLockupScripts: AVector[LockupScript.P2PK],
+      outputInfos: AVector[TxOutputInfo],
+      totalAmountNeeded: TotalAmountNeeded,
+      gasPrice: GasPrice,
+      targetBlockHashOpt: Option[BlockHash]
+  ): TryBuildGrouplessTransferTx = {
     val allLockupScriptsLength       = allLockupScripts.length
     val buildingGrouplessTransferTxs = ArrayBuffer.empty[BuildingGrouplessTransferTx]
 
@@ -359,6 +390,51 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     } else {
       s"Not enough balance: ${notEnoughAssets.mkString(", ")}"
     }
+  }
+
+  def sortedGroupedLockupScripts(
+      blockFlow: BlockFlow,
+      allGroupedLockupScripts: AVector[LockupScript.P2PK],
+      totalAmountNeeded: TotalAmountNeeded,
+      targetBlockHashOpt: Option[BlockHash]
+  ): IOResult[
+    AVector[(LockupScript.P2PK, AVector[AssetOutputInfo], (U256, AVector[(TokenId, U256)]))]
+  ] = {
+    allGroupedLockupScripts
+      .mapE { lockup =>
+        blockFlow
+          .getUsableUtxos(
+            targetBlockHashOpt,
+            lockup,
+            self.apiConfig.defaultUtxosLimit
+          )
+          .map { utxos =>
+            val (alphBalance, tokenBalances) = getAvailableBalances(utxos)
+            (lockup, utxos, (alphBalance, tokenBalances))
+          }
+      }
+      .map(_.sortBy(_._3)(orderingBasedOnTotalAmount(totalAmountNeeded)))
+  }
+
+  // Sort based on the first token (if exists) and then ALPH. The idea is that if we are sending
+  // a token, we might want to start with addresses with most of that token. If we are sending ALPH,
+  // we might want to start with addresses with most ALPH.
+  // The case where we are sending multiple tokens are not considered.
+  private def orderingBasedOnTotalAmount(
+      totalAmountNeeded: UnsignedTransaction.TotalAmountNeeded
+  ): Ordering[(U256, AVector[(TokenId, U256)])] = {
+    val ordering: Ordering[(U256, AVector[(TokenId, U256)])] =
+      if (totalAmountNeeded.tokens.isEmpty) {
+        Ordering.by { case (alphBalance, _) => alphBalance }
+      } else {
+        val firstTokenId = totalAmountNeeded.tokens.head._1
+        Ordering.by { case (alphBalance, tokenBalances) =>
+          val tokenAmount = tokenBalances.find(_._1 == firstTokenId).map(_._2).getOrElse(U256.Zero)
+          (tokenAmount, alphBalance)
+        }
+      }
+
+    ordering.reverse
   }
 }
 

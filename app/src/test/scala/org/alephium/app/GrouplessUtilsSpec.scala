@@ -25,6 +25,7 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{Balance => _, _}
+import org.alephium.protocol.model.UnsignedTransaction.TotalAmountNeeded
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
@@ -769,24 +770,24 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         verifyBalance(toAddress, result.transferTx.unsignedTx, alphAmount, tokenAmount)
       }
 
-      buildingGrouplessTransferTxs(0).from is allLockupScripts(2)
+      buildingGrouplessTransferTxs(0).from is allLockupScripts(0)
       buildingGrouplessTransferTxs(0).remainingLockupScripts is AVector(
-        allLockupScripts(0),
+        allLockupScripts(2),
         allLockupScripts(1)
       )
       verifyFinalResult(buildingGrouplessTransferTxs(0))
 
-      buildingGrouplessTransferTxs(1).from is allLockupScripts(0)
+      buildingGrouplessTransferTxs(1).from is allLockupScripts(2)
       buildingGrouplessTransferTxs(1).remainingLockupScripts is AVector(
-        allLockupScripts(2),
+        allLockupScripts(0),
         allLockupScripts(1)
       )
       verifyFinalResult(buildingGrouplessTransferTxs(1))
 
       buildingGrouplessTransferTxs(2).from is allLockupScripts(1)
       buildingGrouplessTransferTxs(2).remainingLockupScripts is AVector(
-        allLockupScripts(2),
-        allLockupScripts(0)
+        allLockupScripts(0),
+        allLockupScripts(2)
       )
 
       val nextBuildingGrouplessTransferTxs = serverUtils
@@ -803,15 +804,43 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
       nextBuildingGrouplessTransferTxs.length is 2
       nextBuildingGrouplessTransferTxs(0).from is allLockupScripts(1)
-      nextBuildingGrouplessTransferTxs(0).remainingLockupScripts is AVector(allLockupScripts(0))
-      nextBuildingGrouplessTransferTxs(0).remainingAmounts is (ALPH.alph(0), AVector(
-        (tokenId, ALPH.alph(1))
-      ))
+      nextBuildingGrouplessTransferTxs(0).remainingLockupScripts is AVector(allLockupScripts(2))
+      nextBuildingGrouplessTransferTxs(0).remainingAmounts is (ALPH.nanoAlph(
+        2000000
+      ), AVector.empty)
       nextBuildingGrouplessTransferTxs(1).from is allLockupScripts(1)
-      nextBuildingGrouplessTransferTxs(1).remainingLockupScripts is AVector(allLockupScripts(2))
-      nextBuildingGrouplessTransferTxs(0).remainingAmounts is (ALPH.alph(0), AVector(
+      nextBuildingGrouplessTransferTxs(1).remainingLockupScripts is AVector(allLockupScripts(0))
+      nextBuildingGrouplessTransferTxs(1).remainingAmounts is (ALPH.nanoAlph(0), AVector(
         (tokenId, ALPH.alph(1))
       ))
     }
+  }
+
+  it should "sortedGroupedLockupScripts" in new Fixture {
+    val totalAmountNeeded = TotalAmountNeeded(
+      ALPH.alph(2),
+      AVector(tokenId -> ALPH.alph(2)),
+      1
+    )
+
+    prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts(0))
+    prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(1))
+    prepare(ALPH.alph(3), ALPH.alph(2), allLockupScripts(2))
+
+    val sortedGroupedLockupScripts = serverUtils
+      .sortedGroupedLockupScripts(
+        blockFlow,
+        allLockupScripts,
+        totalAmountNeeded,
+        None
+      )
+      .rightValue
+
+    sortedGroupedLockupScripts.length is 3
+    sortedGroupedLockupScripts.map(_._1) is AVector(
+      allLockupScripts(2),
+      allLockupScripts(1),
+      allLockupScripts(0)
+    )
   }
 }
