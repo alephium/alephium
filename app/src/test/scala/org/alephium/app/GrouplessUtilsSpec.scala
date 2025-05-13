@@ -609,8 +609,8 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     balance6.utxoNum is 2
   }
 
-  trait TryBuildGrouplessTransferTxWithSingleAddressFixture extends Fixture {
-    def testTransferWithSingleAddress(
+  trait BuildGrouplessTransferTxWithEachGroupedAddressFixture extends Fixture {
+    def testTransferWithEachGroupedAddress(
         toAddress: Address.Asset,
         alphAmount: U256,
         tokenAmount: U256
@@ -631,7 +631,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         .rightValue
 
       serverUtils
-        .tryBuildGrouplessTransferTxWithSingleAddress(
+        .buildGrouplessTransferTxWithEachGroupedAddress(
           blockFlow,
           fromLockupScript,
           outputInfos,
@@ -656,33 +656,33 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     def testTransferWithEnoughBalance(alphAmount: U256, tokenAmount: U256) = {
       val toAddress = Address.Asset(assetLockupGen(chainIndex.from).sample.get)
       val result =
-        testTransferWithSingleAddress(toAddress, alphAmount, tokenAmount).rightValue.rightValue
+        testTransferWithEachGroupedAddress(toAddress, alphAmount, tokenAmount).rightValue.rightValue
       verifyBalance(toAddress, result.transferTx.unsignedTx, alphAmount, tokenAmount)
     }
 
     def transferWithoutEnoughBalance(alphAmount: U256, tokenAmount: U256) = {
       val toAddress = Address.Asset(assetLockupGen(chainIndex.from).sample.get)
-      testTransferWithSingleAddress(toAddress, alphAmount, tokenAmount).rightValue.leftValue
+      testTransferWithEachGroupedAddress(toAddress, alphAmount, tokenAmount).rightValue.leftValue
     }
   }
 
-  it should "tryBuildGrouplessTransferTxWithSingleAddress" in {
-    new TryBuildGrouplessTransferTxWithSingleAddressFixture {
+  it should "test buildGrouplessTransferTxWithEachGroupedAddress" in {
+    new BuildGrouplessTransferTxWithEachGroupedAddressFixture {
       prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(0))
       testTransferWithEnoughBalance(ALPH.alph(1), ALPH.alph(1))
     }
 
-    new TryBuildGrouplessTransferTxWithSingleAddressFixture {
+    new BuildGrouplessTransferTxWithEachGroupedAddressFixture {
       prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(1))
       testTransferWithEnoughBalance(ALPH.alph(1), ALPH.alph(1))
     }
 
-    new TryBuildGrouplessTransferTxWithSingleAddressFixture {
+    new BuildGrouplessTransferTxWithEachGroupedAddressFixture {
       prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(2))
       testTransferWithEnoughBalance(ALPH.alph(1), ALPH.alph(1))
     }
 
-    new TryBuildGrouplessTransferTxWithSingleAddressFixture {
+    new BuildGrouplessTransferTxWithEachGroupedAddressFixture {
       prepare(ALPH.alph(2).addUnsafe(dustUtxoAmount), ALPH.alph(2), allLockupScripts(1))
       prepare(ALPH.alph(1).addUnsafe(dustUtxoAmount), ALPH.alph(1), allLockupScripts(2))
 
@@ -715,8 +715,8 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "tryBuildGrouplessTransferTx" in {
-    new TryBuildGrouplessTransferTxWithSingleAddressFixture {
+  it should "test tryBuildGrouplessTransferTxFromSingleGroupedAddress" in {
+    new BuildGrouplessTransferTxWithEachGroupedAddressFixture {
       prepare(ALPH.alph(2), ALPH.alph(3), allLockupScripts(0))
       prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(1))
       prepare(ALPH.alph(3), ALPH.alph(2), allLockupScripts(2))
@@ -742,7 +742,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         .rightValue
 
       val buildingGrouplessTransferTxs = serverUtils
-        .tryBuildGrouplessTransferTxWithSingleAddress(
+        .buildGrouplessTransferTxWithEachGroupedAddress(
           blockFlow,
           fromLockupScript,
           outputInfos,
@@ -757,7 +757,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
           currentBuildingGrouplessTx: GrouplessUtils.BuildingGrouplessTransferTx
       ) = {
         val result = serverUtils
-          .tryBuildGrouplessTransferTx(
+          .tryBuildGrouplessTransferTxFromSingleGroupedAddress(
             blockFlow,
             nonCoinbaseMinGasPrice,
             None,
@@ -793,7 +793,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       )
 
       val nextBuildingGrouplessTransferTxs = serverUtils
-        .tryBuildGrouplessTransferTx(
+        .tryBuildGrouplessTransferTxFromSingleGroupedAddress(
           blockFlow,
           nonCoinbaseMinGasPrice,
           None,

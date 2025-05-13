@@ -41,9 +41,8 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       getMempoolUtxos: Boolean
   ): Try[Balance] = {
     for {
-      allBalances <- wrapResult(AVector.from(brokerConfig.groupRange).mapE { groupIndex =>
-        val lockupScript =
-          LockupScript.p2pk(halfDecodedP2PK.publicKey, GroupIndex.unsafe(groupIndex))
+      allBalances <- wrapResult(AVector.from(brokerConfig.groupIndexes).mapE { groupIndex =>
+        val lockupScript = LockupScript.p2pk(halfDecodedP2PK.publicKey, groupIndex)
         blockFlow.getBalance(lockupScript, apiConfig.defaultUtxosLimit, getMempoolUtxos)
       })
       balance <- allBalances.foldE(model.Balance.zero)(_ merge _).left.map(failed)
@@ -54,9 +53,8 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   protected def allGroupedLockupScripts(
       lockup: LockupScript.P2PK
   ): AVector[LockupScript.P2PK] = {
-    AVector
-      .from(self.brokerConfig.groupRange)
-      .map(groupIndex => LockupScript.P2PK(lockup.publicKey, GroupIndex.unsafe(groupIndex)))
+    self.brokerConfig.groupIndexes
+      .map(groupIndex => LockupScript.P2PK(lockup.publicKey, groupIndex))
   }
 
   protected def otherGroupsLockupScripts(
@@ -77,6 +75,19 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   type TryBuildGrouplessTransferTx =
     Try[Either[AVector[BuildingGrouplessTransferTx], BuildGrouplessTransferTxResult]]
 
+  // When building groupless transfer, because we do not know each grouped address's balance,
+  // we could end up building more txs than needed.
+  //
+  // Here we use the breadth-first search to build the txs. First we try to build the tx with
+  // single groupled address, then 2, 3 and 4 until we either succeed or run out of balance.
+  //
+  // Before the breadth-first search, we sort the grouped addresses by the amount of first
+  // token (if exists) and ALPH that we want to transfer. The hope is that this could make us
+  // find the right set of grouped addresses quicker.
+  //
+  // Before the breadth-first search, we also do a preliminary check to see if the balance is
+  // enough, if not enough, we reject directly.
+
   def buildGrouplessTransferTx(
       blockFlow: BlockFlow,
       query: BuildTransferTx,
@@ -84,7 +95,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       extraUtxosInfo: ExtraUtxosInfo
   ): Try[BuildGrouplessTransferTxResult] = {
     if (query.group.isEmpty) {
-      buildGrouplessTransferTx(blockFlow, query, lockupScript).flatMap {
+      buildGrouplessTransferTxWithoutExplicitGroup(blockFlow, query, lockupScript).flatMap {
         case Right(result) =>
           Right(result)
         case Left(buildingTxsInProgress) =>
@@ -103,7 +114,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     }
   }
 
-  def buildGrouplessTransferTx(
+  def buildGrouplessTransferTxWithoutExplicitGroup(
       blockFlow: BlockFlow,
       query: BuildTransferTx,
       lockupScript: LockupScript.P2PK
@@ -120,7 +131,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
         )
         .left
         .map(badRequest)
-      buildResult <- tryBuildGrouplessTransferTxWithSingleAddress(
+      buildResult <- buildGrouplessTransferTxWithEachGroupedAddress(
         blockFlow,
         lockupScript,
         outputInfos,
@@ -174,7 +185,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
         }
       } else {
         val currentBuildingGrouplessTransferTx = currentBuildingGrouplessTransferTxs(index)
-        tryBuildGrouplessTransferTx(
+        tryBuildGrouplessTransferTxFromSingleGroupedAddress(
           blockFlow,
           gasPrice,
           targetBlockHash,
@@ -197,7 +208,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   }
 
   // scalastyle:off method.length
-  def tryBuildGrouplessTransferTx(
+  def tryBuildGrouplessTransferTxFromSingleGroupedAddress(
       blockFlow: BlockFlow,
       gasPrice: GasPrice,
       targetBlockHash: Option[BlockHash],
@@ -276,7 +287,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     }
   }
 
-  def tryBuildGrouplessTransferTxWithSingleAddress(
+  def buildGrouplessTransferTxWithEachGroupedAddress(
       blockFlow: BlockFlow,
       lockupScript: LockupScript.P2PK,
       outputInfos: AVector[TxOutputInfo],
@@ -295,7 +306,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       case Right(sortedScripts) =>
         for {
           _ <- checkEnoughBalance(totalAmountNeeded, sortedScripts.map(_._3))
-          result <- tryBuildGrouplessTransferTxWithSingleAddress(
+          result <- buildGrouplessTransferTxWithEachSortedGroupedAddress(
             blockFlow,
             sortedScripts.map(script => (script._1, script._2)),
             outputInfos,
@@ -308,7 +319,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     }
   }
 
-  def tryBuildGrouplessTransferTxWithSingleAddress(
+  def buildGrouplessTransferTxWithEachSortedGroupedAddress(
       blockFlow: BlockFlow,
       allLockupScriptsWithUtxos: AVector[(LockupScript.P2PK, AVector[AssetOutputInfo])],
       outputInfos: AVector[TxOutputInfo],
