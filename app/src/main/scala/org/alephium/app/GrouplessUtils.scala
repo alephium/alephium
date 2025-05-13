@@ -30,6 +30,7 @@ import org.alephium.util.AVector
 import org.alephium.util.U256
 
 trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
+  import GrouplessUtils.BuildingGrouplessTransferTx
 
   def getGrouplessBalance(
       blockFlow: BlockFlow,
@@ -69,14 +70,6 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       (lockup.asInstanceOf[LockupScript.Asset], UnlockScript.P2PK.asInstanceOf[UnlockScript])
     )
   }
-
-  case class BuildingGrouplessTransferTx(
-      from: LockupScript.P2PK,
-      utxos: AVector[AssetOutputInfo],
-      remainingLockupScripts: AVector[LockupScript.P2PK],
-      remainingAmounts: (U256, AVector[(TokenId, U256)]),
-      builtUnsignedTxsSoFar: AVector[UnsignedTransaction]
-  )
 
   type TryBuildGrouplessTransferTx =
     Try[Either[AVector[BuildingGrouplessTransferTx], BuildGrouplessTransferTxResult]]
@@ -367,4 +360,14 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       s"Not enough balance: ${notEnoughAssets.mkString(", ")}"
     }
   }
+}
+
+object GrouplessUtils {
+  final case class BuildingGrouplessTransferTx(
+      from: LockupScript.P2PK,
+      utxos: AVector[AssetOutputInfo],
+      remainingLockupScripts: AVector[LockupScript.P2PK],
+      remainingAmounts: (U256, AVector[(TokenId, U256)]),
+      builtUnsignedTxsSoFar: AVector[UnsignedTransaction]
+  )
 }

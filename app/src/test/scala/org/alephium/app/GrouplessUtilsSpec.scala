@@ -224,6 +224,24 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       serverUtils.buildTransferTransaction(blockFlow, query).leftValue.detail is expectedError
     }
 
+    def getBalance(
+        address: Address.Asset,
+        outputs: AVector[AssetOutput]
+    ): (U256, AVector[(TokenId, U256)]) = {
+      var alphBalance   = U256.Zero
+      val tokenBalances = mutable.Map.empty[TokenId, U256]
+      for (output <- outputs) {
+        if (output.lockupScript == address.lockupScript) {
+          alphBalance = alphBalance.addUnsafe(output.amount)
+          output.tokens.foreach { token =>
+            val amount = tokenBalances.getOrElse(token._1, U256.Zero)
+            tokenBalances.put(token._1, amount.addUnsafe(token._2))
+          }
+        }
+      }
+      (alphBalance, AVector.from(tokenBalances))
+    }
+
     implicit def toAmount(amount: U256): Amount = Amount(amount)
 
     implicit class RichUnsignedTransaction(tx: UnsignedTransaction) {
@@ -591,25 +609,11 @@ class GrouplessUtilsSpec extends AlephiumSpec {
   }
 
   trait TryBuildGrouplessTransferTxWithSingleAddressFixture extends Fixture {
-    def getBalance(
-        address: Address.Asset,
-        outputs: AVector[AssetOutput]
-    ): (U256, AVector[(TokenId, U256)]) = {
-      var alphBalance   = U256.Zero
-      val tokenBalances = mutable.Map.empty[TokenId, U256]
-      for (output <- outputs) {
-        if (output.lockupScript == address.lockupScript) {
-          alphBalance = alphBalance.addUnsafe(output.amount)
-          output.tokens.foreach { token =>
-            val amount = tokenBalances.getOrElse(token._1, U256.Zero)
-            tokenBalances.put(token._1, amount.addUnsafe(token._2))
-          }
-        }
-      }
-      (alphBalance, AVector.from(tokenBalances))
-    }
-
-    def testTransfer(toAddress: Address.Asset, alphAmount: U256, tokenAmount: U256) = {
+    def testTransferWithSingleAddress(
+        toAddress: Address.Asset,
+        alphAmount: U256,
+        tokenAmount: U256
+    ) = {
       val destination = Destination(
         address = toAddress,
         attoAlphAmount = Some(Amount(alphAmount)),
@@ -636,20 +640,28 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         )
     }
 
-    def testTransferWithEnoughBalance(alphAmount: U256, tokenAmount: U256) = {
-      val toAddress = Address.Asset(assetLockupGen(chainIndex.from).sample.get)
-      val result    = testTransfer(toAddress, alphAmount, tokenAmount).rightValue.rightValue
-      val unsignedTx =
-        deserialize[UnsignedTransaction](Hex.unsafe(result.transferTx.unsignedTx)).rightValue
-
+    def verifyBalance(
+        toAddress: Address.Asset,
+        rawUnsignedTx: String,
+        alphAmount: U256,
+        tokenAmount: U256
+    ) = {
+      val unsignedTx = deserialize[UnsignedTransaction](Hex.unsafe(rawUnsignedTx)).rightValue
       val (alphBalance, tokenBalances) = getBalance(toAddress, unsignedTx.fixedOutputs)
       alphBalance is alphAmount
       tokenBalances is AVector((tokenId, tokenAmount))
     }
 
+    def testTransferWithEnoughBalance(alphAmount: U256, tokenAmount: U256) = {
+      val toAddress = Address.Asset(assetLockupGen(chainIndex.from).sample.get)
+      val result =
+        testTransferWithSingleAddress(toAddress, alphAmount, tokenAmount).rightValue.rightValue
+      verifyBalance(toAddress, result.transferTx.unsignedTx, alphAmount, tokenAmount)
+    }
+
     def transferWithoutEnoughBalance(alphAmount: U256, tokenAmount: U256) = {
       val toAddress = Address.Asset(assetLockupGen(chainIndex.from).sample.get)
-      testTransfer(toAddress, alphAmount, tokenAmount).rightValue.leftValue
+      testTransferWithSingleAddress(toAddress, alphAmount, tokenAmount).rightValue.leftValue
     }
   }
 
@@ -697,6 +709,109 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         allLockupScripts(2),
         allLockupScripts(0)
       )
+    }
+  }
+
+  it should "tryBuildGrouplessTransferTx" in {
+    new TryBuildGrouplessTransferTxWithSingleAddressFixture {
+      prepare(ALPH.alph(2), ALPH.alph(3), allLockupScripts(0))
+      prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(1))
+      prepare(ALPH.alph(3), ALPH.alph(2), allLockupScripts(2))
+
+      val toAddress = Address.Asset(assetLockupGen(chainIndex.from).sample.get)
+
+      val alphAmount  = ALPH.alph(3)
+      val tokenAmount = ALPH.alph(5)
+
+      val destination = Destination(
+        address = toAddress,
+        attoAlphAmount = Some(Amount(alphAmount)),
+        tokens = Some(AVector(Token(tokenId, tokenAmount)))
+      )
+      val outputInfos = serverUtils.prepareOutputInfos(AVector(destination))
+      val totalAmountNeeded = blockFlow
+        .checkAndCalcTotalAmountNeeded(
+          fromLockupScript,
+          outputInfos,
+          None,
+          nonCoinbaseMinGasPrice
+        )
+        .rightValue
+
+      val buildingGrouplessTransferTxs = serverUtils
+        .tryBuildGrouplessTransferTxWithSingleAddress(
+          blockFlow,
+          fromLockupScript,
+          outputInfos,
+          totalAmountNeeded,
+          nonCoinbaseMinGasPrice,
+          None
+        )
+        .rightValue
+        .leftValue
+
+      def verifyFinalResult(
+          currentBuildingGrouplessTx: GrouplessUtils.BuildingGrouplessTransferTx
+      ) = {
+        val result = serverUtils
+          .tryBuildGrouplessTransferTx(
+            blockFlow,
+            nonCoinbaseMinGasPrice,
+            None,
+            outputInfos,
+            totalAmountNeeded,
+            currentBuildingGrouplessTx
+          )
+          .rightValue
+          .rightValue
+
+        result.transferTxs.length is 1
+        verifyBalance(toAddress, result.transferTx.unsignedTx, alphAmount, tokenAmount)
+      }
+
+      buildingGrouplessTransferTxs(0).from is allLockupScripts(2)
+      buildingGrouplessTransferTxs(0).remainingLockupScripts is AVector(
+        allLockupScripts(0),
+        allLockupScripts(1)
+      )
+      verifyFinalResult(buildingGrouplessTransferTxs(0))
+
+      buildingGrouplessTransferTxs(1).from is allLockupScripts(0)
+      buildingGrouplessTransferTxs(1).remainingLockupScripts is AVector(
+        allLockupScripts(2),
+        allLockupScripts(1)
+      )
+      verifyFinalResult(buildingGrouplessTransferTxs(1))
+
+      buildingGrouplessTransferTxs(2).from is allLockupScripts(1)
+      buildingGrouplessTransferTxs(2).remainingLockupScripts is AVector(
+        allLockupScripts(2),
+        allLockupScripts(0)
+      )
+
+      val nextBuildingGrouplessTransferTxs = serverUtils
+        .tryBuildGrouplessTransferTx(
+          blockFlow,
+          nonCoinbaseMinGasPrice,
+          None,
+          outputInfos,
+          totalAmountNeeded,
+          buildingGrouplessTransferTxs(2)
+        )
+        .rightValue
+        .leftValue
+
+      nextBuildingGrouplessTransferTxs.length is 2
+      nextBuildingGrouplessTransferTxs(0).from is allLockupScripts(1)
+      nextBuildingGrouplessTransferTxs(0).remainingLockupScripts is AVector(allLockupScripts(0))
+      nextBuildingGrouplessTransferTxs(0).remainingAmounts is (ALPH.alph(0), AVector(
+        (tokenId, ALPH.alph(1))
+      ))
+      nextBuildingGrouplessTransferTxs(1).from is allLockupScripts(1)
+      nextBuildingGrouplessTransferTxs(1).remainingLockupScripts is AVector(allLockupScripts(2))
+      nextBuildingGrouplessTransferTxs(0).remainingAmounts is (ALPH.alph(0), AVector(
+        (tokenId, ALPH.alph(1))
+      ))
     }
   }
 }
