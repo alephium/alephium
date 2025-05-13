@@ -17,19 +17,20 @@
 package org.alephium.app
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.api.{badRequest, failed, failedInIO, wrapResult, Try}
 import org.alephium.api.model._
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
+import org.alephium.io.IOResult
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
 import org.alephium.protocol.vm.{GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.AVector
 import org.alephium.util.U256
-import org.alephium.io.IOResult
 
 trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   import GrouplessUtils.BuildingGrouplessTransferTx
@@ -292,14 +293,16 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       targetBlockHashOpt
     ) match {
       case Right(sortedScripts) =>
-        tryBuildGrouplessTransferTxWithSingleAddress(
-          blockFlow,
-          sortedScripts.map(_._1),
-          outputInfos,
-          totalAmountNeeded,
-          gasPrice,
-          targetBlockHashOpt
-        )
+        for {
+          _ <- checkEnoughBalance(totalAmountNeeded, sortedScripts.map(_._3))
+          result <- tryBuildGrouplessTransferTxWithSingleAddress(
+            blockFlow,
+            sortedScripts.map(script => (script._1, script._2)),
+            outputInfos,
+            totalAmountNeeded,
+            gasPrice
+          )
+        } yield result
       case Left(error) =>
         Left(failedInIO(error))
     }
@@ -307,13 +310,12 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
   def tryBuildGrouplessTransferTxWithSingleAddress(
       blockFlow: BlockFlow,
-      allLockupScripts: AVector[LockupScript.P2PK],
+      allLockupScriptsWithUtxos: AVector[(LockupScript.P2PK, AVector[AssetOutputInfo])],
       outputInfos: AVector[TxOutputInfo],
       totalAmountNeeded: TotalAmountNeeded,
-      gasPrice: GasPrice,
-      targetBlockHashOpt: Option[BlockHash]
+      gasPrice: GasPrice
   ): TryBuildGrouplessTransferTx = {
-    val allLockupScriptsLength       = allLockupScripts.length
+    val allLockupScriptsLength       = allLockupScriptsWithUtxos.length
     val buildingGrouplessTransferTxs = ArrayBuffer.empty[BuildingGrouplessTransferTx]
 
     @tailrec
@@ -321,46 +323,37 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       if (index == allLockupScriptsLength) {
         Right(Left(AVector.from(buildingGrouplessTransferTxs)))
       } else {
-        val lockup = allLockupScripts(index)
-        blockFlow.getUsableUtxos(
-          targetBlockHashOpt,
+        val (lockup, utxos) = allLockupScriptsWithUtxos(index)
+        blockFlow.transfer(
           lockup,
-          self.apiConfig.defaultUtxosLimit
+          UnlockScript.P2PK,
+          outputInfos,
+          totalAmountNeeded,
+          utxos,
+          None,
+          gasPrice
         ) match {
-          case Right(utxos) =>
-            blockFlow.transfer(
+          case Right(unsignedTx) =>
+            val tx = BuildSimpleTransferTxResult.from(unsignedTx)
+            BuildGrouplessTransferTxResult.from(AVector(tx)).map(Right(_))
+
+          case Left(_) =>
+            val (alphBalance, tokenBalances) = getAvailableBalances(utxos)
+            val maxGasFee                    = gasPrice * getMaximalGasPerTx()
+            val remainAlph = maxGasFee
+              .addUnsafe(totalAmountNeeded.alphAmount)
+              .sub(alphBalance)
+              .getOrElse(U256.Zero)
+            val (remainTokens, _) = calcTokenAmount(tokenBalances, totalAmountNeeded.tokens)
+
+            buildingGrouplessTransferTxs += BuildingGrouplessTransferTx(
               lockup,
-              UnlockScript.P2PK,
-              outputInfos,
-              totalAmountNeeded,
               utxos,
-              None,
-              gasPrice
-            ) match {
-              case Right(unsignedTx) =>
-                val tx = BuildSimpleTransferTxResult.from(unsignedTx)
-                BuildGrouplessTransferTxResult.from(AVector(tx)).map(Right(_))
-
-              case Left(_) =>
-                val (alphBalance, tokenBalances) = getAvailableBalances(utxos)
-                val maxGasFee                    = gasPrice * getMaximalGasPerTx()
-                val remainAlph = maxGasFee
-                  .addUnsafe(totalAmountNeeded.alphAmount)
-                  .sub(alphBalance)
-                  .getOrElse(U256.Zero)
-                val (remainTokens, _) = calcTokenAmount(tokenBalances, totalAmountNeeded.tokens)
-
-                buildingGrouplessTransferTxs += BuildingGrouplessTransferTx(
-                  lockup,
-                  utxos,
-                  allLockupScripts.remove(index),
-                  (remainAlph, remainTokens),
-                  AVector.empty
-                )
-                rec(index + 1)
-            }
-          case Left(error) =>
-            Left(failedInIO(error))
+              allLockupScriptsWithUtxos.remove(index).map(_._1),
+              (remainAlph, remainTokens),
+              AVector.empty
+            )
+            rec(index + 1)
         }
       }
     }
@@ -435,6 +428,37 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       }
 
     ordering.reverse
+  }
+
+  // Priliminary check to see if the balance is enough, if not enough reject directly
+  // otherwise proceed to build the txs, which could still return not enough balance error
+  // due to gas fee and dust amounts.
+  def checkEnoughBalance(
+      totalAmountNeeded: TotalAmountNeeded,
+      balances: AVector[(U256, AVector[(TokenId, U256)])]
+  ): Try[Unit] = {
+    val totalAlphBalance   = balances.map(_._1).fold(U256.Zero)(_ addUnsafe _)
+    val totalTokenBalances = mutable.Map.empty[TokenId, U256]
+    for ((_, tokenBalances) <- balances) {
+      for ((tokenId, amount) <- tokenBalances) {
+        totalTokenBalances(tokenId) =
+          totalTokenBalances.getOrElse(tokenId, U256.Zero).addUnsafe(amount)
+      }
+    }
+
+    val missingAlph = totalAmountNeeded.alphAmount.sub(totalAlphBalance).getOrElse(U256.Zero)
+    val missingTokens = totalAmountNeeded.tokens.collect { case (tokenId, amount) =>
+      amount
+        .sub(totalTokenBalances.getOrElse(tokenId, U256.Zero))
+        .filter(_ > U256.Zero)
+        .map(tokenId -> _)
+    }
+
+    if (missingAlph == U256.Zero && missingTokens.isEmpty) {
+      Right(())
+    } else {
+      Left(failed(notEnoughBalanceError(missingAlph, missingTokens)))
+    }
   }
 }
 
