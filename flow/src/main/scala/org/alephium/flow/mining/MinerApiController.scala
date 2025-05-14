@@ -101,6 +101,12 @@ object MinerApiController {
       case None => Some(MinerApiController.publishJobsDelay)
     }
   }
+
+  final case class CachedTemplate(template: BlockFlowTemplate) {
+    lazy val job: Job             = Job.fromWithoutTxs(template)
+    lazy val txsBlob: ByteString  = serialize(template.transactions)
+    lazy val cacheKey: ByteString = MinerApiController.getCacheKey(job.headerBlob)
+  }
 }
 
 class MinerApiController(allHandlers: AllHandlers)(implicit
@@ -108,6 +114,8 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     networkSetting: NetworkSetting,
     miningSetting: MiningSetting
 ) extends Utils.BaseActorWithPoolExecutor {
+  import MinerApiController.CachedTemplate
+
   val apiAddress: InetSocketAddress =
     new InetSocketAddress(miningSetting.apiInterface, networkSetting.minerApiPort)
   IO(Tcp)(context.system) ! Tcp.Bind(self, apiAddress, options = Seq(Tcp.SO.ReuseAddress(true)))
@@ -121,7 +129,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       terminateSystem()
   }
 
-  var templates: Option[AVector[BlockFlowTemplate]]                      = None
+  var templates: Option[AVector[CachedTemplate]]                         = None
   var latestJobs: Option[AVector[Job]]                                   = None
   val buildJobsState: AsyncUpdateState                                   = AsyncUpdateState()
   val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
@@ -177,13 +185,13 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     mutable.HashMap.empty
   def handleAPI: Receive = {
     case ViewHandler.NewTemplates(templates) =>
-      this.templates = Some(AVector.from(templates.flatten))
+      this.templates = Some(AVector.from(templates.flatten).map(CachedTemplate.apply))
       buildJobsState.requestUpdate()
       tryBuildJobs()
     case ViewHandler.NewTemplate(template, lazyBroadcast) =>
       this.templates.foreach { templates =>
         val index = MinerApiController.calcJobIndex(template.index)
-        this.templates = Some(templates.replace(index, template))
+        this.templates = Some(templates.replace(index, CachedTemplate(template)))
         if (!lazyBroadcast) {
           buildJobsState.requestUpdate()
           tryBuildJobs()
@@ -208,12 +216,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     if (buildJobsState.tryUpdate()) {
       this.templates.foreach { templates =>
         poolAsync {
-          val jobs = templates.map(Job.fromWithoutTxs)
-          val cache = jobs.mapWithIndex { case (job, index) =>
-            val template = templates(index)
-            val txsBlob  = serialize(template.transactions)
-            (MinerApiController.getCacheKey(job.headerBlob), template -> txsBlob)
-          }
+          val jobs = templates.map(_.job)
+          val cache =
+            templates.map(template => (template.cacheKey, template.template -> template.txsBlob))
           val jobsMessage = ServerMessage.serialize(ServerMessage.from(Jobs(jobs)))
           MinerApiController.BuildJobsComplete(jobs, cache, jobsMessage)
         }.pipeTo(self)
