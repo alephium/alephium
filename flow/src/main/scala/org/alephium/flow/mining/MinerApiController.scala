@@ -21,31 +21,39 @@ import java.net.InetSocketAddress
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-import akka.actor.{ActorRef, Props, Terminated}
+import akka.actor.{ActorRef, Cancellable, Props, Terminated}
 import akka.io.{IO, Tcp}
+import akka.pattern.pipe
 import akka.util.ByteString
 
 import org.alephium.flow.Utils
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
-import org.alephium.flow.model.BlockFlowTemplate
+import org.alephium.flow.model.{AsyncUpdateState, BlockFlowTemplate}
 import org.alephium.flow.network.broker.ConnectionHandler
 import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{BlockHash, ChainIndex, Nonce, Target}
 import org.alephium.serde.{avectorSerde, serialize, SerdeResult, Staging}
-import org.alephium.util.{ActorRefT, AVector, BaseActor, Cache, Hex, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, Cache, Duration, Hex, TimeStamp}
 
 object MinerApiController {
   def props(allHandlers: AllHandlers)(implicit
       brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting
-  ): Props =
-    Props(new MinerApiController(allHandlers)).withDispatcher(Utils.PoolDispatcher)
+  ): Props = Props(new MinerApiController(allHandlers))
+
+  val publishJobsDelay: Duration = Duration.ofMillisUnsafe(10)
 
   sealed trait Command
   final case class Received(message: ClientMessage) extends Command
+  final case class BuildJobsComplete(
+      jobs: AVector[Job],
+      cache: AVector[(ByteString, (BlockFlowTemplate, ByteString))],
+      jobsMessage: ByteString
+  ) extends Command
+  final case class PublishJobs(jobsMessage: ByteString) extends Command
 
   def connection(remote: InetSocketAddress, connection: ActorRefT[Tcp.Command])(implicit
       groupConfig: GroupConfig,
@@ -78,13 +86,36 @@ object MinerApiController {
   private[mining] def calcJobIndex(chainIndex: ChainIndex)(implicit config: BrokerConfig): Int = {
     chainIndex.from.value / config.brokerNum * config.groups + chainIndex.to.value
   }
+
+  @inline private[mining] def calcPublishDelay(
+      now: TimeStamp,
+      lastPublishTs: TimeStamp
+  ): Option[Duration] = {
+    now -- lastPublishTs match {
+      case Some(delta) =>
+        if (delta < MinerApiController.publishJobsDelay) {
+          MinerApiController.publishJobsDelay - delta
+        } else {
+          None
+        }
+      case None => Some(MinerApiController.publishJobsDelay)
+    }
+  }
+
+  final case class CachedTemplate(template: BlockFlowTemplate) {
+    lazy val job: Job             = Job.fromWithoutTxs(template)
+    lazy val txsBlob: ByteString  = serialize(template.transactions)
+    lazy val cacheKey: ByteString = MinerApiController.getCacheKey(job.headerBlob)
+  }
 }
 
 class MinerApiController(allHandlers: AllHandlers)(implicit
     brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
     miningSetting: MiningSetting
-) extends BaseActor {
+) extends Utils.BaseActorWithPoolExecutor {
+  import MinerApiController.CachedTemplate
+
   val apiAddress: InetSocketAddress =
     new InetSocketAddress(miningSetting.apiInterface, networkSetting.minerApiPort)
   IO(Tcp)(context.system) ! Tcp.Bind(self, apiAddress, options = Seq(Tcp.SO.ReuseAddress(true)))
@@ -98,11 +129,16 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       terminateSystem()
   }
 
-  var latestJobs: Option[AVector[(Job, BlockFlowTemplate)]]              = None
+  var templates: Option[AVector[CachedTemplate]]                         = None
+  var latestJobs: Option[AVector[Job]]                                   = None
+  val buildJobsState: AsyncUpdateState                                   = AsyncUpdateState()
   val connections: ArrayBuffer[ActorRefT[ConnectionHandler.Command]]     = ArrayBuffer.empty
   val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
   val jobCache: Cache[ByteString, (BlockFlowTemplate, ByteString)] =
     Cache.fifo(brokerConfig.chainNum * miningSetting.jobCacheSizePerChain)
+
+  var lastPublishTimestamp: Option[TimeStamp] = None
+  var publishJobsTask: Option[Cancellable]    = None
 
   def ready: Receive = {
     case Tcp.Connected(remote, _) =>
@@ -120,7 +156,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
           connections.addOne(connectionHandler)
           latestJobs.foreach(jobs =>
             connectionHandler ! ConnectionHandler.Send(
-              ServerMessage.serialize(ServerMessage.from(Jobs(jobs.map(_._1))))
+              ServerMessage.serialize(ServerMessage.from(Jobs(jobs)))
             )
           )
         }
@@ -148,9 +184,24 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   val submittingBlocks: mutable.HashMap[BlockHash, ActorRefT[ConnectionHandler.Command]] =
     mutable.HashMap.empty
   def handleAPI: Receive = {
-    case ViewHandler.NewTemplates(templates) => publishTemplates(templates)
+    case ViewHandler.NewTemplates(templates) =>
+      this.templates = Some(AVector.from(templates.view.flatten.map(CachedTemplate.apply)))
+      buildJobsState.requestUpdate()
+      tryBuildJobs()
     case ViewHandler.NewTemplate(template, lazyBroadcast) =>
-      publishTemplate(template, lazyBroadcast)
+      this.templates.foreach { templates =>
+        val index = MinerApiController.calcJobIndex(template.index)
+        this.templates = Some(templates.replace(index, CachedTemplate(template)))
+        if (!lazyBroadcast) {
+          buildJobsState.requestUpdate()
+          tryBuildJobs()
+        }
+      }
+    case MinerApiController.BuildJobsComplete(jobs, cache, jobsMessage) =>
+      onBuildJobsComplete(jobs, cache, jobsMessage)
+    case MinerApiController.PublishJobs(jobsMessage) =>
+      publishJobsTask = None
+      publishJobs(jobsMessage, TimeStamp.now())
     case MinerApiController.Received(message: ClientMessage) => handleClientMessage(message)
     case BlockChainHandler.BlockAdded(hash) => handleSubmittedBlock(hash, succeeded = true)
     case BlockChainHandler.InvalidBlock(hash, reason) =>
@@ -158,44 +209,57 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       log.error(s"Mined an invalid block ${hash.shortHex} due to: $reason")
   }
 
-  def publishTemplates(templatess: IndexedSeq[IndexedSeq[BlockFlowTemplate]]): Unit = {
-    val jobs = templatess.foldLeft(
-      AVector.ofCapacity[(Job, BlockFlowTemplate)](templatess.length * brokerConfig.groups)
-    ) { case (acc, templates) =>
-      acc ++ AVector.from(templates.view.map(t => Job.fromWithoutTxs(t) -> t))
+  private def tryBuildJobs(): Unit = {
+    if (buildJobsState.isUpdating) {
+      log.debug("Skip building jobs due to pending updates")
     }
+    if (buildJobsState.tryUpdate()) {
+      this.templates.foreach { templates =>
+        poolAsync {
+          val jobs = templates.map(_.job)
+          val cache =
+            templates.map(template => (template.cacheKey, template.template -> template.txsBlob))
+          val jobsMessage = ServerMessage.serialize(ServerMessage.from(Jobs(jobs)))
+          MinerApiController.BuildJobsComplete(jobs, cache, jobsMessage)
+        }.pipeTo(self)
+      }
+    }
+  }
+
+  private def onBuildJobsComplete(
+      jobs: AVector[Job],
+      cache: AVector[(ByteString, (BlockFlowTemplate, ByteString))],
+      jobsMessage: ByteString
+  ): Unit = {
     latestJobs = Some(jobs)
-    publishLatestJobs()
+    publishJobs(jobsMessage)
+    cache.foreach { case (key, value) => jobCache.put(key, value) }
+    buildJobsState.setCompleted()
+    tryBuildJobs()
   }
 
-  def publishTemplate(template: BlockFlowTemplate, lazyBroadcast: Boolean): Unit = {
-    val job = Job.fromWithoutTxs(template)
-    val newJobs = latestJobs.map { existingJobs =>
-      val jobIndex = MinerApiController.calcJobIndex(template.index)
-      existingJobs.replace(jobIndex, job -> template)
-    }
-    latestJobs = newJobs
-    if (!lazyBroadcast) {
-      publishLatestJobs()
+  private[mining] def publishJobs(jobsMessage: ByteString): Unit = {
+    val now = TimeStamp.now()
+    lastPublishTimestamp match {
+      case Some(ts) =>
+        MinerApiController.calcPublishDelay(now, ts) match {
+          case Some(delay) =>
+            publishJobsTask.foreach(_.cancel())
+            publishJobsTask = Some(
+              scheduleCancellableOnce(self, MinerApiController.PublishJobs(jobsMessage), delay)
+            )
+          case None => publishJobs(jobsMessage, now)
+        }
+      case None => publishJobs(jobsMessage, now)
     }
   }
 
-  def publishLatestJobs(): Unit = {
+  @inline private def publishJobs(jobsMessage: ByteString, timestamp: TimeStamp): Unit = {
+    lastPublishTimestamp = Some(timestamp)
     log.debug(
       s"Sending block templates to subscribers: #${connections.length} connections, #${pendings.length} pending connections"
     )
-    latestJobs.foreach { jobs =>
-      connections.foreach(
-        _ ! ConnectionHandler.Send(
-          ServerMessage.serialize(ServerMessage.from(Jobs(jobs.map(_._1))))
-        )
-      )
-
-      jobs.foreach { case (job, template) =>
-        val txsBlob = serialize(template.transactions)
-        jobCache.put(MinerApiController.getCacheKey(job.headerBlob), template -> txsBlob)
-      }
-    }
+    connections.foreach(_ ! ConnectionHandler.Send(jobsMessage))
   }
 
   def handleClientMessage(message: ClientMessage): Unit = message.payload match {
@@ -228,7 +292,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
         case None =>
           sendSubmitResult(blockHash, succeeded = false, ActorRefT(sender()))
           log.error(
-            s"The job for the block is expired: ${Hex.toHexString(blockBlob)}"
+            s"The job for the block is expired or duplicated: ${Hex.toHexString(blockBlob)}"
           )
       }
   }

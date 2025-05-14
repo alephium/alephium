@@ -23,7 +23,7 @@ import akka.pattern.pipe
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.BlockFlowTemplate
+import org.alephium.flow.model.{AsyncUpdateState, BlockFlowTemplate}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.io.{IOResult, IOUtils}
@@ -401,25 +401,4 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
       subscribers.foreach(_ ! ViewHandler.NewTemplate(template, lazyBroadcast = false))
     }
   }
-}
-
-final class AsyncUpdateState(private var _requestCount: Int, private var _isUpdating: Boolean) {
-  @inline def requestCount: Int   = _requestCount
-  @inline def isUpdating: Boolean = _isUpdating
-
-  @inline def tryUpdate(): Boolean = {
-    val needToUpdate = _requestCount > 0 && !_isUpdating
-    if (needToUpdate) {
-      _requestCount = 0
-      _isUpdating = true
-    }
-    needToUpdate
-  }
-
-  @inline def requestUpdate(): Unit = _requestCount += 1
-  @inline def setCompleted(): Unit  = _isUpdating = false
-}
-
-object AsyncUpdateState {
-  def apply(): AsyncUpdateState = new AsyncUpdateState(0, false)
 }
