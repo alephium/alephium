@@ -22,7 +22,7 @@ import akka.util.Timeout
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool
-import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.model.{AsyncUpdateState, DataOrigin}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
@@ -663,32 +663,5 @@ class DanubeUpdateBestViewSpec extends UpdateBestViewSpec {
       viewHandler.underlyingActor.setDanubeUpdateCompleted(chainIndex)
       state.isUpdating is false
     }
-  }
-
-  it should "test AsyncUpdateState" in {
-    val state = AsyncUpdateState()
-    state.isUpdating is false
-    state.requestCount is 0
-
-    state.requestUpdate()
-    state.requestCount is 1
-    state.tryUpdate() is true
-    state.isUpdating is true
-    state.requestCount is 0
-
-    state.tryUpdate() is false
-    state.setCompleted()
-    state.isUpdating is false
-    state.tryUpdate() is false
-
-    state.requestUpdate()
-    state.requestCount is 1
-    state.isUpdating is false
-    state.requestUpdate()
-    state.requestCount is 2
-    state.isUpdating is false
-    state.tryUpdate() is true
-    state.isUpdating is true
-    state.requestCount is 0
   }
 }
