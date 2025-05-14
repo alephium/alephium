@@ -185,7 +185,7 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
     mutable.HashMap.empty
   def handleAPI: Receive = {
     case ViewHandler.NewTemplates(templates) =>
-      this.templates = Some(AVector.from(templates.flatten).map(CachedTemplate.apply))
+      this.templates = Some(AVector.from(templates.view.flatten.map(CachedTemplate.apply)))
       buildJobsState.requestUpdate()
       tryBuildJobs()
     case ViewHandler.NewTemplate(template, lazyBroadcast) =>
