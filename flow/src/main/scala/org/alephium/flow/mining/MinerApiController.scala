@@ -21,7 +21,7 @@ import java.net.InetSocketAddress
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-import akka.actor.{ActorRef, Props, Terminated}
+import akka.actor.{ActorRef, Cancellable, Props, Terminated}
 import akka.io.{IO, Tcp}
 import akka.pattern.pipe
 import akka.util.ByteString
@@ -35,7 +35,7 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{BlockHash, ChainIndex, Nonce, Target}
 import org.alephium.serde.{avectorSerde, serialize, SerdeResult, Staging}
-import org.alephium.util.{ActorRefT, AVector, Cache, Hex, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, Cache, Duration, Hex, TimeStamp}
 
 object MinerApiController {
   def props(allHandlers: AllHandlers)(implicit
@@ -44,6 +44,8 @@ object MinerApiController {
       miningSetting: MiningSetting
   ): Props = Props(new MinerApiController(allHandlers))
 
+  val publishJobsDelay: Duration = Duration.ofMillisUnsafe(10)
+
   sealed trait Command
   final case class Received(message: ClientMessage) extends Command
   final case class BuildJobsComplete(
@@ -51,6 +53,7 @@ object MinerApiController {
       cache: AVector[(ByteString, (BlockFlowTemplate, ByteString))],
       jobsMessage: ByteString
   ) extends Command
+  final case class PublishJobs(jobsMessage: ByteString) extends Command
 
   def connection(remote: InetSocketAddress, connection: ActorRefT[Tcp.Command])(implicit
       groupConfig: GroupConfig,
@@ -83,6 +86,21 @@ object MinerApiController {
   private[mining] def calcJobIndex(chainIndex: ChainIndex)(implicit config: BrokerConfig): Int = {
     chainIndex.from.value / config.brokerNum * config.groups + chainIndex.to.value
   }
+
+  @inline private[mining] def calcPublishDelay(
+      now: TimeStamp,
+      lastPublishTs: TimeStamp
+  ): Option[Duration] = {
+    now -- lastPublishTs match {
+      case Some(delta) =>
+        if (delta < MinerApiController.publishJobsDelay) {
+          MinerApiController.publishJobsDelay - delta
+        } else {
+          None
+        }
+      case None => Some(MinerApiController.publishJobsDelay)
+    }
+  }
 }
 
 class MinerApiController(allHandlers: AllHandlers)(implicit
@@ -110,6 +128,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   val pendings: ArrayBuffer[(InetSocketAddress, ActorRefT[Tcp.Command])] = ArrayBuffer.empty
   val jobCache: Cache[ByteString, (BlockFlowTemplate, ByteString)] =
     Cache.fifo(brokerConfig.chainNum * miningSetting.jobCacheSizePerChain)
+
+  var lastPublishTimestamp: Option[TimeStamp] = None
+  var publishJobsTask: Option[Cancellable]    = None
 
   def ready: Receive = {
     case Tcp.Connected(remote, _) =>
@@ -170,6 +191,9 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       }
     case MinerApiController.BuildJobsComplete(jobs, cache, jobsMessage) =>
       onBuildJobsComplete(jobs, cache, jobsMessage)
+    case MinerApiController.PublishJobs(jobsMessage) =>
+      publishJobsTask = None
+      publishJobs(jobsMessage, TimeStamp.now())
     case MinerApiController.Received(message: ClientMessage) => handleClientMessage(message)
     case BlockChainHandler.BlockAdded(hash) => handleSubmittedBlock(hash, succeeded = true)
     case BlockChainHandler.InvalidBlock(hash, reason) =>
@@ -203,13 +227,34 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
       jobsMessage: ByteString
   ): Unit = {
     latestJobs = Some(jobs)
+    publishJobs(jobsMessage)
+    cache.foreach { case (key, value) => jobCache.put(key, value) }
+    buildJobsState.setCompleted()
+    tryBuildJobs()
+  }
+
+  private[mining] def publishJobs(jobsMessage: ByteString): Unit = {
+    val now = TimeStamp.now()
+    lastPublishTimestamp match {
+      case Some(ts) =>
+        MinerApiController.calcPublishDelay(now, ts) match {
+          case Some(delay) =>
+            publishJobsTask.foreach(_.cancel())
+            publishJobsTask = Some(
+              scheduleCancellableOnce(self, MinerApiController.PublishJobs(jobsMessage), delay)
+            )
+          case None => publishJobs(jobsMessage, now)
+        }
+      case None => publishJobs(jobsMessage, now)
+    }
+  }
+
+  @inline private def publishJobs(jobsMessage: ByteString, timestamp: TimeStamp): Unit = {
+    lastPublishTimestamp = Some(timestamp)
     log.debug(
       s"Sending block templates to subscribers: #${connections.length} connections, #${pendings.length} pending connections"
     )
     connections.foreach(_ ! ConnectionHandler.Send(jobsMessage))
-    cache.foreach { case (key, value) => jobCache.put(key, value) }
-    buildJobsState.setCompleted()
-    tryBuildJobs()
   }
 
   def handleClientMessage(message: ClientMessage): Unit = message.payload match {
