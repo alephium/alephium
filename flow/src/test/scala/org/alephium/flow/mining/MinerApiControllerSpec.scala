@@ -294,7 +294,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val templates0 = AVector.from(templates.flatten)
     eventually {
       minerApiControllerActor.latestJobs.isEmpty is false
-      minerApiControllerActor.latestJobs.value.map(_._2) is templates0
+      minerApiControllerActor.templates.value is templates0
     }
 
     val probe = TestProbe()
@@ -307,11 +307,12 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     probe.expectMsgPF() { case Tcp.Received(data) =>
       ServerMessage.deserialize(data).rightValue.value.payload is a[Jobs]
     }
+    eventually(minerApiControllerActor.buildJobsState.isUpdating is false)
     eventually {
       val index        = MinerApiController.calcJobIndex(chainIndex)
       val newTemplates = templates0.replace(index, newTemplate)
       minerApiControllerActor.latestJobs.isEmpty is false
-      minerApiControllerActor.latestJobs.value.map(_._2) is newTemplates
+      minerApiControllerActor.templates.value is newTemplates
     }
   }
 
@@ -320,7 +321,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val templates               = ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
     minerApiController ! ViewHandler.NewTemplates(templates)
     val jobs = AVector.from(templates.flatten)
-    eventually(minerApiControllerActor.latestJobs.value.map(_._2) is jobs)
+    eventually(minerApiControllerActor.templates.value is jobs)
     val probe = TestProbe()
     connectToServer(probe)
     probe.expectMsgPF() { case Tcp.Received(data) =>
@@ -334,7 +335,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     eventually {
       val index   = MinerApiController.calcJobIndex(chainIndex0)
       val newJobs = jobs.replace(index, newTemplate0)
-      minerApiControllerActor.latestJobs.value.map(_._2) is newJobs
+      minerApiControllerActor.templates.value is newJobs
     }
     probe.expectNoMessage()
 
@@ -342,15 +343,16 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val block1       = emptyBlock(blockFlow, chainIndex1)
     val newTemplate1 = BlockFlowTemplate.from(block1, 1)
     minerApiController ! ViewHandler.NewTemplate(newTemplate1, false)
+    eventually(minerApiControllerActor.buildJobsState.isUpdating is false)
     eventually {
       val index0  = MinerApiController.calcJobIndex(chainIndex0)
       val index1  = MinerApiController.calcJobIndex(chainIndex1)
       val newJobs = jobs.replace(index0, newTemplate0).replace(index1, newTemplate1)
-      minerApiControllerActor.latestJobs.value.map(_._2) is newJobs
+      minerApiControllerActor.templates.value is newJobs
     }
     probe.expectMsgPF() { case Tcp.Received(data) =>
       val jobs = ServerMessage.deserialize(data).rightValue.value.payload.asInstanceOf[Jobs]
-      jobs is Jobs(minerApiControllerActor.latestJobs.value.map(_._1))
+      jobs is Jobs(minerApiControllerActor.latestJobs.value)
     }
   }
 }
