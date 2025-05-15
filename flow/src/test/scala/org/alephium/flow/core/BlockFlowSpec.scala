@@ -1307,6 +1307,32 @@ class BlockFlowSpec extends AlephiumSpec {
     accountView1.inBlocks.contains(block1) is false
   }
 
+  it should "update view per chain index" in new FlowFixture with Generators {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+    brokerConfig.cliqueChainIndexes.foreach { chainIndex =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      addWithoutViewUpdate(blockFlow, block)
+      blockFlow.updateViewPerChainIndexDanube(chainIndex) isE false
+      if (chainIndex.isIntraGroup) {
+        blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is true
+      }
+    }
+
+    forAll(chainIndexGenForBroker(brokerConfig)) { chainIndex =>
+      val block0 = emptyBlock(blockFlow, chainIndex)
+      val block1 = emptyBlock(blockFlow, chainIndex)
+      val sorted = AVector(block0, block1).sortBy(_.hash.bytes)(Bytes.byteStringOrdering)
+      addWithoutViewUpdate(blockFlow, sorted.head)
+      blockFlow.updateViewPerChainIndexDanube(chainIndex) isE false
+      addWithoutViewUpdate(blockFlow, sorted.last)
+      blockFlow.updateViewPerChainIndexDanube(chainIndex) isE chainIndex.isIntraGroup
+      if (chainIndex.isIntraGroup) {
+        blockFlow.getBestFlowSkeleton().intraGroupTips.contains(sorted.last.hash) is true
+      }
+    }
+  }
+
   trait Fixture extends FlowFixture {
     def checkInBestDeps(chainIndex: ChainIndex, blockFlow: BlockFlow, block: Block): Assertion = {
       val hardFork = networkConfig.getHardFork(block.timestamp)

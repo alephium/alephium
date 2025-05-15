@@ -23,7 +23,7 @@ import akka.pattern.pipe
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.BlockFlowTemplate
+import org.alephium.flow.model.{AsyncUpdateState, BlockFlowTemplate}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.io.{IOResult, IOUtils}
@@ -48,9 +48,10 @@ object ViewHandler {
   }
 
   sealed trait Command
-  case object BestDepsUpdatedPreDanube                                     extends Command
-  case object BestDepsUpdateFailedPreDanube                                extends Command
-  final case class BestDepsUpdatedDanube(chainIndex: ChainIndex)           extends Command
+  case object BestDepsUpdatedPreDanube      extends Command
+  case object BestDepsUpdateFailedPreDanube extends Command
+  final case class BestDepsUpdatedDanube(chainIndex: ChainIndex, rebuildTemplates: Boolean)
+      extends Command
   final case class BestDepsUpdateFailedDanube(chainIndex: ChainIndex)      extends Command
   case object Subscribe                                                    extends Command
   case object Unsubscribe                                                  extends Command
@@ -58,6 +59,7 @@ object ViewHandler {
   final case class UpdateSubscribersDanube(chainIndex: ChainIndex)         extends Command
   case object GetMinerAddresses                                            extends Command
   final case class UpdateMinerAddresses(addresses: AVector[Address.Asset]) extends Command
+  case object RebuildTemplatesComplete                                     extends Command
 
   sealed trait Event
   final case class NewTemplates(
@@ -104,7 +106,7 @@ class ViewHandler(
     with InterCliqueManager.NodeSyncStatus {
   override def receive: Receive = handle orElse updateNodeSyncStatus
 
-  // scalastyle:off cyclomatic.complexity
+  // scalastyle:off cyclomatic.complexity method.length
   def handle: Receive = {
     case ChainHandler.FlowDataAdded(data, _, _) =>
       val hardFork = getHardForkNow()
@@ -132,10 +134,10 @@ class ViewHandler(
       preDanubeUpdateState.setCompleted()
       log.warning("Updating pre-danube blockflow deps failed")
 
-    case ViewHandler.BestDepsUpdatedDanube(chainIndex) =>
+    case ViewHandler.BestDepsUpdatedDanube(chainIndex, rebuildTemplates) =>
       setDanubeUpdateCompleted(chainIndex)
       if (isNodeSynced) {
-        scheduleUpdateDanube(chainIndex)
+        scheduleUpdateDanube(chainIndex, rebuildTemplates)
         tryUpdateBestViewDanube(chainIndex)
       }
     case ViewHandler.BestDepsUpdateFailedDanube(chainIndex) =>
@@ -146,14 +148,18 @@ class ViewHandler(
     case ViewHandler.Unsubscribe                         => unsubscribe()
     case ViewHandler.UpdateSubscribersPreDanube          => updateSubscribersPreDanube()
     case ViewHandler.UpdateSubscribersDanube(chainIndex) => updateSubscribersDanube(chainIndex)
-    case ViewHandler.GetMinerAddresses                   => sender() ! minerAddressesOpt
+    case ViewHandler.RebuildTemplatesComplete =>
+      rebuildTemplatesState.setCompleted()
+      rescheduleUpdateDanube()
+      if (minerAddressesOpt.isDefined && subscribers.nonEmpty) tryRebuildTemplates()
+    case ViewHandler.GetMinerAddresses => sender() ! minerAddressesOpt
     case ViewHandler.UpdateMinerAddresses(addresses) =>
       Miner.validateAddresses(addresses) match {
         case Right(_)    => minerAddressesOpt = Some(addresses.map(_.lockupScript))
         case Left(error) => log.error(s"Updating invalid miner addresses: $error")
       }
   }
-  // scalastyle:on cyclomatic.complexity
+  // scalastyle:on cyclomatic.complexity method.length
 }
 
 trait ViewHandlerState extends IOBaseActor {
@@ -167,6 +173,7 @@ trait ViewHandlerState extends IOBaseActor {
   var updateScheduledPreDanube: Option[Cancellable]     = None
   val updateScheduledDanube: Array[Option[Cancellable]] = Array.fill(brokerConfig.chainNum)(None)
   val subscribers: ArrayBuffer[ActorRef]                = ArrayBuffer.empty
+  val rebuildTemplatesState                             = AsyncUpdateState()
 
   def subscribe(): Unit = {
     if (subscribers.contains(sender())) {
@@ -206,21 +213,53 @@ trait ViewHandlerState extends IOBaseActor {
     }
   }
 
-  def scheduleUpdateDanube(chainIndex: ChainIndex): Unit = {
+  protected def scheduleUpdateDanube(chainIndex: ChainIndex): Unit = {
+    val index = chainIndex.flattenIndex
+    updateScheduledDanube(index).foreach(_.cancel())
+    updateScheduledDanube(index) = Some(
+      scheduleCancellableOnce(
+        self,
+        ViewHandler.UpdateSubscribersDanube(chainIndex),
+        miningSetting.pollingInterval
+      )
+    )
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  protected def tryRebuildTemplates(): Unit = {
+    if (rebuildTemplatesState.isUpdating) {
+      log.debug("Skip rebuilding templates due to pending updates")
+    }
+    if (rebuildTemplatesState.tryUpdate()) {
+      assume(minerAddressesOpt.isDefined)
+      val minerAddresses = minerAddressesOpt.get
+      val subscribers    = AVector.from(this.subscribers)
+      poolAsync {
+        escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
+          subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
+        }
+        ViewHandler.RebuildTemplatesComplete
+      }.pipeTo(self)
+      ()
+    }
+  }
+
+  protected def rescheduleUpdateDanube(): Unit = {
+    brokerConfig.chainIndexes.foreach(scheduleUpdateDanube)
+  }
+
+  def scheduleUpdateDanube(chainIndex: ChainIndex, rebuildTemplates: Boolean): Unit = {
     if (
       brokerConfig.contains(chainIndex.from) &&
       minerAddressesOpt.nonEmpty &&
       subscribers.nonEmpty
     ) {
-      val index = chainIndex.flattenIndex
-      updateScheduledDanube(index).foreach(_.cancel())
-      updateScheduledDanube(index) = Some(
-        scheduleCancellableOnce(
-          self,
-          ViewHandler.UpdateSubscribersDanube(chainIndex),
-          miningSetting.pollingInterval
-        )
-      )
+      if (rebuildTemplates) {
+        rebuildTemplatesState.requestUpdate()
+        tryRebuildTemplates()
+      } else {
+        scheduleUpdateDanube(chainIndex)
+      }
     }
   }
 
@@ -329,17 +368,20 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
       val allSubscribers = AVector.from(subscribers)
       poolAsync[ViewHandler.Command] {
         val result = for {
-          _ <- blockFlow.updateViewPerChainIndexDanube(chainIndex)
+          rebuildTemplates <- blockFlow.updateViewPerChainIndexDanube(chainIndex)
           needToUpdate = brokerConfig.contains(chainIndex.from)
           _ <-
-            if (needToUpdate && minerAddress.nonEmpty && allSubscribers.nonEmpty) {
+            if (
+              !rebuildTemplates && needToUpdate && minerAddress.nonEmpty && allSubscribers.nonEmpty
+            ) {
               updateBlockTemplate(chainIndex, minerAddress.get, allSubscribers)
             } else {
               Right(())
             }
-        } yield ()
+        } yield rebuildTemplates
         result match {
-          case Right(_) => ViewHandler.BestDepsUpdatedDanube(chainIndex)
+          case Right(rebuildTemplates) =>
+            ViewHandler.BestDepsUpdatedDanube(chainIndex, rebuildTemplates)
           case Left(error) =>
             log.error(s"Failed to update best view: $error")
             ViewHandler.BestDepsUpdateFailedDanube(chainIndex)
@@ -359,25 +401,4 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
       subscribers.foreach(_ ! ViewHandler.NewTemplate(template, lazyBroadcast = false))
     }
   }
-}
-
-final class AsyncUpdateState(private var _requestCount: Int, private var _isUpdating: Boolean) {
-  @inline def requestCount: Int   = _requestCount
-  @inline def isUpdating: Boolean = _isUpdating
-
-  @inline def tryUpdate(): Boolean = {
-    val needToUpdate = _requestCount > 0 && !_isUpdating
-    if (needToUpdate) {
-      _requestCount = 0
-      _isUpdating = true
-    }
-    needToUpdate
-  }
-
-  @inline def requestUpdate(): Unit = _requestCount += 1
-  @inline def setCompleted(): Unit  = _isUpdating = false
-}
-
-object AsyncUpdateState {
-  def apply(): AsyncUpdateState = new AsyncUpdateState(0, false)
 }
