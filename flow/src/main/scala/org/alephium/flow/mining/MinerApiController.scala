@@ -310,7 +310,7 @@ class MinerApiController(blockFlow: BlockFlow, allHandlers: AllHandlers)(implici
       } else {
         handleSubmissionFailure(
           blockHash,
-          s"Ignore block ${blockHash.toHexString} because it is from the same mining job, so no mining rewards"
+          s"Ignore block ${blockHash.toHexString} because another block from the same mining job is already mined, there will be no mining rewards"
         )
       }
     }

@@ -453,7 +453,7 @@ class MinerApiControllerSpec extends AlephiumActorSpec with SocketUtil {
     blockRejected(
       newBlock,
       newBlockBlob,
-      s"Ignore block ${newBlock.hash.toHexString} because it is from the same mining job, so no mining rewards"
+      s"Ignore block ${newBlock.hash.toHexString} because another block from the same mining job is already mined, there will be no mining rewards"
     )
     eventually(minerApiControllerActor.jobCache.contains(newCacheKey) is false)
   }
