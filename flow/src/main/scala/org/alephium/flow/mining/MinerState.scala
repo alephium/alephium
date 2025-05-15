@@ -29,7 +29,7 @@ trait MinerState {
     Array.fill[U256](brokerConfig.groupNumPerBroker, brokerConfig.groups)(U256.Zero)
   protected val running = Array.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(false)
   protected val pendingTasks =
-    Array.fill(brokerConfig.groupNumPerBroker)(Array.ofDim[Option[Job]](brokerConfig.groups))
+    Array.fill(brokerConfig.groupNumPerBroker)(Array.fill[Option[Job]](brokerConfig.groups)(None))
 
   def getMiningCount(fromShift: Int, to: Int): U256 = miningCounts(fromShift)(to)
 
