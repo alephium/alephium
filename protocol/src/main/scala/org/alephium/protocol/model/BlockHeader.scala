@@ -159,6 +159,6 @@ object BlockHeader {
   }
 
   @inline def fromSameTemplate(header0: BlockHeader, header1: BlockHeader): Boolean = {
-    header0.blockDeps == header1.blockDeps
+    header0.blockDeps == header1.blockDeps && header0.txsHash == header1.txsHash
   }
 }

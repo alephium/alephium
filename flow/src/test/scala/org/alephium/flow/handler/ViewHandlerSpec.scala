@@ -22,7 +22,7 @@ import akka.util.Timeout
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool
-import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.model.{AsyncUpdateState, DataOrigin}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
@@ -419,6 +419,49 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
       blockFlow.getMemPool(chainIndex.from).contains(tx.id) is false
     }
   }
+
+  it should "rebuild all templates when necessary" in new DanubeFixture {
+    setSynced()
+    val probe      = createSubscriber()
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block0     = emptyBlock(blockFlow, chainIndex)
+    val block1     = emptyBlock(blockFlow, chainIndex)
+    val blocks     = AVector(block0, block1).sortBy(_.hash.bytes)(Bytes.byteStringOrdering)
+
+    addWithoutViewUpdate(blockFlow, blocks.head)
+    viewHandler ! ChainHandler.FlowDataAdded(blocks.head, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectMsgType[ViewHandler.NewTemplate])
+
+    addWithoutViewUpdate(blockFlow, blocks.last)
+    viewHandler ! ChainHandler.FlowDataAdded(blocks.last, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectMsgType[ViewHandler.NewTemplates])
+    eventually(viewHandler.underlyingActor.rebuildTemplatesState.isUpdating is false)
+  }
+
+  it should "reschedule update tasks for all chains" in new DanubeFixture {
+    setSynced()
+    createSubscriber()
+
+    val scheduledTasks = viewHandler.underlyingActor.updateScheduledDanube
+    val chainIndexes   = brokerConfig.chainIndexes.drop(1)
+    chainIndexes.foreach { chainIndex =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    }
+    eventually {
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        scheduledTasks(chainIndex.flattenIndex).isDefined is chainIndexes.contains(chainIndex)
+      }
+    }
+
+    viewHandler ! ViewHandler.RebuildTemplatesComplete
+    eventually {
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        scheduledTasks(chainIndex.flattenIndex).isDefined is true
+      }
+    }
+  }
 }
 
 abstract class UpdateBestViewSpec extends ViewHandlerBaseSpec {
@@ -541,7 +584,8 @@ class DanubeUpdateBestViewSpec extends UpdateBestViewSpec {
       viewHandler.underlyingActor.danubeUpdateStates(chainIndex.flattenIndex)
     override def containBlockHashInBestDeps(blockHash: BlockHash): Boolean =
       blockFlow.getBestFlowSkeleton().intraGroupTips.contains(blockHash)
-    def bestDepsUpdatedMsg: ViewHandler.Command = ViewHandler.BestDepsUpdatedDanube(chainIndex)
+    def bestDepsUpdatedMsg: ViewHandler.Command =
+      ViewHandler.BestDepsUpdatedDanube(chainIndex, false)
     def bestDepsUpdateFailedMsg: ViewHandler.Command =
       ViewHandler.BestDepsUpdateFailedDanube(chainIndex)
   }
@@ -617,32 +661,5 @@ class DanubeUpdateBestViewSpec extends UpdateBestViewSpec {
       viewHandler.underlyingActor.setDanubeUpdateCompleted(chainIndex)
       state.isUpdating is false
     }
-  }
-
-  it should "test AsyncUpdateState" in {
-    val state = AsyncUpdateState()
-    state.isUpdating is false
-    state.requestCount is 0
-
-    state.requestUpdate()
-    state.requestCount is 1
-    state.tryUpdate() is true
-    state.isUpdating is true
-    state.requestCount is 0
-
-    state.tryUpdate() is false
-    state.setCompleted()
-    state.isUpdating is false
-    state.tryUpdate() is false
-
-    state.requestUpdate()
-    state.requestCount is 1
-    state.isUpdating is false
-    state.requestUpdate()
-    state.requestCount is 2
-    state.isUpdating is false
-    state.tryUpdate() is true
-    state.isUpdating is true
-    state.requestCount is 0
   }
 }
