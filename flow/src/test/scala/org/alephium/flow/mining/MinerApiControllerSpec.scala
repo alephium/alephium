@@ -23,7 +23,7 @@ import akka.io.{IO, Tcp}
 import akka.testkit.{TestActor, TestProbe}
 import akka.util.ByteString
 
-import org.alephium.flow.AlephiumFlowActorSpec
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.validation.InvalidBlockVersion
@@ -31,15 +31,15 @@ import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Block, ChainIndex, Target}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
-import org.alephium.util.{AVector, Duration, SocketUtil, TimeStamp}
+import org.alephium.util.{AlephiumActorSpec, AVector, Duration, SocketUtil, TimeStamp}
 
-class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
-  trait Fixture {
+class MinerApiControllerSpec extends AlephiumActorSpec with SocketUtil {
+  trait Fixture extends FlowFixture {
     val apiPort                         = generatePort()
     val (allHandlers, allHandlerProbes) = TestUtils.createAllHandlersProbe
     val minerApiController =
       newTestActorRef[MinerApiController](
-        MinerApiController.props(allHandlers)(
+        MinerApiController.props(blockFlow, allHandlers)(
           brokerConfig,
           networkConfig.copy(minerApiPort = apiPort),
           miningSetting
@@ -105,16 +105,8 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val parentHash  = block.blockDeps.parentHash(chainIndex)
     val blockHeight = blockFlow.getHeightUnsafe(parentHash) + 1
 
-    val blockFlowTemplate = BlockFlowTemplate(
-      chainIndex,
-      block.blockDeps.deps,
-      block.header.depStateHash,
-      block.target,
-      block.timestamp,
-      block.transactions,
-      blockHeight
-    )
-    val headerBlob = Job.from(blockFlowTemplate).headerBlob
+    val blockFlowTemplate = BlockFlowTemplate.from(block, blockHeight)
+    val headerBlob        = Job.from(blockFlowTemplate).headerBlob
 
     def blockRejected(block: Block, blockBlob: ByteString, errorMessage: String) = {
       expectErrorMsg(errorMessage) {
@@ -434,5 +426,35 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
       now,
       now.minusUnsafe(MinerApiController.publishJobsDelay.timesUnsafe(2))
     ) is None
+  }
+
+  it should "ignore duplicate blocks" in new SubmissionFixture {
+    val cacheKey = MinerApiController.getCacheKey(headerBlob)
+    minerApiControllerActor.jobCache.put(
+      cacheKey,
+      blockFlowTemplate -> serialize(blockFlowTemplate.transactions)
+    )
+    val blockBlob = serialize(block.copy(transactions = AVector.empty))
+    blockAccepted(block, blockBlob)
+    eventually(minerApiControllerActor.jobCache.contains(cacheKey) is false)
+
+    val newBlock             = emptyBlock(blockFlow, chainIndex)
+    val newBlockFlowTemplate = BlockFlowTemplate.from(newBlock, blockHeight)
+    val newHeaderBlob        = Job.from(newBlockFlowTemplate).headerBlob
+    val newBlockBlob         = serialize(newBlock.copy(transactions = AVector.empty))
+
+    addAndCheck(blockFlow, block)
+    val newCacheKey = MinerApiController.getCacheKey(newHeaderBlob)
+    newCacheKey isnot cacheKey
+    minerApiControllerActor.jobCache.put(
+      newCacheKey,
+      newBlockFlowTemplate -> serialize(newBlockFlowTemplate.transactions)
+    )
+    blockRejected(
+      newBlock,
+      newBlockBlob,
+      s"Ignore block ${newBlock.hash.toHexString} because it is a duplicate"
+    )
+    eventually(minerApiControllerActor.jobCache.contains(newCacheKey) is false)
   }
 }
