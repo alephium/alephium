@@ -26,23 +26,23 @@ import akka.io.{IO, Tcp}
 import akka.pattern.pipe
 import akka.util.ByteString
 
-import org.alephium.flow.Utils
-import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
+import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, IOBaseActor, ViewHandler}
 import org.alephium.flow.model.{AsyncUpdateState, BlockFlowTemplate}
 import org.alephium.flow.network.broker.ConnectionHandler
 import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
-import org.alephium.protocol.model.{BlockHash, ChainIndex, Nonce, Target}
+import org.alephium.protocol.model.{BlockHash, BlockHeader, ChainIndex, Nonce, Target}
 import org.alephium.serde.{avectorSerde, serialize, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, AVector, Cache, Duration, Hex, TimeStamp}
 
 object MinerApiController {
-  def props(allHandlers: AllHandlers)(implicit
+  def props(blockFlow: BlockFlow, allHandlers: AllHandlers)(implicit
       brokerConfig: BrokerConfig,
       networkSetting: NetworkSetting,
       miningSetting: MiningSetting
-  ): Props = Props(new MinerApiController(allHandlers))
+  ): Props = Props(new MinerApiController(blockFlow, allHandlers))
 
   val publishJobsDelay: Duration = Duration.ofMillisUnsafe(10)
 
@@ -109,11 +109,11 @@ object MinerApiController {
   }
 }
 
-class MinerApiController(allHandlers: AllHandlers)(implicit
+class MinerApiController(blockFlow: BlockFlow, allHandlers: AllHandlers)(implicit
     brokerConfig: BrokerConfig,
     networkSetting: NetworkSetting,
     miningSetting: MiningSetting
-) extends Utils.BaseActorWithPoolExecutor {
+) extends IOBaseActor {
   import MinerApiController.CachedTemplate
 
   val apiAddress: InetSocketAddress =
@@ -282,22 +282,50 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
               s"The mined block has invalid work: ${blockHash.toHexString}"
             )
           } else {
-            submit(blockHash, blockBytes, template.index)
-            log.info(
-              s"A new block ${blockHash.toHexString} got mined for ${template.index}, tx: ${template.transactions.length}, target: ${template.target}"
-            )
+            trySubmit(template, blockBytes, blockHash)
             jobCache.remove(cacheKey)
             ()
           }
         case None =>
-          sendSubmitResult(blockHash, succeeded = false, ActorRefT(sender()))
-          log.error(
+          handleSubmissionFailure(
+            blockHash,
             s"The job for the block is expired or duplicated: ${Hex.toHexString(blockBlob)}"
           )
       }
   }
 
-  def submit(blockHash: BlockHash, blockBytes: ByteString, chainIndex: ChainIndex): Unit = {
+  private def trySubmit(
+      template: BlockFlowTemplate,
+      blockBytes: ByteString,
+      blockHash: BlockHash
+  ): Unit = {
+    // use dummy header to avoid deserialization
+    val header = template.dummyHeader()
+    escapeIOError(isDuplicate(header, template.index)) { duplicate =>
+      if (!duplicate) {
+        submit(blockHash, blockBytes, template.index)
+        log.info(
+          s"A new block ${blockHash.toHexString} got mined for ${template.index}, tx: ${template.transactions.length}, target: ${template.target}"
+        )
+      } else {
+        handleSubmissionFailure(
+          blockHash,
+          s"Ignore block ${blockHash.toHexString} because another block from the same mining job is already mined, there will be no mining rewards"
+        )
+      }
+    }
+  }
+
+  private def isDuplicate(header: BlockHeader, chainIndex: ChainIndex) = {
+    val parentHash = header.uncleHash(chainIndex.to)
+    for {
+      parentHeight <- blockFlow.getHeight(parentHash)
+      hashes       <- blockFlow.getHashes(chainIndex, parentHeight + 1)
+      headers      <- hashes.mapE(blockFlow.getBlockHeader)
+    } yield headers.exists(BlockHeader.fromSameTemplate(_, header))
+  }
+
+  private def submit(blockHash: BlockHash, blockBytes: ByteString, chainIndex: ChainIndex): Unit = {
     allHandlers.getBlockHandler(chainIndex) match {
       case Some(blockHandler) =>
         val handlerMessage =
