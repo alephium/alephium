@@ -29,7 +29,7 @@ import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.validation.InvalidBlockVersion
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Block, ChainIndex, Target}
+import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Target}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util.{AlephiumActorSpec, AVector, Duration, SocketUtil, TimeStamp}
 
@@ -438,14 +438,16 @@ class MinerApiControllerSpec extends AlephiumActorSpec with SocketUtil {
     blockAccepted(block, blockBlob)
     eventually(minerApiControllerActor.jobCache.contains(cacheKey) is false)
 
-    val newBlock             = emptyBlock(blockFlow, chainIndex)
-    val newBlockFlowTemplate = BlockFlowTemplate.from(newBlock, blockHeight)
-    val newHeaderBlob        = Job.from(newBlockFlowTemplate).headerBlob
-    val newBlockBlob         = serialize(newBlock.copy(transactions = AVector.empty))
+    val newBlockFlowTemplate = BlockFlowTemplate
+      .from(block, blockHeight)
+      .copy(templateTs = block.timestamp.plusMillisUnsafe(1))
+    val newBlock      = mine(blockFlow, newBlockFlowTemplate)
+    val newHeaderBlob = Job.from(newBlockFlowTemplate).headerBlob
+    val newBlockBlob  = serialize(newBlock.copy(transactions = AVector.empty))
+    BlockHeader.fromSameTemplate(newBlock.header, block.header) is true
 
     addAndCheck(blockFlow, block)
     val newCacheKey = MinerApiController.getCacheKey(newHeaderBlob)
-    newCacheKey isnot cacheKey
     minerApiControllerActor.jobCache.put(
       newCacheKey,
       newBlockFlowTemplate -> serialize(newBlockFlowTemplate.transactions)

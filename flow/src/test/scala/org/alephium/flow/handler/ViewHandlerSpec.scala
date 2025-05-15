@@ -434,10 +434,8 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
 
     addWithoutViewUpdate(blockFlow, blocks.last)
     viewHandler ! ChainHandler.FlowDataAdded(blocks.last, DataOrigin.Local, TimeStamp.now())
-    eventually {
-      probe.expectMsgType[ViewHandler.NewTemplates]
-      viewHandler.underlyingActor.rebuildTemplatesState.isUpdating is false
-    }
+    eventually(probe.expectMsgType[ViewHandler.NewTemplates])
+    eventually(viewHandler.underlyingActor.rebuildTemplatesState.isUpdating is false)
   }
 
   it should "reschedule update tasks for all chains" in new DanubeFixture {
