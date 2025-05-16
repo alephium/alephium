@@ -299,14 +299,9 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, transfer(blockFlow, genesisKey, publicKey1, ALPH.alph(2)))
 
     addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
-    val blocks = {
-      val block0 = transfer(blockFlow, privateKey0, toPublicKey, ALPH.oneAlph)
-      val block1 = transfer(blockFlow, privateKey1, toPublicKey, ALPH.oneAlph)
-      AVector(block0, block1).sortBy(_.hash.bytes)(Bytes.byteStringOrdering)
-    }
-    val block0 = blocks.head
+    val block0 = transfer(blockFlow, privateKey0, toPublicKey, ALPH.oneAlph)
     val tx0    = block0.nonCoinbase.head
-    val block1 = blocks.last
+    val block1 = transfer(blockFlow, privateKey1, toPublicKey, ALPH.oneAlph)
     val tx1    = block1.nonCoinbase.head
 
     blockFlow.grandPool.add(chainIndex, tx0.toTemplate, TimeStamp.now())
@@ -320,7 +315,14 @@ class FlowUtilsSpec extends AlephiumSpec {
     blockFlow.prepareBlockFlowUnsafe(chainIndex, miner).transactions.head.id is tx1.id
     addAndCheck(blockFlow, block1)
     val template1 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    template1.transactions.head.id is tx0.id
+    template1.transactions.head.id is tx1.id
+    blockFlow.getMemPool(chainIndex).contains(tx0.id) is false
+    blockFlow.getMemPool(chainIndex).contains(tx1.id) is true
+
+    val block2 = mineBlockWithDep(chainIndex, block1.hash)
+    addAndCheck(blockFlow, block2)
+    val template2 = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    template2.transactions.head.id is tx0.id
     blockFlow.getMemPool(chainIndex).contains(tx0.id) is true
     blockFlow.getMemPool(chainIndex).contains(tx1.id) is false
   }
