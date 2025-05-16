@@ -23,9 +23,11 @@ import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{AVector, ConcurrentHashMap, TimeStamp}
 
 trait BlockHashChainState {
+  import BlockHashChainState.TipInfo
+
   var numHashes: Int = 0
 
-  protected val tips = ConcurrentHashMap.empty[BlockHash, TimeStamp]
+  protected val tips = ConcurrentHashMap.empty[BlockHash, TipInfo]
 
   def consensusConfigs: ConsensusSettings
 
@@ -34,10 +36,10 @@ trait BlockHashChainState {
   def getTimestamp(hash: BlockHash): IOResult[TimeStamp]
   def getTimestampUnsafe(hash: BlockHash): TimeStamp
 
-  def setGenesisState(newTip: BlockHash, timeStamp: TimeStamp): IOResult[Unit] = {
+  def setGenesisState(newTip: BlockHash, blockTs: TimeStamp): IOResult[Unit] = {
     numHashes += 1
-    tips.put(newTip, timeStamp)
-    pruneDueto(timeStamp)
+    tips.put(newTip, TipInfo(blockTs, TimeStamp.now()))
+    pruneDueto(blockTs)
     updateDB()
   }
 
@@ -47,17 +49,18 @@ trait BlockHashChainState {
       pairs <- state.tips.mapE(tip => getTimestamp(tip).map(tip -> _))
     } yield {
       numHashes = state.numHashes
-      pairs.foreach { case (tip, timestamp) =>
-        tips.put(tip, timestamp)
+      val now = TimeStamp.now()
+      pairs.foreach { case (tip, blockTs) =>
+        tips.put(tip, TipInfo(blockTs, now))
       }
     }
   }
 
-  def updateState(newTip: BlockHash, timeStamp: TimeStamp, parent: BlockHash): IOResult[Unit] = {
+  def updateState(newTip: BlockHash, blockTs: TimeStamp, parent: BlockHash): IOResult[Unit] = {
     numHashes += 1
-    tips.put(newTip, timeStamp)
+    tips.put(newTip, TipInfo(blockTs, TimeStamp.now()))
     tips.remove(parent)
-    pruneDueto(timeStamp)
+    pruneDueto(blockTs)
     updateDB()
   }
 
@@ -75,9 +78,13 @@ trait BlockHashChainState {
   @inline
   private def pruneDueto(timeStamp: TimeStamp): Unit = {
     tips.entries().foreach { entry =>
-      if (entry.getValue + consensusConfigs.tipsPruneDuration < timeStamp) {
+      if (entry.getValue.blockTs + consensusConfigs.tipsPruneDuration < timeStamp) {
         tips.remove(entry.getKey)
       }
     }
   }
+}
+
+object BlockHashChainState {
+  final case class TipInfo(blockTs: TimeStamp, cacheTs: TimeStamp)
 }

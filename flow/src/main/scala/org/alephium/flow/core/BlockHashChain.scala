@@ -26,7 +26,7 @@ import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BlockHash, ChainIndex, ChainTip, Weight}
-import org.alephium.util.{AVector, Cache, EitherF, Math, TimeStamp}
+import org.alephium.util.{AVector, Cache, Duration, EitherF, Math, TimeStamp}
 
 // scalastyle:off number.of.methods file.size.limit
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
@@ -210,6 +210,19 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def getAllTips: AVector[BlockHash] = {
     AVector.from(tips.keys())
+  }
+
+  def getAllTipsWithCacheTime: AVector[BlockHashPool.TipWithCacheTime] = {
+    val now = TimeStamp.now()
+    AVector.from(tips.entries().map { entry =>
+      val blockHash = entry.getKey
+      val tipInfo   = entry.getValue
+      if (now > tipInfo.cacheTs) {
+        BlockHashPool.TipWithCacheTime(blockHash, now.deltaUnsafe(tipInfo.cacheTs))
+      } else {
+        BlockHashPool.TipWithCacheTime(blockHash, Duration.zero)
+      }
+    })
   }
 
   private def getLink(hash: BlockHash): IOResult[BlockHashChain.Link] = {

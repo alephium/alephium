@@ -997,4 +997,28 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     blocks.length is (blocks1.tail.length + blocks2.length + blocks4.length)
     blocks.toSet is Set.from(blocks1.tail ++ blocks2 ++ blocks4)
   }
+
+  it should "order blocks by height and cache time" in new Fixture {
+    val chain   = buildBlockChain()
+    val blocks0 = chainGenOf(3, genesis).sample.get
+    val blocks1 = chainGenOf(3, genesis).sample.get
+    val blocks2 = chainGenOf(4, genesis).sample.get
+    addBlocks(chain, blocks1)
+    addBlocks(chain, blocks0)
+    addBlocks(chain, blocks2)
+
+    chain.getAllTips.toSet is Set(blocks0.last.hash, blocks1.last.hash, blocks2.last.hash)
+
+    chain.getHeightUnsafe(blocks0.last.hash) is 3
+    chain.getHeightUnsafe(blocks1.last.hash) is 3
+    chain.getHeightUnsafe(blocks2.last.hash) is 4
+
+    val tips = chain.getAllTipsWithCacheTime
+    tips.sortBy(_.duration).map(_.blockHash) is
+      AVector(blocks2.last.hash, blocks0.last.hash, blocks1.last.hash)
+    tips.sorted(chain.heightThenCacheTimeOrderingUnsafe).map(_.blockHash) is
+      AVector(blocks0.last.hash, blocks1.last.hash, blocks2.last.hash)
+    tips.sorted(chain.heightThenCacheTimeOrderingUnsafe.reverse).map(_.blockHash) is
+      AVector(blocks2.last.hash, blocks1.last.hash, blocks0.last.hash)
+  }
 }

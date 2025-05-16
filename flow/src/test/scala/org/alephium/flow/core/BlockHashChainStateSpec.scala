@@ -27,6 +27,7 @@ import org.alephium.protocol.model.{BlockHash, ChainIndex}
 import org.alephium.util.{ConcurrentHashMap, TimeStamp}
 
 class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
+  import BlockHashChainState.TipInfo
   trait Fixture {
     val chainState = new BlockHashChainState {
       private val dummyIndex        = ChainIndex.unsafe(0, 0)
@@ -39,7 +40,7 @@ class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
 
       def state: BlockHashChain.State = chainStateStorage.loadState().rightValue
 
-      def allTipsInMem: ConcurrentHashMap[BlockHash, TimeStamp] = tips
+      def allTipsInMem: ConcurrentHashMap[BlockHash, TipInfo] = tips
 
       chainStateStorage.clearState().isRight is true
     }
