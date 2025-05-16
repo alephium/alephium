@@ -331,6 +331,15 @@ class BlockFlowSpec extends AlephiumSpec {
     val blockFlow1 = storageBlockFlow()
     newBlocks1.map(_.hash).diff(blockFlow1.getAllTips.toArray).isEmpty is true
 
+    for {
+      i <- 0 to 1
+      j <- 0 to 1
+    } yield {
+      val chainIndex = ChainIndex.unsafe(i, j)
+      val deps       = blockFlow1.getBestDeps(chainIndex, HardFork.Danube)
+      deps.getOutDep(chainIndex.to) is newBlocks1(i * 2 + j).hash
+    }
+
     val newBlocks2 = for {
       i <- 0 to 1
       j <- 0 to 1
