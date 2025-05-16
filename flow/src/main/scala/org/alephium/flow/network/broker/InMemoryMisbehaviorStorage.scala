@@ -64,11 +64,12 @@ class InMemoryMisbehaviorStorage(val penaltyForgivness: Duration) extends Misbeh
   private def withUpdatedStatus[A](peer: InetAddress, status: MisbehaviorStatus)(
       f: (InetAddress, MisbehaviorStatus) => A
   ): Option[A] = {
+    val now = TimeStamp.now()
     status match {
-      case Banned(until) if until < TimeStamp.now() =>
+      case Banned(until) if until < now =>
         peers.remove(peer)
         None
-      case Penalty(_, ts) if TimeStamp.now().deltaUnsafe(ts) > penaltyForgivness =>
+      case Penalty(_, ts) if now > ts.plusUnsafe(penaltyForgivness) =>
         peers.remove(peer)
         None
       case other =>
