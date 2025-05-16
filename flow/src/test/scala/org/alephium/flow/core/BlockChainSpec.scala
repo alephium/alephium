@@ -1014,8 +1014,8 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.getHeightUnsafe(blocks2.last.hash) is 4
 
     val tips = chain.getAllTipsWithCacheTime
-    tips.sortBy(_.duration).map(_.blockHash) is
-      AVector(blocks2.last.hash, blocks0.last.hash, blocks1.last.hash)
+    tips.sortBy(_.cacheTs).map(_.blockHash) is
+      AVector(blocks1.last.hash, blocks0.last.hash, blocks2.last.hash)
     tips.sorted(chain.heightThenCacheTimeOrderingUnsafe).map(_.blockHash) is
       AVector(blocks0.last.hash, blocks1.last.hash, blocks2.last.hash)
     tips.sorted(chain.heightThenCacheTimeOrderingUnsafe.reverse).map(_.blockHash) is

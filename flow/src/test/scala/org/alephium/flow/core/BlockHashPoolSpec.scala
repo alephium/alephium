@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import akka.util.ByteString
 
 import org.alephium.protocol.model.{BlockHash, Weight}
-import org.alephium.util.{AlephiumSpec, Duration}
+import org.alephium.util.{AlephiumSpec, TimeStamp}
 
 class BlockHashPoolSpec extends AlephiumSpec {
   val hash0 = BlockHash.unsafe(ByteString.fromArray(Array.fill(BlockHash.length)(0)))
@@ -46,14 +46,14 @@ class BlockHashPoolSpec extends AlephiumSpec {
   }
 
   it should "compare cache time w.r.t height" in {
-    val height0   = 0
-    val height1   = 1
-    val duration0 = Duration.unsafe(0)
-    val duration1 = Duration.unsafe(1)
-    BlockHashPool.compareHeight(duration0, height0, duration0, height0) is 0
-    BlockHashPool.compareHeight(duration0, height0, duration0, height1) is -1
-    BlockHashPool.compareHeight(duration0, height1, duration0, height0) is 1
-    BlockHashPool.compareHeight(duration0, height0, duration1, height0) is -1
-    BlockHashPool.compareHeight(duration1, height0, duration0, height0) is 1
+    val height0 = 0
+    val height1 = 1
+    val ts0     = TimeStamp.unsafe(1)
+    val ts1     = TimeStamp.unsafe(0)
+    BlockHashPool.compareHeight(ts0, height0, ts0, height0) is 0
+    BlockHashPool.compareHeight(ts0, height0, ts0, height1) is -1
+    BlockHashPool.compareHeight(ts0, height1, ts0, height0) is 1
+    BlockHashPool.compareHeight(ts0, height0, ts1, height0) is -1
+    BlockHashPool.compareHeight(ts1, height0, ts0, height0) is 1
   }
 }

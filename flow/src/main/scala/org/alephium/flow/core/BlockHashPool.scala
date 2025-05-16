@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import org.alephium.flow.model.BlockState
 import org.alephium.io.IOResult
 import org.alephium.protocol.model.{BlockHash, Weight}
-import org.alephium.util.{AVector, Bytes, Duration}
+import org.alephium.util.{AVector, Bytes, TimeStamp}
 
 trait BlockHashPool {
   import BlockHashPool.TipWithCacheTime
@@ -63,7 +63,7 @@ trait BlockHashPool {
     (tip0: TipWithCacheTime, tip1: TipWithCacheTime) =>
       val height0 = getHeightUnsafe(tip0.blockHash)
       val height1 = getHeightUnsafe(tip1.blockHash)
-      BlockHashPool.compareHeight(tip0.duration, height0, tip1.duration, height1)
+      BlockHashPool.compareHeight(tip0.cacheTs, height0, tip1.cacheTs, height1)
   }
 
   def getBestTipUnsafe(): BlockHash
@@ -78,13 +78,13 @@ trait BlockHashPool {
 }
 
 object BlockHashPool {
-  final case class TipWithCacheTime(blockHash: BlockHash, duration: Duration)
-  def compareHeight(duration0: Duration, height0: Int, duration1: Duration, height1: Int): Int = {
+  final case class TipWithCacheTime(blockHash: BlockHash, cacheTs: TimeStamp)
+  def compareHeight(cacheTs0: TimeStamp, height0: Int, cacheTs1: TimeStamp, height1: Int): Int = {
     val compare = height0.compare(height1)
     if (compare != 0) {
       compare
     } else {
-      duration0.compare(duration1)
+      -cacheTs0.compare(cacheTs1)
     }
   }
 
