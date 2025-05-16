@@ -40,10 +40,11 @@ class InMemoryMisbehaviorStorage(val penaltyForgivness: Duration) extends Misbeh
   }
 
   def isBanned(peer: InetAddress): Boolean = {
+    val now = TimeStamp.now()
     get(peer) match {
       case Some(status) =>
         status match {
-          case Banned(_)     => true
+          case Banned(until) => now.isBefore(until)
           case Penalty(_, _) => false
         }
       case None => false
