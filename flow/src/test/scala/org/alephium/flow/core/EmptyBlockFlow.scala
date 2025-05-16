@@ -50,6 +50,7 @@ trait EmptyBlockFlow extends BlockFlow {
     bestFlowSkeleton.createBlockDeps(chainIndex.from)
   }
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps                                          = ???
+  def calBestFlowSkeletonUnsafe(): BlockFlowSkeleton                                           = ???
   def updateBestFlowSkeleton(): IOResult[Unit]                                                 = ???
   def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Boolean]                 = ???
   def updateViewPreDanube(): IOResult[Unit]                                                    = ???

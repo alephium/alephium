@@ -1177,13 +1177,27 @@ class BlockFlowSpec extends AlephiumSpec {
     blockDeps2.contains(block2.hash) is true
     blockDeps2.contains(block3.hash) is false
 
-    val chainIndex2 = ChainIndex(groupIndex0, groupIndex2)
-    val block4      = emptyBlock(blockFlow, chainIndex2)
+    // block4 has the same height as block2, but its cache time is less than that of block2
+    val block4 = mineBlock(block2.parentHash, block2, 1)
     addAndCheck(blockFlow, block4)
     val blockDeps3 = blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex0).deps
-    blockDeps3.contains(block0.hash) is true
     blockDeps3.contains(block2.hash) is true
-    blockDeps3.contains(block4.hash) is true
+    blockDeps3.contains(block4.hash) is false
+
+    // the height of block5 is greater than that of block2
+    val block5 = mineBlockWithDep(chainIndex1, block4.hash)
+    addAndCheck(blockFlow, block5)
+    val blockDeps4 = blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex0).deps
+    blockDeps4.contains(block2.hash) is false
+    blockDeps4.contains(block5.hash) is true
+
+    val chainIndex2 = ChainIndex(groupIndex0, groupIndex2)
+    val block6      = emptyBlock(blockFlow, chainIndex2)
+    addAndCheck(blockFlow, block6)
+    val blockDeps5 = blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex0).deps
+    blockDeps5.contains(block0.hash) is true
+    blockDeps5.contains(block5.hash) is true
+    blockDeps5.contains(block6.hash) is true
   }
 
   it should "extend block flow for inter-chain" in new ExtendBlockFlowFixture {
@@ -1192,12 +1206,9 @@ class BlockFlowSpec extends AlephiumSpec {
 
     val chainIndex1 = ChainIndex(groupIndex1, groupIndex0)
     chainIndex1.isIntraGroup is false
-    val block0      = mineBlockWithDep(chainIndex1, blockAtH1C0.hash)
-    val block1      = emptyBlock(blockFlow, chainIndex1)
-    val blockAtH2C0 = emptyBlock(blockFlow, chainIndex0)
-    addAndCheck(blockFlow, blockAtH2C0)
+    val block0 = mineBlockWithDep(chainIndex1, blockAtH1C0.hash)
+    val block1 = emptyBlock(blockFlow, chainIndex1)
     val block2 = emptyBlock(blockFlow, chainIndex1)
-    block2.blockDeps.deps.contains(blockAtH2C0.hash) is true
 
     addAndCheck(blockFlow, block0)
     blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex1).deps.contains(block0.hash) is false
@@ -1205,16 +1216,69 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block1)
     blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex1).deps.contains(block1.hash) is true
 
+    // block2 has the same height as block1, but its cache time is less than that of block1
     addAndCheck(blockFlow, block2)
-    val blockDeps = blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex1).deps
-    blockDeps.contains(block2.hash) is true
-    blockDeps.contains(block1.hash) is false
+    val blockDeps0 = blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex1).deps
+    blockDeps0.contains(block1.hash) is true
+    blockDeps0.contains(block2.hash) is false
+
+    // the height of block3 is greater than that of block1
+    val block3 = mineBlockWithDep(chainIndex1, block2.hash)
+    addAndCheck(blockFlow, block3)
+    val blockDeps1 = blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex1).deps
+    blockDeps1.contains(block1.hash) is false
+    blockDeps1.contains(block3.hash) is true
 
     val chainIndex2 = ChainIndex(groupIndex1, groupIndex2)
     chainIndex2.isIntraGroup is false
-    val block3 = emptyBlock(blockFlow, chainIndex2)
-    addAndCheck(blockFlow, block3)
-    blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex1).deps.contains(block3.hash) is false
+    val block4 = emptyBlock(blockFlow, chainIndex2)
+    addAndCheck(blockFlow, block4)
+    blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex1).deps.contains(block4.hash) is false
+  }
+
+  it should "calc best flow skeleton properly" in new ExtendBlockFlowFixture {
+    val blockFlow0  = isolatedBlockFlow()
+    val chainIndex0 = ChainIndex(groupIndex0, groupIndex0)
+    val chainIndex1 = ChainIndex(groupIndex1, groupIndex1)
+
+    def mineBlocksOnChainIndex1(): (Seq[Block], Seq[Block]) = {
+      val block0 = emptyBlock(blockFlow0, chainIndex1)
+      addAndCheck(blockFlow0, block0)
+      val block1 = emptyBlock(blockFlow0, chainIndex1)
+      val block2 = emptyBlock(blockFlow0, chainIndex1)
+      addAndCheck(blockFlow0, block1, block2)
+      val block3 = emptyBlock(blockFlow0, chainIndex1)
+      addAndCheck(blockFlow0, block3)
+      if (block3.parentHash == block2.hash) {
+        (Seq(block0, block1), Seq(block2, block3))
+      } else {
+        (Seq(block0, block2), Seq(block1, block3))
+      }
+    }
+
+    val blocks0 = (0 until 4).map { _ =>
+      val block = emptyBlock(blockFlow, chainIndex0)
+      addAndCheck(blockFlow, block)
+      block
+    }
+    val (blocks1, blocks2) = mineBlocksOnChainIndex1()
+    addAndCheck(blockFlow, blocks1: _*)
+
+    val skeleton0 = blockFlow.calBestFlowSkeletonUnsafe()
+    skeleton0.intraGroupTips.contains(blocks0.last.hash) is true
+    skeleton0.intraGroupTips.contains(blocks1.last.hash) is true
+
+    // `blocks2.head` has the same height as `blocks1.last`, but its cache time is less than that of `blocks1.last`
+    addAndCheck(blockFlow, blocks2.head)
+    val skeleton1 = blockFlow.calBestFlowSkeletonUnsafe()
+    skeleton1.intraGroupTips.contains(blocks1.last.hash) is true
+    skeleton1.intraGroupTips.contains(blocks2.head.hash) is false
+
+    // the height of `blocks2.last` is greater than that of `blocks1.last`
+    addAndCheck(blockFlow, blocks2.last)
+    val skeleton2 = blockFlow.calBestFlowSkeletonUnsafe()
+    skeleton2.intraGroupTips.contains(blocks1.last.hash) is false
+    skeleton2.intraGroupTips.contains(blocks2.last.hash) is true
   }
 
   it should "update conflicted blocks cache before danube" in new FlowFixture with Generators {

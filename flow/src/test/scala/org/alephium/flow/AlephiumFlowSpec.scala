@@ -1128,7 +1128,7 @@ trait FlowFixture
 
   def mineBlock(parentHash: BlockHash, block: Block, height: Int): Block = {
     val chainIndex   = block.chainIndex
-    val lockupScript = getGenesisLockupScript(chainIndex)
+    val lockupScript = getGenesisLockupScript(chainIndex.to)
     val template0    = BlockFlowTemplate.from(block, height)
     val parentIndex  = brokerConfig.groups - 1 + chainIndex.to.value
     val newDeps      = template0.deps.replace(parentIndex, parentHash)

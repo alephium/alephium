@@ -118,6 +118,8 @@ trait BlockFlow
 
   def updateBestFlowSkeleton(): IOResult[Unit]
 
+  def calBestFlowSkeletonUnsafe(): BlockFlowSkeleton
+
   def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Boolean]
 }
 
@@ -352,11 +354,13 @@ object BlockFlow extends StrictLogging {
 
     def tryExtendBlockFlowSkeletonUnsafe(
         flow: BlockFlowSkeleton,
-        group: GroupIndex,
-        toTry: AVector[BlockHash]
+        group: GroupIndex
     ): BlockFlowSkeleton = {
       var updatedFlow: Option[BlockFlowSkeleton] = None
-      toTry.sorted(blockHashOrdering.reverse).foreach { tip =>
+      val sortedTips = getHashChain(group, group).getAllTipsWithCacheTime
+        .sorted(heightThenCacheTimeOrderingUnsafe.reverse)
+        .map(_.blockHash)
+      sortedTips.foreach { tip =>
         if (updatedFlow.isEmpty) {
           tryExtendBlockFlowSkeletonUnsafe(flow, group, tip).foreach { extendedFlow =>
             updatedFlow = Some(extendedFlow)
@@ -384,8 +388,10 @@ object BlockFlow extends StrictLogging {
 
       val chain       = getHashChain(chainIndex)
       val targetGroup = chainIndex.from
-      val toTry       = chain.getAllTips
-      toTry.sorted(blockHashOrdering.reverse).foreach { tip =>
+      val sortedTips = chain.getAllTipsWithCacheTime
+        .sorted(heightThenCacheTimeOrderingUnsafe.reverse)
+        .map(_.blockHash)
+      sortedTips.foreach { tip =>
         if (
           updatedFlow.isEmpty && tip != currentChainTip && isExtendingUnsafe(tip, currentChainTip)
         ) {
@@ -438,8 +444,7 @@ object BlockFlow extends StrictLogging {
       val startFlow         = getBlockFlowSkeletonUnsafe(bestIntraGroupTip)
 
       brokerConfig.cliqueGroups.filter(_ != bestIndex.from).fold(startFlow) { case (flow, g) =>
-        val toTry = getHashChain(g, g).getAllTips
-        tryExtendBlockFlowSkeletonUnsafe(flow, g, toTry)
+        tryExtendBlockFlowSkeletonUnsafe(flow, g)
       }
     }
 
