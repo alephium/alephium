@@ -161,6 +161,7 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     viewHandler.underlyingActor.updateScheduledDanube.forall(_.isEmpty) is true
     brokerConfig.chainIndexes.foreach { chainIndex =>
       val block = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
       viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
     }
     eventually(viewHandler.underlyingActor.updateScheduledDanube.forall(_.nonEmpty) is true)
@@ -180,6 +181,7 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     brokerConfig.contains(chainIndex1.from) is false
 
     val block0 = emptyBlock(blockFlow, chainIndex0)
+    addAndCheck(blockFlow, block0)
     val block1 = blockFlow.genesisBlocks(chainIndex1.from.value)(chainIndex1.to.value)
     viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
     eventually(tasks.forall(_.isEmpty) is true)
@@ -210,6 +212,7 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     updateTasks(taskIndex).isEmpty is true
 
     val block = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
     viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
     eventually(updateTasks(taskIndex).nonEmpty is true)
     val task = updateTasks(taskIndex)
@@ -332,6 +335,7 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     setSynced()
     val probe = createSubscriber()
     val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block)
     viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
     eventually(probe.expectMsgPF() { case msg: ViewHandler.NewTemplate =>
       msg.lazyBroadcast is false
