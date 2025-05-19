@@ -462,6 +462,55 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
       }
     }
   }
+
+  it should "only rebuild template when necessary" in new DanubeFixture {
+    setSynced()
+    val probe            = createSubscriber()
+    val chainIndex       = ChainIndex.unsafe(0, 0)
+    val (block0, block1) = mineTwoBlocksAndAdd(chainIndex)
+
+    viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectMsgType[ViewHandler.NewTemplate])
+    val actor = viewHandler.underlyingActor
+    val index = chainIndex.flattenIndex
+    eventually(actor.danubeUpdateStates(index).requestCount is 0)
+    eventually(actor.lastBlocks(index).map(_.flowData) is Some(block0))
+
+    viewHandler ! ChainHandler.FlowDataAdded(block1, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectNoMessage())
+    eventually(actor.lastBlocks(index).map(_.flowData) is Some(block0))
+
+    val block2 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block2)
+    viewHandler ! ChainHandler.FlowDataAdded(block2, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectMsgType[ViewHandler.NewTemplate])
+    eventually(actor.lastBlocks(index).map(_.flowData) is Some(block2))
+  }
+
+  it should "test shouldSkipBuildTemplate" in new Fixture {
+    val chainIndex       = ChainIndex.unsafe(0, 0)
+    val (block0, block1) = mineTwoBlocksAndAdd(chainIndex)
+    val actor            = viewHandler.underlyingActor
+    val now              = TimeStamp.now()
+    val lastBlock        = ViewHandler.LastBlockPerChain(block0, 1, now)
+    actor.shouldSkipBuildTemplate(lastBlock, block1.hash, 0, now) is false
+    actor.shouldSkipBuildTemplate(lastBlock, block1.hash, 2, now) is false
+    actor.shouldSkipBuildTemplate(
+      lastBlock,
+      block1.hash,
+      1,
+      now.minusUnsafe(Duration.ofMillisUnsafe(1))
+    ) is false
+    actor.shouldSkipBuildTemplate(lastBlock, block1.hash, 1, now.plusSecondsUnsafe(1)) is false
+    actor.shouldSkipBuildTemplate(lastBlock, block1.hash, 1, now.plusSecondsUnsafe(2)) is false
+    actor.shouldSkipBuildTemplate(lastBlock, block1.hash, 1, now.plusMillisUnsafe(1)) is true
+    actor.shouldSkipBuildTemplate(
+      lastBlock.copy(flowData = block1),
+      block0.hash,
+      1,
+      now.plusMillisUnsafe(1)
+    ) is false
+  }
 }
 
 abstract class UpdateBestViewSpec extends ViewHandlerBaseSpec {
@@ -634,15 +683,16 @@ class DanubeUpdateBestViewSpec extends UpdateBestViewSpec {
     setHardFork(HardFork.Danube)
 
     brokerConfig.chainIndexes.foreach { chainIndex =>
-      val state = viewHandler.underlyingActor.danubeUpdateStates(chainIndex.flattenIndex)
+      val flowData = emptyBlock(blockFlow, chainIndex)
+      val state    = viewHandler.underlyingActor.danubeUpdateStates(chainIndex.flattenIndex)
       state.requestCount is 0
       state.isUpdating is false
 
-      viewHandler.underlyingActor.requestDanubeUpdate(chainIndex)
+      viewHandler.underlyingActor.requestDanubeUpdate(flowData)
       state.requestCount is 1
       state.isUpdating is false
 
-      viewHandler.underlyingActor.requestDanubeUpdate(chainIndex)
+      viewHandler.underlyingActor.requestDanubeUpdate(flowData)
       state.requestCount is 2
       state.isUpdating is false
     }

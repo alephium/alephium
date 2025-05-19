@@ -28,12 +28,14 @@ import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Address, ChainIndex, HardFork}
+import org.alephium.protocol.model.{Address, BlockHash, ChainIndex, FlowData, HardFork}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 import org.alephium.util.EventStream.Publisher
 
 object ViewHandler {
+  val skipBuildTemplateThreshold: Duration = Duration.ofSecondsUnsafe(1)
+
   def build(system: ActorSystem, blockFlow: BlockFlow, namePostfix: String)(implicit
       brokerConfig: BrokerConfig,
       miningSetting: MiningSetting
@@ -70,6 +72,8 @@ object ViewHandler {
       extends Event
       with EventStream.Event
   final case class SubscribeResult(succeeded: Boolean) extends Event
+
+  final case class LastBlockPerChain(flowData: FlowData, height: Int, receivedAt: TimeStamp)
 
   def needUpdatePreDanube(chainIndex: ChainIndex)(implicit brokerConfig: BrokerConfig): Boolean = {
     brokerConfig.contains(chainIndex.from)
@@ -115,7 +119,7 @@ class ViewHandler(
       //  2. the header belongs to intra-group chain
       if (isNodeSynced) {
         if (hardFork.isDanubeEnabled() && ViewHandler.needUpdateDanube(data.chainIndex)) {
-          requestDanubeUpdate(data.chainIndex)
+          requestDanubeUpdate(data)
           tryUpdateBestViewDanube(data.chainIndex)
         }
         if (!hardFork.isDanubeEnabled() && ViewHandler.needUpdatePreDanube(data.chainIndex)) {
@@ -350,9 +354,40 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
   protected[handler] val danubeUpdateStates: Array[AsyncUpdateState] =
     Array.fill(brokerConfig.chainNum)(AsyncUpdateState())
 
-  def requestDanubeUpdate(chainIndex: ChainIndex): Unit = {
-    danubeUpdateStates(chainIndex.flattenIndex).requestUpdate()
+  protected[handler] val lastBlocks: Array[Option[ViewHandler.LastBlockPerChain]] =
+    Array.fill(brokerConfig.chainNum)(None)
+
+  def requestDanubeUpdate(flowData: FlowData): Unit = {
+    val index = flowData.chainIndex.flattenIndex
+    val now   = TimeStamp.now()
+    escapeIOError(blockFlow.getHeight(flowData.hash)) { height =>
+      lastBlocks(index) match {
+        case Some(last) =>
+          if (!shouldSkipBuildTemplate(last, flowData.hash, height, now)) {
+            requestDanubeUpdate(flowData, height, now)
+          }
+        case None => requestDanubeUpdate(flowData, height, now)
+      }
+    }
   }
+  @inline private[handler] def shouldSkipBuildTemplate(
+      last: ViewHandler.LastBlockPerChain,
+      currentHash: BlockHash,
+      currentHeight: Int,
+      now: TimeStamp
+  ): Boolean = {
+    currentHeight == last.height &&
+    last.receivedAt.isBefore(now) &&
+    now.deltaUnsafe(last.receivedAt) < ViewHandler.skipBuildTemplateThreshold &&
+    blockFlow.blockHashOrdering.lt(currentHash, last.flowData.hash)
+  }
+
+  @inline private def requestDanubeUpdate(flowData: FlowData, height: Int, ts: TimeStamp): Unit = {
+    val index = flowData.chainIndex.flattenIndex
+    lastBlocks(index) = Some(ViewHandler.LastBlockPerChain(flowData, height, ts))
+    danubeUpdateStates(index).requestUpdate()
+  }
+
   def setDanubeUpdateCompleted(chainIndex: ChainIndex): Unit = {
     danubeUpdateStates(chainIndex.flattenIndex).setCompleted()
   }
