@@ -104,5 +104,31 @@ class ReleaseVersionSpec extends AlephiumSpec {
       ReleaseVersion.fromClientId("scala-alephium/v2.14.6/Linux") is Some(ReleaseVersion(2, 14, 6))
       ReleaseVersion.fromClientId("scala-alephium/v3.0.0/Linux") is Some(ReleaseVersion(3, 0, 0))
     }
+
+    {
+      info("Test testnet Danube")
+      val danubeActivationTS = now.plusHoursUnsafe(-1)
+      implicit val config =
+        buildNetworkConfig(NetworkId.AlephiumTestNet, danubeActivationTS, danubeActivationTS)
+      config.getHardFork(now) is HardFork.Danube
+      ReleaseVersion.fromClientId("xxx") is None
+      ReleaseVersion.fromClientId("scala-alephium/v3.14.3/Linux") is None
+      ReleaseVersion.fromClientId("scala-alephium/v3.14.4/Linux") is Some(ReleaseVersion(3, 14, 4))
+      ReleaseVersion.fromClientId("scala-alephium/v3.15.0/Linux") is Some(ReleaseVersion(3, 15, 0))
+      ReleaseVersion.fromClientId("scala-alephium/v4.0.0/Linux") is Some(ReleaseVersion(4, 0, 0))
+    }
+
+    {
+      info("Test mainnet Danube")
+      val danubeActivationTS = now.plusHoursUnsafe(-1)
+      implicit val config =
+        buildNetworkConfig(NetworkId.AlephiumMainNet, danubeActivationTS, danubeActivationTS)
+      config.getHardFork(now) is HardFork.Danube
+      ReleaseVersion.fromClientId("xxx") is None
+      ReleaseVersion.fromClientId("scala-alephium/v3.14.3/Linux") is None
+      ReleaseVersion.fromClientId("scala-alephium/v3.14.4/Linux") is None
+      ReleaseVersion.fromClientId("scala-alephium/v3.15.0/Linux") is None
+      ReleaseVersion.fromClientId("scala-alephium/v4.0.0/Linux") is None
+    }
   }
 }
