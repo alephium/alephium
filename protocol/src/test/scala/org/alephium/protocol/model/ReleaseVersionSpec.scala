@@ -112,7 +112,8 @@ class ReleaseVersionSpec extends AlephiumSpec {
         buildNetworkConfig(NetworkId.AlephiumTestNet, danubeActivationTS, danubeActivationTS)
       config.getHardFork(now) is HardFork.Danube
       ReleaseVersion.fromClientId("xxx") is None
-      ReleaseVersion.fromClientId("scala-alephium/v3.14.3/Linux") is None
+      ReleaseVersion.fromClientId("scala-alephium/v3.14.2/Linux") is None
+      ReleaseVersion.fromClientId("scala-alephium/v3.14.3/Linux") is Some(ReleaseVersion(3, 14, 3))
       ReleaseVersion.fromClientId("scala-alephium/v3.14.4/Linux") is Some(ReleaseVersion(3, 14, 4))
       ReleaseVersion.fromClientId("scala-alephium/v3.15.0/Linux") is Some(ReleaseVersion(3, 15, 0))
       ReleaseVersion.fromClientId("scala-alephium/v4.0.0/Linux") is Some(ReleaseVersion(4, 0, 0))

@@ -46,7 +46,7 @@ final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
           // TODO: Update this once we release the version for the Danube upgrade
           false
         } else if (networkConfig.networkId == NetworkId.AlephiumTestNet) {
-          this > ReleaseVersion(3, 14, 3)
+          this >= ReleaseVersion(3, 14, 3)
         } else {
           true
         }
