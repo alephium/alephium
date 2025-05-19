@@ -8430,6 +8430,60 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(code)
   }
 
+  it should "support short-circuit evaluation for && and || operators" in new ContractFixture {
+    val contract =
+      s"""
+         |Contract Foo(mut count: U256) {
+         |  @using(checkExternalCaller = false, updateFields = true)
+         |  pub fn foo() -> Bool {
+         |    count += 1
+         |    return count % 2 == 0
+         |  }
+         |  pub fn getCount() -> U256 { return count }
+         |}
+         |""".stripMargin
+    val foo = createContract(contract, AVector.empty, AVector(Val.U256(0)))._1
+
+    val script =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  let foo = Foo(#${foo.toHexString})
+         |  assert!(foo.getCount() == 0, 0)
+         |  if (true || foo.foo()) {
+         |    assert!(foo.getCount() == 0, 0)
+         |  }
+         |  assert!(foo.getCount() == 0, 0)
+         |  if (false && foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 1, 0)
+         |  }
+         |  assert!(foo.getCount() == 0, 0)
+         |
+         |  if (false || true || foo.foo()) {
+         |    assert!(foo.getCount() == 0, 0)
+         |  }
+         |  if (true && false && foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 1, 0)
+         |  }
+         |
+         |  assert!(foo.getCount() == 0, 0)
+         |  if (false || foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 0, 0)
+         |  }
+         |  assert!(foo.getCount() == 1, 0)
+         |  if (true && foo.foo()) {
+         |    assert!(foo.getCount() == 2, 0)
+         |  }
+         |  assert!(foo.getCount() == 2, 0)
+         |}
+         |$contract
+         |""".stripMargin
+    testSimpleScript(script)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

@@ -589,11 +589,19 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      positionedError(
-        left.genCode(state) ++ right.genCode(state) ++ op.genCode(
-          left.getType(state) ++ right.getType(state)
-        )
-      )
+      positionedError {
+        val leftCode  = left.genCode(state)
+        val rightCode = right.genCode(state)
+        val opCode    = op.genCode(left.getType(state) ++ right.getType(state))
+        val instrs: Seq[Instr[Ctx]] = op match {
+          case LogicalOperator.And =>
+            Seq[Instr[Ctx]](Dup, IfFalse(rightCode.length + opCode.length))
+          case LogicalOperator.Or =>
+            Seq[Instr[Ctx]](Dup, IfTrue(rightCode.length + opCode.length))
+          case _ => Seq.empty
+        }
+        leftCode ++ instrs ++ rightCode ++ opCode
+      }
     }
     override def reset(): Unit = {
       left.reset()
