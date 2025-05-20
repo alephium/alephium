@@ -592,7 +592,6 @@ object Ast {
       positionedError {
         val leftCode  = left.genCode(state)
         val rightCode = right.genCode(state)
-        val opCode    = op.genCode(left.getType(state) ++ right.getType(state))
         op match {
           case op: LogicalOperator.BinaryLogicalOperator =>
             val offset = 1 + rightCode.length // we need to pop the first value
@@ -601,7 +600,7 @@ object Ast {
               case LogicalOperator.Or  => IfTrue(offset)
             }
             leftCode ++ Seq(Dup, instr, Pop) ++ rightCode
-          case _ => leftCode ++ rightCode ++ opCode
+          case _ => leftCode ++ rightCode ++ op.genCode(left.getType(state) ++ right.getType(state))
         }
       }
     }
