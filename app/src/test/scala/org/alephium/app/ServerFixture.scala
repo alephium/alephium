@@ -43,6 +43,7 @@ import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
 import org.alephium.json.Json._
 import org.alephium.protocol._
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.ModelGenerators
@@ -52,6 +53,7 @@ import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocat
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
+import org.alephium.api.model.BuildTxCommon.PublicKeyType
 
 trait ServerFixture
     extends InfoFixture
@@ -153,17 +155,35 @@ object ServerFixture {
     )
   }
 
-  def p2mpkhAddress(publicKeys: AVector[String], mrequired: Int): Address.Asset = {
-    Address.Asset(
-      LockupScript
-        .p2mpkh(
-          publicKeys.map { publicKey =>
-            PublicKey.from(Hex.from(publicKey).get).get
-          },
-          mrequired
-        )
-        .get
-    )
+  def p2mpkhAddress(publicKeys: AVector[String], mrequired: Int): String = {
+    Address
+      .Asset(
+        LockupScript
+          .p2mpkh(
+            publicKeys.map { publicKey =>
+              PublicKey.from(Hex.from(publicKey).get).get
+            },
+            mrequired
+          )
+          .get
+      )
+      .toBase58
+  }
+
+  def p2hmpkAddress(
+      publicKeys: AVector[String],
+      publicKeyTypes: AVector[PublicKeyType],
+      mrequired: Int
+  )(implicit groupConfig: GroupConfig): String = {
+    ServerUtils
+      .buildP2HMPKAddress(
+        publicKeys.map(Hex.from(_).get),
+        mrequired,
+        Some(publicKeyTypes)
+      )
+      .toOption
+      .get
+      .address
   }
 
   val dummyParentContractId      = ContractId.hash("parent")

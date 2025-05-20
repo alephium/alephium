@@ -640,15 +640,17 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildMultisigAddressExample: List[Example[BuildMultisigAddress]] =
     simpleExample(
       BuildMultisigAddress(
-        AVector(publicKey, publicKey),
-        1
+        AVector(publicKey.bytes, publicKey.bytes),
+        Some(AVector(BuildTxCommon.Default, BuildTxCommon.Default)),
+        1,
+        Some(MultiSigType.P2MPKH)
       )
     )
 
   implicit val buildMultisigAddressResultExample: List[Example[BuildMultisigAddressResult]] =
     simpleExample(
       BuildMultisigAddressResult(
-        address
+        address.toBase58
       )
     )
 

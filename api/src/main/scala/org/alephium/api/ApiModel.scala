@@ -343,6 +343,18 @@ trait ApiModelCodec {
     macroRW
   implicit val buildChainedTxResultRW: RW[BuildChainedTxResult] = macroRW
 
+  implicit val multiSigTypeRW: RW[MultiSigType] = readwriter[String].bimap(
+    {
+      case MultiSigType.P2MPKH => "p2mpkh"
+      case MultiSigType.P2HMPK => "p2hmpk"
+    },
+    {
+      case "p2mpkh" => MultiSigType.P2MPKH
+      case "p2hmpk" => MultiSigType.P2HMPK
+      case other    => throw Abort(s"Invalid multi-sig type: $other")
+    }
+  )
+
   implicit val buildMultisigAddressRW: RW[BuildMultisigAddress] = macroRW
 
   implicit val buildMultisigAddressResultRW: RW[BuildMultisigAddressResult] = macroRW

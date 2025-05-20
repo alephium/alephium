@@ -554,7 +554,7 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "call POST /multisig/address" in {
+  it should "call POST /multisig/address for P2MPKH" in {
     lazy val (_, dummyKey2, _) = addressStringGen(
       GroupIndex.unsafe(1)
     ).sample.get
@@ -582,6 +582,43 @@ abstract class RestServerSpec(
     }
   }
 
+  it should "call POST /multisig/address for P2HMPK" in {
+    lazy val (_, dummyKey2, _) = addressStringGen(
+      GroupIndex.unsafe(1)
+    ).sample.get
+
+    lazy val dummyKeyHex2 = dummyKey2.toHexString
+
+    Post(
+      s"/multisig/address",
+      body = s"""
+                |{
+                |  "keys": [
+                | "$dummyKeyHex",
+                | "$dummyKeyHex2"
+                |],
+                |  "keyTypes": [
+                |  "default",
+                |  "default"
+                |],
+                |  "multiSigType": "p2hmpk",
+                |  "mrequired": 1
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.Ok
+
+      val result = response.as[BuildMultisigAddressResult]
+      val expected = ServerFixture.p2hmpkAddress(
+        AVector(dummyKeyHex, dummyKeyHex2),
+        AVector(BuildTxCommon.Default, BuildTxCommon.Default),
+        1
+      )
+
+      result.address is expected
+    }
+  }
+
   it should "call POST /multisig/build" in {
     lazy val (_, dummyKey2, _) = addressStringGen(
       GroupIndex.unsafe(1)
@@ -595,7 +632,7 @@ abstract class RestServerSpec(
       s"/multisig/build",
       body = s"""
                 |{
-                |  "fromAddress": "${address.toBase58}",
+                |  "fromAddress": "${address}",
                 |  "fromPublicKeys": ["$dummyKeyHex"],
                 |  "destinations": [
                 |    {
@@ -641,7 +678,7 @@ abstract class RestServerSpec(
       s"/multisig/sweep",
       body = s"""
                 |{
-                |  "fromAddress": "${address.toBase58}",
+                |  "fromAddress": "${address}",
                 |  "fromPublicKeys": ["$dummyKeyHex"],
                 |  "toAddress": "$dummyToAddress"
                 |}

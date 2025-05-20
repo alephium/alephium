@@ -20,6 +20,7 @@ import java.math.BigInteger
 
 import scala.concurrent._
 
+import akka.util.ByteString
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 
@@ -27,7 +28,13 @@ import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
-import org.alephium.crypto.{Byte32, Byte64}
+import org.alephium.crypto.{
+  Byte32,
+  Byte64,
+  ED25519PublicKey,
+  SecP256K1PublicKey,
+  SecP256R1PublicKey
+}
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo}
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
@@ -1237,17 +1244,15 @@ class ServerUtils(implicit
     }
 
   def buildMultisigAddress(
-      keys: AVector[PublicKey],
-      mrequired: Int
+      rawKeys: AVector[ByteString],
+      mrequired: Int,
+      keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]],
+      multiSigType: Option[MultiSigType]
   ): Either[String, BuildMultisigAddressResult] = {
-    LockupScript.p2mpkh(keys, mrequired) match {
-      case Some(lockupScript) =>
-        Right(
-          BuildMultisigAddressResult(
-            Address.Asset(lockupScript)
-          )
-        )
-      case None => Left(s"Invalid m-of-n multisig")
+    if (multiSigType.exists(_ == MultiSigType.P2HMPK)) {
+      ServerUtils.buildP2HMPKAddress(rawKeys, mrequired, keyTypesOpt)
+    } else {
+      ServerUtils.buildP2MPKHAddress(rawKeys, mrequired, keyTypesOpt)
     }
   }
 
@@ -2568,5 +2573,90 @@ object ServerUtils {
     )
 
     wrapCompilerResult(Compiler.compileTxScript(scriptRaw))
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  def buildP2HMPKAddress(
+      rawKeys: AVector[ByteString],
+      mrequired: Int,
+      keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]]
+  )(implicit groupConfig: GroupConfig): Either[String, BuildMultisigAddressResult] = {
+    val keyTypes: Either[String, AVector[BuildTxCommon.PublicKeyType]] =
+      if (keyTypesOpt.isDefined) {
+        if (keyTypesOpt.get.length != rawKeys.length) {
+          Left("`keyTypes` length should be the same as `keys` length")
+        } else {
+          Right(keyTypesOpt.get)
+        }
+      } else {
+        Right(AVector.fill(rawKeys.length)(BuildTxCommon.Default))
+      }
+
+    val publicKeys = keyTypes.flatMap {
+      _.foldWithIndexE(AVector.empty[PublicKeyLike]) { (publicKeys, keyType, index) =>
+        val rawKey = rawKeys(index)
+        val publicKey = keyType match {
+          case BuildTxCommon.Default =>
+            SecP256K1PublicKey.from(rawKey).map(PublicKeyLike.SecP256K1.apply)
+          case BuildTxCommon.GLED25519 =>
+            ED25519PublicKey.from(rawKey).map(PublicKeyLike.ED25519.apply)
+          case BuildTxCommon.GLSecP256K1 =>
+            SecP256K1PublicKey.from(rawKey).map(PublicKeyLike.SecP256K1.apply)
+          case BuildTxCommon.GLSecP256R1 =>
+            SecP256R1PublicKey.from(rawKey).map(PublicKeyLike.SecP256R1.apply)
+          case BuildTxCommon.GLWebAuthn =>
+            SecP256R1PublicKey.from(rawKey).map(PublicKeyLike.WebAuthn.apply)
+          case BuildTxCommon.BIP340Schnorr =>
+            None // BIP340Schnorr not supported
+        }
+
+        publicKey match {
+          case Some(publicKey) =>
+            Right(publicKeys :+ publicKey)
+          case None =>
+            Left(s"Invalid public key ${Hex.toHexString(rawKey)} for keyType $keyType")
+        }
+      }
+    }
+
+    publicKeys.map { pks =>
+      BuildMultisigAddressResult(
+        LockupScript.P2HMPK(pks, mrequired, GroupIndex.unsafe(0)).toBase58WithoutGroup
+      )
+    }
+  }
+
+  def buildP2MPKHAddress(
+      rawKeys: AVector[ByteString],
+      mrequired: Int,
+      keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]]
+  ): Either[String, BuildMultisigAddressResult] = {
+    val isWrongKeyTypes = keyTypesOpt.isDefined && keyTypesOpt.exists(keyTypes =>
+      keyTypes.length != rawKeys.length || keyTypes.exists(_ != BuildTxCommon.Default)
+    )
+
+    if (isWrongKeyTypes) {
+      Left(s"Wrong keyTypes ${keyTypesOpt.map(_.mkString(", "))}")
+    } else {
+      val publicKeys = rawKeys.foldE(AVector.empty[SecP256K1PublicKey]) { (publicKeys, rawKey) =>
+        SecP256K1PublicKey.from(rawKey) match {
+          case Some(publicKey) =>
+            Right(publicKeys :+ publicKey)
+          case None =>
+            Left(s"Invalid SecP256K1 public key: ${Hex.toHexString(rawKey)}")
+        }
+      }
+      publicKeys.flatMap { keys =>
+        LockupScript.p2mpkh(keys, mrequired) match {
+          case Some(lockupScript) =>
+            Right(
+              BuildMultisigAddressResult(
+                Address.Asset(lockupScript).toBase58
+              )
+            )
+          case None => Left(s"Invalid m-of-n multisig")
+        }
+      }
+    }
   }
 }

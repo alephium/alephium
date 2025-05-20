@@ -373,7 +373,9 @@ trait EndpointsLogic extends Endpoints {
       serverUtils
         .buildMultisigAddress(
           buildMultisig.keys,
-          buildMultisig.mrequired
+          buildMultisig.mrequired,
+          buildMultisig.keyTypes,
+          buildMultisig.multiSigType
         )
         .left
         .map(ApiError.BadRequest(_))
