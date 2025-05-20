@@ -11748,6 +11748,10 @@
                   "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                   "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
                 ],
+                "keyTypes": [
+                  "default",
+                  "default"
+                ],
                 "mrequired": 1
               }
             }
@@ -11918,7 +11922,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
+                  "$ref": "#/components/schemas/BuildTransferTxResult"
                 },
                 "example": {
                   "type": "BuildSimpleTransferTxResult",
@@ -14546,7 +14550,7 @@
             "type": "array",
             "items": {
               "type": "string",
-              "format": "public-key"
+              "format": "hex-string"
             }
           },
           "destinations": {
@@ -14577,12 +14581,22 @@
             "type": "array",
             "items": {
               "type": "string",
-              "format": "public-key"
+              "format": "hex-string"
+            }
+          },
+          "keyTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "hex-string"
             }
           },
           "mrequired": {
             "type": "integer",
             "format": "int32"
+          },
+          "multiSigType": {
+            "$ref": "#/components/schemas/MultiSigType"
           }
         }
       },
@@ -14594,8 +14608,7 @@
         ],
         "properties": {
           "address": {
-            "type": "string",
-            "format": "address"
+            "type": "string"
           }
         }
       },
@@ -16361,6 +16374,24 @@
           }
         }
       },
+      "MultiSigType": {
+        "title": "MultiSigType",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/P2HMPK"
+          },
+          {
+            "$ref": "#/components/schemas/P2MPKH"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "P2HMPK": "#/components/schemas/P2HMPK",
+            "P2MPKH": "#/components/schemas/P2MPKH"
+          }
+        }
+      },
       "MultipleCallContract": {
         "title": "MultipleCallContract",
         "type": "object",
@@ -16486,6 +16517,30 @@
           "key": {
             "type": "string",
             "format": "32-byte-hash"
+          }
+        }
+      },
+      "P2HMPK": {
+        "title": "P2HMPK",
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "P2MPKH": {
+        "title": "P2MPKH",
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
           }
         }
       },
