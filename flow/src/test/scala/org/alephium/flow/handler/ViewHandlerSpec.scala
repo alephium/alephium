@@ -692,6 +692,7 @@ class DanubeUpdateBestViewSpec extends UpdateBestViewSpec {
       state.requestCount is 0
       state.isUpdating is false
 
+      addAndCheck(blockFlow, flowData)
       viewHandler.underlyingActor.requestDanubeUpdate(flowData)
       state.requestCount is 1
       state.isUpdating is false
