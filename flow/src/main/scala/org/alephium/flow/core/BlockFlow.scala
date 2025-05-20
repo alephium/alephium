@@ -466,6 +466,10 @@ object BlockFlow extends StrictLogging {
         updateBestDepsPreDanube(mainGroup, deps)
       }
       updateBestFlowSkeletonUnsafe()
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        val deps = calBestFlowPerChainIndexUnsafe(chainIndex)
+        updateBestDepsDanube(chainIndex, deps)
+      }
     }
 
     def updateAccountViewAfterLoadingUnsafe(): Unit = {
