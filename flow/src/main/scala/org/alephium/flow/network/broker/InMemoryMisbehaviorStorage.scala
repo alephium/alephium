@@ -27,21 +27,21 @@ class InMemoryMisbehaviorStorage(val penaltyForgivness: Duration) extends Misbeh
 
   private val peers: mutable.Map[InetAddress, MisbehaviorStatus] = mutable.Map.empty
 
-  def get(peer: InetAddress): Option[MisbehaviorStatus] = getAndExpire(peer)
+  override def get(peer: InetAddress): Option[MisbehaviorStatus] = getAndExpire(peer)
 
   private def getAndExpire(peer: InetAddress): Option[MisbehaviorStatus] = {
     peers.get(peer).flatMap { status => withUpdatedStatus(peer, status) { (_, status) => status } }
   }
 
-  def update(peer: InetAddress, penalty: Penalty): Unit = {
+  override def update(peer: InetAddress, penalty: Penalty): Unit = {
     peers.addOne(peer -> penalty)
   }
 
-  def ban(peer: InetAddress, until: TimeStamp): Unit = {
+  override def ban(peer: InetAddress, until: TimeStamp): Unit = {
     peers.update(peer, Banned(until))
   }
 
-  def isBanned(peer: InetAddress): Boolean = {
+  override def isBanned(peer: InetAddress): Boolean = {
     val now = TimeStamp.now()
     getAndExpire(peer) match {
       case Some(status) =>
@@ -53,11 +53,11 @@ class InMemoryMisbehaviorStorage(val penaltyForgivness: Duration) extends Misbeh
     }
   }
 
-  def remove(peer: InetAddress): Unit = {
+  override def remove(peer: InetAddress): Unit = {
     discard(peers.remove(peer))
   }
 
-  def list(): AVector[Peer] = {
+  override def list(): AVector[Peer] = {
     AVector.from(peers.flatMap { case (peer, status) =>
       withUpdatedStatus(peer, status) { (peer, newStatus) => Peer(peer, newStatus) }
     })
