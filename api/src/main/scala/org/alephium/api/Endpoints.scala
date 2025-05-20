@@ -406,11 +406,11 @@ trait Endpoints
       .out(jsonBody[BuildMultisigAddressResult])
       .summary("Create the multisig address and unlock script")
 
-  val buildMultisig: BaseEndpoint[BuildMultisig, BuildSimpleTransferTxResult] =
+  val buildMultisig: BaseEndpoint[BuildMultisig, BuildTransferTxResult] =
     multisigEndpoint.post
       .in("build")
       .in(jsonBody[BuildMultisig])
-      .out(jsonBody[BuildSimpleTransferTxResult])
+      .out(jsonBody[BuildTransferTxResult])
       .summary("Build a multisig unsigned transaction")
 
   val buildSweepMultisig: BaseEndpoint[BuildSweepMultisig, BuildSweepAddressTransactionsResult] =

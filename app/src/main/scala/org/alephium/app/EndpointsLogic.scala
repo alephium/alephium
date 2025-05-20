@@ -422,7 +422,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
+    bt => Right(Some(bt.fromAddress.getAddress().lockupScript.groupIndex(brokerConfig)))
   )
 
   val buildSweepMultisigLogic = serverLogicRedirect(buildSweepMultisig)(

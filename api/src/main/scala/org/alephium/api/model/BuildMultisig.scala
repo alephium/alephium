@@ -16,16 +16,39 @@
 
 package org.alephium.api.model
 
+import akka.util.ByteString
+
+import org.alephium.api.{badRequest, Try}
+import org.alephium.crypto.SecP256K1PublicKey
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{Address, AddressLike}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Hex}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildMultisig(
-    fromAddress: Address.Asset,
-    fromPublicKeys: AVector[PublicKey],
+    fromAddress: AddressLike,
+    fromPublicKeys: AVector[ByteString],
     destinations: AVector[Destination],
     gas: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None
-)
+) {
+  def getFromAddress()(implicit config: GroupConfig): Try[Address.Asset] = {
+    fromAddress.getAddress() match {
+      case address: Address.Asset =>
+        Right(address)
+      case address: Address.Contract =>
+        Left(badRequest(s"Expect asset address, but was contract address: ${address.toBase58}"))
+    }
+  }
+
+  def getFromPublicKeys(): Try[AVector[PublicKey]] = {
+    fromPublicKeys.foldE(AVector.empty[PublicKey]) { (acc, rawPubKey) =>
+      SecP256K1PublicKey.from(rawPubKey) match {
+        case Some(publicKey) => Right(acc :+ publicKey)
+        case None => Left(badRequest(s"Invalid public key: ${Hex.toHexString(rawPubKey)}"))
+      }
+    }
+  }
+}

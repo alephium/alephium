@@ -349,19 +349,22 @@ class ServerUtils(implicit
       BuildSimpleTransferTxResult.from(unsignedTx)
     }
   }
+
   def buildMultisig(
       blockFlow: BlockFlow,
       query: BuildMultisig
   ): Try[BuildSimpleTransferTxResult] = {
     for {
-      _ <- checkGroup(query.fromAddress.lockupScript)
+      fromAddress <- query.getFromAddress()
+      _           <- checkGroup(fromAddress.lockupScript)
+      publicKeys  <- query.getFromPublicKeys()
       unlockScript <- buildMultisigUnlockScript(
-        query.fromAddress.lockupScript,
-        query.fromPublicKeys
+        fromAddress.lockupScript,
+        publicKeys
       )
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
-        query.fromAddress.lockupScript,
+        fromAddress.lockupScript,
         unlockScript,
         query.destinations,
         query.gas,

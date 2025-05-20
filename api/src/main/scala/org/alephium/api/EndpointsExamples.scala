@@ -26,6 +26,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{
   Address,
+  AddressLike,
   BlockHash,
   CliqueId,
   ContractId,
@@ -657,8 +658,8 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildMultisigTransactionExamples: List[Example[BuildMultisig]] = List(
     defaultExample(
       BuildMultisig(
-        address,
-        AVector(publicKey),
+        AddressLike.from(address),
+        AVector(publicKey.bytes),
         defaultDestinations,
         None,
         None
@@ -666,8 +667,8 @@ trait EndpointsExamples extends ErrorExamples {
     ),
     moreSettingsExample(
       BuildMultisig(
-        address,
-        AVector(publicKey),
+        AddressLike.from(address),
+        AVector(publicKey.bytes),
         moreSettingsDestinations,
         Some(model.minimalGas),
         Some(model.nonCoinbaseMinGasPrice)

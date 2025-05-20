@@ -159,6 +159,10 @@ object AddressLike {
     AddressLike(LockupScript.CompleteLockupScript(lockupScript))
   }
 
+  def from(address: Address): AddressLike = {
+    from(address.lockupScript)
+  }
+
   def fromP2PKPublicKey(publicKey: PublicKeyLike): AddressLike = {
     AddressLike(LockupScript.HalfDecodedP2PK(publicKey))
   }
