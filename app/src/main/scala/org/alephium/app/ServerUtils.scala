@@ -177,6 +177,8 @@ class ServerUtils(implicit
         } yield balance
       case halfDecodedP2PK: LockupScript.HalfDecodedP2PK =>
         getGrouplessBalance(blockFlow, halfDecodedP2PK, getMempoolUtxos)
+      case halfDecodedP2HMPK: LockupScript.HalfDecodedP2HMPK =>
+        getGrouplessBalance(blockFlow, halfDecodedP2HMPK, getMempoolUtxos)
     }
   }
 

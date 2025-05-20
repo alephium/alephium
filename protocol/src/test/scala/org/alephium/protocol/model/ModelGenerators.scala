@@ -70,7 +70,7 @@ trait LockupScriptGenerators extends Generators {
       .map(LockupScript.p2sh)
   }
 
-  def p2pkLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2PK] = {
+  def publicKeyLikeGen(): Gen[PublicKeyLike] = {
     Gen
       .oneOf(
         Gen.const(()).map(_ => PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)),
@@ -78,7 +78,18 @@ trait LockupScriptGenerators extends Generators {
         Gen.const(()).map(_ => PublicKeyLike.ED25519(ED25519PublicKey.generate)),
         Gen.const(()).map(_ => PublicKeyLike.WebAuthn(SecP256R1PublicKey.generate))
       )
-      .map(LockupScript.p2pk(_, groupIndex))
+  }
+
+  def p2pkLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2PK] = {
+    publicKeyLikeGen().map(LockupScript.p2pk(_, groupIndex))
+  }
+
+  def p2hmpkLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2HMPK] = {
+    for {
+      numKeys   <- Gen.chooseNum(1, ALPH.MaxKeysInP2MPK)
+      keys      <- Gen.listOfN(numKeys, publicKeyLikeGen()).map(AVector.from)
+      threshold <- Gen.choose(1, keys.length)
+    } yield LockupScript.P2HMPK(keys, threshold, groupIndex)
   }
 
   def preDanubeLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
@@ -89,8 +100,12 @@ trait LockupScriptGenerators extends Generators {
     )
   }
 
+  def afterDanubeLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
+    Gen.oneOf(p2pkLockupGen(groupIndex), p2hmpkLockupGen(groupIndex))
+  }
+
   def assetLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
-    Gen.oneOf(preDanubeLockupGen(groupIndex), p2pkLockupGen(groupIndex))
+    Gen.oneOf(preDanubeLockupGen(groupIndex), afterDanubeLockupGen(groupIndex))
   }
 
   def p2cLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2C] = {

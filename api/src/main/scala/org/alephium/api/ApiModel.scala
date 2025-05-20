@@ -165,6 +165,9 @@ trait ApiModelCodec {
       case LockupScript.HalfDecodedP2PK(publicKey) =>
         val groupIndex = publicKey.defaultGroup
         Address.Asset(LockupScript.p2pk(publicKey, groupIndex))
+      case LockupScript.HalfDecodedP2HMPK(hash) =>
+        val defaultGroupIndex = LockupScript.P2HMPK.defaultGroup(hash)
+        Address.Asset(LockupScript.p2hmpk(hash, defaultGroupIndex))
       case LockupScript.InvalidLockupScript =>
         throw Abort(s"Unable to decode address from $input")
     }

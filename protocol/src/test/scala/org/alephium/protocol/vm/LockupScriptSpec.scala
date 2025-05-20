@@ -56,7 +56,7 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     serialize[LockupScript](lock3) is Hex.unsafe(s"03${hash0.toHexString}")
   }
 
-  it should "validate multisig" in {
+  it should "validate p2mpkh" in {
     val hash0 = Hash.random
     val hash1 = Hash.random
 
@@ -103,6 +103,22 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
       .startsWith("Wrong checksum") is true
   }
 
+  it should "validate p2hmpk" in {
+    val lockupScript = p2hmpkLockupGen(GroupIndex.unsafe(2)).sample.get
+    lockupScript.groupIndex is lockupScript.scriptHint.groupIndex
+
+    val bytes = Hex.unsafe(s"05${lockupScript.p2hmpkHash.toHexString}02")
+    serialize[LockupScript](lockupScript) is bytes
+    deserialize[LockupScript](bytes) isE lockupScript
+
+    (0 until groupConfig.groups).foreach { value =>
+      val groupIndex = GroupIndex.unsafe(value)
+      val p2hmpk     = LockupScript.p2hmpk(lockupScript.p2hmpkHash, groupIndex)
+      p2hmpk.scriptHint.groupIndex is groupIndex
+      p2hmpk.groupIndex is groupIndex
+    }
+  }
+
   it should "calculate correct script hint for p2pk address" in {
     forAll(groupIndexGen) { groupIndex =>
       forAll(p2pkLockupGen(groupIndex)) { lockupScript0 =>
@@ -119,11 +135,31 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
+  it should "calculate correct script hint for p2hmpk address" in {
+    forAll(groupIndexGen) { groupIndex =>
+      forAll(p2hmpkLockupGen(groupIndex)) { lockupScript =>
+        lockupScript.groupIndex is groupIndex
+        lockupScript.scriptHint.groupIndex is groupIndex
+        lockupScript.scriptHint.groupIndex.value.toByte is lockupScript.groupByte
+      }
+    }
+  }
+
   it should "only modify the MSB of the public key's script hint" in {
     val publicKey   = PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)
     val initialHint = ScriptHint.fromHash(DjbHash.intHash(publicKey.rawBytes))
     (0 until groupConfig.groups).foreach { groupIndex =>
       val lockupScript = LockupScript.p2pk(publicKey, GroupIndex.unsafe(groupIndex))
+      lockupScript.scriptHint.groupIndex.value is groupIndex
+      (lockupScript.scriptHint.value & 0x00ffffff) is (initialHint.value & 0x00ffffff)
+    }
+  }
+
+  it should "only modify the MSB of p2hmpk hash's script hint" in {
+    val p2hmpkHash  = Hash.random
+    val initialHint = ScriptHint.fromHash(DjbHash.intHash(p2hmpkHash.bytes))
+    (0 until groupConfig.groups).foreach { groupIndex =>
+      val lockupScript = LockupScript.p2hmpk(p2hmpkHash, GroupIndex.unsafe(groupIndex))
       lockupScript.scriptHint.groupIndex.value is groupIndex
       (lockupScript.scriptHint.value & 0x00ffffff) is (initialHint.value & 0x00ffffff)
     }
@@ -137,6 +173,8 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L") is a[HalfDecodedP2PK]
     decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0") is
       a[ValidLockupScript]
+    decodeFromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85:0") is a[ValidLockupScript]
+    decodeFromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85") is a[HalfDecodedP2HMPK]
     decodeFromBase58(":1") is InvalidLockupScript
     decodeFromBase58("1C2:1") is InvalidLockupScript
     decodeFromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0") is InvalidLockupScript

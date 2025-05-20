@@ -31,8 +31,8 @@ sealed trait Address {
 
   def toBase58: String = {
     lockupScript match {
-      case script: LockupScript.P2PK => script.toBase58
-      case _                         => Base58.encode(serialize(lockupScript))
+      case script: LockupScript.GrouplessAsset => script.toBase58
+      case _                                   => Base58.encode(serialize(lockupScript))
     }
   }
 
@@ -125,6 +125,9 @@ final case class AddressLike(lockupScriptResult: LockupScript.ValidLockupScript)
       case LockupScript.HalfDecodedP2PK(publicKey) =>
         val defaultGroupIndex = publicKey.defaultGroup
         Address.Asset(LockupScript.p2pk(publicKey, defaultGroupIndex))
+      case LockupScript.HalfDecodedP2HMPK(hash) =>
+        val defaultGroupIndex = LockupScript.P2HMPK.defaultGroup(hash)
+        Address.Asset(LockupScript.p2hmpk(hash, defaultGroupIndex))
     }
   }
 
@@ -134,6 +137,8 @@ final case class AddressLike(lockupScriptResult: LockupScript.ValidLockupScript)
         Address.from(lockupScript).toBase58
       case LockupScript.HalfDecodedP2PK(publicKey) =>
         LockupScript.p2pk(publicKey, new GroupIndex(0)).toBase58WithoutGroup
+      case LockupScript.HalfDecodedP2HMPK(hash) =>
+        LockupScript.p2hmpk(hash, new GroupIndex(0)).toBase58WithoutGroup
     }
   }
 

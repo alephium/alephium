@@ -126,9 +126,9 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       addressLike.lockupScriptResult match {
         case LockupScript.CompleteLockupScript(lockupScript) =>
           getBalance(lockupScript)
-        case halfDecodedP2PK: LockupScript.HalfDecodedP2PK =>
+        case halfDecodedLockupScript: LockupScript.HalfDecodedLockupScript =>
           val balance =
-            serverUtils.getGrouplessBalance(blockFlow, halfDecodedP2PK, false).rightValue
+            serverUtils.getGrouplessBalance(blockFlow, halfDecodedLockupScript, false).rightValue
           val tokenAmount = balance.tokenBalances.flatMap(_.find(_.id == tokenId).map(_.amount))
           (balance.balance.value, tokenAmount.getOrElse(U256.Zero))
       }

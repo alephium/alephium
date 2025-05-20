@@ -21,6 +21,8 @@ import java.nio.charset.StandardCharsets
 import akka.util.ByteString
 
 import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.vm.LockupScript.Groupless
+import org.alephium.protocol.vm.LockupScript.P2HMPK.hashPreImageSerializer
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -28,12 +30,18 @@ sealed trait UnlockScript
 
 object UnlockScript {
   implicit val serde: Serde[UnlockScript] = {
-    implicit val tuple: Serde[(PublicKey, Int)] = Serde.tuple2[PublicKey, Int]
+    implicit val indexedPublicKeySerde: Serde[(PublicKey, Int)] = Serde.tuple2[PublicKey, Int]
+    implicit val publicKeyLikeSerde: Serde[PublicKeyLike]       = Groupless.safePublicKeySerde
 
     val p2mpkhSerde: Serde[P2MPKH] =
       Serde
         .forProduct1[AVector[(PublicKey, Int)], P2MPKH](P2MPKH.apply, t => t.indexedPublicKeys)
     val p2shSerde: Serde[P2SH] = Serde.forProduct2(P2SH.apply, t => (t.script, t.params))
+    val p2hmpkSerde: Serde[P2HMPK] =
+      Serde.forProduct2[AVector[PublicKeyLike], AVector[Int], P2HMPK](
+        P2HMPK.apply,
+        t => (t.publicKeys, t.publicKeyIndexes)
+      )
 
     new Serde[UnlockScript] {
       override def serialize(input: UnlockScript): ByteString = {
@@ -44,6 +52,7 @@ object UnlockScript {
           case SameAsPrevious => ByteString(3)
           case polw: PoLW     => ByteString(4) ++ serdeImpl[PublicKey].serialize(polw.publicKey)
           case P2PK           => ByteString(5)
+          case p2hmpk: P2HMPK => ByteString(6) ++ p2hmpkSerde.serialize(p2hmpk)
         }
       }
 
@@ -57,6 +66,7 @@ object UnlockScript {
           case Staging(4, content) =>
             serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(PoLW.apply))
           case Staging(5, content) => Right(Staging(P2PK, content))
+          case Staging(6, content) => p2hmpkSerde._deserialize(content)
           case Staging(n, _) => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
         }
       }
@@ -90,4 +100,18 @@ object UnlockScript {
     }
   }
   case object P2PK extends UnlockScript
+  final case class P2HMPK(
+      publicKeys: AVector[PublicKeyLike],
+      publicKeyIndexes: AVector[Int]
+  ) extends UnlockScript {
+    def hash: Hash =
+      Hash.hash(hashPreImageSerializer.serialize((publicKeys, publicKeyIndexes.length)))
+  }
+
+  def validateP2hmpk(unlock: UnlockScript.P2HMPK): Boolean = {
+    (0 until (unlock.publicKeyIndexes.length - 1)).forall { i =>
+      val index = unlock.publicKeyIndexes(i)
+      index >= 0 && unlock.publicKeyIndexes(i + 1) > index
+    }
+  }
 }

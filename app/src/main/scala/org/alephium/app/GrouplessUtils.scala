@@ -37,12 +37,12 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
   def getGrouplessBalance(
       blockFlow: BlockFlow,
-      halfDecodedP2PK: LockupScript.HalfDecodedP2PK,
+      halfDecodedLockupScript: LockupScript.HalfDecodedLockupScript,
       getMempoolUtxos: Boolean
   ): Try[Balance] = {
     for {
       allBalances <- wrapResult(AVector.from(brokerConfig.groupIndexes).mapE { groupIndex =>
-        val lockupScript = LockupScript.p2pk(halfDecodedP2PK.publicKey, groupIndex)
+        val lockupScript = halfDecodedLockupScript.toCompleteLockupScript(groupIndex).lockupScript
         blockFlow.getBalance(lockupScript, apiConfig.defaultUtxosLimit, getMempoolUtxos)
       })
       balance <- allBalances.foldE(model.Balance.zero)(_ merge _).left.map(failed)

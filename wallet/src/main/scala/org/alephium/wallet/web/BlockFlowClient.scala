@@ -120,6 +120,8 @@ object BlockFlowClient {
           getBalance(addressLike, lockupScript.groupIndex)
         case LockupScript.HalfDecodedP2PK(publicKey) =>
           getBalance(addressLike, publicKey.defaultGroup)
+        case LockupScript.HalfDecodedP2HMPK(hash) =>
+          getBalance(addressLike, LockupScript.P2HMPK.defaultGroup(hash))
       }
 
     private def getBalance(

@@ -18,8 +18,10 @@ package org.alephium.protocol.vm
 
 import org.scalacheck.Gen
 
+import org.alephium.crypto.{ED25519PublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.NoIndexModelGenerators
+import org.alephium.protocol.vm.LockupScript.Groupless
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
@@ -59,6 +61,22 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
 
     deserialize[UnlockScript](serialize[UnlockScript](UnlockScript.P2PK)) isE UnlockScript.P2PK
+
+    val pubKey0 = SecP256K1PublicKey.generate
+    val pubKey1 = SecP256R1PublicKey.generate
+    val pubKey2 = ED25519PublicKey.generate
+    val pubKey3 = SecP256R1PublicKey.generate
+
+    val publicKeys = AVector(
+      PublicKeyLike.SecP256K1(pubKey0),
+      PublicKeyLike.SecP256R1(pubKey1),
+      PublicKeyLike.ED25519(pubKey2),
+      PublicKeyLike.WebAuthn(pubKey3)
+    )
+    val publicKeyIndexes = AVector(0, 1, 2, 3)
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, publicKeyIndexes))
+    ) isE UnlockScript.P2HMPK(publicKeys, publicKeyIndexes)
   }
 
   it should "serialize examples" in {
@@ -83,6 +101,18 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     deserialize[UnlockScript](encoded).rightValue is unlock3
 
     serialize[UnlockScript](UnlockScript.P2PK) is Hex.unsafe("05")
+
+    val publicKeys = AVector(
+      PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate),
+      PublicKeyLike.SecP256R1(SecP256R1PublicKey.generate)
+    )
+    val publicKeyIndexes = AVector(0)
+    val serializedPublicKey0 =
+      Hex.toHexString(Groupless.safePublicKeySerde.serialize(publicKeys(0)))
+    val serializedPublicKey1 =
+      Hex.toHexString(Groupless.safePublicKeySerde.serialize(publicKeys(1)))
+    serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, publicKeyIndexes)) is
+      Hex.unsafe(s"0602${serializedPublicKey0}${serializedPublicKey1}0100")
   }
 
   it should "validate multisig" in {
