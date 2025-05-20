@@ -27,7 +27,9 @@ class InMemoryMisbehaviorStorage(val penaltyForgivness: Duration) extends Misbeh
 
   private val peers: mutable.Map[InetAddress, MisbehaviorStatus] = mutable.Map.empty
 
-  def get(peer: InetAddress): Option[MisbehaviorStatus] = {
+  def get(peer: InetAddress): Option[MisbehaviorStatus] = getAndExpire(peer)
+
+  private def getAndExpire(peer: InetAddress): Option[MisbehaviorStatus] = {
     peers.get(peer).flatMap { status => withUpdatedStatus(peer, status) { (_, status) => status } }
   }
 
@@ -41,7 +43,7 @@ class InMemoryMisbehaviorStorage(val penaltyForgivness: Duration) extends Misbeh
 
   def isBanned(peer: InetAddress): Boolean = {
     val now = TimeStamp.now()
-    get(peer) match {
+    getAndExpire(peer) match {
       case Some(status) =>
         status match {
           case Banned(until) => now.isBefore(until)

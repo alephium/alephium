@@ -23,7 +23,7 @@ class InMemoryMisbehaviorStorageSpec extends AlephiumSpec with Generators {
   it should "check until for isBanned" in {
     val storage = new InMemoryMisbehaviorStorage(Duration.ofSecondsUnsafe(10))
     val address = socketAddressGen.sample.get.getAddress
-    val until = TimeStamp.now().plusUnsafe(Duration.ofMillisUnsafe(100))
+    val until   = TimeStamp.now().plusUnsafe(Duration.ofMillisUnsafe(100))
 
     storage.ban(address, until)
     storage.isBanned(address) is true
