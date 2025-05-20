@@ -8473,11 +8473,19 @@ class VMSpec extends AlephiumSpec with Generators {
          |    // this line of code will not be executed
          |    assert!(foo.getCount() == 0, 0)
          |  }
-         |  assert!(foo.getCount() == 1, 0)
-         |  if (true && foo.foo()) {
+         |  if (false || foo.foo()) {
          |    assert!(foo.getCount() == 2, 0)
          |  }
          |  assert!(foo.getCount() == 2, 0)
+         |
+         |  if (true && foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 2, 0)
+         |  }
+         |  if (true && foo.foo()) {
+         |    assert!(foo.getCount() == 4, 0)
+         |  }
+         |  assert!(foo.getCount() == 4, 0)
          |}
          |$contract
          |""".stripMargin
