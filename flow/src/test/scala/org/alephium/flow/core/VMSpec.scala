@@ -2296,6 +2296,10 @@ class VMSpec extends AlephiumSpec with Generators {
       )
     )
     val p2cAddress = Address.contract(ContractId.generate)
+    val p2pkAddress = Address.Asset(
+      LockupScript.p2pk(PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate), GroupIndex.unsafe(0))
+    )
+    val p2hmpkAddress = Address.Asset(LockupScript.P2HMPK(Hash.random, GroupIndex.unsafe(0)))
     def main(address: Address): String = {
       val hex = Hex.toHexString(serialize(address.lockupScript))
       s"""
@@ -2310,6 +2314,8 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(main(p2shAddress))
     testSimpleScript(main(p2mpkhAddress))
     testSimpleScript(main(p2cAddress))
+    testSimpleScript(main(p2pkAddress))
+    testSimpleScript(main(p2hmpkAddress))
   }
 
   it should "create and use NFT contract" in new ContractFixture {
