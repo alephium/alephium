@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import org.alephium.crypto.{ED25519PublicKey, SecP256R1PublicKey}
 import org.alephium.macros.Gas
 import org.alephium.protocol.PublicKey
-
+import org.alephium.util.AVector
 //scalastyle:off magic.number number.of.types
 
 trait GasSchedule
@@ -282,4 +282,21 @@ object GasSchedule {
     GasBox.unsafe(GasHash.gas(ED25519PublicKey.length).value + GasSignature.gas.value)
 
   def p2mpkUnlockGas(m: Int): GasBox = secp256K1UnlockGas.mulUnsafe(m)
+
+  def p2hmpkUnlockGas(publicKeysLike: AVector[PublicKeyLike]): GasBox = {
+    publicKeysLike.fold(GasBox.unsafe(0)) { (acc, publicKeyLike) =>
+      val acc1 = publicKeyLike match {
+        case PublicKeyLike.SecP256K1(_) =>
+          acc.addUnsafe(secp256K1UnlockGas)
+        case PublicKeyLike.SecP256R1(_) =>
+          acc.addUnsafe(secp256R1UnlockGas)
+        case PublicKeyLike.ED25519(_) =>
+          acc.addUnsafe(ed25519UnlockGas)
+        case PublicKeyLike.WebAuthn(_) =>
+          acc.addUnsafe(webauthnUnlockGas(500))
+      }
+
+      acc1.addUnsafe(GasSignature.gas)
+    }
+  }
 }

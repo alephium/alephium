@@ -118,6 +118,16 @@ object GasEstimation extends StrictLogging {
           case lockupScript =>
             Left(s"Invalid lockup script $lockupScript, expected LockupScript.P2PK")
         }
+      case p2hmpk: UnlockScript.P2HMPK =>
+        val publicKeys = p2hmpk.publicKeyIndexes.fold(AVector.empty[PublicKeyLike]) {
+          (acc, index) =>
+            acc :+ p2hmpk.publicKeys(index)
+        }
+        Right(
+          GasSchedule.txInputBaseGas.addUnsafe(
+            GasSchedule.p2hmpkUnlockGas(publicKeys)
+          )
+        )
     }
   }
 

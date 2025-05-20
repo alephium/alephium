@@ -23,7 +23,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.crypto.{Byte64, ED25519, SecP256R1}
+import org.alephium.crypto.{Byte64, ED25519, SecP256K1, SecP256R1}
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.validation.ValidationStatus.{invalidTx, validTx}
@@ -1148,7 +1148,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
   }
 
-  it should "invalidate p2mpkh" in new Fixture {
+  it should "check invalid p2mpkh" in new Fixture {
     val (priKey0, pubKey0) = keypairGen.sample.value
     val (priKey1, pubKey1) = keypairGen.sample.value
     val (_, pubKey2)       = keypairGen.sample.value
@@ -1173,6 +1173,31 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx(pubKey1 -> 0, pubKey1 -> 1).fail(InvalidPublicKeyHash)
     tx(pubKey0 -> 0, pubKey2 -> 2).fail(InvalidSignature)
     tx(pubKey0 -> 0, pubKey1 -> 1).pass()
+  }
+
+  it should "check invalid p2hmpk" in new Fixture {
+    val (priKey0, pubKey0) = keypairGen.sample.value
+    val (priKey1, pubKey1) = keypairGen.sample.value
+    val (_, pubKey2)       = keypairGen.sample.value
+    val allPubKeys: AVector[PublicKeyLike] =
+      AVector(pubKey0, pubKey1, pubKey2).map(PublicKeyLike.SecP256K1.apply)
+
+    def tx(publicKeyIndexes: AVector[Int]): Transaction = {
+      val lockup   = LockupScript.P2HMPK(allPubKeys, 2, GroupIndex.unsafe(0))
+      val unlock   = UnlockScript.P2HMPK(allPubKeys, publicKeyIndexes)
+      val unsigned = prepareOutput(lockup, unlock)
+      sign(unsigned, priKey0, priKey1)
+    }
+
+    implicit val validator: (Transaction) => TxValidationResult[Unit] =
+      validateTxOnlyForTest(_, blockFlow, None)
+
+    tx(AVector(0, 1, 2)).fail(InvalidP2hmpkHash)
+    tx(AVector(0)).fail(InvalidP2hmpkHash)
+    tx(AVector.empty).fail(InvalidP2hmpkHash)
+    tx(AVector(0, 2)).fail(InvalidSignature)
+    tx(AVector(2, 0)).fail(InvalidP2hmpkUnlockScript)
+    tx(AVector(0, 1)).pass()
   }
 
   it should "validate p2sh" in new Fixture {
@@ -1492,6 +1517,30 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     )
   }
 
+  it should "validate p2hmpk lockup script" in new Fixture {
+    val groupIndex = GroupIndex.unsafe(0)
+    val lockup     = p2hmpkLockupGen(groupIndex).sample.get
+    val fromPriKey = genesisKeys(groupIndex.value)._1
+    val unsignedTx = blockFlow
+      .transfer(
+        fromPriKey.publicKey,
+        AVector(TxOutputInfo(lockup, ALPH.alph(1), AVector.empty, None)),
+        None,
+        nonCoinbaseMinGasPrice,
+        defaultUtxoLimit,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+      .rightValue
+    val tx = Transaction.from(unsignedTx, fromPriKey)
+    tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
+    tx.fail(InvalidLockupScriptPreDanube)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
+    tx.fail(InvalidLockupScriptPreDanube)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
+    tx.fail(InvalidLockupScriptPreDanube)(
+      validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet))
+    )
+  }
+
   trait P2PKUnlockScriptFixture extends Fixture {
     val groupIndex    = GroupIndex.unsafe(0)
     val genesisPriKey = genesisKeys(groupIndex.value)._1
@@ -1597,6 +1646,206 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     def sign(unsignedTx: UnsignedTransaction): Transaction = Transaction.from(unsignedTx, priKey)
     def unlockGas: GasBox                                  = GasSchedule.ed25519UnlockGas
+
+    prepare()
+    checkValidTx(createTx())
+  }
+
+  trait P2HMPKUnlockScriptFixture extends Fixture {
+    val groupIndex    = GroupIndex.unsafe(0)
+    val genesisPriKey = genesisKeys(groupIndex.value)._1
+
+    def publicKeys: AVector[PublicKeyLike]
+    def publicKeyIndexes: AVector[Int]
+    def lockup: LockupScript.P2HMPK =
+      LockupScript.P2HMPK(publicKeys, publicKeyIndexes.length, groupIndex)
+    def sign(unsignedTx: UnsignedTransaction): Transaction
+    def unlockGas: GasBox
+
+    def prepare(): Unit = {
+      val block =
+        transfer(blockFlow, genesisPriKey, lockup, AVector.empty[(TokenId, U256)], ALPH.oneAlph)
+      addAndCheck(blockFlow, block)
+    }
+
+    def createTx(): Transaction = {
+      val utxos = blockFlow.getUsableUtxos(None, lockup, Int.MaxValue).rightValue
+      utxos.length is 1
+
+      val unsignedTx = UnsignedTransaction(
+        utxos.map(utxo => TxInput(utxo.ref, UnlockScript.P2HMPK(publicKeys, publicKeyIndexes))),
+        AVector(
+          AssetOutput(
+            ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee),
+            LockupScript.p2pkh(genesisPriKey.publicKey),
+            TimeStamp.zero,
+            AVector.empty,
+            ByteString.empty
+          )
+        )
+      )
+      sign(unsignedTx)
+    }
+
+    private def checkUnlockGas(tx: Transaction) = {
+      import GasSchedule._
+      val blockEnv =
+        BlockEnv(tx.chainIndex, networkConfig.networkId, TimeStamp.now(), Target.Max, None)
+      val worldState  = blockFlow.getBestPersistedWorldState(tx.chainIndex.from).rightValue
+      val prevOutputs = worldState.getPreOutputs(tx).rightValue
+      val initialGas  = tx.unsigned.gasAmount
+      val gasLeft     = checkGasAndWitnesses(tx, prevOutputs, blockEnv, false, 0).rightValue
+      val gasUsed     = initialGas.use(gasLeft).rightValue
+      gasUsed is (txBaseGas addUnsafe txInputBaseGas addUnsafe txOutputBaseGas addUnsafe unlockGas)
+    }
+
+    def checkValidTx(tx: Transaction) = {
+      tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
+      checkUnlockGas(tx)
+      blockFlow.updateViewPreDanube() isE ()
+      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
+      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
+      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet)))
+    }
+
+    def checkInvalidTx(invalidTx: Transaction) = {
+      invalidTx.fail(InvalidUnlockScriptType)(
+        validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube))
+      )
+    }
+  }
+
+  it should "validate p2hmpk(secp256k1) unlock script" in new P2HMPKUnlockScriptFixture {
+    val (priKey0, pubKey0) = SecP256K1.generatePriPub()
+    val (_, pubKey1)       = SecP256K1.generatePriPub()
+    val (priKey2, pubKey2) = SecP256K1.generatePriPub()
+
+    val publicKeys = AVector(
+      PublicKeyLike.SecP256K1(pubKey0),
+      PublicKeyLike.SecP256K1(pubKey1),
+      PublicKeyLike.SecP256K1(pubKey2)
+    )
+    val publicKeyIndexes = AVector(0, 2)
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = sign(unsignedTx, priKey0, priKey2)
+    def unlockGas: GasBox = GasSchedule.secp256K1UnlockGas.mulUnsafe(2)
+
+    prepare()
+    checkValidTx(createTx())
+  }
+
+  it should "validate p2hmpk(secp256r1) unlock script" in new P2HMPKUnlockScriptFixture {
+    val (priKey0, pubKey0) = SecP256R1.generatePriPub()
+    val (_, pubKey1)       = SecP256R1.generatePriPub()
+    val (priKey2, pubKey2) = SecP256R1.generatePriPub()
+
+    val publicKeys = AVector(
+      PublicKeyLike.SecP256R1(pubKey0),
+      PublicKeyLike.SecP256R1(pubKey1),
+      PublicKeyLike.SecP256R1(pubKey2)
+    )
+    val publicKeyIndexes = AVector(0, 2)
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = {
+      val signatures =
+        AVector(priKey0, priKey2).map(key => Byte64.from(SecP256R1.sign(unsignedTx.id, key)))
+      Transaction.from(unsignedTx, AVector.from(signatures))
+    }
+    def unlockGas: GasBox = GasSchedule.secp256R1UnlockGas.mulUnsafe(2)
+
+    prepare()
+    checkValidTx(createTx())
+  }
+
+  it should "validate p2hmpk(webauthn) unlock script" in new P2HMPKUnlockScriptFixture {
+    val (priKey0, pubKey0) = SecP256R1.generatePriPub()
+    val (_, pubKey1)       = SecP256R1.generatePriPub()
+    val (priKey2, pubKey2) = SecP256R1.generatePriPub()
+
+    val publicKeys = AVector(
+      PublicKeyLike.WebAuthn(pubKey0),
+      PublicKeyLike.WebAuthn(pubKey1),
+      PublicKeyLike.WebAuthn(pubKey2)
+    )
+    val publicKeyIndexes = AVector(0, 2)
+
+    private var _webauthn0: Option[WebAuthn] = None
+    private var _webauthn2: Option[WebAuthn] = None
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = {
+      val (webauthn0, transaction0) = signWithWebAuthn(unsignedTx, priKey0)
+      val (webauthn2, transaction2) = signWithWebAuthn(unsignedTx, priKey2)
+      _webauthn0 = Some(webauthn0)
+      _webauthn2 = Some(webauthn2)
+      transaction0.copy(
+        inputSignatures = transaction0.inputSignatures ++ transaction2.inputSignatures
+      )
+    }
+
+    def unlockGas: GasBox = GasSchedule
+      .webauthnUnlockGas(_webauthn0.get.bytesLength)
+      .addUnsafe(GasSchedule.webauthnUnlockGas(_webauthn2.get.bytesLength))
+
+    prepare()
+    checkValidTx(createTx())
+  }
+
+  it should "validate p2hmpk(ed25519) unlock script" in new P2HMPKUnlockScriptFixture {
+    val (priKey0, pubKey0) = ED25519.generatePriPub()
+    val (_, pubKey1)       = ED25519.generatePriPub()
+    val (priKey2, pubKey2) = ED25519.generatePriPub()
+
+    val publicKeys = AVector(
+      PublicKeyLike.ED25519(pubKey0),
+      PublicKeyLike.ED25519(pubKey1),
+      PublicKeyLike.ED25519(pubKey2)
+    )
+    val publicKeyIndexes = AVector(0, 2)
+
+    def sign(unsignedTx: UnsignedTransaction): Transaction = {
+      val signatures =
+        AVector(priKey0, priKey2).map(key => Byte64.from(ED25519.sign(unsignedTx.id, key)))
+      Transaction.from(unsignedTx, AVector.from(signatures))
+    }
+    def unlockGas: GasBox = GasSchedule.ed25519UnlockGas.mulUnsafe(2)
+
+    prepare()
+    checkValidTx(createTx())
+  }
+
+  it should "validate p2hmpk(mix of secp256k1, secp256r1, ed25519, webauthn) unlock script" in new P2HMPKUnlockScriptFixture {
+    val (priKey0, pubKey0) = SecP256K1.generatePriPub()
+    val (priKey1, pubKey1) = SecP256R1.generatePriPub()
+    val (priKey2, pubKey2) = ED25519.generatePriPub()
+    val (priKey3, pubKey3) = SecP256R1.generatePriPub()
+    val (_, pubKey4)       = SecP256R1.generatePriPub()
+
+    val publicKeys = AVector(
+      PublicKeyLike.SecP256K1(pubKey0),
+      PublicKeyLike.SecP256R1(pubKey1),
+      PublicKeyLike.ED25519(pubKey2),
+      PublicKeyLike.WebAuthn(pubKey3),
+      PublicKeyLike.SecP256R1(pubKey4)
+    )
+    val publicKeyIndexes = AVector(0, 1, 2, 3)
+
+    private var _webauthn: Option[WebAuthn] = None
+    def sign(unsignedTx: UnsignedTransaction): Transaction = {
+      val signature0              = Byte64.from(SecP256K1.sign(unsignedTx.id, priKey0))
+      val signature1              = Byte64.from(SecP256R1.sign(unsignedTx.id, priKey1))
+      val signature2              = Byte64.from(ED25519.sign(unsignedTx.id, priKey2))
+      val (webauthn, transaction) = signWithWebAuthn(unsignedTx, priKey3)
+      _webauthn = Some(webauthn)
+      transaction.copy(
+        inputSignatures = AVector(signature0, signature1, signature2) ++ transaction.inputSignatures
+      )
+    }
+
+    def unlockGas: GasBox = GasSchedule
+      .webauthnUnlockGas(_webauthn.get.bytesLength)
+      .addUnsafe(GasSchedule.secp256R1UnlockGas)
+      .addUnsafe(GasSchedule.ed25519UnlockGas)
+      .addUnsafe(GasSchedule.secp256K1UnlockGas)
 
     prepare()
     checkValidTx(createTx())

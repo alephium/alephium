@@ -534,6 +534,7 @@ object TxValidation {
         _ <- checkOutputAmount(output, hardFork)
         _ <- checkP2MPKStat(output, hardFork)
         _ <- checkP2PKStat(output, hardFork)
+        _ <- checkP2HMPKStat(output, hardFork)
         _ <- checkOutputDataState(output)
       } yield ()
     }
@@ -581,6 +582,20 @@ object TxValidation {
         output.lockupScript match {
           case _: LockupScript.P2PK => invalidTx(InvalidLockupScriptPreDanube)
           case _                    => Right(())
+        }
+      }
+    }
+
+    @inline private def checkP2HMPKStat(
+        output: TxOutput,
+        hardFork: HardFork
+    ): TxValidationResult[Unit] = {
+      if (hardFork.isDanubeEnabled()) {
+        Right(())
+      } else {
+        output.lockupScript match {
+          case _: LockupScript.P2HMPK => invalidTx(InvalidLockupScriptPreDanube)
+          case _                      => Right(())
         }
       }
     }
@@ -876,6 +891,9 @@ object TxValidation {
         case (lock: LockupScript.P2PK, UnlockScript.P2PK)
             if blockEnv.getHardFork().isDanubeEnabled() =>
           checkP2pk(txEnv, txEnv.txId.bytes, gasRemaining, lock)
+        case (lock: LockupScript.P2HMPK, unlock: UnlockScript.P2HMPK)
+            if blockEnv.getHardFork().isDanubeEnabled() =>
+          checkP2hmpk(txEnv, txEnv.txId.bytes, gasRemaining, lock, unlock)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
       }
@@ -896,6 +914,40 @@ object TxValidation {
           checkED25519Signature(txEnv, preImage, gasRemaining, key)
         case PublicKeyLike.WebAuthn(key) =>
           checkWebAuthnSignature(txEnv, preImage, gasRemaining, key)
+      }
+    }
+
+    protected[validation] def checkP2hmpk(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        lock: LockupScript.P2HMPK,
+        unlock: UnlockScript.P2HMPK
+    ): TxValidationResult[GasBox] = {
+      if (unlock.publicKeyIndexes.length > unlock.publicKeys.length) {
+        invalidTx(InvalidNumberOfPublicKey)
+      } else if (!UnlockScript.validateP2hmpk(unlock)) {
+        invalidTx(InvalidP2hmpkUnlockScript)
+      } else if (lock.p2hmpkHash != unlock.hash) {
+        invalidTx(InvalidP2hmpkHash)
+      } else {
+        unlock.publicKeyIndexes.foldE(gasRemaining) { case (gasBox, index) =>
+          unlock.publicKeys.get(index) match {
+            case Some(publicKey) =>
+              publicKey match {
+                case PublicKeyLike.SecP256K1(key) =>
+                  checkSecP256K1Signature(txEnv, preImage, gasBox, key)
+                case PublicKeyLike.SecP256R1(key) =>
+                  checkSecP256R1Signature(txEnv, preImage, gasBox, key)
+                case PublicKeyLike.ED25519(key) =>
+                  checkED25519Signature(txEnv, preImage, gasBox, key)
+                case PublicKeyLike.WebAuthn(key) =>
+                  checkWebAuthnSignature(txEnv, preImage, gasBox, key)
+              }
+            case None =>
+              invalidTx(InvalidP2hmpkUnlockScript)
+          }
+        }
       }
     }
 
