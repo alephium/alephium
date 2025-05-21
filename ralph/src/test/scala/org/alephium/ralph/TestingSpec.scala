@@ -49,6 +49,38 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     }
 
     {
+      info("Consider the stdId field")
+      def code(enableStd: Boolean) =
+        s"""
+           |@std(enabled = $enableStd)
+           |Contract Foo(@unused v0: U256, @unused mut v1: U256) implements FooBase {
+           |  pub fn foo() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo" {
+           |    testCheck!(foo() == 0)
+           |  }
+           |}
+           |@std(id = #1234)
+           |Interface FooBase {
+           |  pub fn foo() -> U256
+           |}
+           |""".stripMargin
+      val test0     = compileContractFull(code(true)).rightValue.tests.value.tests.head
+      val contract0 = test0.before.head
+      contract0.immFields is AVector[(String, Val)](
+        ("v0", Val.U256(U256.Zero)),
+        (Ast.stdArg.ident.name, Val.ByteVec(Ast.StdInterfaceIdPrefix ++ Hex.unsafe("1234")))
+      )
+      contract0.mutFields is AVector[(String, Val)](("v1", Val.U256(U256.Zero)))
+
+      val test1     = compileContractFull(code(false)).rightValue.tests.value.tests.head
+      val contract1 = test1.before.head
+      contract1.immFields is AVector[(String, Val)](("v0", Val.U256(U256.Zero)))
+      contract1.mutFields is AVector[(String, Val)](("v1", Val.U256(U256.Zero)))
+    }
+
+    {
       info("Create simple contract")
       val code =
         s"""

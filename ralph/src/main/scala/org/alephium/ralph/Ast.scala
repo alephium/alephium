@@ -33,7 +33,7 @@ import org.alephium.util.{AVector, DjbHash, Hex, I256, U256}
 object Ast {
   type StdInterfaceId = Val.ByteVec
   val StdInterfaceIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
-  private val stdArg: Argument =
+  private[ralph] val stdArg: Argument =
     Argument(Ident("__stdInterfaceId"), Type.ByteVec, isMutable = false, isUnused = true)
 
   trait Positioned {

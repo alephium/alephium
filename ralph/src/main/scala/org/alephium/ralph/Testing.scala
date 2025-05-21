@@ -230,8 +230,14 @@ object Testing {
     }
   }
 
-  private def getContractFields(values: Seq[(String, Val, Boolean)]) = {
-    val (immFields, mutFields) = values.view.partition(!_._3)
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  private def getContractFields(contract: Ast.Contract, fields: Seq[(String, Val, Boolean)]) = {
+    val allFields = if (contract.hasStdIdField) {
+      fields :+ (Ast.stdArg.ident.name, contract.stdInterfaceId.get, Ast.stdArg.isMutable)
+    } else {
+      fields
+    }
+    val (immFields, mutFields) = allFields.view.partition(!_._3)
     (AVector.from(immFields.map(f => (f._1, f._2))), AVector.from(mutFields.map(f => (f._1, f._2))))
   }
 
@@ -330,7 +336,7 @@ object Testing {
           genDefaultValue(state, argument.ident.name, fieldType, argument.isMutable)
         }
       }
-      getContractFields(values)
+      getContractFields(self, values)
     }
 
     private def getTypeIdAndFields(state: Compiler.State[Ctx], origin: Ast.TypeId) = {
@@ -440,7 +446,7 @@ object Testing {
         val values = contract.fields.flatMap { argument =>
           genDefaultValue(state, argument.ident.name, argument.tpe, argument.isMutable)
         }
-        val (immFields, mutFields) = getContractFields(values)
+        val (immFields, mutFields) = getContractFields(contract, values)
         val selfContract =
           CreateContractValue(state.typeId, AVector.empty, immFields, mutFields, ContractId.random)
         AVector.from(dependencies.map(_.compileBeforeContract(state, origin))) :+ selfContract
