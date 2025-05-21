@@ -14,8 +14,28 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow
+package org.alephium.flow.model
 
-package object mining {
-  val MiningDispatcher = "akka.actor.mining-dispatcher"
+final private[flow] class AsyncUpdateState(
+    private var _requestCount: Int,
+    private var _isUpdating: Boolean
+) {
+  @inline def requestCount: Int   = _requestCount
+  @inline def isUpdating: Boolean = _isUpdating
+
+  @inline def tryUpdate(): Boolean = {
+    val needToUpdate = _requestCount > 0 && !_isUpdating
+    if (needToUpdate) {
+      _requestCount = 0
+      _isUpdating = true
+    }
+    needToUpdate
+  }
+
+  @inline def requestUpdate(): Unit = _requestCount += 1
+  @inline def setCompleted(): Unit  = _isUpdating = false
+}
+
+private[flow] object AsyncUpdateState {
+  def apply(): AsyncUpdateState = new AsyncUpdateState(0, false)
 }

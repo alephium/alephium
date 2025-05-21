@@ -20,6 +20,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.util.ByteString
 import io.prometheus.client.{Counter, Gauge, Histogram}
 
+import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxForkDepth, BlockFlow}
 import org.alephium.flow.handler.AllHandlers.BlockNotify
 import org.alephium.flow.model.DataOrigin
@@ -28,7 +29,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation._
 import org.alephium.io.IOResult
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs, NetworkConfig}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, NetworkId}
 import org.alephium.protocol.vm.{LogConfig, WorldState}
@@ -49,9 +50,11 @@ object BlockChainHandler {
       networkSetting: NetworkSetting,
       logConfig: LogConfig
   ): ActorRefT[Command] = {
+    val props = Props(new BlockChainHandler(blockFlow, chainIndex, eventBus, maxForkDepth))
+      .withDispatcher(Utils.PoolDispatcher)
     val actor = ActorRefT.build[Command](
       system,
-      Props(new BlockChainHandler(blockFlow, chainIndex, eventBus, maxForkDepth)),
+      props,
       s"BlockChainHandler-${chainIndex.from.value}-${chainIndex.to.value}$namePostfix"
     )
     system.eventStream.subscribe(actor.ref, classOf[InterCliqueManager.SyncedResult])
@@ -88,6 +91,14 @@ object BlockChainHandler {
     .build(
       "alephium_blocks_received_total",
       "Total number of blocks received"
+    )
+    .labelNames("chain_from", "chain_to")
+    .register()
+
+  val uncleBlocksReceivedTotal: Counter = Counter
+    .build(
+      "alephium_uncle_blocks_received_total",
+      "Total number of uncle blocks received"
     )
     .labelNames("chain_from", "chain_to")
     .register()
@@ -254,14 +265,23 @@ class BlockChainHandler(
   private val blocksTotalLabeled = blocksTotal.labels(chainIndexFromString, chainIndexToString)
   private val blocksReceivedTotalLabeled =
     blocksReceivedTotal.labels(chainIndexFromString, chainIndexToString)
+  // how to get uncle blocks received total for this block?
+  private val uncleBlocksReceivedTotalLabeled =
+    uncleBlocksReceivedTotal.labels(chainIndexFromString, chainIndexToString)
   private val transactionsReceivedTotalLabeled =
     transactionsReceivedTotal.labels(chainIndexFromString, chainIndexToString)
-  override def measure(block: Block): Unit = {
+  override def measure(block: Block)(implicit networkConfig: NetworkConfig): Unit = {
     val chain             = measureCommon(block.header)
     val numOfTransactions = block.transactions.length
 
     blocksTotalLabeled.set(chain.numHashes.toDouble)
     blocksReceivedTotalLabeled.inc()
+    block.ghostUncleData match {
+      case Right(ghostUncleData) =>
+        uncleBlocksReceivedTotalLabeled.inc(ghostUncleData.length.toDouble)
+      case Left(error) =>
+        log.error(s"Error getting ghost uncle data: $error")
+    }
     transactionsReceivedTotalLabeled.inc(numOfTransactions.toDouble)
   }
 

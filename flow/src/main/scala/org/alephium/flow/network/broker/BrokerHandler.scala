@@ -118,6 +118,7 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   def handleNewBlock(block: Block): Unit =
     handleFlowData(AVector(block), dataOrigin, isBlock = true)
 
+  // scalastyle:off method.length
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
       log.debug(
@@ -146,10 +147,13 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
           log.error("Unexpected BlocksResponse data")
       }
     case Received(BlocksRequest(requestId, hashes)) =>
-      escapeIOError(hashes.mapE(blockflow.getHeaderVerifiedBlockBytes), "load blocks") {
-        blockBytes =>
-          send(BlocksResponse.fromBlockBytes(requestId, blockBytes))
+      poolAsync {
+        escapeIOError(hashes.mapE(blockflow.getHeaderVerifiedBlockBytes), "load blocks") {
+          blockBytes =>
+            send(BlocksResponse.fromBlockBytes(requestId, blockBytes))
+        }
       }
+      ()
     case Received(NewHeader(header)) =>
       log.debug(
         s"Received new block header ${header.hash.shortHex} from $remoteAddress"
@@ -167,6 +171,7 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
     case Send(data) =>
       brokerConnectionHandler ! ConnectionHandler.Send(data)
   }
+  // scalastyle:on method.length
 
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def flowEvents: Receive = {

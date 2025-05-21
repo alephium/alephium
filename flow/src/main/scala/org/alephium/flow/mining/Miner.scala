@@ -17,12 +17,12 @@
 package org.alephium.flow.mining
 
 import scala.annotation.tailrec
-import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
 
+import org.alephium.flow.Utils
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.flow.validation.InvalidTestnetMiner
@@ -148,7 +148,7 @@ object Miner extends LazyLogging {
   }
 }
 
-trait Miner extends BaseActor with MinerState {
+trait Miner extends Utils.BaseActorWithPoolExecutor with MinerState {
   @volatile var miningStarted: Boolean = false
 
   // scalastyle:off method.length
@@ -226,17 +226,17 @@ trait Miner extends BaseActor with MinerState {
   }
 
   def mine(index: ChainIndex, job: Job): Unit = {
-    val task = Future {
+    val task = poolAsync {
       Miner.mine(index, job) match {
         case Some((block, miningCount)) =>
           self ! Miner.NewBlockSolution(block, miningCount)
         case None =>
           self ! Miner.MiningNoBlock(index, miningConfig.nonceStep)
       }
-    }(context.dispatcher)
+    }
     task.onComplete {
       case Success(_) => ()
       case Failure(e) => log.debug(s"Mining task failed: ${e.getMessage}")
-    }(context.dispatcher)
+    }
   }
 }

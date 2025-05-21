@@ -1360,7 +1360,8 @@ object BuiltIn {
         "amount"    -> "the amount of token to be transferred"
       ),
       retComment = "",
-      doc = "Transfers the contract's token from the input assets of the function."
+      doc = "Transfers the contract's token from the input assets of the function. " +
+        "The toAddress must not be the same as the contract address."
     )
 
   val transferTokenToSelf: SimpleBuiltIn[StatefulContext] =
@@ -1376,7 +1377,8 @@ object BuiltIn {
         "amount"      -> "the amount of token to be transferred"
       ),
       retComment = "",
-      doc = "Transfers token to the contract from the input assets of the function."
+      doc = "Transfers token to the contract from the input assets of the function. " +
+        "The fromAddress must not be the same as the contract address."
     )
 
   val burnToken: SimpleBuiltIn[StatefulContext] =
@@ -1634,7 +1636,9 @@ object BuiltIn {
       argsName =
         Seq("refundAddress" -> "the address to receive the remaining assets in the contract"),
       retComment = "",
-      doc = "Destroys the contract and transfer the remaining assets to a designated address."
+      doc = "Destroys the contract and transfer the remaining assets to a designated address. " +
+        "The function will return immediately once the contract is destroyed. " +
+        "Returning value following the contract destruction is not supported."
     )
 
   val migrate: SimpleBuiltIn[StatefulContext] =

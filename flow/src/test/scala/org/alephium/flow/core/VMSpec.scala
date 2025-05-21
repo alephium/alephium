@@ -8212,6 +8212,57 @@ class VMSpec extends AlephiumSpec with Generators {
     balance is ALPH.alph(2)
   }
 
+  trait MergeBackContractBalanceFixture extends ContractFixture {
+    def danubeHardForkTimestamp: Long
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimestamp)
+    )
+
+    val contract =
+      s"""
+         |Contract TestInsertMap() {
+         |  mapping[U256, U256] map
+         |
+         |  @using(assetsInContract = true, checkExternalCaller = false)
+         |  pub fn maybeInsertMap(insert: Bool) -> () {
+         |    insertMap{ selfAddress!() -> ALPH: mapEntryDeposit!() }(selfAddress!(), insert)
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  fn insertMap(contractAddr: Address, insert: Bool) -> () {
+         |    if (insert) {
+         |      map.insert!(contractAddr, 0, 0)
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(contract, initialAttoAlphAmount = ALPH.alph(99))._1
+
+    def script(insert: Boolean) =
+      s"""
+         |TxScript Main {
+         |  let contract = TestInsertMap(#${contractId.toHexString})
+         |  contract.maybeInsertMap($insert)
+         |}
+         |$contract
+         |""".stripMargin
+  }
+
+  it should "merge back contract balance when it is approved only through `preapprovedAssets` before Danube" in new MergeBackContractBalanceFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.Max.millis
+
+    callTxScript(script(true))
+    callTxScript(script(false))
+  }
+
+  it should "merge back contract balance when it is approved only through `preapprovedAssets` since Danube" in new MergeBackContractBalanceFixture {
+    override def danubeHardForkTimestamp: Long = TimeStamp.now().millis - 1
+
+    callTxScript(script(true))
+    callTxScript(script(false))
+  }
+
   it should "be able to use assets for the newly created contract" in new ContractFixture {
     val fancyTokenCode =
       s"""
@@ -8377,6 +8428,68 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "test bitwise operators for I256 since Danube" in new I256BitwiseFixture {
     setHardForkSince(HardFork.Danube)
     testSimpleScript(code)
+  }
+
+  it should "support short-circuit evaluation for && and || operators" in new ContractFixture {
+    val contract =
+      s"""
+         |Contract Foo(mut count: U256) {
+         |  @using(checkExternalCaller = false, updateFields = true)
+         |  pub fn foo() -> Bool {
+         |    count += 1
+         |    return count % 2 == 0
+         |  }
+         |  pub fn getCount() -> U256 { return count }
+         |}
+         |""".stripMargin
+    val foo = createContract(contract, AVector.empty, AVector(Val.U256(0)))._1
+
+    val script =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  let foo = Foo(#${foo.toHexString})
+         |  assert!(foo.getCount() == 0, 0)
+         |  if (true || foo.foo()) {
+         |    assert!(foo.getCount() == 0, 0)
+         |  }
+         |  assert!(foo.getCount() == 0, 0)
+         |  if (false && foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 1, 0)
+         |  }
+         |  assert!(foo.getCount() == 0, 0)
+         |
+         |  if (false || true || foo.foo()) {
+         |    assert!(foo.getCount() == 0, 0)
+         |  }
+         |  if (true && false && foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 1, 0)
+         |  }
+         |
+         |  assert!(foo.getCount() == 0, 0)
+         |  if (false || foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 0, 0)
+         |  }
+         |  if (false || foo.foo()) {
+         |    assert!(foo.getCount() == 2, 0)
+         |  }
+         |  assert!(foo.getCount() == 2, 0)
+         |
+         |  if (true && foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 2, 0)
+         |  }
+         |  if (true && foo.foo()) {
+         |    assert!(foo.getCount() == 4, 0)
+         |  }
+         |  assert!(foo.getCount() == 4, 0)
+         |}
+         |$contract
+         |""".stripMargin
+    testSimpleScript(script)
   }
 
   private def getEvents(

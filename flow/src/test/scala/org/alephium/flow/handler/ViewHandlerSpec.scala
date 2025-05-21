@@ -22,7 +22,7 @@ import akka.util.Timeout
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool
-import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.model.{AsyncUpdateState, DataOrigin}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
@@ -76,7 +76,6 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     EventFilter.warning("Unable to subscribe the miner, as miner addresses are not set").intercept {
       viewHandler ! ViewHandler.Subscribe
       viewHandler.underlyingActor.subscribers.isEmpty is true
-      viewHandler.underlyingActor.updateScheduled is None
       expectMsg(ViewHandler.SubscribeResult(succeeded = false))
     }
 
@@ -84,14 +83,12 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     viewHandler ! ViewHandler.Subscribe
     eventually {
       viewHandler.underlyingActor.subscribers.nonEmpty is true
-      viewHandler.underlyingActor.updateScheduled.nonEmpty is true
       expectMsg(ViewHandler.SubscribeResult(succeeded = true))
     }
 
     viewHandler ! ViewHandler.Unsubscribe
     eventually {
       viewHandler.underlyingActor.subscribers.isEmpty is true
-      viewHandler.underlyingActor.updateScheduled is None
     }
   }
 
@@ -125,18 +122,126 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
       mempool.isReady(tx0.id) is false
       mempool.isReady(tx1.id) is true
     }
+  }
 
+  it should "schedule update pre-danube" in new Fixture {
+    setHardForkBefore(HardFork.Danube)
+    setSynced()
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
-    viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
+    viewHandler ! ViewHandler.Subscribe
+    eventually(viewHandler.underlyingActor.updateScheduledPreDanube.nonEmpty is true)
+    eventually(expectMsgType[ViewHandler.NewTemplates])
+    Thread.sleep(miningSetting.pollingInterval.millis)
     eventually(expectMsgType[ViewHandler.NewTemplates])
   }
 
-  it should "update templates automatically" in new SyncedFixture {
+  it should "not schedule update since-danube" in new Fixture {
+    setHardForkSince(HardFork.Danube)
+    setSynced()
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
     viewHandler ! ViewHandler.Subscribe
-
-    Thread.sleep(miningSetting.pollingInterval.millis)
+    eventually(viewHandler.underlyingActor.updateScheduledPreDanube.isEmpty is true)
     eventually(expectMsgType[ViewHandler.NewTemplates])
+    Thread.sleep(miningSetting.pollingInterval.millis)
+    eventually(expectNoMessage())
+  }
+
+  trait DanubeUpdateSubscribersFixture extends Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.mining.polling-interval", "1 seconds")
+    )
+    setHardForkSince(HardFork.Danube)
+    setSynced()
+    viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
+    viewHandler ! ViewHandler.Subscribe
+  }
+
+  it should "schedule an update task for each chain index since-danube" in new DanubeUpdateSubscribersFixture {
+    viewHandler.underlyingActor.updateScheduledDanube.forall(_.isEmpty) is true
+    brokerConfig.chainIndexes.foreach { chainIndex =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    }
+    eventually(viewHandler.underlyingActor.updateScheduledDanube.forall(_.nonEmpty) is true)
+    eventually(expectMsgType[ViewHandler.NewTemplate])
+    viewHandler ! ViewHandler.Unsubscribe
+    eventually(viewHandler.underlyingActor.updateScheduledDanube.forall(_.isEmpty) is true)
+  }
+
+  it should "schedule an update task only if needed" in new Fixture {
+    setHardForkSince(HardFork.Danube)
+    setSynced()
+
+    val tasks       = viewHandler.underlyingActor.updateScheduledDanube
+    val chainIndex0 = ChainIndex.unsafe(0, 0)
+    val chainIndex1 = ChainIndex.unsafe(1, 1)
+    brokerConfig.contains(chainIndex0.from) is true
+    brokerConfig.contains(chainIndex1.from) is false
+
+    val block0 = emptyBlock(blockFlow, chainIndex0)
+    addAndCheck(blockFlow, block0)
+    val block1 = blockFlow.genesisBlocks(chainIndex1.from.value)(chainIndex1.to.value)
+    viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
+    eventually(tasks.forall(_.isEmpty) is true)
+    viewHandler ! ChainHandler.FlowDataAdded(block1.header, DataOrigin.Local, TimeStamp.now())
+    eventually(tasks.forall(_.isEmpty) is true)
+
+    viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
+    eventually(viewHandler.underlyingActor.minerAddressesOpt.nonEmpty is true)
+    viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
+    eventually(tasks.forall(_.isEmpty) is true)
+    viewHandler ! ChainHandler.FlowDataAdded(block1.header, DataOrigin.Local, TimeStamp.now())
+    eventually(tasks.forall(_.isEmpty) is true)
+
+    viewHandler ! ViewHandler.Subscribe
+    eventually(viewHandler.underlyingActor.subscribers.nonEmpty is true)
+    viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
+    viewHandler ! ChainHandler.FlowDataAdded(block1.header, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      tasks.head.nonEmpty is true
+      tasks.tail.forall(_.isEmpty) is true
+    }
+  }
+
+  it should "cancel the current update task and start a new one once the template update is complete" in new DanubeUpdateSubscribersFixture {
+    val updateTasks = viewHandler.underlyingActor.updateScheduledDanube
+    val chainIndex  = ChainIndex.unsafe(0, 0)
+    val taskIndex   = chainIndex.flattenIndex
+    updateTasks(taskIndex).isEmpty is true
+
+    val block = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually(updateTasks(taskIndex).nonEmpty is true)
+    val task = updateTasks(taskIndex)
+
+    viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    eventually {
+      updateTasks(taskIndex).nonEmpty is true
+      updateTasks(taskIndex) isnot task
+    }
+    eventually(expectMsgType[ViewHandler.NewTemplate])
+  }
+
+  it should "schedule a new update task after it receives the UpdateSubscribersDanube message" in new DanubeUpdateSubscribersFixture {
+    val updateTasks = viewHandler.underlyingActor.updateScheduledDanube
+    val chainIndex  = ChainIndex.unsafe(0, 0)
+    val taskIndex   = chainIndex.flattenIndex
+    updateTasks(taskIndex).isEmpty is true
+
+    viewHandler ! ViewHandler.UpdateSubscribersDanube(chainIndex)
+    eventually(updateTasks(taskIndex).nonEmpty is true)
+    val task0 = updateTasks(taskIndex)
+    eventually(expectMsgPF() { case msg: ViewHandler.NewTemplate =>
+      msg.lazyBroadcast is true
+    })
+    eventually(expectMsgPF() { case msg: ViewHandler.NewTemplate =>
+      msg.lazyBroadcast is true
+    })
+    val task1 = updateTasks(taskIndex)
+    task0 isnot task1
   }
 
   it should "subscribe and unsubscribe actors" in new Fixture {
@@ -158,12 +263,12 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     probe1.send(viewHandler, ViewHandler.Subscribe)
     eventually(viewHandler.underlyingActor.subscribers.toSeq is Seq(probe0.ref, probe1.ref))
 
-    viewHandler.underlyingActor.updateSubscribers()
+    viewHandler.underlyingActor.updateSubscribersPreDanube()
     eventually(probe0.expectNoMessage())
     eventually(probe1.expectNoMessage())
 
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
-    viewHandler.underlyingActor.updateSubscribers()
+    viewHandler.underlyingActor.updateSubscribersPreDanube()
     eventually(probe0.expectMsgType[ViewHandler.NewTemplates])
     eventually(probe1.expectMsgType[ViewHandler.NewTemplates])
 
@@ -210,7 +315,7 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
 
   it should "remove subscribes" in new UnsyncedFixture {
     viewHandler.underlyingActor.subscribers.addOne(testActor)
-    viewHandler ! ViewHandler.UpdateSubscribers
+    viewHandler ! ViewHandler.UpdateSubscribersPreDanube
     expectMsg(ViewHandler.SubscribeResult(false))
   }
 
@@ -230,8 +335,11 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     setSynced()
     val probe = createSubscriber()
     val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block)
     viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
-    eventually(probe.expectMsgType[ViewHandler.NewTemplate])
+    eventually(probe.expectMsgPF() { case msg: ViewHandler.NewTemplate =>
+      msg.lazyBroadcast is false
+    })
   }
 
   it should "not notify subscribers when the best view is updated since danube" in new DanubeFixture {
@@ -314,6 +422,98 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     eventually {
       blockFlow.getMemPool(chainIndex.from).contains(tx.id) is false
     }
+  }
+
+  it should "rebuild all templates when necessary" in new DanubeFixture {
+    setSynced()
+    val probe      = createSubscriber()
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block0     = emptyBlock(blockFlow, chainIndex)
+    val block1     = emptyBlock(blockFlow, chainIndex)
+    val blocks     = AVector(block0, block1).sortBy(_.hash.bytes)(Bytes.byteStringOrdering)
+
+    addWithoutViewUpdate(blockFlow, blocks.head)
+    viewHandler ! ChainHandler.FlowDataAdded(blocks.head, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectMsgType[ViewHandler.NewTemplate])
+
+    addWithoutViewUpdate(blockFlow, blocks.last)
+    viewHandler ! ChainHandler.FlowDataAdded(blocks.last, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectMsgType[ViewHandler.NewTemplates])
+    eventually(viewHandler.underlyingActor.rebuildTemplatesState.isUpdating is false)
+  }
+
+  it should "reschedule update tasks for all chains" in new DanubeFixture {
+    setSynced()
+    createSubscriber()
+
+    val scheduledTasks = viewHandler.underlyingActor.updateScheduledDanube
+    val chainIndexes   = brokerConfig.chainIndexes.drop(1)
+    chainIndexes.foreach { chainIndex =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      viewHandler ! ChainHandler.FlowDataAdded(block, DataOrigin.Local, TimeStamp.now())
+    }
+    eventually {
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        scheduledTasks(chainIndex.flattenIndex).isDefined is chainIndexes.contains(chainIndex)
+      }
+    }
+
+    viewHandler ! ViewHandler.RebuildTemplatesComplete
+    eventually {
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        scheduledTasks(chainIndex.flattenIndex).isDefined is true
+      }
+    }
+  }
+
+  it should "only rebuild template when necessary" in new DanubeFixture {
+    setSynced()
+    val probe            = createSubscriber()
+    val chainIndex       = ChainIndex.unsafe(0, 0)
+    val (block0, block1) = mineTwoBlocksAndAdd(chainIndex)
+
+    viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectMsgType[ViewHandler.NewTemplate])
+    val actor = viewHandler.underlyingActor
+    val index = chainIndex.flattenIndex
+    eventually(actor.danubeUpdateStates(index).requestCount is 0)
+    eventually(actor.lastBlocks(index).map(_.flowData) is Some(block0))
+
+    viewHandler ! ChainHandler.FlowDataAdded(block1, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectNoMessage())
+    eventually(actor.lastBlocks(index).map(_.flowData) is Some(block0))
+
+    val block2 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block2)
+    viewHandler ! ChainHandler.FlowDataAdded(block2, DataOrigin.Local, TimeStamp.now())
+    eventually(probe.expectMsgType[ViewHandler.NewTemplate])
+    eventually(actor.lastBlocks(index).map(_.flowData) is Some(block2))
+  }
+
+  it should "test shouldSkipBuildTemplate" in new Fixture {
+    val chainIndex       = ChainIndex.unsafe(0, 0)
+    val (block0, block1) = mineTwoBlocksAndAdd(chainIndex)
+    val actor            = viewHandler.underlyingActor
+    val now              = TimeStamp.now()
+    val lastBlock        = ViewHandler.LastBlockPerChain(block0, 1, now)
+    actor.shouldSkipBuildTemplate(lastBlock, block1.hash, 0, now) is false
+    actor.shouldSkipBuildTemplate(lastBlock, block1.hash, 2, now) is false
+    actor.shouldSkipBuildTemplate(
+      lastBlock,
+      block1.hash,
+      1,
+      now.minusUnsafe(Duration.ofMillisUnsafe(1))
+    ) is false
+    actor.shouldSkipBuildTemplate(lastBlock, block1.hash, 1, now.plusSecondsUnsafe(1)) is false
+    actor.shouldSkipBuildTemplate(lastBlock, block1.hash, 1, now.plusSecondsUnsafe(2)) is false
+    actor.shouldSkipBuildTemplate(lastBlock, block1.hash, 1, now.plusMillisUnsafe(1)) is true
+    actor.shouldSkipBuildTemplate(
+      lastBlock.copy(flowData = block1),
+      block0.hash,
+      1,
+      now.plusMillisUnsafe(1)
+    ) is false
   }
 }
 
@@ -437,7 +637,8 @@ class DanubeUpdateBestViewSpec extends UpdateBestViewSpec {
       viewHandler.underlyingActor.danubeUpdateStates(chainIndex.flattenIndex)
     override def containBlockHashInBestDeps(blockHash: BlockHash): Boolean =
       blockFlow.getBestFlowSkeleton().intraGroupTips.contains(blockHash)
-    def bestDepsUpdatedMsg: ViewHandler.Command = ViewHandler.BestDepsUpdatedDanube(chainIndex)
+    def bestDepsUpdatedMsg: ViewHandler.Command =
+      ViewHandler.BestDepsUpdatedDanube(chainIndex, false)
     def bestDepsUpdateFailedMsg: ViewHandler.Command =
       ViewHandler.BestDepsUpdateFailedDanube(chainIndex)
   }
@@ -486,15 +687,17 @@ class DanubeUpdateBestViewSpec extends UpdateBestViewSpec {
     setHardFork(HardFork.Danube)
 
     brokerConfig.chainIndexes.foreach { chainIndex =>
-      val state = viewHandler.underlyingActor.danubeUpdateStates(chainIndex.flattenIndex)
+      val flowData = emptyBlock(blockFlow, chainIndex)
+      val state    = viewHandler.underlyingActor.danubeUpdateStates(chainIndex.flattenIndex)
       state.requestCount is 0
       state.isUpdating is false
 
-      viewHandler.underlyingActor.requestDanubeUpdate(chainIndex)
+      addAndCheck(blockFlow, flowData)
+      viewHandler.underlyingActor.requestDanubeUpdate(flowData)
       state.requestCount is 1
       state.isUpdating is false
 
-      viewHandler.underlyingActor.requestDanubeUpdate(chainIndex)
+      viewHandler.underlyingActor.requestDanubeUpdate(flowData)
       state.requestCount is 2
       state.isUpdating is false
     }
@@ -513,32 +716,5 @@ class DanubeUpdateBestViewSpec extends UpdateBestViewSpec {
       viewHandler.underlyingActor.setDanubeUpdateCompleted(chainIndex)
       state.isUpdating is false
     }
-  }
-
-  it should "test AsyncUpdateState" in {
-    val state = AsyncUpdateState()
-    state.isUpdating is false
-    state.requestCount is 0
-
-    state.requestUpdate()
-    state.requestCount is 1
-    state.tryUpdate() is true
-    state.isUpdating is true
-    state.requestCount is 0
-
-    state.tryUpdate() is false
-    state.setCompleted()
-    state.isUpdating is false
-    state.tryUpdate() is false
-
-    state.requestUpdate()
-    state.requestCount is 1
-    state.isUpdating is false
-    state.requestUpdate()
-    state.requestCount is 2
-    state.isUpdating is false
-    state.tryUpdate() is true
-    state.isUpdating is true
-    state.requestCount is 0
   }
 }

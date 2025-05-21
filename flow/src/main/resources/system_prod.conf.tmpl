@@ -9,7 +9,7 @@ alephium {
     batch-delay = 0 milli
 
     # the polling interval for block templates, when there is no new blocks generated
-    polling-interval = 2 seconds
+    polling-interval = 4 seconds
 
     # the size of the cache that stores the latest mining jobs
     job-cache-size-per-chain = 100
@@ -44,7 +44,7 @@ alephium {
     stable-sync-frequency = 20 second
     sync-peer-sample-size-v1 = 3
     sync-peer-sample-size-v2 = 5
-    enable-p2p-v2 = false
+    enable-p2p-v2 = true
     sync-cleanup-frequency = 10 second
     sync-expiry-period = 10 second
     dependency-expiry-period = 5 minute
@@ -103,6 +103,7 @@ alephium {
     blockflow-fetch-max-age = 30 minutes
     ask-timeout = 5 seconds
     api-key-enabled = true
+    api-key-enabled = ${?ALEPHIUM_API_KEY_ENABLED}
     api-key = null
     api-key = ${?ALEPHIUM_API_KEY}
     gas-fee-cap = "1000000000000000000"// 1 ALPH
@@ -152,13 +153,12 @@ akka {
   io.tcp.register-timeout = 1m
 
   actor {
-    mining-dispatcher {
+    pool-dispatcher {
       type = Dispatcher
-      executor = "fork-join-executor"
-      fork-join-executor {
-        parallelism-min = 4
-        parallelism-max = 4
-        parallelism-factor = 1
+      executor = "thread-pool-executor"
+      thread-pool-executor {
+        core-pool-size-min = 4
+        core-pool-size-max = 32
       }
       throughput = 1
     }

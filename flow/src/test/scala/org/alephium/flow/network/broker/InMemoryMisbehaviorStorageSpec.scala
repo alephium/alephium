@@ -16,16 +16,20 @@
 
 package org.alephium.flow.network.broker
 
-import org.alephium.flow.Utils
-import org.alephium.util.EventStream.Publisher
+import org.alephium.protocol.Generators
+import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
 
-trait BaseHandler extends Utils.BaseActorWithPoolExecutor with Publisher {
+class InMemoryMisbehaviorStorageSpec extends AlephiumSpec with Generators {
+  it should "check until for isBanned" in {
+    val storage = new InMemoryMisbehaviorStorage(Duration.ofSecondsUnsafe(10))
+    val address = socketAddressGen.sample.get.getAddress
+    val until   = TimeStamp.now().plusUnsafe(Duration.ofMillisUnsafe(100))
 
-  def handleMisbehavior(misbehavior: MisbehaviorManager.Misbehavior): Unit = {
-    publishEvent(misbehavior)
-    misbehavior match {
-      case _: MisbehaviorManager.Critical => context.stop(self)
-      case _                              => ()
-    }
+    storage.ban(address, until)
+    storage.isBanned(address) is true
+
+    Thread.sleep(100)
+    storage.isBanned(address) is false
   }
+
 }
