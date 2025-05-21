@@ -624,25 +624,28 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   }
 
   it should "parse if-else statements" in {
-    fastparse
-      .parse("if (x) { return }", StatelessParser.statement(_))
-      .get
-      .value is
+    def test(str: String, expected: IfElseStatement[StatelessContext]) = {
+      val parsed = fastparse.parse(str, StatelessParser.statement(_)).get.value
+      parsed is expected
+      parsed.sourceIndex.get.width is str.length
+    }
+
+    test(
+      "if (x) { return }",
       Ast.IfElseStatement[StatelessContext](
         Seq(Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("x"))), Seq(ReturnStmt(Seq.empty)))),
         None
       )
-
-    val error = intercept[Compiler.Error](
-      fastparse
-        .parse("if (x) { return } else if (y) { return }", StatelessParser.statement(_))
     )
-    error.message is "If ... else if constructs should be terminated with an else statement"
-
-    fastparse
-      .parse("if (x) { return } else if (y) { return } else {}", StatelessParser.statement(_))
-      .get
-      .value is
+    test(
+      "if (x) { return } else { return }",
+      Ast.IfElseStatement[StatelessContext](
+        Seq(Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("x"))), Seq(ReturnStmt(Seq.empty)))),
+        Some(ElseBranchStatement(Seq(ReturnStmt(Seq.empty))))
+      )
+    )
+    test(
+      "if (x) { return } else if (y) { return } else {}",
       Ast.IfElseStatement[StatelessContext](
         Seq(
           Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("x"))), Seq(ReturnStmt(Seq.empty))),
@@ -650,6 +653,13 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         ),
         Some(Ast.ElseBranchStatement(Seq.empty))
       )
+    )
+
+    val error = intercept[Compiler.Error](
+      fastparse
+        .parse("if (x) { return } else if (y) { return }", StatelessParser.statement(_))
+    )
+    error.message is "If ... else if constructs should be terminated with an else statement"
   }
 
   it should "parse if-else expressions" in {
