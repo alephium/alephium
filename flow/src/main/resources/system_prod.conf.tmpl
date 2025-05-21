@@ -111,6 +111,7 @@ alephium {
     blockflow-fetch-max-age = 30 minutes
     ask-timeout = 5 seconds
     api-key-enabled = true
+    api-key-enabled = ${?ALEPHIUM_API_KEY_ENABLED}
     api-key = null
     api-key = ${?ALEPHIUM_API_KEY}
     gas-fee-cap = "1000000000000000000"// 1 ALPH

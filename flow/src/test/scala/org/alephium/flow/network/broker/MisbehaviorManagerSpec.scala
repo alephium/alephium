@@ -92,6 +92,9 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec {
     misbehaviorManager ! InvalidFlowData(peer)
     bannedProbe.expectMsg(PeerBanned(peer.getAddress))
 
+    misbehaviorManager ! ConfirmConnection(connected, connection.ref)
+    expectMsg(TcpController.ConnectionConfirmed(connected, connection.ref))
+
     eventually {
       misbehaviorManager ! GetPeers
       expectMsg(Peers(AVector.empty))

@@ -85,7 +85,7 @@ trait Server extends Service {
   override protected def startSelfOnce(): Future[Unit] = Future {
     val props =
       MinerApiController
-        .props(node.allHandlers)(
+        .props(node.blockFlow, node.allHandlers)(
           config.broker,
           config.network,
           config.mining

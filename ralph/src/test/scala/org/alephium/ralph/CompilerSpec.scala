@@ -2603,7 +2603,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          }
            |""".stripMargin
       val script = Compiler.compileTxScript(code).rightValue
-      script.toTemplateString() is "010100000700402c{1}{2}{3}{4}1703170217011700{6}{7}{8}170617051704{5}18{0}1816030f2f16000c2f1a0c7b16021603181816060e2f16050d2f1a16040c2f1a0c7b"
+      script.toTemplateString() is "0101000007004032{1}{2}{3}{4}1703170217011700{6}{7}{8}170617051704{5}18{0}1816030f2f7a4c041816000c2f0c7b16021603181816060e2f7a4c041816050d2f7a4c041816040c2f0c7b"
       runScript(
         script,
         AVector(
@@ -2704,7 +2704,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       val script = Compiler.compileTxScript(code).rightValue
-      script.toTemplateString() is "010100000600402f{1}{2}17011700{3}{4}{5}{6}1705170417031702{0}0c2f0c7b{7}0c7b16000c2f1601140100411a0c7b16031401014116020d2f1a0c7b16051401024116040e2f1a0c7b"
+      script.toTemplateString() is "0101000006004035{1}{2}17011700{3}{4}{5}{6}1705170417031702{0}0c2f0c7b{7}0c7b16000c2f7a4c04181601140100410c7b1603140101417a4c041816020d2f0c7b1605140102417a4c041816040e2f0c7b"
       runScript(
         script,
         AVector(

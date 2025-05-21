@@ -27,34 +27,37 @@ class InMemoryMisbehaviorStorage(val penaltyForgivness: Duration) extends Misbeh
 
   private val peers: mutable.Map[InetAddress, MisbehaviorStatus] = mutable.Map.empty
 
-  def get(peer: InetAddress): Option[MisbehaviorStatus] = {
+  override def get(peer: InetAddress): Option[MisbehaviorStatus] = getAndExpire(peer)
+
+  private def getAndExpire(peer: InetAddress): Option[MisbehaviorStatus] = {
     peers.get(peer).flatMap { status => withUpdatedStatus(peer, status) { (_, status) => status } }
   }
 
-  def update(peer: InetAddress, penalty: Penalty): Unit = {
+  override def update(peer: InetAddress, penalty: Penalty): Unit = {
     peers.addOne(peer -> penalty)
   }
 
-  def ban(peer: InetAddress, until: TimeStamp): Unit = {
+  override def ban(peer: InetAddress, until: TimeStamp): Unit = {
     peers.update(peer, Banned(until))
   }
 
-  def isBanned(peer: InetAddress): Boolean = {
-    get(peer) match {
+  override def isBanned(peer: InetAddress): Boolean = {
+    val now = TimeStamp.now()
+    getAndExpire(peer) match {
       case Some(status) =>
         status match {
-          case Banned(_)     => true
+          case Banned(until) => now.isBefore(until)
           case Penalty(_, _) => false
         }
       case None => false
     }
   }
 
-  def remove(peer: InetAddress): Unit = {
+  override def remove(peer: InetAddress): Unit = {
     discard(peers.remove(peer))
   }
 
-  def list(): AVector[Peer] = {
+  override def list(): AVector[Peer] = {
     AVector.from(peers.flatMap { case (peer, status) =>
       withUpdatedStatus(peer, status) { (peer, newStatus) => Peer(peer, newStatus) }
     })
@@ -63,11 +66,12 @@ class InMemoryMisbehaviorStorage(val penaltyForgivness: Duration) extends Misbeh
   private def withUpdatedStatus[A](peer: InetAddress, status: MisbehaviorStatus)(
       f: (InetAddress, MisbehaviorStatus) => A
   ): Option[A] = {
+    val now = TimeStamp.now()
     status match {
-      case Banned(until) if until < TimeStamp.now() =>
+      case Banned(until) if until < now =>
         peers.remove(peer)
         None
-      case Penalty(_, ts) if TimeStamp.now().deltaUnsafe(ts) > penaltyForgivness =>
+      case Penalty(_, ts) if now > ts.plusUnsafe(penaltyForgivness) =>
         peers.remove(peer)
         None
       case other =>

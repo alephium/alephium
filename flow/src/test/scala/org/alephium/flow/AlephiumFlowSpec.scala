@@ -19,6 +19,7 @@ package org.alephium.flow
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.language.implicitConversions
+import scala.util.Random
 
 import akka.util.ByteString
 import org.scalatest.Assertion
@@ -63,8 +64,10 @@ trait FlowFixture
 
   def addWithoutViewUpdate(blockFlow: BlockFlow, block: Block): Assertion = {
     val worldState =
-      blockFlow.getCachedWorldState(block.blockDeps, block.chainIndex.from).rightValue
-    blockFlow.add(block, Some(worldState)) isE ()
+      Option.when(block.chainIndex.isIntraGroup)(
+        blockFlow.getCachedWorldState(block.blockDeps, block.chainIndex.from).rightValue
+      )
+    blockFlow.add(block, worldState) isE ()
   }
 
   def addAndUpdateView(blockFlow: BlockFlow, block: Block): Assertion = {
@@ -883,15 +886,14 @@ trait FlowFixture
 
   def checkOutputs(blockFlow: BlockFlow, block: Block): Unit = {
     val chainIndex = block.chainIndex
-    val worldState =
-      blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
-    val hardFork = networkConfig.getHardFork(block.timestamp)
-    val usedRefs =
-      block.nonCoinbase
-        .flatMap(_.unsigned.inputs.map(_.outputRef))
-        .toSet
-        .asInstanceOf[Set[TxOutputRef]]
     if (chainIndex.isIntraGroup) {
+      val worldState = blockFlow.getPersistedWorldState(block.hash).fold(throw _, identity)
+      val hardFork   = networkConfig.getHardFork(block.timestamp)
+      val usedRefs =
+        block.nonCoinbase
+          .flatMap(_.unsigned.inputs.map(_.outputRef))
+          .toSet
+          .asInstanceOf[Set[TxOutputRef]]
       block.nonCoinbase.foreach { tx =>
         tx.allOutputs.foreachWithIndex { case (output, index) =>
           val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.id, index))
@@ -1221,12 +1223,19 @@ trait GhostUncleFixture extends FlowFixture {
       chainIndex: ChainIndex,
       height: Int
   ): Block = {
+    val sameBlockDeps = Random.nextBoolean()
     val template      = getBlockTemplate(blockFlow, chainIndex, height)
-    val depGroupIndex = (chainIndex.from.value + 1) % blockFlow.brokerConfig.groups
-    val depIndex = if (depGroupIndex < chainIndex.from.value) depGroupIndex else depGroupIndex - 1
-    val oldDep   = blockFlow.getBlockHeaderUnsafe(template.deps(depIndex))
-    val newDeps  = BlockDeps.unsafe(template.deps.replace(depIndex, oldDep.parentHash))
-    val block    = mine(blockFlow, chainIndex, newDeps)
+    val block = if (sameBlockDeps) {
+      val miner = getGenesisLockupScript(chainIndex.to)
+      val txs   = transferTxs(blockFlow, chainIndex, ALPH.oneAlph, 1, None, true)
+      mine(blockFlow, chainIndex, BlockDeps.unsafe(template.deps), txs, miner, None)
+    } else {
+      val depGroupIndex = (chainIndex.from.value + 1) % blockFlow.brokerConfig.groups
+      val depIndex = if (depGroupIndex < chainIndex.from.value) depGroupIndex else depGroupIndex - 1
+      val oldDep   = blockFlow.getBlockHeaderUnsafe(template.deps(depIndex))
+      val newDeps  = BlockDeps.unsafe(template.deps.replace(depIndex, oldDep.parentHash))
+      mine(blockFlow, chainIndex, newDeps)
+    }
     BlockHeader.fromSameTemplate(block.header, template.dummyHeader()) is false
     addAndCheck(blockFlow, block)
     block
