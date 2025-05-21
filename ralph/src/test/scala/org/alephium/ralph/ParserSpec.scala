@@ -1596,7 +1596,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         List(
           ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
           ContractInheritance(TypeId("Parent1"), Seq(Ident("x")))
-        )
+        ),
+        Seq.empty
       )
       fastparse
         .parse(code(Keyword.`extends`.name), StatefulParser.contract(_))
@@ -1965,7 +1966,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
-        Seq(InterfaceInheritance(TypeId("Parent")))
+        Seq(InterfaceInheritance(TypeId("Parent"))),
+        Seq.empty
       )
     }
 
@@ -2012,7 +2014,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           ContractInheritance(TypeId("Parent0"), Seq.empty),
           ContractInheritance(TypeId("Parent1"), Seq.empty),
           InterfaceInheritance(TypeId("Parent2"))
-        )
+        ),
+        Seq.empty
       )
     }
 
@@ -2183,6 +2186,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
+        Seq.empty,
         Seq.empty
       )
     }
@@ -2236,7 +2240,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
-        Seq(InterfaceInheritance(TypeId("Bar")))
+        Seq(InterfaceInheritance(TypeId("Bar"))),
+        Seq.empty
       )
     }
   }
@@ -2827,6 +2832,297 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       UnaryOp[StatelessContext](Not, Variable(Ident("x")))
     parse("-x", StatelessParser.expr(_)).get.value is
       UnaryOp[StatelessContext](Negate, Variable(Ident("x")))
+  }
+
+  it should "parse unit test defs" in {
+    val statements = Seq(
+      FuncCall[StatefulContext](
+        FuncId("assert", true),
+        Seq.empty,
+        Seq(
+          Binop(
+            Eq,
+            CallExpr(FuncId("foo", false), Seq.empty, Seq.empty),
+            Const(Val.U256(U256.unsafe(10)))
+          ),
+          Const(Val.U256(U256.unsafe(0)))
+        )
+      )
+    )
+
+    val simpleTest =
+      s"""
+         |test "foo" {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(simpleTest, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        None,
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs.empty,
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
+    val withoutSettings =
+      s"""
+         |test "foo"
+         |before Self(10) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withoutSettings, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        None,
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
+    val withSettings =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |before Self(10) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withSettings, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
+    val withAfter =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |before Self(10)
+         |after Self(11) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withAfter, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(11)))),
+                  None
+                )
+              )
+            ),
+            None,
+            statements
+          )
+        )
+      )
+
+    val withAssets =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |before Self(10)
+         |approve{ From -> ALPH: 1 }
+         |{
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withAssets, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            Some(
+              Testing.ApprovedAssetsDef(
+                Seq(
+                  ApproveAsset(
+                    Variable(Ident("From")),
+                    Seq((ALPHTokenId(), Const(Val.U256(U256.One))))
+                  )
+                )
+              )
+            ),
+            statements
+          )
+        )
+      )
+
+    val withMultipleContracts =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |before
+         |  Self(10)
+         |  Bar(20)@address1
+         |  Bar(30)@address2
+         |{
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withMultipleContracts, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                ),
+                Testing.CreateContractDef(
+                  TypeId("Bar"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(20)))),
+                  Some(Ident("address1"))
+                ),
+                Testing.CreateContractDef(
+                  TypeId("Bar"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(30)))),
+                  Some(Ident("address2"))
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
+    val withMultipleTests =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |before Self(10) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |before Self(11) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withMultipleTests, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          ),
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(11)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
+    val contractWithTests =
+      s"""
+         |Contract Foo(v: U256) {
+         |  pub fn foo() -> U256 {
+         |    return v
+         |  }
+         |  test "foo" before Self(10) {
+         |    assert!(foo() == 10, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val parsed = parse(contractWithTests, StatefulParser.contract(_)).get.value
+    parsed.unitTests.length is 1
   }
 }
 

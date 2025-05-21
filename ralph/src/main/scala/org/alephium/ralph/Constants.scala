@@ -22,7 +22,11 @@ import org.alephium.ralph.Compiler.{Error, VarInfo}
 trait Constants[Ctx <: StatelessContext] {
   def getConstant(ident: Ast.Ident): VarInfo.Constant[Ctx]
   def getConstantValue(ident: Ast.Ident): Val = getConstant(ident).value
-  protected def addConstant(ident: Ast.Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit
+  protected def addConstant(
+      ident: Ast.Ident,
+      value: Val,
+      constantDef: Option[Ast.ConstantDefinition]
+  ): Unit
 
   def addConstants(constantVars: Seq[Ast.ConstantVarDef[Ctx]]): Seq[(Ast.Ident, Val)] = {
     Ast.UniqueDef.checkDuplicates(constantVars, "constant variables")
@@ -33,14 +37,14 @@ trait Constants[Ctx <: StatelessContext] {
     Ast.UniqueDef.checkDuplicates(enums, "enums")
     enums.foreach(e =>
       e.fields.foreach(field =>
-        addConstant(Ast.EnumDef.fieldIdent(e.id, field.ident), field.value.v, field)
+        addConstant(Ast.EnumDef.fieldIdent(e.id, field.ident), field.value.v, Some(field))
       )
     )
   }
 
   private def calcAndAddConstant(constantVarDef: Ast.ConstantVarDef[Ctx]): Val = {
     val value = calcConstant(constantVarDef.expr)
-    addConstant(constantVarDef.ident, value, constantVarDef)
+    addConstant(constantVarDef.ident, value, Some(constantVarDef))
     value
   }
 

@@ -674,7 +674,7 @@ trait EndpointsLogic extends Endpoints {
   }
 
   val compileProjectLogic = serverLogic(compileProject) { query =>
-    Future.successful(serverUtils.compileProject(query))
+    Future.successful(serverUtils.compileProject(blockFlow, query))
   }
 
   val buildDeployContractTxLogic = serverLogic(buildDeployContractTx) { query =>

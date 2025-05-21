@@ -984,7 +984,9 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
     "org.wartremover.warts.Serializable"
   )
 )
-class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulContext] {
+class StatefulParser(val fileURI: Option[java.net.URI])
+    extends Parser[StatefulContext]
+    with TestingParser {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
       const | stringLiteral | alphTokenId | mapContains | contractCallOrLoadData | callExpr | contractConv |
@@ -1192,7 +1194,7 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
         Keyword.Contract
       ) ~/ Lexer.typeId ~ contractFields ~
         contractInheritances.? ~ "{" ~
-        (mapDef | eventDef | constantVarDef | rawEnumDef | func).rep ~ "}"
+        (mapDef | eventDef | constantVarDef | rawEnumDef | func | rawUnitTestDef).rep ~ "}"
         ~~ Index
     ).map {
       case (
@@ -1213,31 +1215,35 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
         val events                = ArrayBuffer.empty[Ast.EventDef]
         val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef[StatefulContext]]
         val enums                 = ArrayBuffer.empty[Ast.EnumDef[StatefulContext]]
+        val unitTests             = ArrayBuffer.empty[Testing.UnitTestDef[StatefulContext]]
 
         statements.foreach {
           case m: Ast.MapDef =>
-            if (events.nonEmpty || constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty) {
+            if (
+              events.nonEmpty || constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty || unitTests.nonEmpty
+            ) {
               throwContractStmtsOutOfOrderException(m.sourceIndex)
             }
             maps += m
           case e: Ast.EventDef =>
-            if (constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty) {
+            if (constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty || unitTests.nonEmpty) {
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
             events += e
           case c: Ast.ConstantVarDef[StatefulContext @unchecked] =>
-            if (funcs.nonEmpty || enums.nonEmpty) {
+            if (funcs.nonEmpty || enums.nonEmpty || unitTests.nonEmpty) {
               throwContractStmtsOutOfOrderException(c.sourceIndex)
             }
             constantVars += c.withOrigin(typeId)
           case e: Ast.EnumDef[StatefulContext @unchecked] =>
-            if (funcs.nonEmpty) {
+            if (funcs.nonEmpty || unitTests.nonEmpty) {
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
             e.fields.foreach(_.withOrigin(typeId))
             enums += e
-          case f: Ast.FuncDef[StatefulContext @unchecked] => funcs += f
-          case _                                          =>
+          case f: Ast.FuncDef[StatefulContext @unchecked]         => funcs += f
+          case t: Testing.UnitTestDef[StatefulContext @unchecked] => unitTests += t
+          case _                                                  =>
         }
 
         Ast
@@ -1253,7 +1259,8 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
             events.toSeq,
             constantVars.toSeq,
             enums.toSeq,
-            contractInheritances.getOrElse(Seq.empty)
+            contractInheritances.getOrElse(Seq.empty),
+            unitTests.map(_.withOrigin(typeId)).toSeq
           )
           .atSourceIndex(fromIndex, endIndex, fileURI)
     }
@@ -1363,4 +1370,46 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
       .map { case (fromIndex, typeId, exprs, endIndex) =>
         Ast.EmitEvent(typeId, exprs).atSourceIndex(fromIndex, endIndex, fileURI)
       }
+}
+
+trait TestingParser { self: StatefulParser =>
+  private def settingDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] =
+    PP(Lexer.ident ~ "=" ~ expr) { case (ident, expr) => Testing.SettingDef(ident.name, expr) }
+  private def settingsDef[Unknown: P]: P[Testing.SettingsDef[StatefulContext]] =
+    PP("with" ~ "Settings" ~ "(" ~ settingDef.rep(0, ",") ~ ")")(Testing.SettingsDef.apply)
+
+  private def contractAssets[Unknown: P] = P("{" ~ amountList ~ "}")
+  private def contractCtor[Unknown: P]   = P("(" ~ expr.rep(0, ",") ~ ")")
+  private def createContractDef[Unknown: P]: P[Testing.CreateContractDef[StatefulContext]] =
+    PP(Lexer.typeId ~ contractAssets.? ~ contractCtor ~ P("@" ~ Lexer.ident).?) {
+      case (typeId, assets, fields, address) =>
+        Testing.CreateContractDef(typeId, assets.getOrElse(Seq.empty), fields, address)
+    }
+
+  private def testName[Unknown: P]: P[String] = P("\"" ~ CharPred(_ != '"').rep.! ~ "\"")
+  private def approveAssetsDef[Unknown: P]: P[Testing.ApprovedAssetsDef[StatefulContext]] =
+    PP("approve" ~ approveAssets)(Testing.ApprovedAssetsDef.apply)
+  private def contractDefs[Unknown: P](
+      key: String
+  ): P[Testing.CreateContractDefs[StatefulContext]] =
+    PP(key ~ createContractDef.rep)(Testing.CreateContractDefs.apply)
+  private def singleTestDef[Unknown: P]: P[Testing.SingleTestDef[StatefulContext]] =
+    PP(
+      contractDefs("before").? ~ contractDefs("after").? ~
+        approveAssetsDef.? ~ "{" ~ statement.rep ~ "}"
+    ) { case (before, after, assets, statements) =>
+      Testing.SingleTestDef(
+        before.getOrElse(Testing.CreateContractDefs.empty),
+        after.getOrElse(Testing.CreateContractDefs.empty),
+        assets,
+        statements
+      )
+    }
+
+  def rawUnitTestDef[Unknown: P]: P[Testing.UnitTestDef[StatefulContext]] =
+    PP("test" ~ testName ~ settingsDef.? ~ singleTestDef.rep) { case (name, settings, tests) =>
+      Testing.UnitTestDef(name, settings, tests)
+    }
+  def unitTestDef[Unknown: P]: P[Testing.UnitTestDef[StatefulContext]] =
+    P(Start ~ rawUnitTestDef ~ End)
 }

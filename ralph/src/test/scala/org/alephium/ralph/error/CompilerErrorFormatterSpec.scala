@@ -194,7 +194,6 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
           |  |
           |  |
           |  |-------------
-          |  |
           |""".stripMargin
       // scalastyle:on whitespace.end.of.line
     }
@@ -430,5 +429,28 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
       val program = programLines.mkString("\n")
       CompilerErrorFormatter.getErroredLine(erroredLineIndex, program) is ""
     }
+  }
+
+  it should "be able to format a multi-line footer" in {
+    val formatter =
+      CompilerErrorFormatter(
+        errorTitle = "error title",
+        errorLine = "this is the error line",
+        foundLength = "line".length,
+        errorMessage = "failed here",
+        errorFooter = Some("Debug messages:\n> Contract A: balance 0\n> Contract B: balance 1"),
+        sourcePosition = SourcePosition(1, 19)
+      )
+
+    formatter.format(None) is
+      """-- error (1:19): error title
+        |1 |this is the error line
+        |  |                  ^^^^
+        |  |                  failed here
+        |  |-----------------------------
+        |  |Debug messages:
+        |  |> Contract A: balance 0
+        |  |> Contract B: balance 1
+        |""".stripMargin
   }
 }

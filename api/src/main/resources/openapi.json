@@ -15526,6 +15526,9 @@
           },
           "skipAbstractContractCheck": {
             "type": "boolean"
+          },
+          "skipTests": {
+            "type": "boolean"
           }
         }
       },

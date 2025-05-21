@@ -50,7 +50,8 @@ final case class CompilerOptions(
     ignoreUpdateFieldsCheckWarnings: Option[Boolean] = None,
     ignoreCheckExternalCallerWarnings: Option[Boolean] = None,
     ignoreUnusedFunctionReturnWarnings: Option[Boolean] = None,
-    skipAbstractContractCheck: Option[Boolean] = None
+    skipAbstractContractCheck: Option[Boolean] = None,
+    skipTests: Option[Boolean] = None
 ) {
   def toLangCompilerOptions(): ralph.CompilerOptions = {
     ralph.CompilerOptions(
@@ -77,7 +78,8 @@ final case class CompilerOptions(
       ),
       skipAbstractContractCheck = skipAbstractContractCheck.getOrElse(
         ralph.CompilerOptions.Default.skipAbstractContractCheck
-      )
+      ),
+      skipTests = skipTests.getOrElse(ralph.CompilerOptions.Default.skipTests)
     )
   }
 }

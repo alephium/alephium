@@ -2900,7 +2900,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (contracts, scripts, globalState, globalWarnings) =
       Compiler.compileProject(rawCode).rightValue
     val query  = Compile.Project(rawCode)
-    val result = serverUtils.compileProject(query).rightValue
+    val result = serverUtils.compileProject(blockFlow, query).rightValue
 
     result.contracts.length is 1
     contracts.length is 1
@@ -3008,7 +3008,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
 
     val query  = Compile.Project(rawCode)
-    val result = serverUtils.compileProject(query).rightValue
+    val result = serverUtils.compileProject(blockFlow, query).rightValue
     result.contracts.length is 1
     result.contracts.head.functions.length is 2
     result.scripts.length is 1
@@ -5682,6 +5682,249 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"Contract code hash: ${codeHash.toHexString} not found"
     createContract(code, AVector.empty, AVector.empty)._2
     serverUtils.getContractCode(blockFlow, codeHash) is Right(statefulContract)
+  }
+
+  it should "run unit tests" in new Fixture {
+    val serverUtils = new ServerUtils
+
+    {
+      val now = TimeStamp.now()
+
+      def code(blockTimeStamp: TimeStamp) =
+        s"""
+           |Contract Foo(@unused v: U256) {
+           |  pub fn foo() -> U256 {
+           |    return blockTimeStamp!()
+           |  }
+           |  test "foo"
+           |  with Settings(blockTimeStamp = ${now.millis})
+           |  before Self(0) {
+           |    testCheck!(foo() == ${blockTimeStamp.millis})
+           |  }
+           |}
+           |""".stripMargin
+
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(now))).isRight is true
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(TimeStamp.zero)))
+        .leftValue
+        .detail is
+        s"""|-- error (9:5): Testing error
+            |9 |    testCheck!(foo() == 0)
+            |  |    ^^^^^^^^^^^^^^^^^^^^^^
+            |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed in test `Foo:foo`
+            |""".stripMargin
+    }
+
+    {
+      def code(result: Int) =
+        s"""
+           |Contract Foo(bar0: Bar, bar1: Bar) {
+           |  pub fn add() -> U256 {
+           |    return bar0.value() + bar1.value()
+           |  }
+           |  test "add"
+           |  before
+           |    Bar(10)@addr0
+           |    Bar(20)@addr1
+           |    Self(addr0, addr1)
+           |  {
+           |    testCheck!(add() == $result)
+           |  }
+           |}
+           |Contract Bar(v: U256) {
+           |  pub fn value() -> U256 {
+           |    return v
+           |  }
+           |}
+           |""".stripMargin
+
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(30))).isRight is true
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(20)))
+        .leftValue
+        .detail is
+        s"""|-- error (12:5): Testing error
+            |12 |    testCheck!(add() == 20)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:add, detail: VM execution error: Assertion Failed in test `Foo:add`
+            |""".stripMargin
+    }
+
+    {
+      val fromAddress = generateAddress(ChainIndex.unsafe(0))
+
+      def code(result: String) =
+        s"""
+           |Contract Foo(mut balance: U256) {
+           |  @using(preapprovedAssets = true, assetsInContract = true, checkExternalCaller = false)
+           |  pub fn transfer(from: Address) -> U256 {
+           |    let amount = 1 alph
+           |    transferTokenToSelf!(from, ALPH, 1 alph)
+           |    balance = balance + amount
+           |    return balance
+           |  }
+           |
+           |  test "transfer"
+           |  before Self(0)
+           |  after Self{ALPH: 1.1 alph}(1 alph)
+           |  approve{@$fromAddress -> ALPH: 2 alph} {
+           |    emit Debug(`balance: $${balance}`)
+           |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == $result)
+           |  }
+           |}
+           |""".stripMargin
+
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code("1 alph"))).isRight is true
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("2 alph")))
+        .leftValue
+        .detail is
+        s"""|-- error (16:5): Testing error
+            |16 |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == 2 alph)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:transfer, detail: VM execution error: Assertion Failed in test `Foo:transfer`
+            |   |--------------------------------------------------------------------------------------------------
+            |   |Debug messages:
+            |   |> Contract @ Foo - balance: 0
+            |""".stripMargin
+    }
+
+    {
+      def code(a: Int, b: Int) =
+        s"""
+           |Contract Foo(a: U256, b: U256) extends Base(a, b) {
+           |  pub fn foo() -> U256 { return base() }
+           |  fn base() -> U256 { return a + b }
+           |  fn isSum() -> Bool { return true }
+           |}
+           |Contract Bar(a: U256, b: U256) extends Base(a, b) {
+           |  pub fn bar() -> U256 { return base() }
+           |  fn base() -> U256 { return a - b }
+           |  fn isSum() -> Bool { return false }
+           |}
+           |Abstract Contract Base(a: U256, b: U256) {
+           |  fn isSum() -> Bool
+           |  fn base() -> U256
+           |  test "base" before Self(20, 10) {
+           |    let result = if (isSum()) $a else $b
+           |    testCheck!(base() == result)
+           |  }
+           |}
+           |""".stripMargin
+
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(30, 10))).isRight is true
+      Seq(code(20, 10), code(30, 20)).foreach { code =>
+        serverUtils
+          .compileProject(blockFlow, api.Compile.Project(code))
+          .leftValue
+          .detail is
+          s"""|-- error (17:5): Testing error
+              |17 |    testCheck!(base() == result)
+              |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed in test `Base:base`
+              |""".stripMargin
+      }
+    }
+
+    {
+      def code(value: String) =
+        s"""
+           |struct Bar {
+           |  mut a: U256,
+           |  mut b: [U256; 2],
+           |  c: [U256; 2]
+           |}
+           |Contract Foo(mut bar: Bar) {
+           |  pub fn foo() -> () {
+           |    bar.a = bar.a + 1
+           |    bar.b[0] = bar.b[0] + 1
+           |  }
+           |  test "foo"
+           |  before Self(Bar { a: 0, b: [0; 2], c: [0; 2] })
+           |  after Self($value) {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+
+      val correct = "Bar { a: 1, b: [1, 0], c: [0; 2] }"
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(correct))).isRight is true
+      val invalid0 = "Bar { a: 0, b: [1, 0], c: [0; 2] }"
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(invalid0)))
+        .leftValue
+        .detail is
+        s"""|-- error (14:9): Testing error
+            |14 |  after Self(Bar { a: 0, b: [1, 0], c: [0; 2] }) {
+            |   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |        Test failed: Foo:foo, detail: invalid field bar.a, expected U256(0), have: U256(1)
+            |""".stripMargin
+
+      val invalid1 = "Bar { a: 1, b: [1, 1], c: [0; 2] }"
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(invalid1)))
+        .leftValue
+        .detail is
+        s"""|-- error (14:9): Testing error
+            |14 |  after Self(Bar { a: 1, b: [1, 1], c: [0; 2] }) {
+            |   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |        Test failed: Foo:foo, detail: invalid field bar.b[1], expected U256(1), have: U256(0)
+            |""".stripMargin
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo(bar: Bar) {
+           |  @using(checkExternalCaller = false, assetsInContract = enforced)
+           |  pub fn foo() -> () {
+           |    bar.bar()
+           |  }
+           |
+           |  test "foo"
+           |  before
+           |    Bar{ALPH: 10 alph}(0)@barId
+           |    Self(barId)
+           |  after
+           |    Bar{ALPH: 9 alph}(1)@barId
+           |    Self{ALPH: 1.1 alph}(barId)
+           |  {
+           |    foo()
+           |  }
+           |}
+           |Contract Bar(mut value: U256) {
+           |  @using(checkExternalCaller = false, assetsInContract = true)
+           |  pub fn bar() -> () {
+           |    value += 1
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo" {
+           |    testCheck!(foo() == 1)
+           |  }
+           |}
+           |""".stripMargin
+      val options0 = CompilerOptions(skipTests = Some(true))
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code, Some(options0)))
+        .isRight is true
+      val options1 = CompilerOptions(skipTests = Some(false))
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code, Some(options1)))
+        .isRight is false
+    }
   }
 
   it should "test auto fund" in {
