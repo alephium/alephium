@@ -1,5 +1,25 @@
 [
   {
+    "name": "testCheck",
+    "category": "Test",
+    "signature": "fn testCheck!(condition:Bool) -> ()",
+    "doc": "Tests the condition or checks invariants.",
+    "params": [
+      "@condition the condition to be checked"
+    ],
+    "returns": "@returns "
+  },
+  {
+    "name": "testFail",
+    "category": "Test",
+    "signature": "fn testFail!(expr) -> ()",
+    "doc": "Asserts that the given expression throws an exception during execution.",
+    "params": [
+      "@expr the expression to be executed"
+    ],
+    "returns": "@returns "
+  },
+  {
     "name": "encodeFields",
     "category": "Contract",
     "signature": "fn <ContractName>.encodeFields!(...) -> (ByteVec, ByteVec)",
@@ -585,16 +605,6 @@
       "@param an array"
     ],
     "returns": "@returns the length of an array"
-  },
-  {
-    "name": "testCheck",
-    "category": "Utils",
-    "signature": "fn testCheck!(condition:Bool) -> ()",
-    "doc": "Tests the condition or checks invariants.",
-    "params": [
-      "@param condition the condition to be checked"
-    ],
-    "returns": "@returns "
   },
   {
     "name": "nullContractAddress",

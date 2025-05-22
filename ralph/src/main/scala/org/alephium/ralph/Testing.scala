@@ -775,6 +775,8 @@ object Testing {
     val (errorCode, msg) = exeFailure match {
       case AssertionFailedWithErrorCode(_, errorCode) =>
         (Some(errorCode), s"Assertion Failed in test `$testName`")
+      case ExpectedAnExeFailure(errorCode) =>
+        (Some(errorCode), exeFailure.toString)
       case _ => (None, exeFailure.toString)
     }
     val detail = s"VM execution error: $msg"

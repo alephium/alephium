@@ -3124,6 +3124,17 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val parsed = parse(contractWithTests, StatefulParser.contract(_)).get.value
     parsed.unitTests.length is 1
   }
+
+  it should "parse test assert statements" in {
+    parse("testCheck!(a == 1)", StatefulParser.testAssert(_)).get.value is
+      TestCheck[StatefulContext](Binop(Eq, Variable(Ident("a")), Const(Val.U256(U256.One))))
+    parse("testCheck!(foo())", StatefulParser.testAssert(_)).get.value is
+      TestCheck[StatefulContext](CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+    parse("testFail!(a == 1)", StatefulParser.testAssert(_)).get.value is
+      TestFail[StatefulContext](Binop(Eq, Variable(Ident("a")), Const(Val.U256(U256.One))))
+    parse("testFail!(foo())", StatefulParser.testAssert(_)).get.value is
+      TestFail[StatefulContext](CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+  }
 }
 
 class ParseNoFileSpec extends ParserSpec(None)

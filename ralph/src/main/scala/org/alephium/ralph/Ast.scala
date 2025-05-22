@@ -36,7 +36,7 @@ object Ast {
   private[ralph] val stdArg: Argument =
     Argument(Ident("__stdInterfaceId"), Type.ByteVec, isMutable = false, isUnused = true)
 
-  trait Positioned {
+  trait Positioned extends Product with Serializable {
     var sourceIndex: Option[SourceIndex] = None
 
     def atSourceIndex(fromIndex: Int, endIndex: Int, fileURI: Option[java.net.URI]): this.type = {
@@ -2149,15 +2149,26 @@ object Ast {
     def reset(): Unit = interpolationParts.foreach(_.reset())
   }
 
-  final case class TestCheck[Ctx <: StatelessContext](expr: Expr[Ctx]) extends Statement[Ctx] {
-    def check(state: Compiler.State[Ctx]): Unit = {
+  sealed trait TestAssert[Ctx <: StatelessContext] extends Statement[Ctx] {
+    def checkInTestContext(state: Compiler.State[Ctx], name: String): Unit = {
       if (!state.isInTestContext) {
         throw Compiler.Error(
-          s"The `testCheck!` function can only be used in unit tests",
+          s"The `$name` function can only be used in unit tests",
           sourceIndex
         )
       }
+    }
 
+    def genErrorCode(state: Compiler.State[Ctx]): Val.U256 = {
+      val errorCode = state.addTestCheckCall(this)
+      assume(errorCode >= 0)
+      Val.U256(U256.unsafe(errorCode))
+    }
+  }
+
+  final case class TestCheck[Ctx <: StatelessContext](expr: Expr[Ctx]) extends TestAssert[Ctx] {
+    def check(state: Compiler.State[Ctx]): Unit = {
+      checkInTestContext(state, "testCheck!")
       val inputType = expr.getType(state)
       if (inputType != Seq(Type.Bool)) {
         throw Compiler.Error(
@@ -2168,9 +2179,24 @@ object Ast {
     }
 
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val errorCode = state.addTestCheckCall(this)
-      assume(errorCode >= 0)
-      expr.genCode(state) ++ Seq(Val.U256(U256.unsafe(errorCode)).toConstInstr, AssertWithErrorCode)
+      val errorCode = genErrorCode(state)
+      expr.genCode(state) ++ Seq(errorCode.toConstInstr, AssertWithErrorCode)
+    }
+
+    def reset(): Unit = expr.reset()
+  }
+
+  final case class TestFail[Ctx <: StatelessContext](expr: Expr[Ctx]) extends TestAssert[Ctx] {
+    def check(state: Compiler.State[Ctx]): Unit = {
+      checkInTestContext(state, "testFail!")
+      expr.getType(state)
+      ()
+    }
+
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val errorCode = genErrorCode(state)
+      val testCode  = expr.genCode(state)
+      Seq(errorCode.toConstInstr, DevInstr(TestCheckStart)) ++ testCode :+ DevInstr(TestCheckEnd)
     }
 
     def reset(): Unit = expr.reset()

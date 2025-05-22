@@ -5925,6 +5925,38 @@ class ServerUtilsSpec extends AlephiumSpec {
         .compileProject(blockFlow, api.Compile.Project(code, Some(options1)))
         .isRight is false
     }
+
+    {
+      def code(str: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo0() -> () {
+           |    let v = 1 / 0
+           |    let _ = v
+           |  }
+           |  fn foo1() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo" {
+           |    testFail!($str)
+           |  }
+           |}
+           |""".stripMargin
+
+      Seq("foo0()", "1 / 0", "1 / foo1()", "foo1() / foo1()").foreach { expr =>
+        serverUtils.compileProject(blockFlow, api.Compile.Project(code(expr))).isRight is true
+      }
+
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("foo1() / 1")))
+        .leftValue
+        .detail is
+        s"""|-- error (11:5): Testing error
+            |11 |    testFail!(foo1() / 1)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Assertion failed: the test code did not throw an exception
+            |""".stripMargin
+    }
   }
 
   it should "test auto fund" in {

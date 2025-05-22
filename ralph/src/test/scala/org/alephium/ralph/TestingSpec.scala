@@ -480,16 +480,20 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     }
   }
 
-  it should "throw an error if `testCheck!` is called in non-test code" in {
-    val code =
+  it should "throw an error if test assert is called in non-test code" in {
+    def code(func: String) =
       s"""
          |Contract Foo(v: U256) {
          |  pub fn foo() -> () {
-         |    $$testCheck!(v == 0)$$
+         |    $$$func(v == 0)$$
          |  }
          |}
          |""".stripMargin
-    testContractError(code, "The `testCheck!` function can only be used in unit tests")
+    testContractError(
+      code("testCheck!"),
+      "The `testCheck!` function can only be used in unit tests"
+    )
+    testContractError(code("testFail!"), "The `testFail!` function can only be used in unit tests")
   }
 
   it should "get error" in {

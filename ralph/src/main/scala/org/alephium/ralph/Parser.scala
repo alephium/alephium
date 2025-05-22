@@ -1066,7 +1066,7 @@ class StatefulParser(val fileURI: Option[java.net.URI])
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
       varDef | structDestruction | assign | compoundAssign | debug | mapCall | contractCall |
-        testCheck | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+        testAssert | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
   def insertToMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
@@ -1414,10 +1414,19 @@ trait TestingParser { self: StatefulParser =>
   def unitTestDef[Unknown: P]: P[Testing.UnitTestDef[StatefulContext]] =
     P(Start ~ rawUnitTestDef ~ End)
 
-  def testCheck[Unknown: P]: P[Ast.TestCheck[StatefulContext]] =
+  def testCheck[Unknown: P]: P[Ast.TestAssert[StatefulContext]] =
     P(Index ~ "testCheck!" ~/ "(" ~ expr ~ ")" ~~ Index)
       .map { case (fromIndex, expr, endIndex) =>
         val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
         Ast.TestCheck(expr).atSourceIndex(sourceIndex)
       }
+
+  def testFail[Unknown: P]: P[Ast.TestAssert[StatefulContext]] =
+    P(Index ~ "testFail!" ~/ "(" ~ expr ~ ")" ~~ Index)
+      .map { case (fromIndex, expr, endIndex) =>
+        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
+        Ast.TestFail(expr).atSourceIndex(sourceIndex)
+      }
+
+  def testAssert[Unknown: P]: P[Ast.TestAssert[StatefulContext]] = P(testCheck | testFail)
 }
