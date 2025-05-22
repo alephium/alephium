@@ -629,6 +629,64 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "validate the P2HMPK transfer request" in {
+    new P2HMPKFixture {
+      val groupIndex = groupIndexGen.sample.get
+      val toAddress  = Address.Asset(assetLockupGen(groupIndex).sample.get)
+      val destinations = AVector(
+        Destination(
+          toAddress,
+          Some(Amount(ALPH.oneAlph)),
+          Some(AVector(Token(tokenId, ALPH.oneAlph)))
+        )
+      )
+
+      val query = BuildMultisig(
+        fromAddressWithoutGroup,
+        fromPublicKeys = AVector(fromPublicKey0.bytes, fromPublicKey1.bytes, fromPublicKey2.bytes),
+        fromPublicKeyTypes = Some(
+          AVector(BuildTxCommon.GLWebAuthn, BuildTxCommon.GLSecP256K1, BuildTxCommon.GLED25519)
+        ),
+        fromPublicKeyIndexes = Some(AVector(0, 1)),
+        group = Some(chainIndex.from),
+        destinations = destinations,
+        multiSigType = Some(MultiSigType.P2HMPK)
+      )
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyTypes = Some(AVector(BuildTxCommon.GLWebAuthn)))
+        )
+        .leftValue
+        .detail is "`keyTypes` length should be the same as `keys` length"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyTypes = None)
+        )
+        .leftValue
+        .detail is s"Invalid public key ${Hex.toHexString(fromPublicKey2.bytes)} for keyType SecP256K1"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyTypes = Some(AVector.fill(3)(BuildTxCommon.GLED25519)))
+        )
+        .leftValue
+        .detail is s"Invalid public key ${Hex.toHexString(fromPublicKey0.bytes)} for keyType GLED25519"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeys = AVector.empty, fromPublicKeyTypes = None)
+        )
+        .leftValue
+        .detail is "`keys` can not be empty"
+    }
+  }
+
   trait BuildExecuteScriptTxFixture extends P2PKFixture {
     val contract =
       s"""

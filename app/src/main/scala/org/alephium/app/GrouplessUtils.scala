@@ -554,46 +554,67 @@ object GrouplessUtils {
       builtUnsignedTxsSoFar: AVector[UnsignedTransaction]
   )
 
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def buildPublicKeyLikes(
       rawKeys: AVector[ByteString],
       keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]]
   ): Either[String, AVector[PublicKeyLike]] = {
-    val keyTypes: Either[String, AVector[BuildTxCommon.PublicKeyType]] =
-      if (keyTypesOpt.isDefined) {
-        if (keyTypesOpt.get.length != rawKeys.length) {
-          Left("`keyTypes` length should be the same as `keys` length")
-        } else {
-          Right(keyTypesOpt.get)
-        }
+    for {
+      _          <- checkPublicKeys(rawKeys)
+      keyTypes   <- checkPublicKeyTypes(rawKeys, keyTypesOpt)
+      publicKeys <- convertPublicKeys(rawKeys, keyTypes)
+    } yield publicKeys
+  }
+
+  private def checkPublicKeys(rawKeys: AVector[ByteString]): Either[String, Unit] = {
+    if (rawKeys.length == 0) {
+      Left("`keys` can not be empty")
+    } else {
+      Right(())
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  private def checkPublicKeyTypes(
+      rawKeys: AVector[ByteString],
+      keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]]
+  ): Either[String, AVector[BuildTxCommon.PublicKeyType]] = {
+    if (keyTypesOpt.isDefined) {
+      if (keyTypesOpt.get.length != rawKeys.length) {
+        Left("`keyTypes` length should be the same as `keys` length")
       } else {
-        Right(AVector.fill(rawKeys.length)(BuildTxCommon.Default))
+        Right(keyTypesOpt.get)
+      }
+    } else {
+      Right(AVector.fill(rawKeys.length)(BuildTxCommon.Default))
+    }
+  }
+
+  private def convertPublicKeys(
+      rawKeys: AVector[ByteString],
+      keyTypes: AVector[BuildTxCommon.PublicKeyType]
+  ): Either[String, AVector[PublicKeyLike]] = {
+    keyTypes.foldWithIndexE(AVector.empty[PublicKeyLike]) { (publicKeys, keyType, index) =>
+      val rawKey = rawKeys(index)
+      val publicKey = keyType match {
+        case BuildTxCommon.Default =>
+          SecP256K1PublicKey.from(rawKey).map(PublicKeyLike.SecP256K1.apply)
+        case BuildTxCommon.GLED25519 =>
+          ED25519PublicKey.from(rawKey).map(PublicKeyLike.ED25519.apply)
+        case BuildTxCommon.GLSecP256K1 =>
+          SecP256K1PublicKey.from(rawKey).map(PublicKeyLike.SecP256K1.apply)
+        case BuildTxCommon.GLSecP256R1 =>
+          SecP256R1PublicKey.from(rawKey).map(PublicKeyLike.SecP256R1.apply)
+        case BuildTxCommon.GLWebAuthn =>
+          SecP256R1PublicKey.from(rawKey).map(PublicKeyLike.WebAuthn.apply)
+        case BuildTxCommon.BIP340Schnorr =>
+          None // BIP340Schnorr not supported
       }
 
-    keyTypes.flatMap {
-      _.foldWithIndexE(AVector.empty[PublicKeyLike]) { (publicKeys, keyType, index) =>
-        val rawKey = rawKeys(index)
-        val publicKey = keyType match {
-          case BuildTxCommon.Default =>
-            SecP256K1PublicKey.from(rawKey).map(PublicKeyLike.SecP256K1.apply)
-          case BuildTxCommon.GLED25519 =>
-            ED25519PublicKey.from(rawKey).map(PublicKeyLike.ED25519.apply)
-          case BuildTxCommon.GLSecP256K1 =>
-            SecP256K1PublicKey.from(rawKey).map(PublicKeyLike.SecP256K1.apply)
-          case BuildTxCommon.GLSecP256R1 =>
-            SecP256R1PublicKey.from(rawKey).map(PublicKeyLike.SecP256R1.apply)
-          case BuildTxCommon.GLWebAuthn =>
-            SecP256R1PublicKey.from(rawKey).map(PublicKeyLike.WebAuthn.apply)
-          case BuildTxCommon.BIP340Schnorr =>
-            None // BIP340Schnorr not supported
-        }
-
-        publicKey match {
-          case Some(publicKey) =>
-            Right(publicKeys :+ publicKey)
-          case None =>
-            Left(s"Invalid public key ${Hex.toHexString(rawKey)} for keyType $keyType")
-        }
+      publicKey match {
+        case Some(publicKey) =>
+          Right(publicKeys :+ publicKey)
+        case None =>
+          Left(s"Invalid public key ${Hex.toHexString(rawKey)} for keyType ${keyType.name}")
       }
     }
   }

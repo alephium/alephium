@@ -48,13 +48,17 @@ trait BuildTxCommon {
 }
 
 object BuildTxCommon {
-  sealed trait PublicKeyType
-  object Default       extends PublicKeyType // SecP256K1
-  object BIP340Schnorr extends PublicKeyType
-  object GLSecP256K1   extends PublicKeyType
-  object GLSecP256R1   extends PublicKeyType
-  object GLED25519     extends PublicKeyType
-  object GLWebAuthn    extends PublicKeyType
+  sealed trait PublicKeyType extends Product with Serializable {
+    def name: String = productPrefix
+  }
+  case object Default extends PublicKeyType {
+    override def name: String = "SecP256K1"
+  }
+  case object BIP340Schnorr extends PublicKeyType
+  case object GLSecP256K1   extends PublicKeyType
+  case object GLSecP256R1   extends PublicKeyType
+  case object GLED25519     extends PublicKeyType
+  case object GLWebAuthn    extends PublicKeyType
 
   trait FromPublicKey {
     def fromPublicKey: ByteString
