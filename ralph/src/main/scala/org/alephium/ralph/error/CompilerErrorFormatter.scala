@@ -104,17 +104,27 @@ final case class CompilerErrorFormatter(
         val emptyLineNumberGutterLength =
           emptyLineNumGutter.length
 
+        val footerLines      = footer.linesIterator.toSeq
+        val initMarginLength = footerLines.headOption.map(_.length).getOrElse(0)
         val marginLength = // max length of the footer margin.
-          errorBodyStripped.linesIterator.foldLeft(footer.length) { case (currentMax, nextLine) =>
-            currentMax max (nextLine.length - emptyLineNumberGutterLength)
-          }
+          errorBodyStripped.linesIterator
+            .concat(footerLines)
+            .foldLeft(initMarginLength) { case (currentMax, nextLine) =>
+              currentMax max (nextLine.length - emptyLineNumberGutterLength)
+            }
 
         val footerMargin = highlight("-" * marginLength, errorColor)
 
+        val footerWithGutter = if (footerLines.isEmpty) {
+          ""
+        } else {
+          footerLines
+            .map(line => s"$emptyLineNumGutter$line")
+            .mkString("", System.lineSeparator(), System.lineSeparator())
+        }
         s"""$errorBody
            |$emptyLineNumGutter$footerMargin
-           |$emptyLineNumGutter$footer
-           |""".stripMargin
+           |""".stripMargin + footerWithGutter
 
       case None =>
         errorBodyStripped + System.lineSeparator()

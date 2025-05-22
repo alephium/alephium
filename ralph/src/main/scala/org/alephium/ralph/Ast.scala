@@ -670,7 +670,7 @@ object Ast {
             val instrs = genApproveCode(state, func) ++
               func.genCodeForArgs(args, state) ++
               variadicInstrs ++
-              func.genCode(argsType)
+              func.genCode(this, state, argsType)
             if (ignoreReturn) {
               val returnType = positionedError(func.getReturnType(argsType, state))
               instrs ++ Seq.fill(state.flattenTypeLength(returnType))(Pop)
@@ -2203,7 +2203,7 @@ object Ast {
           )
       }
     }
-    def addConstant(ident: Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
+    def addConstant(ident: Ident, value: Val, constantDef: Option[Ast.ConstantDefinition]): Unit = {
       val tpe = Type.fromVal(value)
       constants(ident) =
         Compiler.VarInfo.Constant(ident, tpe, value, Seq(value.toConstInstr), constantDef)
@@ -2596,7 +2596,8 @@ object Ast {
       events: Seq[EventDef],
       constantVars: Seq[ConstantVarDef[StatefulContext]],
       enums: Seq[EnumDef[StatefulContext]],
-      inheritances: Seq[Inheritance]
+      inheritances: Seq[Inheritance],
+      unitTests: Seq[Testing.UnitTestDef[StatefulContext]]
   ) extends ContractWithState {
     lazy val hasStdIdField: Boolean = stdIdEnabled.exists(identity) && stdInterfaceId.nonEmpty
     lazy val contractFields: Seq[Argument] = if (hasStdIdField) fields :+ Ast.stdArg else fields
@@ -2750,6 +2751,12 @@ object Ast {
       StatefulContract(fieldsLength, genMethods(state))
     }
 
+    def genUnitTestCode(
+        state: Compiler.State[StatefulContext]
+    ): Testing.CompiledUnitTests[StatefulContext] = {
+      state.genUnitTestCode(unitTests)
+    }
+
     // the state must have been updated in the check pass
     def buildCheckExternalCallerTable(
         state: Compiler.State[StatefulContext]
@@ -2830,7 +2837,7 @@ object Ast {
         case txContract: Ast.Contract =>
           Compiler.ContractKind.Contract(txContract.isAbstract)
       }
-      contract.ident -> Compiler.ContractInfo(kind, contract.funcTable(globalState))
+      contract.ident -> Compiler.ContractInfo(contract, kind, contract.funcTable(globalState))
     }.toMap
 
     def structs: Seq[Struct]                 = globalState.structs
@@ -2930,7 +2937,7 @@ object Ast {
         case script: TxScript =>
           script.withTemplateVarDefs(globalState).atSourceIndex(script.sourceIndex)
         case c: Contract =>
-          val (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums) =
+          val (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums, unitTests) =
             MultiContract.extractContract(parentsCache, methodSelectorTable, c)
           Contract(
             Some(stdIdEnabled),
@@ -2944,7 +2951,8 @@ object Ast {
             events,
             constantVars,
             enums,
-            c.inheritances
+            c.inheritances,
+            unitTests
           ).atSourceIndex(c.sourceIndex)
         case i: ContractInterface =>
           val (stdId, funcs, events) =
@@ -3126,7 +3134,8 @@ object Ast {
           inlinedReleaseCode,
           contract,
           state.getWarnings,
-          inlinedDebugCode
+          inlinedDebugCode,
+          Option.unless(compilerOptions.skipTests)(contract.genUnitTestCode(state))
         ) -> index
       }
       (warnings, compiled)
@@ -3377,14 +3386,17 @@ object Ast {
         Seq[MapDef],
         Seq[EventDef],
         Seq[ConstantVarDef[StatefulContext]],
-        Seq[EnumDef[StatefulContext]]
+        Seq[EnumDef[StatefulContext]],
+        Seq[Testing.UnitTestDef[StatefulContext]]
     ) = {
-      val parents                       = parentsCache(contract.ident)
-      val (allContracts, allInterfaces) = (parents :+ contract).partition(_.isInstanceOf[Contract])
-      val sortedInterfaces =
-        sortInterfaces(parentsCache, allInterfaces.map(_.asInstanceOf[ContractInterface]))
-      val stdId        = getStdId(sortedInterfaces)
-      val stdIdEnabled = getStdIdEnabled(allContracts.map(_.asInstanceOf[Contract]), contract.ident)
+      val parents = parentsCache(contract.ident)
+      val (parentContracts, parentInterfaces) =
+        (parents :+ contract).partition(_.isInstanceOf[Contract])
+      val allContracts     = parentContracts.map(_.asInstanceOf[Contract])
+      val allInterfaces    = parentInterfaces.map(_.asInstanceOf[ContractInterface])
+      val sortedInterfaces = sortInterfaces(parentsCache, allInterfaces)
+      val stdId            = getStdId(sortedInterfaces)
+      val stdIdEnabled     = getStdIdEnabled(allContracts, contract.ident)
 
       val interfaceFuncs = sortedInterfaces.flatMap { interface =>
         interface.funcs.foreach(func =>
@@ -3416,7 +3428,8 @@ object Ast {
       } else {
         rearrangeFuncs(sortedInterfaces, allUniqueFuncs)
       }
-      (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums)
+      val allUnitTests = allContracts.flatMap(_.unitTests)
+      (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums, allUnitTests)
     }
     // scalastyle:on method.length
 

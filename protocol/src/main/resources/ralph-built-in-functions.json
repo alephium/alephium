@@ -587,6 +587,16 @@
     "returns": "@returns the length of an array"
   },
   {
+    "name": "testCheck",
+    "category": "Utils",
+    "signature": "fn testCheck!(condition:Bool) -> ()",
+    "doc": "Tests the condition or checks invariants.",
+    "params": [
+      "@param condition the condition to be checked"
+    ],
+    "returns": "@returns "
+  },
+  {
     "name": "nullContractAddress",
     "category": "Utils",
     "signature": "fn nullContractAddress!() -> (Address)",

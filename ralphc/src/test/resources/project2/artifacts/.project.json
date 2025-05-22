@@ -7,7 +7,8 @@
     "ignoreUpdateFieldsCheckWarnings": false,
     "ignoreCheckExternalCallerWarnings": false,
     "ignoreUnusedFunctionReturnWarnings": false,
-    "skipAbstractContractCheck": false
+    "skipAbstractContractCheck": false,
+    "skipTests": false
   },
   "infos": {
     "Action": {

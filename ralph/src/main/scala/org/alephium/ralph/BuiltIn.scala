@@ -357,19 +357,41 @@ object BuiltIn {
     SimpleBuiltIn.hash("sha256", Seq(Type.ByteVec), Seq(Type.ByteVec), Sha256)
   val sha3: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.hash("sha3", Seq(Type.ByteVec), Seq(Type.ByteVec), Sha3)
-  val assert: SimpleBuiltIn[StatelessContext] =
-    SimpleBuiltIn.utils(
-      "assert",
-      Seq[Type](Type.Bool, Type.U256),
-      Seq.empty,
-      AssertWithErrorCode,
-      argsName = Seq(
-        "condition" -> "the condition to be checked",
-        "errorCode" -> "the error code to throw if the check fails"
-      ),
-      retComment = "",
-      doc = "Tests the condition or checks invariants."
+  val assert: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] with DocUtils {
+    val name: String = "assert"
+
+    def category: Category            = Category.Utils
+    def usePreapprovedAssets: Boolean = false
+
+    def getReturnType[C <: StatelessContext](
+        inputType: Seq[Type],
+        state: Compiler.State[C]
+    ): Seq[Type] = {
+      if (state.isInTestContext) {
+        throw Compiler.Error("Please use `testCheck!` instead of `assert!` in unit tests", None)
+      }
+      val argsType = Seq[Type](Type.Bool, Type.U256)
+      if (inputType == argsType) {
+        Seq.empty
+      } else {
+        throw Error(
+          s"Invalid args type ${quote(inputType)} for builtin func $name, expected ${quote(argsType)}",
+          None
+        )
+      }
+    }
+    def returnType(selfContractType: Type): Seq[Type] = Seq.empty
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(AssertWithErrorCode)
+
+    def signature: String = s"fn $name!(condition:Bool, errorCode:U256) -> ()"
+    def argsCommentedName: Seq[(String, String)] = Seq(
+      "condition" -> "the condition to be checked",
+      "errorCode" -> "the error code to throw if the check fails"
     )
+    def retComment: String = ""
+    def doc: String        = "Tests the condition or checks invariants."
+  }
   val verifyTxSignature: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
       "verifyTxSignature",
@@ -1112,6 +1134,50 @@ object BuiltIn {
     def doc: String         = "Get the length of an array"
   }
 
+  val testCheck: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] with DocUtils {
+    val name: String = "testCheck"
+
+    def category: Category            = Category.Utils
+    def usePreapprovedAssets: Boolean = false
+
+    def getReturnType[C <: StatelessContext](
+        inputType: Seq[Type],
+        state: Compiler.State[C]
+    ): Seq[Type] = {
+      if (!state.isInTestContext) {
+        throw Compiler.Error(
+          s"The `testCheck!` function can only be used in unit tests",
+          inputType.headOption.flatMap(_.sourceIndex)
+        )
+      }
+      inputType match {
+        case Seq(Type.Bool) => Seq.empty
+        case _ =>
+          throw Compiler.Error(
+            s"Expected a bool, got ${quoteTypes(inputType)}",
+            inputType.headOption.flatMap(_.sourceIndex)
+          )
+      }
+    }
+    def returnType(selfContractType: Type): Seq[Type] = Seq.empty
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = ???
+    override def genCode[C <: StatelessContext](
+        ast: Ast.Positioned,
+        state: Compiler.State[C],
+        inputType: Seq[Type]
+    ): Seq[Instr[StatelessContext]] = {
+      val errorCode = state.addTestCheckCall(ast)
+      assume(errorCode >= 0)
+      Seq(Val.U256(U256.unsafe(errorCode)).toConstInstr, AssertWithErrorCode)
+    }
+
+    def signature: String                        = s"fn $name!(condition:Bool) -> ()"
+    def argsCommentedName: Seq[(String, String)] = Seq("condition" -> "the condition to be checked")
+    def retComment: String                       = ""
+    def doc: String                              = "Tests the condition or checks invariants."
+  }
+
   val verifySignature: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
       "verifySignature",
@@ -1231,6 +1297,7 @@ object BuiltIn {
     i256Min,
     groupOfAddress,
     len,
+    testCheck,
     verifySignature,
     verifySecP256R1,
     verifyWebAuthn,
