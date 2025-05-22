@@ -5983,6 +5983,33 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
       serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
     }
+
+    {
+      def code(testCall: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo" {
+           |    $testCall
+           |  }
+           |}
+           |""".stripMargin
+
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("testEqual!(foo(), 0)")))
+        .isRight is true
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("testEqual!(foo(), 1)")))
+        .leftValue
+        .detail is
+        s"""|-- error (7:5): Testing error
+            |7 |    testEqual!(foo(), 1)
+            |  |    ^^^^^^^^^^^^^^^^^^^^
+            |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: left(U256(0)) is not equal to right(U256(1))
+            |""".stripMargin
+    }
   }
 
   it should "test auto fund" in {

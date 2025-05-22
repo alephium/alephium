@@ -127,6 +127,19 @@ object BuiltInFunctions extends App {
       returns = "@returns "
     )
 
+    val testEqual: FunctionInfo = FunctionInfo(
+      name = "testEqual",
+      category = BuiltIn.Category.Test.toString,
+      signature =
+        "fn testEqual!(left: <Bool | U256 | I256 | Address | ByteVec>, right: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
+      doc = "Asserts that the given values are equal.",
+      params = Seq(
+        "@left the first value to compare",
+        "@right the second value to compare; must be the same type as `left`"
+      ),
+      returns = "@returns "
+    )
+
     val testFail: FunctionInfo = FunctionInfo(
       name = "testFail",
       category = BuiltIn.Category.Test.toString,
@@ -136,6 +149,6 @@ object BuiltInFunctions extends App {
       returns = "@returns "
     )
 
-    val testFunctions: Seq[FunctionInfo] = Seq(testCheck, testFail)
+    val testFunctions: Seq[FunctionInfo] = Seq(testCheck, testFail, testEqual)
   }
 }

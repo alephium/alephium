@@ -481,19 +481,26 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
   }
 
   it should "throw an error if test assert is called in non-test code" in {
-    def code(func: String) =
+    def code(testCall: String) =
       s"""
          |Contract Foo(v: U256) {
          |  pub fn foo() -> () {
-         |    $$$func(v == 0)$$
+         |    $$$testCall$$
          |  }
          |}
          |""".stripMargin
     testContractError(
-      code("testCheck!"),
+      code("testCheck!(v == 0)"),
       "The `testCheck!` function can only be used in unit tests"
     )
-    testContractError(code("testFail!"), "The `testFail!` function can only be used in unit tests")
+    testContractError(
+      code("testFail!(v == 0)"),
+      "The `testFail!` function can only be used in unit tests"
+    )
+    testContractError(
+      code("testEqual!(v, 0)"),
+      "The `testEqual!` function can only be used in unit tests"
+    )
   }
 
   it should "get error" in {
@@ -700,6 +707,30 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     testContractError(
       code(s"$$randomI256!() > foo0()$$"),
       "Invalid param types List(I256, U256) for > operator"
+    )
+  }
+
+  it should "compile testEqual" in {
+    def code(testCall: String) =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> U256 {
+         |    return 0
+         |  }
+         |  test "foo" {
+         |    $testCall
+         |  }
+         |}
+         |""".stripMargin
+
+    compileContractFull(code("testEqual!(foo(), 0)")).isRight is true
+    testContractError(
+      code(s"$$testEqual!(foo(), 0, 0)$$"),
+      "Expected 2 arguments, but got 3"
+    )
+    testContractError(
+      code(s"$$testEqual!(foo(), 0i)$$"),
+      "Invalid args type List(U256, I256) for builtin func testEqual"
     )
   }
 }

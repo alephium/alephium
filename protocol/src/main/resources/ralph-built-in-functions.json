@@ -36,6 +36,17 @@
     "returns": "@returns "
   },
   {
+    "name": "testEqual",
+    "category": "Test",
+    "signature": "fn testEqual!(left: <Bool | U256 | I256 | Address | ByteVec>, right: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
+    "doc": "Asserts that the given values are equal.",
+    "params": [
+      "@left the first value to compare",
+      "@right the second value to compare; must be the same type as `left`"
+    ],
+    "returns": "@returns "
+  },
+  {
     "name": "encodeFields",
     "category": "Contract",
     "signature": "fn <ContractName>.encodeFields!(...) -> (ByteVec, ByteVec)",

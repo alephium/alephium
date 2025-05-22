@@ -2175,7 +2175,7 @@ object Ast {
         case Binop(TestOperator.Eq, left, right) =>
           left.genCode(state) ++ right.genCode(state) ++ Seq(
             errorCode.toConstInstr,
-            DevInstr(TestEqual)
+            DevInstr(vm.TestEqual)
           )
         case _ =>
           expr.genCode(state) ++ Seq(errorCode.toConstInstr, AssertWithErrorCode)
@@ -2199,6 +2199,27 @@ object Ast {
     }
 
     def reset(): Unit = expr.reset()
+  }
+
+  final case class TestEqual[Ctx <: StatelessContext](args: Seq[Expr[Ctx]])
+      extends TestAssert[Ctx] {
+    def check(state: Compiler.State[Ctx]): Unit = {
+      state.checkInTestContext("testEqual!", sourceIndex)
+      if (args.length != 2) {
+        throw Compiler.Error(s"Expected 2 arguments, but got ${args.length}", sourceIndex)
+      }
+      val types = args.flatMap(_.getType(state))
+      if (types.length != 2 || types(0) != types(1)) {
+        throw Compiler.Error(s"Invalid args type $types for builtin func testEqual", sourceIndex)
+      }
+    }
+
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val errorCode = genErrorCode(state)
+      args.flatMap(_.genCode(state)) ++ Seq(errorCode.toConstInstr, DevInstr(vm.TestEqual))
+    }
+
+    def reset(): Unit = args.foreach(_.reset())
   }
 
   object TemplateVar {
