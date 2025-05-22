@@ -216,7 +216,7 @@ object Instr {
     /* Below are instructions for Rhone hard fork */
     GroupOfAddress,
     /* Below are instructions for Danube hard fork */
-    VerifySignature, GetSegregatedWebAuthnSignature
+    VerifySignature, GetSegregatedWebAuthnSignature, DevInstr
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -3194,3 +3194,62 @@ final case class DEBUG(stringParts: AVector[Val.ByteVec])
   }
 }
 object DEBUG extends StatelessInstrCompanion1[AVector[Val.ByteVec]]
+
+sealed trait DevInstrBase
+case object TestCheckStart extends DevInstrBase
+case object TestCheckEnd   extends DevInstrBase
+object DevInstrBase {
+  implicit val serde: Serde[DevInstrBase] = new Serde[DevInstrBase] {
+    override def serialize(input: DevInstrBase): ByteString = {
+      input match {
+        case TestCheckStart => ByteString(0)
+        case TestCheckEnd   => ByteString(1)
+      }
+    }
+
+    override def _deserialize(input: ByteString): SerdeResult[Staging[DevInstrBase]] = {
+      byteSerde._deserialize(input).flatMap {
+        case Staging(0, content) => Right(Staging(TestCheckStart, content))
+        case Staging(1, content) => Right(Staging(TestCheckEnd, content))
+        case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid dev instr prefix $n"))
+      }
+    }
+  }
+}
+
+@ByteCode
+final case class DevInstr(instr: DevInstrBase)
+    extends DanubeInstrWithSimpleGas[StatelessContext]
+    with GasZero {
+  def serialize(): ByteString =
+    ByteString(code) ++ serdeImpl[DevInstrBase].serialize(instr)
+
+  def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    if (
+      frame.ctx.networkConfig.networkId == model.NetworkId.AlephiumMainNet ||
+      frame.ctx.networkConfig.networkId == model.NetworkId.AlephiumTestNet
+    ) {
+      failed(DevInstrIsOnlySupportedOnDevnet)
+    } else {
+      instr match {
+        case TestCheckStart =>
+          for {
+            errorCodeU256 <- frame.popOpStackU256()
+            errorCode     <- errorCodeU256.v.toInt.toRight(Right(InvalidErrorCode(errorCodeU256.v)))
+          } yield frame.ctx.initTestEnv(errorCode, frame)
+        case TestCheckEnd =>
+          frame.ctx.testEnvOpt match {
+            case Some(testEnv) =>
+              frame.ctx.resetTestEnv()
+              if (testEnv.exeFailure.isDefined) {
+                okay
+              } else {
+                failed(ExpectedAnExeFailure(testEnv.errorCode))
+              }
+            case None => failed(InvalidTestCheckInstr)
+          }
+      }
+    }
+  }
+}
+object DevInstr extends StatelessInstrCompanion1[DevInstrBase]

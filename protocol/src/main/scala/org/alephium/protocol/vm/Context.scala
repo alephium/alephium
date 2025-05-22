@@ -218,7 +218,38 @@ final case class NodeIndexesConfig(
     subcontractIndex: Boolean
 )
 
-trait StatelessContext extends CostStrategy {
+final class TestEnv(
+    val errorCode: Int,
+    val testFrame: Frame[_],
+    private var _exeFailure: Option[ExeFailure]
+) {
+  def setExeFailure(error: ExeFailure): Unit = _exeFailure = Some(error)
+  def exeFailure: Option[ExeFailure]         = _exeFailure
+}
+object TestEnv {
+  def apply(errorCode: Int, testFrame: Frame[_]): TestEnv =
+    new TestEnv(errorCode, testFrame, None)
+}
+
+trait TestContext {
+  private var _testEnv: Option[TestEnv] = None
+  def initTestEnv(errorCode: Int, testFrame: Frame[_]): Unit = {
+    assume(_testEnv.isEmpty)
+    _testEnv = Some(TestEnv(errorCode, testFrame))
+  }
+  def resetTestEnv(): Unit = {
+    assume(_testEnv.isDefined)
+    _testEnv = None
+  }
+  def testEnvOpt: Option[TestEnv] = _testEnv
+
+  def setTestError(error: ExeFailure): Unit = {
+    assume(_testEnv.isDefined)
+    _testEnv.foreach(_.setExeFailure(error))
+  }
+}
+
+trait StatelessContext extends CostStrategy with TestContext {
   def networkConfig: NetworkConfig
   def groupConfig: GroupConfig
   def blockEnv: BlockEnv

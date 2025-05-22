@@ -470,6 +470,12 @@ final case class AssertionFailedWithErrorCode(contractIdOpt: Option[ContractId],
 final case class InvalidWebAuthnPayload(error: SerdeError) extends ExeFailure
 final case class InvalidPublicKeyType(tpe: ByteString)     extends ExeFailure
 
+case object DevInstrIsOnlySupportedOnDevnet extends ExeFailure
+case object InvalidTestCheckInstr           extends ExeFailure
+final case class ExpectedAnExeFailure(errorCode: Int) extends ExeFailure {
+  override def toString: String = s"Assertion failed: the test code did not throw an exception"
+}
+
 sealed trait IOFailure extends Product {
   def error: IOError
   def name: String = productPrefix
