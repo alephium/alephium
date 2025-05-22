@@ -667,4 +667,39 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     val test = compileContractFull(code).rightValue.tests.get.tests.head
     test.selfContract.immFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(2))))
   }
+
+  it should "test using random func" in {
+    def code(str: String) =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo0() -> U256 {
+         |    return 0
+         |  }
+         |  pub fn foo1() -> I256 {
+         |    return -1i
+         |  }
+         |  test "foo" {
+         |    testCheck!($str)
+         |  }
+         |}
+         |""".stripMargin
+    compileContractFull(code("randomU256!() > foo0()")).isRight is true
+    compileContractFull(code("randomI256!() > foo1()")).isRight is true
+    testContractError(
+      code(s"$$randomU256!(1)$$ > foo0()"),
+      "Invalid args type for builtin func randomU256"
+    )
+    testContractError(
+      code(s"$$randomU256!() > foo1()$$"),
+      "Invalid param types List(U256, I256) for > operator"
+    )
+    testContractError(
+      code(s"$$randomI256!(1)$$ > foo1()"),
+      "Invalid args type for builtin func randomI256"
+    )
+    testContractError(
+      code(s"$$randomI256!() > foo0()$$"),
+      "Invalid param types List(I256, U256) for > operator"
+    )
+  }
 }

@@ -4814,12 +4814,16 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     serialize[DevInstrBase](TestCheckStart) is Hex.unsafe("00")
     serialize[DevInstrBase](TestCheckEnd) is Hex.unsafe("01")
     serialize[DevInstrBase](TestEqual) is Hex.unsafe("02")
+    serialize[DevInstrBase](RandomU256) is Hex.unsafe("03")
+    serialize[DevInstrBase](RandomI256) is Hex.unsafe("04")
 
     deserialize[DevInstrBase](Hex.unsafe("00")).rightValue is TestCheckStart
     deserialize[DevInstrBase](Hex.unsafe("01")).rightValue is TestCheckEnd
     deserialize[DevInstrBase](Hex.unsafe("02")).rightValue is TestEqual
-    deserialize[DevInstrBase](Hex.unsafe("03")).leftValue is SerdeError.WrongFormat(
-      "Invalid dev instr prefix 3"
+    deserialize[DevInstrBase](Hex.unsafe("03")).rightValue is RandomU256
+    deserialize[DevInstrBase](Hex.unsafe("04")).rightValue is RandomI256
+    deserialize[DevInstrBase](Hex.unsafe("05")).leftValue is SerdeError.WrongFormat(
+      "Invalid dev instr prefix 5"
     )
   }
 
@@ -4881,6 +4885,24 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     frame.pushOpStack(Val.I256(I256.Zero))
     frame.pushOpStack(Val.U256(255))
     DevInstr(TestEqual).runWith(frame) isE ()
+  }
+
+  it should "DevInstr(RandomU256)" in new DevInstrFixture {
+    fail(DevInstr(RandomU256))
+
+    frame.opStack.isEmpty is true
+    DevInstr(RandomU256).runWith(frame) isE ()
+    frame.opStack.size is 1
+    frame.opStack.top.value is a[Val.U256]
+  }
+
+  it should "DevInstr(RandomI256)" in new DevInstrFixture {
+    fail(DevInstr(RandomI256))
+
+    frame.opStack.isEmpty is true
+    DevInstr(RandomI256).runWith(frame) isE ()
+    frame.opStack.size is 1
+    frame.opStack.top.value is a[Val.I256]
   }
 
   it should "test gas amount" in new FrameFixture {

@@ -2150,15 +2150,6 @@ object Ast {
   }
 
   sealed trait TestAssert[Ctx <: StatelessContext] extends Statement[Ctx] {
-    def checkInTestContext(state: Compiler.State[Ctx], name: String): Unit = {
-      if (!state.isInTestContext) {
-        throw Compiler.Error(
-          s"The `$name` function can only be used in unit tests",
-          sourceIndex
-        )
-      }
-    }
-
     def genErrorCode(state: Compiler.State[Ctx]): Val.U256 = {
       val errorCode = state.addTestCheckCall(this)
       assume(errorCode >= 0)
@@ -2168,7 +2159,7 @@ object Ast {
 
   final case class TestCheck[Ctx <: StatelessContext](expr: Expr[Ctx]) extends TestAssert[Ctx] {
     def check(state: Compiler.State[Ctx]): Unit = {
-      checkInTestContext(state, "testCheck!")
+      state.checkInTestContext("testCheck!", sourceIndex)
       val inputType = expr.getType(state)
       if (inputType != Seq(Type.Bool)) {
         throw Compiler.Error(
@@ -2196,7 +2187,7 @@ object Ast {
 
   final case class TestFail[Ctx <: StatelessContext](expr: Expr[Ctx]) extends TestAssert[Ctx] {
     def check(state: Compiler.State[Ctx]): Unit = {
-      checkInTestContext(state, "testFail!")
+      state.checkInTestContext("testFail!", sourceIndex)
       expr.getType(state)
       ()
     }

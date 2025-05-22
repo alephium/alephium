@@ -1194,6 +1194,43 @@ object BuiltIn {
       doc = "Retrieves the segregated WebAuthn signature payload from the current transaction"
     )
 
+  def randomFunc[T <: Type](
+      funcName: String,
+      retType: T,
+      retTypeStr: String,
+      instr: DevInstr
+  ): BuiltIn[StatelessContext] = {
+    new BuiltIn[StatelessContext] with DocUtils {
+      val name: String = funcName
+
+      def category: Category            = Category.Test
+      def usePreapprovedAssets: Boolean = false
+
+      def getReturnType[C <: StatelessContext](
+          inputType: Seq[Type],
+          state: Compiler.State[C]
+      ): Seq[Type] = {
+        if (inputType.nonEmpty) {
+          throw Compiler.Error(s"Invalid args type for builtin func $funcName", None)
+        }
+        state.checkInTestContext(s"$funcName!", None)
+        Seq(retType)
+      }
+      def returnType(selfContractType: Type): Seq[Type] = Seq(retType)
+
+      def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(instr)
+      def signature: String                        = s"fn $funcName!() -> $retTypeStr"
+      def argsCommentedName: Seq[(String, String)] = Seq.empty
+      def retComment: String = s"a randomly generated $retTypeStr value for testing purposes"
+      def doc: String        = s"Generates a random $retTypeStr value"
+    }
+  }
+
+  val randomU256: BuiltIn[StatelessContext] =
+    randomFunc("randomU256", Type.U256, "U256", DevInstr(RandomU256))
+  val randomI256: BuiltIn[StatelessContext] =
+    randomFunc("randomI256", Type.I256, "I256", DevInstr(RandomI256))
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -1257,7 +1294,9 @@ object BuiltIn {
     verifySignature,
     verifySecP256R1,
     verifyWebAuthn,
-    getSegregatedWebAuthnSignature
+    getSegregatedWebAuthnSignature,
+    randomU256,
+    randomI256
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap

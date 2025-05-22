@@ -1358,6 +1358,15 @@ object Compiler {
         )
       }
     }
+
+    def checkInTestContext(funcName: String, sourceIndex: Option[SourceIndex]): Unit = {
+      if (!isInTestContext) {
+        throw Compiler.Error(
+          s"The `$funcName` function can only be used in unit tests",
+          sourceIndex
+        )
+      }
+    }
   }
   // scalastyle:on number.of.methods
 

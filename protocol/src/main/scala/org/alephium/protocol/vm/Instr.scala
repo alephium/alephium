@@ -3199,6 +3199,8 @@ sealed trait DevInstrBase
 case object TestCheckStart extends DevInstrBase
 case object TestCheckEnd   extends DevInstrBase
 case object TestEqual      extends DevInstrBase
+case object RandomU256     extends DevInstrBase
+case object RandomI256     extends DevInstrBase
 object DevInstrBase {
   implicit val serde: Serde[DevInstrBase] = new Serde[DevInstrBase] {
     override def serialize(input: DevInstrBase): ByteString = {
@@ -3206,6 +3208,8 @@ object DevInstrBase {
         case TestCheckStart => ByteString(0)
         case TestCheckEnd   => ByteString(1)
         case TestEqual      => ByteString(2)
+        case RandomU256     => ByteString(3)
+        case RandomI256     => ByteString(4)
       }
     }
 
@@ -3214,6 +3218,8 @@ object DevInstrBase {
         case Staging(0, content) => Right(Staging(TestCheckStart, content))
         case Staging(1, content) => Right(Staging(TestCheckEnd, content))
         case Staging(2, content) => Right(Staging(TestEqual, content))
+        case Staging(3, content) => Right(Staging(RandomU256, content))
+        case Staging(4, content) => Right(Staging(RandomI256, content))
         case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid dev instr prefix $n"))
       }
     }
@@ -3267,6 +3273,8 @@ final case class DevInstr(instr: DevInstrBase)
                 failed(NotEqualInTest(left, right, errorCode))
               }
           } yield ()
+        case RandomU256 => frame.pushOpStack(Val.U256(util.UnsecureRandom.nextU256()))
+        case RandomI256 => frame.pushOpStack(Val.I256(util.UnsecureRandom.nextI256()))
       }
     }
   }

@@ -5964,6 +5964,25 @@ class ServerUtilsSpec extends AlephiumSpec {
             |   |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: the test code did not throw an exception
             |""".stripMargin
     }
+
+    {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo0() -> U256 {
+           |    return 0
+           |  }
+           |  pub fn foo1() -> I256 {
+           |    return i256Max!()
+           |  }
+           |  test "foo" {
+           |    testCheck!(randomU256!() >= foo0())
+           |    testCheck!(randomI256!() <= foo1())
+           |  }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+    }
   }
 
   it should "test auto fund" in {
