@@ -3233,7 +3233,7 @@ final case class DevInstr(instr: DevInstrBase)
   def serialize(): ByteString =
     ByteString(code) ++ serdeImpl[DevInstrBase].serialize(instr)
 
-  private def popErrorCode[C <: StatelessContext](frame: Frame[C]): ExeResult[Int] = {
+  private def popInt[C <: StatelessContext](frame: Frame[C]): ExeResult[Int] = {
     for {
       errorCodeU256 <- frame.popOpStackU256()
       errorCode     <- errorCodeU256.v.toInt.toRight(Right(InvalidErrorCode(errorCodeU256.v)))
@@ -3249,7 +3249,7 @@ final case class DevInstr(instr: DevInstrBase)
     } else {
       instr match {
         case TestCheckStart =>
-          popErrorCode(frame).map(errorCode => frame.ctx.initTestEnv(errorCode, frame))
+          popInt(frame).map(sourcePosIndex => frame.ctx.initTestEnv(sourcePosIndex, frame))
         case TestCheckEnd =>
           frame.ctx.testEnvOpt match {
             case Some(testEnv) =>
@@ -3257,13 +3257,13 @@ final case class DevInstr(instr: DevInstrBase)
               if (testEnv.exeFailure.isDefined) {
                 okay
               } else {
-                failed(ExpectedAnExeFailure(testEnv.errorCode))
+                failed(ExpectedAnExeFailure(testEnv.sourcePosIndex))
               }
             case None => failed(InvalidTestCheckInstr)
           }
         case TestEqual =>
           for {
-            errorCode <- popErrorCode(frame)
+            errorCode <- popInt(frame)
             right     <- frame.popOpStack()
             left      <- frame.popOpStack()
             _ <-

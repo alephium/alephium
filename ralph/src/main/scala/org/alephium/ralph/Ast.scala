@@ -2150,10 +2150,10 @@ object Ast {
   }
 
   sealed trait TestAssert[Ctx <: StatelessContext] extends Statement[Ctx] {
-    def genErrorCode(state: Compiler.State[Ctx]): Val.U256 = {
-      val errorCode = state.addTestCheckCall(this)
-      assume(errorCode >= 0)
-      Val.U256(U256.unsafe(errorCode))
+    def genSourcePosIndex(state: Compiler.State[Ctx]): Val.U256 = {
+      val sourcePosIndex = state.addTestCheckCall(this)
+      assume(sourcePosIndex >= 0)
+      Val.U256(U256.unsafe(sourcePosIndex))
     }
   }
 
@@ -2170,15 +2170,15 @@ object Ast {
     }
 
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val errorCode = genErrorCode(state)
+      val sourcePosIndex = genSourcePosIndex(state)
       expr match {
         case Binop(TestOperator.Eq, left, right) =>
           left.genCode(state) ++ right.genCode(state) ++ Seq(
-            errorCode.toConstInstr,
+            sourcePosIndex.toConstInstr,
             DevInstr(vm.TestEqual)
           )
         case _ =>
-          expr.genCode(state) ++ Seq(errorCode.toConstInstr, AssertWithErrorCode)
+          expr.genCode(state) ++ Seq(sourcePosIndex.toConstInstr, AssertWithErrorCode)
       }
     }
 
@@ -2193,9 +2193,11 @@ object Ast {
     }
 
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val errorCode = genErrorCode(state)
-      val testCode  = expr.genCode(state)
-      Seq(errorCode.toConstInstr, DevInstr(TestCheckStart)) ++ testCode :+ DevInstr(TestCheckEnd)
+      val sourcePosIndex = genSourcePosIndex(state)
+      val testCode       = expr.genCode(state)
+      Seq(sourcePosIndex.toConstInstr, DevInstr(TestCheckStart)) ++ testCode :+ DevInstr(
+        TestCheckEnd
+      )
     }
 
     def reset(): Unit = expr.reset()
@@ -2215,8 +2217,8 @@ object Ast {
     }
 
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val errorCode = genErrorCode(state)
-      args.flatMap(_.genCode(state)) ++ Seq(errorCode.toConstInstr, DevInstr(vm.TestEqual))
+      val sourcePosIndex = genSourcePosIndex(state)
+      args.flatMap(_.genCode(state)) ++ Seq(sourcePosIndex.toConstInstr, DevInstr(vm.TestEqual))
     }
 
     def reset(): Unit = args.foreach(_.reset())

@@ -219,7 +219,7 @@ final case class NodeIndexesConfig(
 )
 
 final class TestEnv(
-    val errorCode: Int,
+    val sourcePosIndex: Int,
     val testFrame: Frame[_],
     private var _exeFailure: Option[ExeFailure]
 ) {

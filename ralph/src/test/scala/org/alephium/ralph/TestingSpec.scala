@@ -521,7 +521,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       None,
       None
     )
-    tests.getError("foo", Some(tests.errorCodes.keys.head), "error", "") is CompilerError
+    tests.getError("foo", Some(tests.sourceIndexes.keys.head), "error", "") is CompilerError
       .TestError(
         "Test failed: foo, detail: error",
         sourceIndex,

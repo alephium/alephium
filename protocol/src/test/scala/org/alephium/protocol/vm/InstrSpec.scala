@@ -4849,7 +4849,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     DevInstr(TestCheckStart).runWith(frame) isE ()
     context.testEnvOpt.isDefined is true
     context.testEnvOpt.value.testFrame.asInstanceOf[Frame[StatelessContext]] is frame
-    context.testEnvOpt.value.errorCode is 0
+    context.testEnvOpt.value.sourcePosIndex is 0
   }
 
   it should "DevInstr(TestCheckEnd)" in new DevInstrFixture {
