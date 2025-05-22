@@ -392,10 +392,10 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |Contract Foo(v: U256) {
            |  pub fn foo() -> U256 { return v }
            |  test "foo" before Self(1) {
-           |    testCheck!(foo() == 1, 0)
+           |    testCheck!(foo() == 1)
            |  }
            |  $$test "foo" before Self(2) {
-           |    testCheck!(foo() == 2, 0)
+           |    testCheck!(foo() == 2)
            |  }$$
            |}
            |""".stripMargin

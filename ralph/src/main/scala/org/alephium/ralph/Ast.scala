@@ -670,7 +670,7 @@ object Ast {
             val instrs = genApproveCode(state, func) ++
               func.genCodeForArgs(args, state) ++
               variadicInstrs ++
-              func.genCode(this, state, argsType)
+              func.genCode(argsType)
             if (ignoreReturn) {
               val returnType = positionedError(func.getReturnType(argsType, state))
               instrs ++ Seq.fill(state.flattenTypeLength(returnType))(Pop)
@@ -2147,6 +2147,33 @@ object Ast {
       }
     }
     def reset(): Unit = interpolationParts.foreach(_.reset())
+  }
+
+  final case class TestCheck[Ctx <: StatelessContext](expr: Expr[Ctx]) extends Statement[Ctx] {
+    def check(state: Compiler.State[Ctx]): Unit = {
+      if (!state.isInTestContext) {
+        throw Compiler.Error(
+          s"The `testCheck!` function can only be used in unit tests",
+          sourceIndex
+        )
+      }
+
+      val inputType = expr.getType(state)
+      if (inputType != Seq(Type.Bool)) {
+        throw Compiler.Error(
+          s"Invalid args type ${quote(inputType)} for builtin func testCheck",
+          sourceIndex
+        )
+      }
+    }
+
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val errorCode = state.addTestCheckCall(this)
+      assume(errorCode >= 0)
+      expr.genCode(state) ++ Seq(Val.U256(U256.unsafe(errorCode)).toConstInstr, AssertWithErrorCode)
+    }
+
+    def reset(): Unit = expr.reset()
   }
 
   object TemplateVar {

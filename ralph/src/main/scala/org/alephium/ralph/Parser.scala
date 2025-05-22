@@ -1065,7 +1065,8 @@ class StatefulParser(val fileURI: Option[java.net.URI])
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | structDestruction | assign | compoundAssign | debug | mapCall | contractCall | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | structDestruction | assign | compoundAssign | debug | mapCall | contractCall |
+        testCheck | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
   def insertToMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
@@ -1412,4 +1413,11 @@ trait TestingParser { self: StatefulParser =>
     }
   def unitTestDef[Unknown: P]: P[Testing.UnitTestDef[StatefulContext]] =
     P(Start ~ rawUnitTestDef ~ End)
+
+  def testCheck[Unknown: P]: P[Ast.TestCheck[StatefulContext]] =
+    P(Index ~ "testCheck!" ~/ "(" ~ expr ~ ")" ~~ Index)
+      .map { case (fromIndex, expr, endIndex) =>
+        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
+        Ast.TestCheck(expr).atSourceIndex(sourceIndex)
+      }
 }

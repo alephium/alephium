@@ -37,7 +37,7 @@ object BuiltInFunctions extends App {
       case (_, f) =>
         FunctionInfo(f.name, f.category.toString, f.signature, f.doc, f.params, f.returns)
     }
-    ((FunctionInfo.encodeFields +: allFunctions.toSeq) ++ FunctionInfo.mapFunctions).sorted
+    ((FunctionInfo.encodeFields +: allFunctions.toSeq) ++ FunctionInfo.mapFunctions ++ FunctionInfo.testFunctions).sorted
   }
 
   final case class FunctionInfo(
@@ -117,5 +117,16 @@ object BuiltInFunctions extends App {
     )
 
     val mapFunctions: Seq[FunctionInfo] = Seq(mapInsert, mapRemove, mapContains)
+
+    val testCheck: FunctionInfo = FunctionInfo(
+      name = "testCheck",
+      category = BuiltIn.Category.Test.toString,
+      signature = "fn testCheck!(condition:Bool) -> ()",
+      doc = "Tests the condition or checks invariants.",
+      params = Seq("@condition the condition to be checked"),
+      returns = "@returns "
+    )
+
+    val testFunctions: Seq[FunctionInfo] = Seq(testCheck)
   }
 }

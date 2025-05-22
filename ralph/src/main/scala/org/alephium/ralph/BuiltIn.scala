@@ -59,6 +59,7 @@ object BuiltIn {
     case object Conversion   extends Category
     case object ByteVec      extends Category
     case object Cryptography extends Category
+    case object Test         extends Category
   }
 
   trait DocUtils {
@@ -1134,50 +1135,6 @@ object BuiltIn {
     def doc: String         = "Get the length of an array"
   }
 
-  val testCheck: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] with DocUtils {
-    val name: String = "testCheck"
-
-    def category: Category            = Category.Utils
-    def usePreapprovedAssets: Boolean = false
-
-    def getReturnType[C <: StatelessContext](
-        inputType: Seq[Type],
-        state: Compiler.State[C]
-    ): Seq[Type] = {
-      if (!state.isInTestContext) {
-        throw Compiler.Error(
-          s"The `testCheck!` function can only be used in unit tests",
-          inputType.headOption.flatMap(_.sourceIndex)
-        )
-      }
-      inputType match {
-        case Seq(Type.Bool) => Seq.empty
-        case _ =>
-          throw Compiler.Error(
-            s"Expected a bool, got ${quoteTypes(inputType)}",
-            inputType.headOption.flatMap(_.sourceIndex)
-          )
-      }
-    }
-    def returnType(selfContractType: Type): Seq[Type] = Seq.empty
-
-    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = ???
-    override def genCode[C <: StatelessContext](
-        ast: Ast.Positioned,
-        state: Compiler.State[C],
-        inputType: Seq[Type]
-    ): Seq[Instr[StatelessContext]] = {
-      val errorCode = state.addTestCheckCall(ast)
-      assume(errorCode >= 0)
-      Seq(Val.U256(U256.unsafe(errorCode)).toConstInstr, AssertWithErrorCode)
-    }
-
-    def signature: String                        = s"fn $name!(condition:Bool) -> ()"
-    def argsCommentedName: Seq[(String, String)] = Seq("condition" -> "the condition to be checked")
-    def retComment: String                       = ""
-    def doc: String                              = "Tests the condition or checks invariants."
-  }
-
   val verifySignature: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
       "verifySignature",
@@ -1297,7 +1254,6 @@ object BuiltIn {
     i256Min,
     groupOfAddress,
     len,
-    testCheck,
     verifySignature,
     verifySecP256R1,
     verifyWebAuthn,
