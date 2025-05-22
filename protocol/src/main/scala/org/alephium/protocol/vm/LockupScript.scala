@@ -354,6 +354,11 @@ object LockupScript {
       P2HMPK(Hash.hash(hashPreImageSerializer.serialize((publicKeys, m))), groupIndex.value.toByte)
     }
 
+    def apply(publicKeys: AVector[PublicKeyLike], m: Int)(implicit config: GroupConfig): P2HMPK = {
+      val hash = Hash.hash(hashPreImageSerializer.serialize((publicKeys, m)))
+      P2HMPK(hash, defaultGroup(hash))
+    }
+
     def unsafe(publicKeys: AVector[PublicKeyLike], m: Int, groupByte: Byte): P2HMPK = {
       P2HMPK(Hash.hash(hashPreImageSerializer.serialize((publicKeys, m))), groupByte)
     }

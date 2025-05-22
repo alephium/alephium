@@ -660,7 +660,10 @@ trait EndpointsExamples extends ErrorExamples {
       BuildMultisig(
         AddressLike.from(address),
         AVector(publicKey.bytes),
+        None,
+        None,
         defaultDestinations,
+        None,
         None,
         None
       )
@@ -669,9 +672,12 @@ trait EndpointsExamples extends ErrorExamples {
       BuildMultisig(
         AddressLike.from(address),
         AVector(publicKey.bytes),
+        None,
+        None,
         moreSettingsDestinations,
         Some(model.minimalGas),
-        Some(model.nonCoinbaseMinGasPrice)
+        Some(model.nonCoinbaseMinGasPrice),
+        None
       )
     )
   )

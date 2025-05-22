@@ -14553,6 +14553,20 @@
               "format": "hex-string"
             }
           },
+          "fromPublicKeyTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "hex-string"
+            }
+          },
+          "fromPublicKeyIndexes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
           "destinations": {
             "type": "array",
             "items": {
@@ -14566,6 +14580,13 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
+          },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
+          },
+          "multiSigType": {
+            "$ref": "#/components/schemas/MultiSigType"
           }
         }
       },

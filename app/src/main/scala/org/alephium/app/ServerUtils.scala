@@ -28,13 +28,7 @@ import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
-import org.alephium.crypto.{
-  Byte32,
-  Byte64,
-  ED25519PublicKey,
-  SecP256K1PublicKey,
-  SecP256R1PublicKey
-}
+import org.alephium.crypto.{Byte32, Byte64, SecP256K1PublicKey}
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo}
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
@@ -328,7 +322,7 @@ class ServerUtils(implicit
       lockupPair <- query.getLockPair(query.group)
       result <- lockupPair._1 match {
         case lockupScript: LockupScript.P2PK =>
-          buildGrouplessTransferTx(blockFlow, query, lockupScript, extraUtxosInfo)
+          buildP2PKTransferTx(blockFlow, query, lockupScript, extraUtxosInfo)
         case _ =>
           buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
             .map(BuildSimpleTransferTxResult.from)
@@ -353,12 +347,23 @@ class ServerUtils(implicit
   def buildMultisig(
       blockFlow: BlockFlow,
       query: BuildMultisig
+  ): Try[BuildTransferTxResult] = {
+    if (query.multiSigType == Some(MultiSigType.P2HMPK)) {
+      buildP2HMPKTransferTx(blockFlow, query)
+    } else {
+      buildP2MPKHTransferTx(blockFlow, query)
+    }
+  }
+
+  private def buildP2MPKHTransferTx(
+      blockFlow: BlockFlow,
+      query: BuildMultisig
   ): Try[BuildSimpleTransferTxResult] = {
     for {
       fromAddress <- query.getFromAddress()
       _           <- checkGroup(fromAddress.lockupScript)
       publicKeys  <- query.getFromPublicKeys()
-      unlockScript <- buildMultisigUnlockScript(
+      unlockScript <- buildP2MPKHUnlockScript(
         fromAddress.lockupScript,
         publicKeys
       )
@@ -384,7 +389,7 @@ class ServerUtils(implicit
     val lockupScript = query.fromAddress.lockupScript
     for {
       _            <- checkGroup(lockupScript)
-      unlockScript <- buildMultisigUnlockScript(lockupScript, query.fromPublicKeys)
+      unlockScript <- buildP2MPKHUnlockScript(lockupScript, query.fromPublicKeys)
       unsignedTxs <- prepareSweepAddressTransactionFromScripts(
         blockFlow,
         lockupScript,
@@ -406,7 +411,7 @@ class ServerUtils(implicit
     }
   }
 
-  private def buildMultisigUnlockScript(
+  private def buildP2MPKHUnlockScript(
       lockupScript: LockupScript,
       pubKeys: AVector[PublicKey]
   ): Try[UnlockScript.P2MPKH] = {
@@ -1252,7 +1257,7 @@ class ServerUtils(implicit
       keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]],
       multiSigType: Option[MultiSigType]
   ): Either[String, BuildMultisigAddressResult] = {
-    if (multiSigType.exists(_ == MultiSigType.P2HMPK)) {
+    if (multiSigType == Some(MultiSigType.P2HMPK)) {
       ServerUtils.buildP2HMPKAddress(rawKeys, mrequired, keyTypesOpt)
     } else {
       ServerUtils.buildP2MPKHAddress(rawKeys, mrequired, keyTypesOpt)
@@ -2578,51 +2583,12 @@ object ServerUtils {
     wrapCompilerResult(Compiler.compileTxScript(scriptRaw))
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def buildP2HMPKAddress(
       rawKeys: AVector[ByteString],
       mrequired: Int,
       keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]]
   )(implicit groupConfig: GroupConfig): Either[String, BuildMultisigAddressResult] = {
-    val keyTypes: Either[String, AVector[BuildTxCommon.PublicKeyType]] =
-      if (keyTypesOpt.isDefined) {
-        if (keyTypesOpt.get.length != rawKeys.length) {
-          Left("`keyTypes` length should be the same as `keys` length")
-        } else {
-          Right(keyTypesOpt.get)
-        }
-      } else {
-        Right(AVector.fill(rawKeys.length)(BuildTxCommon.Default))
-      }
-
-    val publicKeys = keyTypes.flatMap {
-      _.foldWithIndexE(AVector.empty[PublicKeyLike]) { (publicKeys, keyType, index) =>
-        val rawKey = rawKeys(index)
-        val publicKey = keyType match {
-          case BuildTxCommon.Default =>
-            SecP256K1PublicKey.from(rawKey).map(PublicKeyLike.SecP256K1.apply)
-          case BuildTxCommon.GLED25519 =>
-            ED25519PublicKey.from(rawKey).map(PublicKeyLike.ED25519.apply)
-          case BuildTxCommon.GLSecP256K1 =>
-            SecP256K1PublicKey.from(rawKey).map(PublicKeyLike.SecP256K1.apply)
-          case BuildTxCommon.GLSecP256R1 =>
-            SecP256R1PublicKey.from(rawKey).map(PublicKeyLike.SecP256R1.apply)
-          case BuildTxCommon.GLWebAuthn =>
-            SecP256R1PublicKey.from(rawKey).map(PublicKeyLike.WebAuthn.apply)
-          case BuildTxCommon.BIP340Schnorr =>
-            None // BIP340Schnorr not supported
-        }
-
-        publicKey match {
-          case Some(publicKey) =>
-            Right(publicKeys :+ publicKey)
-          case None =>
-            Left(s"Invalid public key ${Hex.toHexString(rawKey)} for keyType $keyType")
-        }
-      }
-    }
-
-    publicKeys.map { pks =>
+    GrouplessUtils.buildPublicKeyLikes(rawKeys, keyTypesOpt).map { pks =>
       BuildMultisigAddressResult(
         LockupScript.P2HMPK(pks, mrequired, GroupIndex.unsafe(0)).toBase58WithoutGroup
       )

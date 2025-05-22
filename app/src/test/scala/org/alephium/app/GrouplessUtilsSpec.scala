@@ -47,7 +47,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     val fromAddressWithGroup    = AddressLike.from(fromLockupScript)
     val fromAddressWithoutGroup = AddressLike.fromP2PKPublicKey(publicKeyLike)
 
-    def allLockupScripts: AVector[LockupScript.P2PK] = {
+    def allLockupScripts: AVector[LockupScript.GrouplessAsset] = {
       brokerConfig.cliqueGroups.fold(AVector.empty[LockupScript.P2PK]) { case (acc, group) =>
         if (group == chainIndex.from) {
           acc
@@ -55,7 +55,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
           acc :+ LockupScript.p2pk(publicKeyLike, group)
         }
       } :+ fromLockupScript
-    }
+    }.asInstanceOf[AVector[LockupScript.GrouplessAsset]]
 
     val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(chainIndex.from.value)
     val tokenId                                  = issueToken()
@@ -634,6 +634,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         .buildGrouplessTransferTxWithEachGroupedAddress(
           blockFlow,
           fromLockupScript,
+          UnlockScript.P2PK,
           outputInfos,
           totalAmountNeeded,
           nonCoinbaseMinGasPrice,
@@ -745,6 +746,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         .buildGrouplessTransferTxWithEachGroupedAddress(
           blockFlow,
           fromLockupScript,
+          UnlockScript.P2PK,
           outputInfos,
           totalAmountNeeded,
           nonCoinbaseMinGasPrice,
