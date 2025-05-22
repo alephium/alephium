@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.util.Random
 
 import akka.util.ByteString
 import org.scalacheck.Arbitrary.arbitrary
@@ -106,7 +107,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   trait DanubeForkFixture extends AllInstrsFixture {
     val danubeStatelessInstrs =
-      AVector[DanubeInstr[StatelessContext]](VerifySignature, GetSegregatedWebAuthnSignature)
+      AVector[DanubeInstr[StatelessContext]](
+        VerifySignature,
+        GetSegregatedWebAuthnSignature,
+        DevInstr(TestCheckStart)
+      )
     val danubeStatefulInstrs = AVector[DanubeInstr[StatefulContext]](
       ExternalCallerContractId,
       ExternalCallerAddress
@@ -4805,6 +4810,59 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
+  it should "serialize/deserialize DevInstrBase" in {
+    serialize[DevInstrBase](TestCheckStart) is Hex.unsafe("00")
+    serialize[DevInstrBase](TestCheckEnd) is Hex.unsafe("01")
+
+    deserialize[DevInstrBase](Hex.unsafe("00")).rightValue is TestCheckStart
+    deserialize[DevInstrBase](Hex.unsafe("01")).rightValue is TestCheckEnd
+    deserialize[DevInstrBase](Hex.unsafe("02")).leftValue is SerdeError.WrongFormat(
+      "Invalid dev instr prefix 2"
+    )
+  }
+
+  trait DevInstrFixture extends StatelessInstrFixture {
+    def fail(instr: DevInstr) = {
+      val networkConfig = new NetworkConfigFixture.Default {
+        override def networkId: model.NetworkId = if (Random.nextBoolean()) {
+          model.NetworkId.AlephiumMainNet
+        } else {
+          model.NetworkId.AlephiumTestNet
+        }
+      }.networkConfig
+      val frame = prepareFrame(AVector.empty)(networkConfig)
+      instr.runWith(frame).leftValue isE DevInstrIsOnlySupportedOnDevnet
+    }
+  }
+
+  it should "DevInstr(TestCheckStart)" in new DevInstrFixture {
+    fail(DevInstr(TestCheckStart))
+
+    context.testEnvOpt.isEmpty is true
+    frame.pushOpStack(Val.U256(0))
+    DevInstr(TestCheckStart).runWith(frame) isE ()
+    context.testEnvOpt.isDefined is true
+    context.testEnvOpt.value.testFrame.asInstanceOf[Frame[StatelessContext]] is frame
+    context.testEnvOpt.value.errorCode is 0
+  }
+
+  it should "DevInstr(TestCheckEnd)" in new DevInstrFixture {
+    fail(DevInstr(TestCheckEnd))
+
+    context.testEnvOpt.isEmpty is true
+    DevInstr(TestCheckEnd).runWith(frame).leftValue isE InvalidTestCheckInstr
+
+    context.initTestEnv(0, frame)
+    context.testEnvOpt.isDefined is true
+    DevInstr(TestCheckEnd).runWith(frame).leftValue isE ExpectedAnExeFailure(0)
+    context.testEnvOpt.isEmpty is true
+
+    context.initTestEnv(0, frame)
+    context.setTestError(AssertionFailedWithErrorCode(None, 0))
+    DevInstr(TestCheckEnd).runWith(frame) isE ()
+    context.testEnvOpt.isEmpty is true
+  }
+
   it should "test gas amount" in new FrameFixture {
     val bytes      = AVector[Byte](0, 255.toByte, Byte.MaxValue, Byte.MinValue)
     val ints       = AVector[Int](0, 1 << 16, -(1 << 16))
@@ -4847,7 +4905,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Rhone hard fork */
       GroupOfAddress -> 5,
       /* Below are instructions for Danube hard fork */
-      VerifySignature -> 2000, GetSegregatedWebAuthnSignature -> 8
+      VerifySignature -> 2000, GetSegregatedWebAuthnSignature -> 8, DevInstr(TestCheckStart) -> 0
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadMutField(byte) -> 3, StoreMutField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -4985,7 +5043,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Rhone hard fork */
       GroupOfAddress -> 140,
       /* Below are instructions for Danube hard fork */
-      VerifySignature -> 141, GetSegregatedWebAuthnSignature -> 142,
+      VerifySignature -> 141, GetSegregatedWebAuthnSignature -> 142, DevInstr(TestCheckStart) -> 143,
       // stateful instructions
       LoadMutField(byte) -> 160, StoreMutField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -5064,7 +5122,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Rhone hard fork */
       GroupOfAddress,
       /* Below are instructions for Danube hard fork */
-      VerifySignature, GetSegregatedWebAuthnSignature
+      VerifySignature, GetSegregatedWebAuthnSignature, DevInstr(TestCheckStart)
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadMutField(byte), StoreMutField(byte), CallExternal(byte),

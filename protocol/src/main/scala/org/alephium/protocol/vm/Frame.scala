@@ -215,15 +215,15 @@ abstract class Frame[Ctx <: StatelessContext] {
   protected def runReturn(): ExeResult[Option[Frame[Ctx]]] =
     Return.runWith(this).map(_ => None)
 
-  private def handleError(exeFailure: ExeFailure): ExeResult[Option[Frame[Ctx]]] = {
+  private[vm] def handleError(exeFailure: ExeFailure): ExeResult[Option[Frame[Ctx]]] = {
     ctx.testEnvOpt match {
-      case None => Left(Right(exeFailure))
+      case None => failed(exeFailure)
       case Some(testEnv) =>
         ctx.setTestError(exeFailure)
         if (testEnv.testFrame == this) {
           val testEndIndex = method.instrs.view.indexOf(DevInstr(TestCheckEnd), pc)
           if (testEndIndex == -1) {
-            Left(Right(InvalidTestCheckInstr))
+            failed(InvalidTestCheckInstr)
           } else {
             pc = testEndIndex
             execute()
