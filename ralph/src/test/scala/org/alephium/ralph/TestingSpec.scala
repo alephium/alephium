@@ -710,7 +710,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     )
   }
 
-  it should "compile testEqual" in {
+  trait Fixture {
     def code(testCall: String) =
       s"""
          |Contract Foo() {
@@ -722,7 +722,9 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
          |  }
          |}
          |""".stripMargin
+  }
 
+  it should "compile testEqual" in new Fixture {
     compileContractFull(code("testEqual!(foo(), 0)")).isRight is true
     testContractError(
       code(s"$$testEqual!(foo(), 0, 0)$$"),
@@ -731,6 +733,18 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     testContractError(
       code(s"$$testEqual!(foo(), 0i)$$"),
       "Invalid args type List(U256, I256) for builtin func testEqual"
+    )
+  }
+
+  it should "compile testError" in new Fixture {
+    compileContractFull(code("testError!(foo(), 0)")).isRight is true
+    testContractError(
+      code(s"$$testError!(foo(), 0, 0)$$"),
+      "Expected 2 arguments, but got 3"
+    )
+    testContractError(
+      code(s"$$testError!(foo(), 0i)$$"),
+      "Invalid args type List(U256, I256) for builtin func testError"
     )
   }
 }

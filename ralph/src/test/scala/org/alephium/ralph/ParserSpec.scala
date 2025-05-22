@@ -3136,6 +3136,10 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       TestFail[StatefulContext](Binop(Eq, Variable(Ident("a")), Const(Val.U256(U256.One))))
     parse("testFail!(foo())", StatefulParser.testAssert(_)).get.value is
       TestFail[StatefulContext](CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+    parse("testError!(foo(), 1)", StatefulParser.testAssert(_)).get.value is
+      TestError[StatefulContext](
+        Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty), Const(Val.U256(U256.One)))
+      )
   }
 }
 

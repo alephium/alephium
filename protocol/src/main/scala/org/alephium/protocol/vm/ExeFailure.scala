@@ -478,6 +478,20 @@ final case class ExpectedAnExeFailure(sourcePosIndex: Int) extends ExeFailure {
 final case class NotEqualInTest(left: Val, right: Val, sourcePosIndex: Int) extends ExeFailure {
   override def toString: String = s"Assertion Failed: left($left) is not equal to right($right)"
 }
+final case class NotExpectedErrorInTest(
+    expectedErrorCode: Int,
+    error: Either[Int, ExeFailure],
+    sourcePosIndex: Int
+) extends ExeFailure {
+  override def toString: String = {
+    error match {
+      case Left(actualCode) =>
+        s"Unexpected error code in test. Expected: $expectedErrorCode, but got: $actualCode."
+      case Right(exeFailure) =>
+        s"Unexpected execution failure in test. Expected error code: $expectedErrorCode, but got failure: $exeFailure."
+    }
+  }
+}
 
 sealed trait IOFailure extends Product {
   def error: IOError

@@ -4812,18 +4812,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "serialize/deserialize DevInstrBase" in {
     serialize[DevInstrBase](TestCheckStart) is Hex.unsafe("00")
-    serialize[DevInstrBase](TestCheckEnd) is Hex.unsafe("01")
-    serialize[DevInstrBase](TestEqual) is Hex.unsafe("02")
-    serialize[DevInstrBase](RandomU256) is Hex.unsafe("03")
-    serialize[DevInstrBase](RandomI256) is Hex.unsafe("04")
+    serialize[DevInstrBase](TestErrorStart) is Hex.unsafe("01")
+    serialize[DevInstrBase](TestCheckEnd) is Hex.unsafe("02")
+    serialize[DevInstrBase](TestEqual) is Hex.unsafe("03")
+    serialize[DevInstrBase](RandomU256) is Hex.unsafe("04")
+    serialize[DevInstrBase](RandomI256) is Hex.unsafe("05")
 
     deserialize[DevInstrBase](Hex.unsafe("00")).rightValue is TestCheckStart
-    deserialize[DevInstrBase](Hex.unsafe("01")).rightValue is TestCheckEnd
-    deserialize[DevInstrBase](Hex.unsafe("02")).rightValue is TestEqual
-    deserialize[DevInstrBase](Hex.unsafe("03")).rightValue is RandomU256
-    deserialize[DevInstrBase](Hex.unsafe("04")).rightValue is RandomI256
-    deserialize[DevInstrBase](Hex.unsafe("05")).leftValue is SerdeError.WrongFormat(
-      "Invalid dev instr prefix 5"
+    deserialize[DevInstrBase](Hex.unsafe("01")).rightValue is TestErrorStart
+    deserialize[DevInstrBase](Hex.unsafe("02")).rightValue is TestCheckEnd
+    deserialize[DevInstrBase](Hex.unsafe("03")).rightValue is TestEqual
+    deserialize[DevInstrBase](Hex.unsafe("04")).rightValue is RandomU256
+    deserialize[DevInstrBase](Hex.unsafe("05")).rightValue is RandomI256
+    deserialize[DevInstrBase](Hex.unsafe("06")).leftValue is SerdeError.WrongFormat(
+      "Invalid dev instr prefix 6"
     )
   }
 
@@ -4849,7 +4851,21 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     DevInstr(TestCheckStart).runWith(frame) isE ()
     context.testEnvOpt.isDefined is true
     context.testEnvOpt.value.testFrame.asInstanceOf[Frame[StatelessContext]] is frame
+    context.testEnvOpt.value.expectedErrorCode is None
     context.testEnvOpt.value.sourcePosIndex is 0
+  }
+
+  it should "DevInstr(TestErrorStart)" in new DevInstrFixture {
+    fail(DevInstr(TestErrorStart))
+
+    context.testEnvOpt.isEmpty is true
+    frame.pushOpStack(Val.U256(0))
+    frame.pushOpStack(Val.U256(1))
+    DevInstr(TestErrorStart).runWith(frame) isE ()
+    context.testEnvOpt.isDefined is true
+    context.testEnvOpt.value.testFrame.asInstanceOf[Frame[StatelessContext]] is frame
+    context.testEnvOpt.value.expectedErrorCode is Some(0)
+    context.testEnvOpt.value.sourcePosIndex is 1
   }
 
   it should "DevInstr(TestCheckEnd)" in new DevInstrFixture {
@@ -4858,14 +4874,33 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     context.testEnvOpt.isEmpty is true
     DevInstr(TestCheckEnd).runWith(frame).leftValue isE InvalidTestCheckInstr
 
-    context.initTestEnv(0, frame)
+    context.initTestEnv(0, None, frame)
     context.testEnvOpt.isDefined is true
     DevInstr(TestCheckEnd).runWith(frame).leftValue isE ExpectedAnExeFailure(0)
     context.testEnvOpt.isEmpty is true
 
-    context.initTestEnv(0, frame)
+    context.initTestEnv(0, None, frame)
     context.setTestError(AssertionFailedWithErrorCode(None, 0))
     DevInstr(TestCheckEnd).runWith(frame) isE ()
+    context.testEnvOpt.isEmpty is true
+
+    context.initTestEnv(0, Some(1), frame)
+    context.setTestError(AssertionFailedWithErrorCode(None, 1))
+    DevInstr(TestCheckEnd).runWith(frame) isE ()
+    context.testEnvOpt.isEmpty is true
+
+    context.initTestEnv(0, Some(1), frame)
+    context.setTestError(AssertionFailedWithErrorCode(None, 0))
+    DevInstr(TestCheckEnd).runWith(frame).leftValue isE NotExpectedErrorInTest(1, Left(0), 0)
+    context.testEnvOpt.isEmpty is true
+
+    context.initTestEnv(0, Some(1), frame)
+    context.setTestError(ZeroContractId)
+    DevInstr(TestCheckEnd).runWith(frame).leftValue isE NotExpectedErrorInTest(
+      1,
+      Right(ZeroContractId),
+      0
+    )
     context.testEnvOpt.isEmpty is true
   }
 

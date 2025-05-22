@@ -149,6 +149,18 @@ object BuiltInFunctions extends App {
       returns = "@returns "
     )
 
-    val testFunctions: Seq[FunctionInfo] = Seq(testCheck, testFail, testEqual)
+    val testError: FunctionInfo = FunctionInfo(
+      name = "testError",
+      category = BuiltIn.Category.Test.toString,
+      signature = "fn testError!(expr, errorCode: U256) -> ()",
+      doc = "Asserts that the given expression throws an exception with the expected error code.",
+      params = Seq(
+        "@expr the expression to be executed",
+        "@errorCode the expected error code"
+      ),
+      returns = "@returns "
+    )
+
+    val testFunctions: Seq[FunctionInfo] = Seq(testCheck, testEqual, testFail, testError)
   }
 }

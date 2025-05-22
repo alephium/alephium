@@ -220,22 +220,25 @@ final case class NodeIndexesConfig(
 
 final class TestEnv(
     val sourcePosIndex: Int,
+    val expectedErrorCode: Option[Int],
     val testFrame: Frame[_],
     private var _exeFailure: Option[ExeFailure]
 ) {
-  def setExeFailure(error: ExeFailure): Unit = _exeFailure = Some(error)
-  def exeFailure: Option[ExeFailure]         = _exeFailure
+  def setExeFailure(error: ExeFailure): Unit = {
+    if (_exeFailure.isEmpty) _exeFailure = Some(error)
+  }
+  def exeFailure: Option[ExeFailure] = _exeFailure
 }
 object TestEnv {
-  def apply(errorCode: Int, testFrame: Frame[_]): TestEnv =
-    new TestEnv(errorCode, testFrame, None)
+  def apply(errorCode: Int, expectedErrorCode: Option[Int], testFrame: Frame[_]): TestEnv =
+    new TestEnv(errorCode, expectedErrorCode, testFrame, None)
 }
 
 trait TestContext {
   private var _testEnv: Option[TestEnv] = None
-  def initTestEnv(errorCode: Int, testFrame: Frame[_]): Unit = {
+  def initTestEnv(errorCode: Int, expectedErrorCode: Option[Int], testFrame: Frame[_]): Unit = {
     assume(_testEnv.isEmpty)
-    _testEnv = Some(TestEnv(errorCode, testFrame))
+    _testEnv = Some(TestEnv(errorCode, expectedErrorCode, testFrame))
   }
   def resetTestEnv(): Unit = {
     assume(_testEnv.isDefined)

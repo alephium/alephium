@@ -1435,7 +1435,14 @@ trait TestingParser { self: StatefulParser =>
         Ast.TestFail(expr).atSourceIndex(sourceIndex)
       }
 
+  def testError[Unknown: P]: P[Ast.TestAssert[StatefulContext]] =
+    P(Index ~ "testError!" ~/ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index)
+      .map { case (fromIndex, exprs, endIndex) =>
+        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
+        Ast.TestError(exprs).atSourceIndex(sourceIndex)
+      }
+
   def testAssert[Unknown: P]: P[Ast.TestAssert[StatefulContext]] = P(
-    testCheck | testEqual | testFail
+    testCheck | testEqual | testFail | testError
   )
 }

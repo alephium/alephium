@@ -26,6 +26,17 @@
     "returns": "@returns "
   },
   {
+    "name": "testEqual",
+    "category": "Test",
+    "signature": "fn testEqual!(left: <Bool | U256 | I256 | Address | ByteVec>, right: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
+    "doc": "Asserts that the given values are equal.",
+    "params": [
+      "@left the first value to compare",
+      "@right the second value to compare; must be the same type as `left`"
+    ],
+    "returns": "@returns "
+  },
+  {
     "name": "testFail",
     "category": "Test",
     "signature": "fn testFail!(expr) -> ()",
@@ -36,13 +47,13 @@
     "returns": "@returns "
   },
   {
-    "name": "testEqual",
+    "name": "testError",
     "category": "Test",
-    "signature": "fn testEqual!(left: <Bool | U256 | I256 | Address | ByteVec>, right: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
-    "doc": "Asserts that the given values are equal.",
+    "signature": "fn testError!(expr, errorCode: U256) -> ()",
+    "doc": "Asserts that the given expression throws an exception with the expected error code.",
     "params": [
-      "@left the first value to compare",
-      "@right the second value to compare; must be the same type as `left`"
+      "@expr the expression to be executed",
+      "@errorCode the expected error code"
     ],
     "returns": "@returns "
   },

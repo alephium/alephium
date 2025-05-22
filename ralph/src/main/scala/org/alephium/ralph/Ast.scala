@@ -2224,6 +2224,30 @@ object Ast {
     def reset(): Unit = args.foreach(_.reset())
   }
 
+  final case class TestError[Ctx <: StatelessContext](args: Seq[Expr[Ctx]])
+      extends TestAssert[Ctx] {
+    def check(state: Compiler.State[Ctx]): Unit = {
+      state.checkInTestContext("testError!", sourceIndex)
+      if (args.length != 2) {
+        throw Compiler.Error(s"Expected 2 arguments, but got ${args.length}", sourceIndex)
+      }
+      val types = args.flatMap(_.getType(state))
+      if (types.lastOption.exists(_ != Type.U256)) {
+        throw Compiler.Error(s"Invalid args type $types for builtin func testError", sourceIndex)
+      }
+    }
+
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val sourcePosIndex    = genSourcePosIndex(state)
+      val testCode          = args(0).genCode(state)
+      val expectedErrorCode = args(1).genCode(state)
+      expectedErrorCode ++ Seq(sourcePosIndex.toConstInstr, DevInstr(TestErrorStart)) ++
+        testCode :+ DevInstr(TestCheckEnd)
+    }
+
+    def reset(): Unit = args.foreach(_.reset())
+  }
+
   object TemplateVar {
     private val arraySuffix  = "-template-array"
     private val structSuffix = "-template-struct"

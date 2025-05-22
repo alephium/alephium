@@ -660,19 +660,19 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     val error  = AssertionFailedWithErrorCode(None, 0)
     val frame0 = genStatelessFrame()
     frame0.handleError(error).leftValue isE error
-    frame0.ctx.initTestEnv(error.errorCode, frame0)
+    frame0.ctx.initTestEnv(error.errorCode, None, frame0)
     frame0.handleError(error).leftValue isE InvalidTestCheckInstr
 
     val method = baseMethod[StatelessContext](2).copy(instrs =
       AVector[Instr[StatelessContext]](DevInstr(TestCheckStart), DevInstr(TestCheckEnd))
     )
     val frame1 = genStatelessFrame(method)
-    frame1.ctx.initTestEnv(error.errorCode, frame1)
+    frame1.ctx.initTestEnv(error.errorCode, None, frame1)
     frame1.handleError(error) isE None
     frame1.ctx.testEnvOpt.isEmpty is true
 
     val frame2 = genStatelessFrame()
-    frame2.ctx.initTestEnv(error.errorCode, frame1)
+    frame2.ctx.initTestEnv(error.errorCode, None, frame1)
     frame2.handleError(error) isE None
     frame2.ctx.testEnvOpt.isDefined is true
     frame2.ctx.testEnvOpt.value.exeFailure.value is error

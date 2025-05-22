@@ -6010,6 +6010,63 @@ class ServerUtilsSpec extends AlephiumSpec {
             |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: left(U256(0)) is not equal to right(U256(1))
             |""".stripMargin
     }
+
+    {
+      def code(testCall: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(a: U256, b: U256) -> U256 {
+           |    if (a > b) {
+           |      assert!(a >= 5, 0)
+           |    } else {
+           |      assert!(b >= 5, 1)
+           |    }
+           |    return mulModN!(a, a, b)
+           |  }
+           |  test "foo" {
+           |    $testCall
+           |  }
+           |}
+           |""".stripMargin
+
+      Seq(
+        "testError!(foo(4, 3), 0)",
+        "testError!(foo(3, 4), 1)",
+        "testFail!(foo(9, 0))",
+        "testError!(foo(4, 3), 0)\ntestError!(foo(3, 4), 1)\ntestFail!(foo(9, 0))"
+      ).foreach { testCall =>
+        serverUtils
+          .compileProject(blockFlow, api.Compile.Project(code(testCall)))
+          .isRight is true
+      }
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(4, 3), 1)")))
+        .leftValue
+        .detail is
+        s"""|-- error (12:5): Testing error
+            |12 |    testError!(foo(4, 3), 1)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected error code in test. Expected: 1, but got: 0.
+            |""".stripMargin
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(3, 4), 0)")))
+        .leftValue
+        .detail is
+        s"""|-- error (12:5): Testing error
+            |12 |    testError!(foo(3, 4), 0)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected error code in test. Expected: 0, but got: 1.
+            |""".stripMargin
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(9, 0), 1)")))
+        .leftValue
+        .detail is
+        s"""|-- error (12:5): Testing error
+            |12 |    testError!(foo(9, 0), 1)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected execution failure in test. Expected error code: 1, but got failure: ArithmeticError((U256(9) * U256(9)) % U256(0)).
+            |""".stripMargin
+    }
   }
 
   it should "test auto fund" in {

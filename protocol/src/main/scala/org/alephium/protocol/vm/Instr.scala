@@ -3197,6 +3197,7 @@ object DEBUG extends StatelessInstrCompanion1[AVector[Val.ByteVec]]
 
 sealed trait DevInstrBase
 case object TestCheckStart extends DevInstrBase
+case object TestErrorStart extends DevInstrBase
 case object TestCheckEnd   extends DevInstrBase
 case object TestEqual      extends DevInstrBase
 case object RandomU256     extends DevInstrBase
@@ -3206,20 +3207,22 @@ object DevInstrBase {
     override def serialize(input: DevInstrBase): ByteString = {
       input match {
         case TestCheckStart => ByteString(0)
-        case TestCheckEnd   => ByteString(1)
-        case TestEqual      => ByteString(2)
-        case RandomU256     => ByteString(3)
-        case RandomI256     => ByteString(4)
+        case TestErrorStart => ByteString(1)
+        case TestCheckEnd   => ByteString(2)
+        case TestEqual      => ByteString(3)
+        case RandomU256     => ByteString(4)
+        case RandomI256     => ByteString(5)
       }
     }
 
     override def _deserialize(input: ByteString): SerdeResult[Staging[DevInstrBase]] = {
       byteSerde._deserialize(input).flatMap {
         case Staging(0, content) => Right(Staging(TestCheckStart, content))
-        case Staging(1, content) => Right(Staging(TestCheckEnd, content))
-        case Staging(2, content) => Right(Staging(TestEqual, content))
-        case Staging(3, content) => Right(Staging(RandomU256, content))
-        case Staging(4, content) => Right(Staging(RandomI256, content))
+        case Staging(1, content) => Right(Staging(TestErrorStart, content))
+        case Staging(2, content) => Right(Staging(TestCheckEnd, content))
+        case Staging(3, content) => Right(Staging(TestEqual, content))
+        case Staging(4, content) => Right(Staging(RandomU256, content))
+        case Staging(5, content) => Right(Staging(RandomI256, content))
         case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid dev instr prefix $n"))
       }
     }
@@ -3240,6 +3243,21 @@ final case class DevInstr(instr: DevInstrBase)
     } yield errorCode
   }
 
+  private def checkError(testEnv: TestEnv): ExeResult[Unit] = {
+    (testEnv.exeFailure, testEnv.expectedErrorCode) match {
+      case (None, _) => failed(ExpectedAnExeFailure(testEnv.sourcePosIndex))
+      case (_, None) => okay
+      case (Some(AssertionFailedWithErrorCode(_, errorCode)), Some(expectedErrorCode)) =>
+        if (errorCode == expectedErrorCode) {
+          okay
+        } else {
+          failed(NotExpectedErrorInTest(expectedErrorCode, Left(errorCode), testEnv.sourcePosIndex))
+        }
+      case (Some(error), Some(expectedErrorCode)) =>
+        failed(NotExpectedErrorInTest(expectedErrorCode, Right(error), testEnv.sourcePosIndex))
+    }
+  }
+
   def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     if (
       frame.ctx.networkConfig.networkId == model.NetworkId.AlephiumMainNet ||
@@ -3249,16 +3267,17 @@ final case class DevInstr(instr: DevInstrBase)
     } else {
       instr match {
         case TestCheckStart =>
-          popInt(frame).map(sourcePosIndex => frame.ctx.initTestEnv(sourcePosIndex, frame))
+          popInt(frame).map(sourcePosIndex => frame.ctx.initTestEnv(sourcePosIndex, None, frame))
+        case TestErrorStart =>
+          for {
+            sourcePosIndex    <- popInt(frame)
+            expectedErrorCode <- popInt(frame)
+          } yield frame.ctx.initTestEnv(sourcePosIndex, Some(expectedErrorCode), frame)
         case TestCheckEnd =>
           frame.ctx.testEnvOpt match {
             case Some(testEnv) =>
               frame.ctx.resetTestEnv()
-              if (testEnv.exeFailure.isDefined) {
-                okay
-              } else {
-                failed(ExpectedAnExeFailure(testEnv.sourcePosIndex))
-              }
+              checkError(testEnv)
             case None => failed(InvalidTestCheckInstr)
           }
         case TestEqual =>

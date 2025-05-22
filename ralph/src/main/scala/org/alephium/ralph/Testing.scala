@@ -777,7 +777,9 @@ object Testing {
         (Some(sourcePosIndex), s"Assertion Failed in test `$testName`")
       case ExpectedAnExeFailure(sourcePosIndex) => (Some(sourcePosIndex), exeFailure.toString)
       case NotEqualInTest(_, _, sourcePosIndex) => (Some(sourcePosIndex), exeFailure.toString)
-      case _                                    => (None, exeFailure.toString)
+      case NotExpectedErrorInTest(_, _, sourcePosIndex) =>
+        (Some(sourcePosIndex), exeFailure.toString)
+      case _ => (None, exeFailure.toString)
     }
     val detail = s"VM execution error: $msg"
     tests.getError(testName, sourcePosIndex, detail, debugMessages).format(sourceCode)
