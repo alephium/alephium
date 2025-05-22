@@ -3198,12 +3198,14 @@ object DEBUG extends StatelessInstrCompanion1[AVector[Val.ByteVec]]
 sealed trait DevInstrBase
 case object TestCheckStart extends DevInstrBase
 case object TestCheckEnd   extends DevInstrBase
+case object TestEqual      extends DevInstrBase
 object DevInstrBase {
   implicit val serde: Serde[DevInstrBase] = new Serde[DevInstrBase] {
     override def serialize(input: DevInstrBase): ByteString = {
       input match {
         case TestCheckStart => ByteString(0)
         case TestCheckEnd   => ByteString(1)
+        case TestEqual      => ByteString(2)
       }
     }
 
@@ -3211,6 +3213,7 @@ object DevInstrBase {
       byteSerde._deserialize(input).flatMap {
         case Staging(0, content) => Right(Staging(TestCheckStart, content))
         case Staging(1, content) => Right(Staging(TestCheckEnd, content))
+        case Staging(2, content) => Right(Staging(TestEqual, content))
         case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid dev instr prefix $n"))
       }
     }
@@ -3224,6 +3227,13 @@ final case class DevInstr(instr: DevInstrBase)
   def serialize(): ByteString =
     ByteString(code) ++ serdeImpl[DevInstrBase].serialize(instr)
 
+  private def popErrorCode[C <: StatelessContext](frame: Frame[C]): ExeResult[Int] = {
+    for {
+      errorCodeU256 <- frame.popOpStackU256()
+      errorCode     <- errorCodeU256.v.toInt.toRight(Right(InvalidErrorCode(errorCodeU256.v)))
+    } yield errorCode
+  }
+
   def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     if (
       frame.ctx.networkConfig.networkId == model.NetworkId.AlephiumMainNet ||
@@ -3233,10 +3243,7 @@ final case class DevInstr(instr: DevInstrBase)
     } else {
       instr match {
         case TestCheckStart =>
-          for {
-            errorCodeU256 <- frame.popOpStackU256()
-            errorCode     <- errorCodeU256.v.toInt.toRight(Right(InvalidErrorCode(errorCodeU256.v)))
-          } yield frame.ctx.initTestEnv(errorCode, frame)
+          popErrorCode(frame).map(errorCode => frame.ctx.initTestEnv(errorCode, frame))
         case TestCheckEnd =>
           frame.ctx.testEnvOpt match {
             case Some(testEnv) =>
@@ -3248,6 +3255,18 @@ final case class DevInstr(instr: DevInstrBase)
               }
             case None => failed(InvalidTestCheckInstr)
           }
+        case TestEqual =>
+          for {
+            errorCode <- popErrorCode(frame)
+            right     <- frame.popOpStack()
+            left      <- frame.popOpStack()
+            _ <-
+              if (left == right) {
+                okay
+              } else {
+                failed(NotEqualInTest(left, right, errorCode))
+              }
+          } yield ()
       }
     }
   }

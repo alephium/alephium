@@ -2180,7 +2180,15 @@ object Ast {
 
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val errorCode = genErrorCode(state)
-      expr.genCode(state) ++ Seq(errorCode.toConstInstr, AssertWithErrorCode)
+      expr match {
+        case Binop(TestOperator.Eq, left, right) =>
+          left.genCode(state) ++ right.genCode(state) ++ Seq(
+            errorCode.toConstInstr,
+            DevInstr(TestEqual)
+          )
+        case _ =>
+          expr.genCode(state) ++ Seq(errorCode.toConstInstr, AssertWithErrorCode)
+      }
     }
 
     def reset(): Unit = expr.reset()

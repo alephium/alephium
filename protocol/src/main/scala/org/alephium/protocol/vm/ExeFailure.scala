@@ -473,7 +473,10 @@ final case class InvalidPublicKeyType(tpe: ByteString)     extends ExeFailure
 case object DevInstrIsOnlySupportedOnDevnet extends ExeFailure
 case object InvalidTestCheckInstr           extends ExeFailure
 final case class ExpectedAnExeFailure(errorCode: Int) extends ExeFailure {
-  override def toString: String = s"Assertion failed: the test code did not throw an exception"
+  override def toString: String = s"Assertion Failed: the test code did not throw an exception"
+}
+final case class NotEqualInTest(left: Val, right: Val, errorCode: Int) extends ExeFailure {
+  override def toString: String = s"Assertion Failed: left($left) is not equal to right($right)"
 }
 
 sealed trait IOFailure extends Product {

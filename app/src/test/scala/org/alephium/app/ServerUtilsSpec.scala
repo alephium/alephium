@@ -5712,7 +5712,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"""|-- error (9:5): Testing error
             |9 |    testCheck!(foo() == 0)
             |  |    ^^^^^^^^^^^^^^^^^^^^^^
-            |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed in test `Foo:foo`
+            |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: left(U256(${now.millis})) is not equal to right(U256(0))
             |""".stripMargin
     }
 
@@ -5747,7 +5747,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"""|-- error (12:5): Testing error
             |12 |    testCheck!(add() == 20)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^
-            |   |    Test failed: Foo:add, detail: VM execution error: Assertion Failed in test `Foo:add`
+            |   |    Test failed: Foo:add, detail: VM execution error: Assertion Failed: left(U256(30)) is not equal to right(U256(20))
             |""".stripMargin
     }
 
@@ -5783,8 +5783,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"""|-- error (16:5): Testing error
             |16 |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == 2 alph)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-            |   |    Test failed: Foo:transfer, detail: VM execution error: Assertion Failed in test `Foo:transfer`
-            |   |--------------------------------------------------------------------------------------------------
+            |   |    Test failed: Foo:transfer, detail: VM execution error: Assertion Failed: left(U256(1000000000000000000)) is not equal to right(U256(2000000000000000000))
+            |   |-------------------------------------------------------------------------------------------------------------------------------------------------------------
             |   |Debug messages:
             |   |> Contract @ Foo - balance: 0
             |""".stripMargin
@@ -5814,17 +5814,24 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
 
       serverUtils.compileProject(blockFlow, api.Compile.Project(code(30, 10))).isRight is true
-      Seq(code(20, 10), code(30, 20)).foreach { code =>
-        serverUtils
-          .compileProject(blockFlow, api.Compile.Project(code))
-          .leftValue
-          .detail is
-          s"""|-- error (17:5): Testing error
-              |17 |    testCheck!(base() == result)
-              |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-              |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed in test `Base:base`
-              |""".stripMargin
-      }
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(20, 10)))
+        .leftValue
+        .detail is
+        s"""|-- error (17:5): Testing error
+            |17 |    testCheck!(base() == result)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed: left(U256(30)) is not equal to right(U256(20))
+            |""".stripMargin
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(30, 20)))
+        .leftValue
+        .detail is
+        s"""|-- error (17:5): Testing error
+            |17 |    testCheck!(base() == result)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed: left(U256(10)) is not equal to right(U256(20))
+            |""".stripMargin
     }
 
     {
@@ -5954,7 +5961,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"""|-- error (11:5): Testing error
             |11 |    testFail!(foo1() / 1)
             |   |    ^^^^^^^^^^^^^^^^^^^^^
-            |   |    Test failed: Foo:foo, detail: VM execution error: Assertion failed: the test code did not throw an exception
+            |   |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: the test code did not throw an exception
             |""".stripMargin
     }
   }

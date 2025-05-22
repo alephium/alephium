@@ -4813,11 +4813,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "serialize/deserialize DevInstrBase" in {
     serialize[DevInstrBase](TestCheckStart) is Hex.unsafe("00")
     serialize[DevInstrBase](TestCheckEnd) is Hex.unsafe("01")
+    serialize[DevInstrBase](TestEqual) is Hex.unsafe("02")
 
     deserialize[DevInstrBase](Hex.unsafe("00")).rightValue is TestCheckStart
     deserialize[DevInstrBase](Hex.unsafe("01")).rightValue is TestCheckEnd
-    deserialize[DevInstrBase](Hex.unsafe("02")).leftValue is SerdeError.WrongFormat(
-      "Invalid dev instr prefix 2"
+    deserialize[DevInstrBase](Hex.unsafe("02")).rightValue is TestEqual
+    deserialize[DevInstrBase](Hex.unsafe("03")).leftValue is SerdeError.WrongFormat(
+      "Invalid dev instr prefix 3"
     )
   }
 
@@ -4861,6 +4863,24 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     context.setTestError(AssertionFailedWithErrorCode(None, 0))
     DevInstr(TestCheckEnd).runWith(frame) isE ()
     context.testEnvOpt.isEmpty is true
+  }
+
+  it should "DevInstr(TestEqual)" in new DevInstrFixture {
+    fail(DevInstr(TestEqual))
+
+    frame.pushOpStack(Val.I256(I256.Zero))
+    frame.pushOpStack(Val.I256(I256.One))
+    frame.pushOpStack(Val.U256(255))
+    DevInstr(TestEqual).runWith(frame).leftValue isE NotEqualInTest(
+      Val.I256(I256.Zero),
+      Val.I256(I256.One),
+      255
+    )
+
+    frame.pushOpStack(Val.I256(I256.Zero))
+    frame.pushOpStack(Val.I256(I256.Zero))
+    frame.pushOpStack(Val.U256(255))
+    DevInstr(TestEqual).runWith(frame) isE ()
   }
 
   it should "test gas amount" in new FrameFixture {
