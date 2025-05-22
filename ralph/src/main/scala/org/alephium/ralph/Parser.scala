@@ -517,7 +517,14 @@ abstract class Parser[Ctx <: StatelessContext] {
             ifBranch.sourceIndex
           )
         }
-        Ast.IfElseStatement(ifBranch +: elseIfBranches, elseBranchOpt)
+        val sourceIndex = if (elseBranchOpt.nonEmpty) {
+          SourceIndex(ifBranch.sourceIndex, elseBranchOpt.flatMap(_.sourceIndex))
+        } else if (elseIfBranches.nonEmpty) {
+          SourceIndex(ifBranch.sourceIndex, elseIfBranches.lastOption.flatMap(_.sourceIndex))
+        } else {
+          ifBranch.sourceIndex
+        }
+        Ast.IfElseStatement(ifBranch +: elseIfBranches, elseBranchOpt).atSourceIndex(sourceIndex)
       }
 
   def whileStmt[Unknown: P]: P[Ast.While[Ctx]] =
