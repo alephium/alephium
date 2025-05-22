@@ -115,6 +115,10 @@ trait ServerFixture
   )
   def dummyBuildTransactionResult(tx: Transaction) =
     BuildSimpleTransferTxResult.from(tx.unsigned)
+  def dummyBuildGrouplessTransactionResult(tx: Transaction) =
+    BuildGrouplessTransferTxResult
+      .from(AVector(BuildSimpleTransferTxResult.from(tx.unsigned)))
+      .rightValue
   def dummySweepAddressBuildTransactionsResult(
       tx: Transaction,
       fromGroup: GroupIndex,

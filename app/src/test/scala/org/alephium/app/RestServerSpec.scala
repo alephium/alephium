@@ -620,37 +620,109 @@ abstract class RestServerSpec(
   }
 
   it should "call POST /multisig/build" in {
-    lazy val (_, dummyKey2, _) = addressStringGen(
-      GroupIndex.unsafe(1)
-    ).sample.get
+    {
+      info("P2MPKH")
 
-    lazy val dummyKeyHex2 = dummyKey2.toHexString
+      lazy val (_, dummyKey2, _) = addressStringGen(
+        GroupIndex.unsafe(1)
+      ).sample.get
 
-    val address = ServerFixture.p2mpkhAddress(AVector(dummyKeyHex, dummyKeyHex2), 1)
+      lazy val dummyKeyHex2 = dummyKey2.toHexString
 
-    Post(
-      s"/multisig/build",
-      body = s"""
-                |{
-                |  "fromAddress": "${address}",
-                |  "fromPublicKeys": ["$dummyKeyHex"],
-                |  "destinations": [
-                |    {
-                |      "address": "$dummyToAddress",
-                |      "attoAlphAmount": "1",
-                |      "tokens": []
-                |    }
-                |  ]
-                |}
+      val address = ServerFixture.p2mpkhAddress(AVector(dummyKeyHex, dummyKeyHex2), 1)
+
+      Post(
+        s"/multisig/build",
+        body = s"""
+                  |{
+                  |  "fromAddress": "${address}",
+                  |  "fromPublicKeys": ["$dummyKeyHex"],
+                  |  "destinations": [
+                  |    {
+                  |      "address": "$dummyToAddress",
+                  |      "attoAlphAmount": "1",
+                  |      "tokens": []
+                  |    }
+                  |  ]
+                  |}
         """.stripMargin
-    ) check { response =>
-      response.code is StatusCode.Ok
-      response.as[BuildTransferTxResult] is dummyBuildTransactionResult(
-        ServerFixture.dummyTransferTx(
-          dummyTx,
-          AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
+      ) check { response =>
+        response.code is StatusCode.Ok
+        response.as[BuildTransferTxResult] is dummyBuildTransactionResult(
+          ServerFixture.dummyTransferTx(
+            dummyTx,
+            AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
+          )
         )
+      }
+    }
+
+    {
+      info("P2HMPK")
+
+      lazy val (_, dummyKey2, _) = addressStringGen(
+        GroupIndex.unsafe(1)
+      ).sample.get
+
+      lazy val dummyKeyHex2 = dummyKey2.toHexString
+
+      val address = ServerFixture.p2hmpkAddress(
+        AVector(dummyKeyHex, dummyKeyHex2),
+        AVector(BuildTxCommon.Default, BuildTxCommon.Default),
+        1
       )
+
+      Post(
+        s"/multisig/build",
+        body = s"""
+                  |{
+                  |  "fromAddress": "${address}",
+                  |  "fromPublicKeys": ["$dummyKeyHex", "$dummyKeyHex2"],
+                  |  "destinations": [
+                  |    {
+                  |      "address": "$dummyToAddress",
+                  |      "attoAlphAmount": "1",
+                  |      "tokens": []
+                  |    }
+                  |  ],
+                  |  "group": 0,
+                  |  "multiSigType": "p2hmpk"
+                  |}
+        """.stripMargin
+      ) check { response =>
+        response.code is StatusCode.BadRequest
+        response.as[ApiError.BadRequest] is ApiError.BadRequest(
+          "fromPublicKeyIndexes is required for P2HMPK multisig"
+        )
+      }
+
+      Post(
+        s"/multisig/build",
+        body = s"""
+                  |{
+                  |  "fromAddress": "${address}",
+                  |  "fromPublicKeys": ["$dummyKeyHex", "$dummyKeyHex2"],
+                  |  "destinations": [
+                  |    {
+                  |      "address": "$dummyToAddress",
+                  |      "attoAlphAmount": "1",
+                  |      "tokens": []
+                  |    }
+                  |  ],
+                  |  "group": 0,
+                  |  "fromPublicKeyIndexes": [0],
+                  |  "multiSigType": "p2hmpk"
+                  |}
+        """.stripMargin
+      ) check { response =>
+        response.code is StatusCode.Ok
+        response.as[BuildTransferTxResult] is dummyBuildGrouplessTransactionResult(
+          ServerFixture.dummyTransferTx(
+            dummyTx,
+            AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
+          )
+        )
+      }
     }
   }
 
