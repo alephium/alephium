@@ -166,4 +166,8 @@ object AddressLike {
   def fromP2PKPublicKey(publicKey: PublicKeyLike): AddressLike = {
     AddressLike(LockupScript.HalfDecodedP2PK(publicKey))
   }
+
+  def fromP2HMPKHash(hash: Hash): AddressLike = {
+    AddressLike(LockupScript.HalfDecodedP2HMPK(hash))
+  }
 }

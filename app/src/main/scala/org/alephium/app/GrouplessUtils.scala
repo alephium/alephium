@@ -294,7 +294,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
         transferFromFallbackAddress(
           blockFlow,
-          (selectedLockupScript, UnlockScript.P2PK),
+          (selectedLockupScript, currentBuildingGrouplessTx.fromUnlockScript),
           currentBuildingGrouplessTx.from,
           remainingAmounts._1,
           remainingAmounts._2,
@@ -313,7 +313,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
               blockFlow
                 .transfer(
                   currentBuildingGrouplessTx.from,
-                  UnlockScript.P2PK,
+                  currentBuildingGrouplessTx.fromUnlockScript,
                   outputInfos,
                   totalAmountNeeded,
                   currentBuildingGrouplessTx.utxos ++ getExtraUtxos(
@@ -427,6 +427,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
             buildingGrouplessTransferTxs += BuildingGrouplessTransferTx(
               lockup,
+              unlockScript,
               utxos,
               allLockupScriptsWithUtxos.remove(index).map(_._1),
               (remainAlph, remainTokens),
@@ -546,6 +547,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 object GrouplessUtils {
   final case class BuildingGrouplessTransferTx(
       from: LockupScript.GrouplessAsset,
+      fromUnlockScript: UnlockScript,
       utxos: AVector[AssetOutputInfo],
       remainingLockupScripts: AVector[LockupScript.GrouplessAsset],
       remainingAmounts: (U256, AVector[(TokenId, U256)]),
