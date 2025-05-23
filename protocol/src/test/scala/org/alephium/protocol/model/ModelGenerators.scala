@@ -89,7 +89,7 @@ trait LockupScriptGenerators extends Generators {
       numKeys   <- Gen.chooseNum(1, ALPH.MaxKeysInP2MPK)
       keys      <- Gen.listOfN(numKeys, publicKeyLikeGen()).map(AVector.from)
       threshold <- Gen.choose(1, keys.length)
-    } yield LockupScript.P2HMPK(keys, threshold, groupIndex)
+    } yield LockupScript.P2HMPK.unsafe(keys, threshold, groupIndex)
   }
 
   def preDanubeLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] = {

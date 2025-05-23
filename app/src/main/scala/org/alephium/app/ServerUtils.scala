@@ -2588,10 +2588,11 @@ object ServerUtils {
       mrequired: Int,
       keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]]
   )(implicit groupConfig: GroupConfig): Either[String, BuildMultisigAddressResult] = {
-    GrouplessUtils.buildPublicKeyLikes(rawKeys, keyTypesOpt).map { pks =>
-      BuildMultisigAddressResult(
-        LockupScript.P2HMPK(pks, mrequired, GroupIndex.unsafe(0)).toBase58WithoutGroup
-      )
+    for {
+      pks          <- GrouplessUtils.buildPublicKeyLikes(rawKeys, keyTypesOpt)
+      lockupScript <- LockupScript.P2HMPK(pks, mrequired, GroupIndex.unsafe(0))
+    } yield {
+      BuildMultisigAddressResult(lockupScript.toBase58WithoutGroup)
     }
   }
 

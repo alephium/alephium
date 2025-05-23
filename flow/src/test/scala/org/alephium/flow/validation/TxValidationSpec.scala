@@ -1183,7 +1183,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       AVector(pubKey0, pubKey1, pubKey2).map(PublicKeyLike.SecP256K1.apply)
 
     def tx(publicKeyIndexes: AVector[Int]): Transaction = {
-      val lockup   = LockupScript.P2HMPK(allPubKeys, 2, GroupIndex.unsafe(0))
+      val lockup   = LockupScript.P2HMPK.unsafe(allPubKeys, 2, GroupIndex.unsafe(0))
       val unlock   = UnlockScript.P2HMPK(allPubKeys, publicKeyIndexes)
       val unsigned = prepareOutput(lockup, unlock)
       sign(unsigned, priKey0, priKey1)
@@ -1658,7 +1658,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def publicKeys: AVector[PublicKeyLike]
     def publicKeyIndexes: AVector[Int]
     def lockup: LockupScript.P2HMPK =
-      LockupScript.P2HMPK(publicKeys, publicKeyIndexes.length, groupIndex)
+      LockupScript.P2HMPK.unsafe(publicKeys, publicKeyIndexes.length, groupIndex)
     def sign(unsignedTx: UnsignedTransaction): Transaction
     def unlockGas: GasBox
 

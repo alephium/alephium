@@ -135,9 +135,13 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
           Left(badRequest("fromPublicKeyIndexes is required for P2HMPK multisig"))
         case (Some(group), Some(keyIndexes)) =>
           for {
+            lockupScript <- LockupScript
+              .P2HMPK(pubKeys, keyIndexes.length, group)
+              .left
+              .map(badRequest)
             unsignedTx <- prepareUnsignedTransaction(
               blockFlow,
-              LockupScript.P2HMPK(pubKeys, keyIndexes.length, group),
+              lockupScript,
               UnlockScript.P2HMPK(pubKeys, keyIndexes),
               query.destinations,
               query.gas,
@@ -150,15 +154,18 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
             )
           } yield result
         case (None, Some(keyIndexes)) =>
-          buildGrouplessTransferTxWithoutExplicitGroup(
-            blockFlow,
-            LockupScript.P2HMPK(pubKeys, keyIndexes.length),
-            UnlockScript.P2HMPK(pubKeys, keyIndexes),
-            query.destinations,
-            query.gas,
-            query.gasPrice,
-            None
-          )
+          for {
+            lockupScript <- LockupScript.P2HMPK(pubKeys, keyIndexes.length).left.map(badRequest)
+            result <- buildGrouplessTransferTxWithoutExplicitGroup(
+              blockFlow,
+              lockupScript,
+              UnlockScript.P2HMPK(pubKeys, keyIndexes),
+              query.destinations,
+              query.gas,
+              query.gasPrice,
+              None
+            )
+          } yield result
       }
     }
   }

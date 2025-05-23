@@ -134,7 +134,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with LockupScriptGenerators {
         PublicKeyLike.SecP256R1(pubKey1),
         PublicKeyLike.ED25519(pubKey2)
       )
-      val lockup        = LockupScript.P2HMPK(publicKeys, 2, groupIndex)
+      val lockup        = LockupScript.P2HMPK.unsafe(publicKeys, 2, groupIndex)
       val unlock        = UnlockScript.P2HMPK(publicKeys, AVector(0, 1))
       val mockEstimator = AssetScriptGasEstimator.Mock
       GasEstimation

@@ -279,7 +279,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
     val allPubicKeyLikes = AVector(publicKeyLike0, publicKeyLike1, publicKeyLike2)
 
-    lazy val fromLockupScript   = LockupScript.P2HMPK(allPubicKeyLikes, 2, chainIndex.from)
+    lazy val fromLockupScript   = LockupScript.P2HMPK.unsafe(allPubicKeyLikes, 2, chainIndex.from)
     val fromP2HMPKHash          = fromLockupScript.p2hmpkHash
     val fromAddress             = Address.Asset(fromLockupScript)
     val fromAddressWithGroup    = AddressLike.from(fromLockupScript)

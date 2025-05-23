@@ -617,6 +617,51 @@ abstract class RestServerSpec(
 
       result.address is expected
     }
+
+    Post(
+      s"/multisig/address",
+      body = s"""
+                |{
+                |  "keys": [
+                | "$dummyKeyHex",
+                | "$dummyKeyHex2"
+                |],
+                |  "keyTypes": [
+                |  "default",
+                |  "default"
+                |],
+                |  "multiSigType": "p2hmpk",
+                |  "mrequired": 3
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.BadRequest
+      response.as[ApiError.BadRequest] is ApiError.BadRequest(
+        "Invalid m in m-of-n multisig: m=3, n=2"
+      )
+    }
+
+    Post(
+      s"/multisig/address",
+      body = s"""
+                |{
+                |  "keys": [
+                | "$dummyKeyHex",
+                | "$dummyKeyHex2"
+                |],
+                |  "keyTypes": [
+                |  "default"
+                |],
+                |  "multiSigType": "p2hmpk",
+                |  "mrequired": 1
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.BadRequest
+      response.as[ApiError.BadRequest] is ApiError.BadRequest(
+        "`keyTypes` length should be the same as `keys` length"
+      )
+    }
   }
 
   it should "call POST /multisig/build" in {

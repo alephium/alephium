@@ -233,7 +233,7 @@ object LockupScript {
     def toBase58: String = s"${toBase58WithoutGroup}:$groupByte"
 
     def toBase58WithoutGroup: String = {
-      val bytes = serialize[LockupScript](this).dropRight(P2PK.groupByteLength)
+      val bytes = serialize[LockupScript](this).dropRight(Groupless.groupByteLength)
       Base58.encode(bytes)
     }
   }
@@ -286,17 +286,11 @@ object LockupScript {
     // so we need to find a `scriptHint` that matches the group index.
     // Since the least significant byte is already used to distinguish the output type,
     // we use the most significant byte here to calculate the new `scriptHint`.
-    override lazy val scriptHint: ScriptHint = {
-      val initialHint  = ScriptHint.fromHash(DjbHash.intHash(publicKey.rawBytes)).value
-      val xorResult    = Bytes.xorByte(initialHint)
-      val byte0        = (initialHint >> 24).toByte
-      val newByte0     = byte0 ^ xorResult ^ groupByte
-      val newHintValue = (newByte0 << 24) | (initialHint & 0x00ffffff)
-      ScriptHint.fromHash(newHintValue)
-    }
+    override lazy val scriptHint: ScriptHint =
+      Groupless.calcScriptHint(publicKey.rawBytes, groupByte)
   }
 
-  object P2PK extends Groupless {
+  object P2PK {
 
     def apply(publicKey: PublicKeyLike, groupIndex: GroupIndex): P2PK = {
       P2PK(publicKey, groupIndex.value.toByte)
@@ -307,7 +301,7 @@ object LockupScript {
     }
 
     def decodePublicKey(bytes: ByteString): Option[PublicKeyLike] = {
-      safePublicKeySerde.deserialize(bytes).toOption
+      Groupless.safePublicKeySerde.deserialize(bytes).toOption
     }
 
     def fromDecodedBase58(bytes: ByteString, groupByte: Byte): Option[P2PK] = {
@@ -316,7 +310,7 @@ object LockupScript {
 
     implicit val serde: Serde[P2PK] = {
       Serde.forProduct2(P2PK.unsafe, (p: P2PK) => (p.publicKey, p.groupByte))(
-        safePublicKeySerde,
+        Groupless.safePublicKeySerde,
         serdeImpl[Byte]
       )
     }
@@ -326,17 +320,10 @@ object LockupScript {
       p2hmpkHash: Hash,
       groupByte: Byte
   ) extends GrouplessAsset {
-    override lazy val scriptHint: ScriptHint = {
-      val initialHint  = ScriptHint.fromHash(DjbHash.intHash(p2hmpkHash.bytes)).value
-      val xorResult    = Bytes.xorByte(initialHint)
-      val byte0        = (initialHint >> 24).toByte
-      val newByte0     = byte0 ^ xorResult ^ groupByte
-      val newHintValue = (newByte0 << 24) | (initialHint & 0x00ffffff)
-      ScriptHint.fromHash(newHintValue)
-    }
+    override lazy val scriptHint: ScriptHint = Groupless.calcScriptHint(p2hmpkHash.bytes, groupByte)
   }
 
-  object P2HMPK extends Groupless with MultiSig {
+  object P2HMPK extends MultiSig {
 
     def apply(p2hmpkHash: Hash, groupIndex: GroupIndex): P2HMPK = {
       P2HMPK(p2hmpkHash, groupIndex.value.toByte)
@@ -350,17 +337,44 @@ object LockupScript {
       ScriptHint.fromHash(p2hmpkHash).groupIndex
     }
 
-    def apply(publicKeys: AVector[PublicKeyLike], m: Int, groupIndex: GroupIndex): P2HMPK = {
-      P2HMPK(Hash.hash(hashPreImageSerializer.serialize((publicKeys, m))), groupIndex.value.toByte)
+    def apply(
+        publicKeys: AVector[PublicKeyLike],
+        m: Int,
+        groupIndex: GroupIndex
+    ): Either[String, P2HMPK] = {
+      checkThreshold(publicKeys, m) {
+        P2HMPK(
+          Hash.hash(hashPreImageSerializer.serialize((publicKeys, m))),
+          groupIndex.value.toByte
+        )
+      }
     }
 
-    def apply(publicKeys: AVector[PublicKeyLike], m: Int)(implicit config: GroupConfig): P2HMPK = {
-      val hash = Hash.hash(hashPreImageSerializer.serialize((publicKeys, m)))
-      P2HMPK(hash, defaultGroup(hash))
+    def apply(publicKeys: AVector[PublicKeyLike], m: Int)(implicit
+        config: GroupConfig
+    ): Either[String, P2HMPK] = {
+      checkThreshold(publicKeys, m) {
+        val hash = Hash.hash(hashPreImageSerializer.serialize((publicKeys, m)))
+        P2HMPK(hash, defaultGroup(hash))
+      }
+    }
+
+    private def checkThreshold(publicKeys: AVector[PublicKeyLike], m: Int)(
+        p2hmpk: => P2HMPK
+    ): Either[String, P2HMPK] = {
+      if (P2HMPK.validate(publicKeys.length, m)) {
+        Right(p2hmpk)
+      } else {
+        Left(validationErrorMsg(publicKeys.length, m))
+      }
     }
 
     def unsafe(publicKeys: AVector[PublicKeyLike], m: Int, groupByte: Byte): P2HMPK = {
       P2HMPK(Hash.hash(hashPreImageSerializer.serialize((publicKeys, m))), groupByte)
+    }
+
+    def unsafe(publicKeys: AVector[PublicKeyLike], m: Int, groupIndex: GroupIndex): P2HMPK = {
+      unsafe(publicKeys, m, groupIndex.value.toByte)
     }
 
     implicit val serde: Serde[P2HMPK] = {
@@ -382,7 +396,7 @@ object LockupScript {
       new Serializer[(AVector[PublicKeyLike], Int)] {
         override def serialize(input: (AVector[PublicKeyLike], Int)): ByteString = {
           val (publicKeys, m) = input
-          val publicKeysBytes = safePublicKeysSerde.serialize(publicKeys)
+          val publicKeysBytes = Groupless.safePublicKeysSerde.serialize(publicKeys)
           val mBytes          = serdeImpl[Int].serialize(m)
           val nBytes          = serdeImpl[Int].serialize(publicKeys.length)
           ByteString(5) ++ mBytes ++ nBytes ++ publicKeysBytes
@@ -390,7 +404,7 @@ object LockupScript {
       }
   }
 
-  trait Groupless {
+  object Groupless {
     val groupByteLength: Int = 1
 
     implicit val safePublicKeySerde: Serde[PublicKeyLike] = new Serde[PublicKeyLike] {
@@ -410,12 +424,19 @@ object LockupScript {
       }
     }
 
-    implicit val safePublicKeysSerde: Serde[AVector[PublicKeyLike]] = avectorSerde[PublicKeyLike]
-  }
+    val safePublicKeysSerde: Serde[AVector[PublicKeyLike]] = avectorSerde[PublicKeyLike]
 
-  object Groupless extends Groupless {
     def hasExplicitGroupIndex(input: String): Boolean = {
       input.length > 2 && input(input.length - 2) == ':'
+    }
+
+    def calcScriptHint(preImage: ByteString, groupByte: Byte): ScriptHint = {
+      val initialHint  = ScriptHint.fromHash(DjbHash.intHash(preImage)).value
+      val xorResult    = Bytes.xorByte(initialHint)
+      val byte0        = (initialHint >> 24).toByte
+      val newByte0     = byte0 ^ xorResult ^ groupByte
+      val newHintValue = (newByte0 << 24) | (initialHint & 0x00ffffff)
+      ScriptHint.fromHash(newHintValue)
     }
   }
 
