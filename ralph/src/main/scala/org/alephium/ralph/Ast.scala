@@ -661,18 +661,9 @@ object Ast {
           if (func.inline && state.genInlineCode) {
             func.genInlineCode(args, state, this)
           } else {
-            val argsType = args.flatMap(_.getType(state))
-            val variadicInstrs = if (func.isVariadic) {
-              Seq(U256Const(Val.U256.unsafe(state.flattenTypeLength(argsType))))
-            } else {
-              Seq.empty
-            }
-            val instrs = genApproveCode(state, func) ++
-              func.genCodeForArgs(args, state) ++
-              variadicInstrs ++
-              func.genCode(argsType)
+            val instrs = genApproveCode(state, func) ++ func.genCode(this, args, state)
             if (ignoreReturn) {
-              val returnType = positionedError(func.getReturnType(argsType, state))
+              val returnType = positionedError(func.getReturnType(this, args, state))
               instrs ++ Seq.fill(state.flattenTypeLength(returnType))(Pop)
             } else {
               instrs
@@ -708,7 +699,7 @@ object Ast {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
-      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      positionedError(funcInfo.getReturnType(this, args, state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -741,7 +732,7 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      positionedError(funcInfo.getReturnType(this, args, state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -788,7 +779,7 @@ object Ast {
       val funcInfo = state.getFunc(contractType.id, callId)
       checkNonStaticContractFunction(contractType.id, callId, funcInfo)
       state.addExternalCall(contractType.id, callId)
-      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      val retTypes = positionedError(funcInfo.getReturnType(this, args, state))
       (contractType.id, retTypes)
     }
 
@@ -799,8 +790,7 @@ object Ast {
     ): Seq[Instr[StatefulContext]] = {
       val contract  = obj.getType(state)(0).asInstanceOf[Type.Contract]
       val func      = state.getFunc(contract.id, callId)
-      val argTypes  = args.flatMap(_.getType(state))
-      val retTypes  = func.getReturnType(argTypes, state)
+      val retTypes  = func.getReturnType(this, args, state)
       val retLength = state.flattenTypeLength(retTypes)
       genApproveCode(state, func) ++
         args.flatMap(_.genCode(state)) ++
@@ -1962,7 +1952,7 @@ object Ast {
     override def check(state: Compiler.State[Ctx]): Unit = {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
-      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      val retTypes = positionedError(funcInfo.getReturnType(this, args, state))
       checkReturnValueUsed(state, state.typeId, id, retTypes)
     }
 
@@ -1993,7 +1983,7 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      val retTypes = positionedError(funcInfo.getReturnType(this, args, state))
       checkReturnValueUsed(state, contractId, id, retTypes)
     }
 
@@ -2147,105 +2137,6 @@ object Ast {
       }
     }
     def reset(): Unit = interpolationParts.foreach(_.reset())
-  }
-
-  sealed trait TestAssert[Ctx <: StatelessContext] extends Statement[Ctx] {
-    def genSourcePosIndex(state: Compiler.State[Ctx]): Val.U256 = {
-      val sourcePosIndex = state.addTestCheckCall(this)
-      assume(sourcePosIndex >= 0)
-      Val.U256(U256.unsafe(sourcePosIndex))
-    }
-  }
-
-  final case class TestCheck[Ctx <: StatelessContext](expr: Expr[Ctx]) extends TestAssert[Ctx] {
-    def check(state: Compiler.State[Ctx]): Unit = {
-      state.checkInTestContext("testCheck!", sourceIndex)
-      val inputType = expr.getType(state)
-      if (inputType != Seq(Type.Bool)) {
-        throw Compiler.Error(
-          s"Invalid args type ${quote(inputType)} for builtin func testCheck",
-          sourceIndex
-        )
-      }
-    }
-
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val sourcePosIndex = genSourcePosIndex(state)
-      expr match {
-        case Binop(TestOperator.Eq, left, right) =>
-          left.genCode(state) ++ right.genCode(state) ++ Seq(
-            sourcePosIndex.toConstInstr,
-            DevInstr(vm.TestEqual)
-          )
-        case _ =>
-          expr.genCode(state) ++ Seq(sourcePosIndex.toConstInstr, AssertWithErrorCode)
-      }
-    }
-
-    def reset(): Unit = expr.reset()
-  }
-
-  final case class TestFail[Ctx <: StatelessContext](expr: Expr[Ctx]) extends TestAssert[Ctx] {
-    def check(state: Compiler.State[Ctx]): Unit = {
-      state.checkInTestContext("testFail!", sourceIndex)
-      expr.getType(state)
-      ()
-    }
-
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val sourcePosIndex = genSourcePosIndex(state)
-      val testCode       = expr.genCode(state)
-      Seq(sourcePosIndex.toConstInstr, DevInstr(TestCheckStart)) ++ testCode :+ DevInstr(
-        TestCheckEnd
-      )
-    }
-
-    def reset(): Unit = expr.reset()
-  }
-
-  final case class TestEqual[Ctx <: StatelessContext](args: Seq[Expr[Ctx]])
-      extends TestAssert[Ctx] {
-    def check(state: Compiler.State[Ctx]): Unit = {
-      state.checkInTestContext("testEqual!", sourceIndex)
-      if (args.length != 2) {
-        throw Compiler.Error(s"Expected 2 arguments, but got ${args.length}", sourceIndex)
-      }
-      val types = args.flatMap(_.getType(state))
-      if (types.length != 2 || types(0) != types(1)) {
-        throw Compiler.Error(s"Invalid args type $types for builtin func testEqual", sourceIndex)
-      }
-    }
-
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val sourcePosIndex = genSourcePosIndex(state)
-      args.flatMap(_.genCode(state)) ++ Seq(sourcePosIndex.toConstInstr, DevInstr(vm.TestEqual))
-    }
-
-    def reset(): Unit = args.foreach(_.reset())
-  }
-
-  final case class TestError[Ctx <: StatelessContext](args: Seq[Expr[Ctx]])
-      extends TestAssert[Ctx] {
-    def check(state: Compiler.State[Ctx]): Unit = {
-      state.checkInTestContext("testError!", sourceIndex)
-      if (args.length != 2) {
-        throw Compiler.Error(s"Expected 2 arguments, but got ${args.length}", sourceIndex)
-      }
-      val types = args.flatMap(_.getType(state))
-      if (types.lastOption.exists(_ != Type.U256)) {
-        throw Compiler.Error(s"Invalid args type $types for builtin func testError", sourceIndex)
-      }
-    }
-
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val sourcePosIndex    = genSourcePosIndex(state)
-      val testCode          = args(0).genCode(state)
-      val expectedErrorCode = args(1).genCode(state)
-      expectedErrorCode ++ Seq(sourcePosIndex.toConstInstr, DevInstr(TestErrorStart)) ++
-        testCode :+ DevInstr(TestCheckEnd)
-    }
-
-    def reset(): Unit = args.foreach(_.reset())
   }
 
   object TemplateVar {

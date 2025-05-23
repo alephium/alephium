@@ -3126,18 +3126,40 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   }
 
   it should "parse test assert statements" in {
-    parse("testCheck!(a == 1)", StatefulParser.testAssert(_)).get.value is
-      TestCheck[StatefulContext](Binop(Eq, Variable(Ident("a")), Const(Val.U256(U256.One))))
-    parse("testCheck!(foo())", StatefulParser.testAssert(_)).get.value is
-      TestCheck[StatefulContext](CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
-    parse("testEqual!(a, b)", StatefulParser.testAssert(_)).get.value is
-      TestEqual[StatefulContext](Seq(Variable(Ident("a")), Variable(Ident("b"))))
-    parse("testFail!(a == 1)", StatefulParser.testAssert(_)).get.value is
-      TestFail[StatefulContext](Binop(Eq, Variable(Ident("a")), Const(Val.U256(U256.One))))
-    parse("testFail!(foo())", StatefulParser.testAssert(_)).get.value is
-      TestFail[StatefulContext](CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
-    parse("testError!(foo(), 1)", StatefulParser.testAssert(_)).get.value is
-      TestError[StatefulContext](
+    parse("testCheck!(a == 1)", StatefulParser.statement(_)).get.value is
+      FuncCall[StatefulContext](
+        FuncId("testCheck", true),
+        Seq.empty,
+        Seq(Binop(Eq, Variable(Ident("a")), Const(Val.U256(U256.One))))
+      )
+    parse("testCheck!(foo())", StatefulParser.statement(_)).get.value is
+      FuncCall[StatefulContext](
+        FuncId("testCheck", true),
+        Seq.empty,
+        Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+      )
+    parse("testEqual!(a, b)", StatefulParser.statement(_)).get.value is
+      FuncCall[StatefulContext](
+        FuncId("testEqual", true),
+        Seq.empty,
+        Seq(Variable(Ident("a")), Variable(Ident("b")))
+      )
+    parse("testFail!(a == 1)", StatefulParser.statement(_)).get.value is
+      FuncCall[StatefulContext](
+        FuncId("testFail", true),
+        Seq.empty,
+        Seq(Binop(Eq, Variable(Ident("a")), Const(Val.U256(U256.One))))
+      )
+    parse("testFail!(foo())", StatefulParser.statement(_)).get.value is
+      FuncCall[StatefulContext](
+        FuncId("testFail", true),
+        Seq.empty,
+        Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+      )
+    parse("testError!(foo(), 1)", StatefulParser.statement(_)).get.value is
+      FuncCall[StatefulContext](
+        FuncId("testError", true),
+        Seq.empty,
         Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty), Const(Val.U256(U256.One)))
       )
   }

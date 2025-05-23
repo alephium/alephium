@@ -736,6 +736,11 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     )
   }
 
+  it should "compile testFail" in new Fixture {
+    compileContractFull(code("testFail!(foo())")).isRight is true
+    testContractError(code(s"$$testFail!(foo(), 0)$$"), "Expected 1 arguments, but got 2")
+  }
+
   it should "compile testError" in new Fixture {
     compileContractFull(code("testError!(foo(), 0)")).isRight is true
     testContractError(

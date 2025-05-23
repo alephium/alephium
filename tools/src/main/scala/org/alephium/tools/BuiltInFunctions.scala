@@ -37,7 +37,7 @@ object BuiltInFunctions extends App {
       case (_, f) =>
         FunctionInfo(f.name, f.category.toString, f.signature, f.doc, f.params, f.returns)
     }
-    ((FunctionInfo.encodeFields +: allFunctions.toSeq) ++ FunctionInfo.mapFunctions ++ FunctionInfo.testFunctions).sorted
+    ((FunctionInfo.encodeFields +: allFunctions.toSeq) ++ FunctionInfo.mapFunctions).sorted
   }
 
   final case class FunctionInfo(
@@ -117,50 +117,5 @@ object BuiltInFunctions extends App {
     )
 
     val mapFunctions: Seq[FunctionInfo] = Seq(mapInsert, mapRemove, mapContains)
-
-    val testCheck: FunctionInfo = FunctionInfo(
-      name = "testCheck",
-      category = BuiltIn.Category.Test.toString,
-      signature = "fn testCheck!(condition:Bool) -> ()",
-      doc = "Tests the condition or checks invariants.",
-      params = Seq("@condition the condition to be checked"),
-      returns = "@returns "
-    )
-
-    val testEqual: FunctionInfo = FunctionInfo(
-      name = "testEqual",
-      category = BuiltIn.Category.Test.toString,
-      signature =
-        "fn testEqual!(left: <Bool | U256 | I256 | Address | ByteVec>, right: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
-      doc = "Asserts that the given values are equal.",
-      params = Seq(
-        "@left the first value to compare",
-        "@right the second value to compare; must be the same type as `left`"
-      ),
-      returns = "@returns "
-    )
-
-    val testFail: FunctionInfo = FunctionInfo(
-      name = "testFail",
-      category = BuiltIn.Category.Test.toString,
-      signature = "fn testFail!(expr) -> ()",
-      doc = "Asserts that the given expression throws an exception during execution.",
-      params = Seq("@expr the expression to be executed"),
-      returns = "@returns "
-    )
-
-    val testError: FunctionInfo = FunctionInfo(
-      name = "testError",
-      category = BuiltIn.Category.Test.toString,
-      signature = "fn testError!(expr, errorCode: U256) -> ()",
-      doc = "Asserts that the given expression throws an exception with the expected error code.",
-      params = Seq(
-        "@expr the expression to be executed",
-        "@errorCode the expected error code"
-      ),
-      returns = "@returns "
-    )
-
-    val testFunctions: Seq[FunctionInfo] = Seq(testCheck, testEqual, testFail, testError)
   }
 }

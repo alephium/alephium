@@ -18,6 +18,7 @@ package org.alephium.ralph
 
 import java.nio.charset.StandardCharsets
 
+import scala.annotation.nowarn
 import scala.collection.{immutable, mutable}
 
 import akka.util.ByteString
@@ -157,9 +158,30 @@ object Compiler {
     def useUpdateFields: Boolean
     def inline: Boolean = false
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type]
+    def getReturnType[C <: Ctx](
+        @nowarn ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: State[C]
+    ): Seq[Type] = {
+      val argsType = args.flatMap(_.getType(state))
+      getReturnType(argsType, state)
+    }
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
       args.flatMap(_.genCode(state))
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
+    def genCode[C <: Ctx](
+        @nowarn ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: State[C]
+    ): Seq[Instr[C]] = {
+      val argsType = args.flatMap(_.getType(state))
+      val variadicInstrs = if (isVariadic) {
+        Seq(U256Const(Val.U256.unsafe(state.flattenTypeLength(argsType))))
+      } else {
+        Seq.empty
+      }
+      genCodeForArgs(args, state) ++ variadicInstrs ++ genCode(argsType)
+    }
     def genInlineCode[C <: Ctx](
         args: Seq[Ast.Expr[C]],
         state: Compiler.State[C],

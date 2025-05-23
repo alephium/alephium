@@ -1065,8 +1065,7 @@ class StatefulParser(val fileURI: Option[java.net.URI])
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | structDestruction | assign | compoundAssign | debug | mapCall | contractCall |
-        testAssert | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | structDestruction | assign | compoundAssign | debug | mapCall | contractCall | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
   def insertToMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
@@ -1413,36 +1412,4 @@ trait TestingParser { self: StatefulParser =>
     }
   def unitTestDef[Unknown: P]: P[Testing.UnitTestDef[StatefulContext]] =
     P(Start ~ rawUnitTestDef ~ End)
-
-  def testCheck[Unknown: P]: P[Ast.TestAssert[StatefulContext]] =
-    P(Index ~ "testCheck!" ~/ "(" ~ expr ~ ")" ~~ Index)
-      .map { case (fromIndex, expr, endIndex) =>
-        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
-        Ast.TestCheck(expr).atSourceIndex(sourceIndex)
-      }
-
-  def testEqual[Unknown: P]: P[Ast.TestAssert[StatefulContext]] =
-    P(Index ~ "testEqual!" ~/ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index)
-      .map { case (fromIndex, exprs, endIndex) =>
-        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
-        Ast.TestEqual(exprs).atSourceIndex(sourceIndex)
-      }
-
-  def testFail[Unknown: P]: P[Ast.TestAssert[StatefulContext]] =
-    P(Index ~ "testFail!" ~/ "(" ~ expr ~ ")" ~~ Index)
-      .map { case (fromIndex, expr, endIndex) =>
-        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
-        Ast.TestFail(expr).atSourceIndex(sourceIndex)
-      }
-
-  def testError[Unknown: P]: P[Ast.TestAssert[StatefulContext]] =
-    P(Index ~ "testError!" ~/ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index)
-      .map { case (fromIndex, exprs, endIndex) =>
-        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
-        Ast.TestError(exprs).atSourceIndex(sourceIndex)
-      }
-
-  def testAssert[Unknown: P]: P[Ast.TestAssert[StatefulContext]] = P(
-    testCheck | testEqual | testFail | testError
-  )
 }
