@@ -59,6 +59,7 @@ object BuiltIn {
     case object Conversion   extends Category
     case object ByteVec      extends Category
     case object Cryptography extends Category
+    case object Test         extends Category
   }
 
   trait DocUtils {
@@ -1134,50 +1135,6 @@ object BuiltIn {
     def doc: String         = "Get the length of an array"
   }
 
-  val testCheck: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] with DocUtils {
-    val name: String = "testCheck"
-
-    def category: Category            = Category.Utils
-    def usePreapprovedAssets: Boolean = false
-
-    def getReturnType[C <: StatelessContext](
-        inputType: Seq[Type],
-        state: Compiler.State[C]
-    ): Seq[Type] = {
-      if (!state.isInTestContext) {
-        throw Compiler.Error(
-          s"The `testCheck!` function can only be used in unit tests",
-          inputType.headOption.flatMap(_.sourceIndex)
-        )
-      }
-      inputType match {
-        case Seq(Type.Bool) => Seq.empty
-        case _ =>
-          throw Compiler.Error(
-            s"Expected a bool, got ${quoteTypes(inputType)}",
-            inputType.headOption.flatMap(_.sourceIndex)
-          )
-      }
-    }
-    def returnType(selfContractType: Type): Seq[Type] = Seq.empty
-
-    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = ???
-    override def genCode[C <: StatelessContext](
-        ast: Ast.Positioned,
-        state: Compiler.State[C],
-        inputType: Seq[Type]
-    ): Seq[Instr[StatelessContext]] = {
-      val errorCode = state.addTestCheckCall(ast)
-      assume(errorCode >= 0)
-      Seq(Val.U256(U256.unsafe(errorCode)).toConstInstr, AssertWithErrorCode)
-    }
-
-    def signature: String                        = s"fn $name!(condition:Bool) -> ()"
-    def argsCommentedName: Seq[(String, String)] = Seq("condition" -> "the condition to be checked")
-    def retComment: String                       = ""
-    def doc: String                              = "Tests the condition or checks invariants."
-  }
-
   val verifySignature: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
       "verifySignature",
@@ -1236,6 +1193,231 @@ object BuiltIn {
         "the segregated WebAuthn payload containing the signature and authenticator data",
       doc = "Retrieves the segregated WebAuthn signature payload from the current transaction"
     )
+
+  def randomFunc[T <: Type](
+      funcName: String,
+      retType: T,
+      retTypeStr: String,
+      instr: DevInstr
+  ): BuiltIn[StatelessContext] = {
+    new BuiltIn[StatelessContext] with DocUtils {
+      val name: String = funcName
+
+      def category: Category            = Category.Test
+      def usePreapprovedAssets: Boolean = false
+
+      def getReturnType[C <: StatelessContext](
+          inputType: Seq[Type],
+          state: Compiler.State[C]
+      ): Seq[Type] = {
+        if (inputType.nonEmpty) {
+          throw Compiler.Error(s"Invalid args type for builtin func $funcName", None)
+        }
+        state.checkInTestContext(s"$funcName!", None)
+        Seq(retType)
+      }
+      def returnType(selfContractType: Type): Seq[Type] = Seq(retType)
+
+      def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(instr)
+      def signature: String                        = s"fn $funcName!() -> $retTypeStr"
+      def argsCommentedName: Seq[(String, String)] = Seq.empty
+      def retComment: String = s"a randomly generated $retTypeStr value for testing purposes"
+      def doc: String        = s"Generates a random $retTypeStr value"
+    }
+  }
+
+  sealed trait TestBuiltIn extends BuiltIn[StatelessContext] with DocUtils {
+    def category: Category                            = Category.Test
+    def usePreapprovedAssets: Boolean                 = false
+    def returnType(selfContractType: Type): Seq[Type] = Seq.empty
+
+    def getReturnType[C <: StatelessContext](
+        inputType: Seq[Type],
+        state: Compiler.State[C]
+    ): Seq[Type] = ???
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = ???
+
+    def checkArgs[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Unit
+    override def getReturnType[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Type] = {
+      state.checkInTestContext(s"$name!", None)
+      checkArgs(ast, args, state)
+      Seq.empty
+    }
+
+    protected def genSourcePosIndex[C <: StatelessContext](
+        ast: Ast.Positioned,
+        state: Compiler.State[C]
+    ): Val.U256 = {
+      val sourcePosIndex = state.addTestCheckCall(ast)
+      assume(sourcePosIndex >= 0)
+      Val.U256(U256.unsafe(sourcePosIndex))
+    }
+  }
+
+  val testCheck: BuiltIn[StatelessContext] = new TestBuiltIn {
+    val name: String = "testCheck"
+
+    def checkArgs[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Unit = {
+      val inputType = args.flatMap(_.getType(state))
+      if (inputType != Seq(Type.Bool)) {
+        throw Compiler.Error(
+          s"Invalid args type ${quote(inputType)} for builtin func testCheck",
+          ast.sourceIndex
+        )
+      }
+    }
+
+    override def genCode[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Instr[C]] = {
+      val sourcePosIndex = genSourcePosIndex(ast, state)
+      args match {
+        case Seq(Ast.Binop(TestOperator.Eq, left, right)) =>
+          left.genCode(state) ++ right.genCode(state) ++ Seq(
+            sourcePosIndex.toConstInstr,
+            DevInstr(TestEqual)
+          )
+        case _ =>
+          args.flatMap(_.genCode(state)) ++ Seq(sourcePosIndex.toConstInstr, AssertWithErrorCode)
+      }
+    }
+
+    def signature: String                        = s"fn $name!(condition:Bool) -> ()"
+    def argsCommentedName: Seq[(String, String)] = Seq("condition" -> "the condition to be checked")
+    def retComment: String                       = ""
+    def doc: String                              = "Tests the condition or checks invariants."
+  }
+
+  val testEqual: BuiltIn[StatelessContext] = new TestBuiltIn {
+    val name: String = "testEqual"
+
+    def checkArgs[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Unit = {
+      if (args.length != 2) {
+        throw Compiler.Error(s"Expected 2 arguments, but got ${args.length}", ast.sourceIndex)
+      }
+      val types = args.flatMap(_.getType(state))
+      if (types.length != 2 || types(0) != types(1)) {
+        throw Compiler.Error(
+          s"Invalid args type $types for builtin func testEqual",
+          ast.sourceIndex
+        )
+      }
+    }
+
+    override def genCode[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Instr[C]] = {
+      val sourcePosIndex = genSourcePosIndex(ast, state)
+      args.flatMap(_.genCode(state)) ++ Seq(sourcePosIndex.toConstInstr, DevInstr(TestEqual))
+    }
+
+    def signature: String =
+      s"fn $name!(left: <Bool | U256 | I256 | Address | ByteVec>, right: <Bool | U256 | I256 | Address | ByteVec>) -> ()"
+    def argsCommentedName: Seq[(String, String)] = Seq(
+      "left"  -> "the first value to compare",
+      "right" -> "the second value to compare; must be the same type as `left`"
+    )
+    def retComment: String = ""
+    def doc: String        = "Asserts that the given values are equal."
+  }
+
+  val testFail: BuiltIn[StatelessContext] = new TestBuiltIn {
+    val name: String = "testFail"
+
+    def checkArgs[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Unit = {
+      if (args.length != 1) {
+        throw Compiler.Error(s"Expected 1 arguments, but got ${args.length}", ast.sourceIndex)
+      }
+    }
+
+    override def genCode[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Instr[C]] = {
+      val sourcePosIndex = genSourcePosIndex(ast, state)
+      val testCode       = args.flatMap(_.genCode(state))
+      Seq(sourcePosIndex.toConstInstr, DevInstr(TestCheckStart)) ++ testCode :+ DevInstr(
+        TestCheckEnd
+      )
+    }
+
+    def signature: String                        = s"fn $name!(expr) -> ()"
+    def argsCommentedName: Seq[(String, String)] = Seq("expr" -> "the expression to be executed")
+    def retComment: String                       = ""
+    def doc: String = "Asserts that the given expression throws an exception during execution."
+  }
+
+  val testError: BuiltIn[StatelessContext] = new TestBuiltIn {
+    val name: String = "testError"
+
+    def checkArgs[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Unit = {
+      if (args.length != 2) {
+        throw Compiler.Error(s"Expected 2 arguments, but got ${args.length}", ast.sourceIndex)
+      }
+      val types = args.flatMap(_.getType(state))
+      if (types.lastOption.exists(_ != Type.U256)) {
+        throw Compiler.Error(
+          s"Invalid args type $types for builtin func testError",
+          ast.sourceIndex
+        )
+      }
+    }
+
+    override def genCode[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Instr[C]] = {
+      val sourcePosIndex    = genSourcePosIndex(ast, state)
+      val testCode          = args(0).genCode(state)
+      val expectedErrorCode = args(1).genCode(state)
+      expectedErrorCode ++ Seq(sourcePosIndex.toConstInstr, DevInstr(TestErrorStart)) ++
+        testCode :+ DevInstr(TestCheckEnd)
+    }
+
+    def signature: String = s"fn $name!(expr, errorCode: U256) -> ()"
+    def argsCommentedName: Seq[(String, String)] = Seq(
+      "expr"      -> "the expression to be executed",
+      "errorCode" -> "the expected error code"
+    )
+    def retComment: String = ""
+    def doc: String =
+      "Asserts that the given expression throws an exception with the expected error code."
+  }
+
+  val randomU256: BuiltIn[StatelessContext] =
+    randomFunc("randomU256", Type.U256, "U256", DevInstr(RandomU256))
+  val randomI256: BuiltIn[StatelessContext] =
+    randomFunc("randomI256", Type.I256, "I256", DevInstr(RandomI256))
 
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
@@ -1297,11 +1479,16 @@ object BuiltIn {
     i256Min,
     groupOfAddress,
     len,
-    testCheck,
     verifySignature,
     verifySecP256R1,
     verifyWebAuthn,
-    getSegregatedWebAuthnSignature
+    getSegregatedWebAuthnSignature,
+    testCheck,
+    testEqual,
+    testFail,
+    testError,
+    randomU256,
+    randomI256
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap

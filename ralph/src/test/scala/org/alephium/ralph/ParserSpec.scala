@@ -3134,6 +3134,43 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val parsed = parse(contractWithTests, StatefulParser.contract(_)).get.value
     parsed.unitTests.length is 1
   }
+
+  it should "parse test assert statements" in {
+    val stmt = FuncCall[StatefulContext](
+      FuncId("testCheck", true),
+      Seq.empty,
+      Seq(Binop(Eq, Variable(Ident("a")), Const(Val.U256(U256.One))))
+    )
+    parse("testCheck!(a == 1)", StatefulParser.statement(_)).get.value is stmt
+    parse("testCheck!(foo())", StatefulParser.statement(_)).get.value is
+      stmt.copy(args =
+        Seq[Expr[StatefulContext]](CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+      )
+    parse("testEqual!(a, b)", StatefulParser.statement(_)).get.value is
+      stmt.copy(
+        id = FuncId("testEqual", true),
+        args = Seq[Expr[StatefulContext]](Variable(Ident("a")), Variable(Ident("b")))
+      )
+    parse("testFail!(a == 1)", StatefulParser.statement(_)).get.value is
+      stmt.copy(
+        id = FuncId("testFail", true),
+        args =
+          Seq[Expr[StatefulContext]](Binop(Eq, Variable(Ident("a")), Const(Val.U256(U256.One))))
+      )
+    parse("testFail!(foo())", StatefulParser.statement(_)).get.value is
+      stmt.copy(
+        id = FuncId("testFail", true),
+        args = Seq[Expr[StatefulContext]](CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+      )
+    parse("testError!(foo(), 1)", StatefulParser.statement(_)).get.value is
+      stmt.copy(
+        id = FuncId("testError", true),
+        args = Seq[Expr[StatefulContext]](
+          CallExpr(FuncId("foo", false), Seq.empty, Seq.empty),
+          Const(Val.U256(U256.One))
+        )
+      )
+  }
 }
 
 class ParseNoFileSpec extends ParserSpec(None)

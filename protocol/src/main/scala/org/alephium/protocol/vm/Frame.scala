@@ -200,7 +200,8 @@ abstract class Frame[Ctx <: StatelessContext] {
             case Right(_) =>
               advancePC()
               execute()
-            case Left(e) => Left(e)
+            case Left(Left(ioError))     => Left(Left(ioError))
+            case Left(Right(exeFailure)) => handleError(exeFailure)
           }
       }
     } else if (pc == pcMax) {
@@ -213,6 +214,25 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   protected def runReturn(): ExeResult[Option[Frame[Ctx]]] =
     Return.runWith(this).map(_ => None)
+
+  private[vm] def handleError(exeFailure: ExeFailure): ExeResult[Option[Frame[Ctx]]] = {
+    ctx.testEnvOpt match {
+      case None => failed(exeFailure)
+      case Some(testEnv) =>
+        ctx.setTestError(exeFailure)
+        if (testEnv.testFrame == this) {
+          val testEndIndex = method.instrs.view.indexOf(DevInstr(TestCheckEnd), pc)
+          if (testEndIndex == -1) {
+            failed(InvalidTestCheckInstr)
+          } else {
+            pc = testEndIndex
+            execute()
+          }
+        } else {
+          Right(None)
+        }
+    }
+  }
 }
 
 final class StatelessFrame(

@@ -33,10 +33,10 @@ import org.alephium.util.{AVector, DjbHash, Hex, I256, U256}
 object Ast {
   type StdInterfaceId = Val.ByteVec
   val StdInterfaceIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
-  private val stdArg: Argument =
+  private[ralph] val stdArg: Argument =
     Argument(Ident("__stdInterfaceId"), Type.ByteVec, isMutable = false, isUnused = true)
 
-  trait Positioned {
+  trait Positioned extends Product with Serializable {
     var sourceIndex: Option[SourceIndex] = None
 
     def atSourceIndex(fromIndex: Int, endIndex: Int, fileURI: Option[java.net.URI]): this.type = {
@@ -661,18 +661,9 @@ object Ast {
           if (func.inline && state.genInlineCode) {
             func.genInlineCode(args, state, this)
           } else {
-            val argsType = args.flatMap(_.getType(state))
-            val variadicInstrs = if (func.isVariadic) {
-              Seq(U256Const(Val.U256.unsafe(state.flattenTypeLength(argsType))))
-            } else {
-              Seq.empty
-            }
-            val instrs = genApproveCode(state, func) ++
-              func.genCodeForArgs(args, state) ++
-              variadicInstrs ++
-              func.genCode(this, state, argsType)
+            val instrs = genApproveCode(state, func) ++ func.genCode(this, args, state)
             if (ignoreReturn) {
-              val returnType = positionedError(func.getReturnType(argsType, state))
+              val returnType = positionedError(func.getReturnType(this, args, state))
               instrs ++ Seq.fill(state.flattenTypeLength(returnType))(Pop)
             } else {
               instrs
@@ -708,7 +699,7 @@ object Ast {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
-      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      positionedError(funcInfo.getReturnType(this, args, state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -741,7 +732,7 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      positionedError(funcInfo.getReturnType(this, args, state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -788,7 +779,7 @@ object Ast {
       val funcInfo = state.getFunc(contractType.id, callId)
       checkNonStaticContractFunction(contractType.id, callId, funcInfo)
       state.addExternalCall(contractType.id, callId)
-      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      val retTypes = positionedError(funcInfo.getReturnType(this, args, state))
       (contractType.id, retTypes)
     }
 
@@ -799,8 +790,7 @@ object Ast {
     ): Seq[Instr[StatefulContext]] = {
       val contract  = obj.getType(state)(0).asInstanceOf[Type.Contract]
       val func      = state.getFunc(contract.id, callId)
-      val argTypes  = args.flatMap(_.getType(state))
-      val retTypes  = func.getReturnType(argTypes, state)
+      val retTypes  = func.getReturnType(this, args, state)
       val retLength = state.flattenTypeLength(retTypes)
       genApproveCode(state, func) ++
         args.flatMap(_.genCode(state)) ++
@@ -1962,7 +1952,7 @@ object Ast {
     override def check(state: Compiler.State[Ctx]): Unit = {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
-      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      val retTypes = positionedError(funcInfo.getReturnType(this, args, state))
       checkReturnValueUsed(state, state.typeId, id, retTypes)
     }
 
@@ -1993,7 +1983,7 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      val retTypes = positionedError(funcInfo.getReturnType(this, args, state))
       checkReturnValueUsed(state, contractId, id, retTypes)
     }
 

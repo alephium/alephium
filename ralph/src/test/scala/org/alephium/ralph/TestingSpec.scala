@@ -49,6 +49,38 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     }
 
     {
+      info("Consider the stdId field")
+      def code(enableStd: Boolean) =
+        s"""
+           |@std(enabled = $enableStd)
+           |Contract Foo(@unused v0: U256, @unused mut v1: U256) implements FooBase {
+           |  pub fn foo() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo" {
+           |    testCheck!(foo() == 0)
+           |  }
+           |}
+           |@std(id = #1234)
+           |Interface FooBase {
+           |  pub fn foo() -> U256
+           |}
+           |""".stripMargin
+      val test0     = compileContractFull(code(true)).rightValue.tests.value.tests.head
+      val contract0 = test0.before.head
+      contract0.immFields is AVector[(String, Val)](
+        ("v0", Val.U256(U256.Zero)),
+        (Ast.stdArg.ident.name, Val.ByteVec(Ast.StdInterfaceIdPrefix ++ Hex.unsafe("1234")))
+      )
+      contract0.mutFields is AVector[(String, Val)](("v1", Val.U256(U256.Zero)))
+
+      val test1     = compileContractFull(code(false)).rightValue.tests.value.tests.head
+      val contract1 = test1.before.head
+      contract1.immFields is AVector[(String, Val)](("v0", Val.U256(U256.Zero)))
+      contract1.mutFields is AVector[(String, Val)](("v1", Val.U256(U256.Zero)))
+    }
+
+    {
       info("Create simple contract")
       val code =
         s"""
@@ -360,10 +392,10 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |Contract Foo(v: U256) {
            |  pub fn foo() -> U256 { return v }
            |  test "foo" before Self(1) {
-           |    testCheck!(foo() == 1, 0)
+           |    testCheck!(foo() == 1)
            |  }
            |  $$test "foo" before Self(2) {
-           |    testCheck!(foo() == 2, 0)
+           |    testCheck!(foo() == 2)
            |  }$$
            |}
            |""".stripMargin
@@ -448,16 +480,27 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     }
   }
 
-  it should "throw an error if `testCheck!` is called in non-test code" in {
-    val code =
+  it should "throw an error if test assert is called in non-test code" in {
+    def code(testCall: String) =
       s"""
          |Contract Foo(v: U256) {
          |  pub fn foo() -> () {
-         |    $$testCheck!(v == 0)$$
+         |    $$$testCall$$
          |  }
          |}
          |""".stripMargin
-    testContractError(code, "The `testCheck!` function can only be used in unit tests")
+    testContractError(
+      code("testCheck!(v == 0)"),
+      "The `testCheck!` function can only be used in unit tests"
+    )
+    testContractError(
+      code("testFail!(v == 0)"),
+      "The `testFail!` function can only be used in unit tests"
+    )
+    testContractError(
+      code("testEqual!(v, 0)"),
+      "The `testEqual!` function can only be used in unit tests"
+    )
   }
 
   it should "get error" in {
@@ -478,7 +521,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       None,
       None
     )
-    tests.getError("foo", Some(tests.errorCodes.keys.head), "error", "") is CompilerError
+    tests.getError("foo", Some(tests.sourceIndexes.keys.head), "error", "") is CompilerError
       .TestError(
         "Test failed: foo, detail: error",
         sourceIndex,
@@ -630,5 +673,83 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
          |""".stripMargin
     val test = compileContractFull(code).rightValue.tests.get.tests.head
     test.selfContract.immFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(2))))
+  }
+
+  it should "test using random func" in {
+    def code(str: String) =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo0() -> U256 {
+         |    return 0
+         |  }
+         |  pub fn foo1() -> I256 {
+         |    return -1i
+         |  }
+         |  test "foo" {
+         |    testCheck!($str)
+         |  }
+         |}
+         |""".stripMargin
+    compileContractFull(code("randomU256!() > foo0()")).isRight is true
+    compileContractFull(code("randomI256!() > foo1()")).isRight is true
+    testContractError(
+      code(s"$$randomU256!(1)$$ > foo0()"),
+      "Invalid args type for builtin func randomU256"
+    )
+    testContractError(
+      code(s"$$randomU256!() > foo1()$$"),
+      "Invalid param types List(U256, I256) for > operator"
+    )
+    testContractError(
+      code(s"$$randomI256!(1)$$ > foo1()"),
+      "Invalid args type for builtin func randomI256"
+    )
+    testContractError(
+      code(s"$$randomI256!() > foo0()$$"),
+      "Invalid param types List(I256, U256) for > operator"
+    )
+  }
+
+  trait Fixture {
+    def code(testCall: String) =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> U256 {
+         |    return 0
+         |  }
+         |  test "foo" {
+         |    $testCall
+         |  }
+         |}
+         |""".stripMargin
+  }
+
+  it should "compile testEqual" in new Fixture {
+    compileContractFull(code("testEqual!(foo(), 0)")).isRight is true
+    testContractError(
+      code(s"$$testEqual!(foo(), 0, 0)$$"),
+      "Expected 2 arguments, but got 3"
+    )
+    testContractError(
+      code(s"$$testEqual!(foo(), 0i)$$"),
+      "Invalid args type List(U256, I256) for builtin func testEqual"
+    )
+  }
+
+  it should "compile testFail" in new Fixture {
+    compileContractFull(code("testFail!(foo())")).isRight is true
+    testContractError(code(s"$$testFail!(foo(), 0)$$"), "Expected 1 arguments, but got 2")
+  }
+
+  it should "compile testError" in new Fixture {
+    compileContractFull(code("testError!(foo(), 0)")).isRight is true
+    testContractError(
+      code(s"$$testError!(foo(), 0, 0)$$"),
+      "Expected 2 arguments, but got 3"
+    )
+    testContractError(
+      code(s"$$testError!(foo(), 0i)$$"),
+      "Invalid args type List(U256, I256) for builtin func testError"
+    )
   }
 }

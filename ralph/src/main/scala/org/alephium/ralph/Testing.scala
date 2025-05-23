@@ -230,8 +230,14 @@ object Testing {
     }
   }
 
-  private def getContractFields(values: Seq[(String, Val, Boolean)]) = {
-    val (immFields, mutFields) = values.view.partition(!_._3)
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  private def getContractFields(contract: Ast.Contract, fields: Seq[(String, Val, Boolean)]) = {
+    val allFields = if (contract.hasStdIdField) {
+      fields :+ (Ast.stdArg.ident.name, contract.stdInterfaceId.get, Ast.stdArg.isMutable)
+    } else {
+      fields
+    }
+    val (immFields, mutFields) = allFields.view.partition(!_._3)
     (AVector.from(immFields.map(f => (f._1, f._2))), AVector.from(mutFields.map(f => (f._1, f._2))))
   }
 
@@ -330,7 +336,7 @@ object Testing {
           genDefaultValue(state, argument.ident.name, fieldType, argument.isMutable)
         }
       }
-      getContractFields(values)
+      getContractFields(self, values)
     }
 
     private def getTypeIdAndFields(state: Compiler.State[Ctx], origin: Ast.TypeId) = {
@@ -440,7 +446,7 @@ object Testing {
         val values = contract.fields.flatMap { argument =>
           genDefaultValue(state, argument.ident.name, argument.tpe, argument.isMutable)
         }
-        val (immFields, mutFields) = getContractFields(values)
+        val (immFields, mutFields) = getContractFields(contract, values)
         val selfContract =
           CreateContractValue(state.typeId, AVector.empty, immFields, mutFields, ContractId.random)
         AVector.from(dependencies.map(_.compileBeforeContract(state, origin))) :+ selfContract
@@ -603,15 +609,15 @@ object Testing {
 
   final case class CompiledUnitTests[Ctx <: StatelessContext](
       tests: AVector[CompiledUnitTest[Ctx]],
-      errorCodes: Map[Int, Option[SourceIndex]]
+      sourceIndexes: Map[Int, Option[SourceIndex]]
   ) {
     def getError(
         testName: String,
-        errorCode: Option[Int],
+        sourcePosIndex: Option[Int],
         detail: String,
         debugMessages: String
     ): Compiler.Error = {
-      val sourceIndex = errorCode.flatMap(errorCodes.get).flatten
+      val sourceIndex = sourcePosIndex.flatMap(sourceIndexes.get).flatten
       getTestError(testName, sourceIndex, detail, debugMessages)
     }
   }
@@ -640,13 +646,13 @@ object Testing {
     }
 
     @scala.annotation.tailrec
-    private def nextErrorCode: Int = {
-      val errorCode = Random.between(0, Int.MaxValue)
-      if (testCheckCalls.contains(errorCode)) nextErrorCode else errorCode
+    private def nextSourcePosIndex: Int = {
+      val sourcePosIndex = Random.between(0, Int.MaxValue)
+      if (testCheckCalls.contains(sourcePosIndex)) nextSourcePosIndex else sourcePosIndex
     }
 
     def addTestCheckCall(ast: Ast.Positioned): Int = {
-      val errorCode = nextErrorCode
+      val errorCode = nextSourcePosIndex
       testCheckCalls.addOne(errorCode -> ast.sourceIndex)
       errorCode
     }
@@ -766,13 +772,17 @@ object Testing {
       exeFailure: ExeFailure,
       debugMessages: String
   ): String = {
-    val (errorCode, msg) = exeFailure match {
-      case AssertionFailedWithErrorCode(_, errorCode) =>
-        (Some(errorCode), s"Assertion Failed in test `$testName`")
+    val (sourcePosIndex, msg) = exeFailure match {
+      case AssertionFailedWithErrorCode(_, sourcePosIndex) =>
+        (Some(sourcePosIndex), s"Assertion Failed in test `$testName`")
+      case ExpectedAnExeFailure(sourcePosIndex) => (Some(sourcePosIndex), exeFailure.toString)
+      case NotEqualInTest(_, _, sourcePosIndex) => (Some(sourcePosIndex), exeFailure.toString)
+      case NotExpectedErrorInTest(_, _, sourcePosIndex) =>
+        (Some(sourcePosIndex), exeFailure.toString)
       case _ => (None, exeFailure.toString)
     }
     val detail = s"VM execution error: $msg"
-    tests.getError(testName, errorCode, detail, debugMessages).format(sourceCode)
+    tests.getError(testName, sourcePosIndex, detail, debugMessages).format(sourceCode)
   }
 
   private def extractDebugMessage(

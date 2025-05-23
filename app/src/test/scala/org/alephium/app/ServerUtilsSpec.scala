@@ -5712,7 +5712,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"""|-- error (9:5): Testing error
             |9 |    testCheck!(foo() == 0)
             |  |    ^^^^^^^^^^^^^^^^^^^^^^
-            |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed in test `Foo:foo`
+            |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: left(U256(${now.millis})) is not equal to right(U256(0))
             |""".stripMargin
     }
 
@@ -5747,7 +5747,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"""|-- error (12:5): Testing error
             |12 |    testCheck!(add() == 20)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^
-            |   |    Test failed: Foo:add, detail: VM execution error: Assertion Failed in test `Foo:add`
+            |   |    Test failed: Foo:add, detail: VM execution error: Assertion Failed: left(U256(30)) is not equal to right(U256(20))
             |""".stripMargin
     }
 
@@ -5783,8 +5783,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"""|-- error (16:5): Testing error
             |16 |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == 2 alph)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-            |   |    Test failed: Foo:transfer, detail: VM execution error: Assertion Failed in test `Foo:transfer`
-            |   |--------------------------------------------------------------------------------------------------
+            |   |    Test failed: Foo:transfer, detail: VM execution error: Assertion Failed: left(U256(1000000000000000000)) is not equal to right(U256(2000000000000000000))
+            |   |-------------------------------------------------------------------------------------------------------------------------------------------------------------
             |   |Debug messages:
             |   |> Contract @ Foo - balance: 0
             |""".stripMargin
@@ -5814,17 +5814,24 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
 
       serverUtils.compileProject(blockFlow, api.Compile.Project(code(30, 10))).isRight is true
-      Seq(code(20, 10), code(30, 20)).foreach { code =>
-        serverUtils
-          .compileProject(blockFlow, api.Compile.Project(code))
-          .leftValue
-          .detail is
-          s"""|-- error (17:5): Testing error
-              |17 |    testCheck!(base() == result)
-              |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-              |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed in test `Base:base`
-              |""".stripMargin
-      }
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(20, 10)))
+        .leftValue
+        .detail is
+        s"""|-- error (17:5): Testing error
+            |17 |    testCheck!(base() == result)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed: left(U256(30)) is not equal to right(U256(20))
+            |""".stripMargin
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(30, 20)))
+        .leftValue
+        .detail is
+        s"""|-- error (17:5): Testing error
+            |17 |    testCheck!(base() == result)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed: left(U256(10)) is not equal to right(U256(20))
+            |""".stripMargin
     }
 
     {
@@ -5924,6 +5931,141 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils
         .compileProject(blockFlow, api.Compile.Project(code, Some(options1)))
         .isRight is false
+    }
+
+    {
+      def code(str: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo0() -> () {
+           |    let v = 1 / 0
+           |    let _ = v
+           |  }
+           |  fn foo1() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo" {
+           |    testFail!($str)
+           |  }
+           |}
+           |""".stripMargin
+
+      Seq("foo0()", "1 / 0", "1 / foo1()", "foo1() / foo1()").foreach { expr =>
+        serverUtils.compileProject(blockFlow, api.Compile.Project(code(expr))).isRight is true
+      }
+
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("foo1() / 1")))
+        .leftValue
+        .detail is
+        s"""|-- error (11:5): Testing error
+            |11 |    testFail!(foo1() / 1)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: the test code did not throw an exception
+            |""".stripMargin
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo0() -> U256 {
+           |    return 0
+           |  }
+           |  pub fn foo1() -> I256 {
+           |    return i256Max!()
+           |  }
+           |  test "foo" {
+           |    testCheck!(randomU256!() >= foo0())
+           |    testCheck!(randomI256!() <= foo1())
+           |  }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+    }
+
+    {
+      def code(testCall: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo" {
+           |    $testCall
+           |  }
+           |}
+           |""".stripMargin
+
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("testEqual!(foo(), 0)")))
+        .isRight is true
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("testEqual!(foo(), 1)")))
+        .leftValue
+        .detail is
+        s"""|-- error (7:5): Testing error
+            |7 |    testEqual!(foo(), 1)
+            |  |    ^^^^^^^^^^^^^^^^^^^^
+            |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: left(U256(0)) is not equal to right(U256(1))
+            |""".stripMargin
+    }
+
+    {
+      def code(testCall: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(a: U256, b: U256) -> U256 {
+           |    if (a > b) {
+           |      assert!(a >= 5, 0)
+           |    } else {
+           |      assert!(b >= 5, 1)
+           |    }
+           |    return mulModN!(a, a, b)
+           |  }
+           |  test "foo" {
+           |    $testCall
+           |  }
+           |}
+           |""".stripMargin
+
+      Seq(
+        "testError!(foo(4, 3), 0)",
+        "testError!(foo(3, 4), 1)",
+        "testFail!(foo(9, 0))",
+        "testError!(foo(4, 3), 0)\ntestError!(foo(3, 4), 1)\ntestFail!(foo(9, 0))"
+      ).foreach { testCall =>
+        serverUtils
+          .compileProject(blockFlow, api.Compile.Project(code(testCall)))
+          .isRight is true
+      }
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(4, 3), 1)")))
+        .leftValue
+        .detail is
+        s"""|-- error (12:5): Testing error
+            |12 |    testError!(foo(4, 3), 1)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected error code in test. Expected: 1, but got: 0.
+            |""".stripMargin
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(3, 4), 0)")))
+        .leftValue
+        .detail is
+        s"""|-- error (12:5): Testing error
+            |12 |    testError!(foo(3, 4), 0)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected error code in test. Expected: 0, but got: 1.
+            |""".stripMargin
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(9, 0), 1)")))
+        .leftValue
+        .detail is
+        s"""|-- error (12:5): Testing error
+            |12 |    testError!(foo(9, 0), 1)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected execution failure in test. Expected error code: 1, but got failure: ArithmeticError((U256(9) * U256(9)) % U256(0)).
+            |""".stripMargin
     }
   }
 

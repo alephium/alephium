@@ -1,5 +1,63 @@
 [
   {
+    "name": "testCheck",
+    "category": "Test",
+    "signature": "fn testCheck!(condition:Bool) -> ()",
+    "doc": "Tests the condition or checks invariants.",
+    "params": [
+      "@param condition the condition to be checked"
+    ],
+    "returns": "@returns "
+  },
+  {
+    "name": "testEqual",
+    "category": "Test",
+    "signature": "fn testEqual!(left: <Bool | U256 | I256 | Address | ByteVec>, right: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
+    "doc": "Asserts that the given values are equal.",
+    "params": [
+      "@param left the first value to compare",
+      "@param right the second value to compare; must be the same type as `left`"
+    ],
+    "returns": "@returns "
+  },
+  {
+    "name": "testFail",
+    "category": "Test",
+    "signature": "fn testFail!(expr) -> ()",
+    "doc": "Asserts that the given expression throws an exception during execution.",
+    "params": [
+      "@param expr the expression to be executed"
+    ],
+    "returns": "@returns "
+  },
+  {
+    "name": "testError",
+    "category": "Test",
+    "signature": "fn testError!(expr, errorCode: U256) -> ()",
+    "doc": "Asserts that the given expression throws an exception with the expected error code.",
+    "params": [
+      "@param expr the expression to be executed",
+      "@param errorCode the expected error code"
+    ],
+    "returns": "@returns "
+  },
+  {
+    "name": "randomU256",
+    "category": "Test",
+    "signature": "fn randomU256!() -> U256",
+    "doc": "Generates a random U256 value",
+    "params": [],
+    "returns": "@returns a randomly generated U256 value for testing purposes"
+  },
+  {
+    "name": "randomI256",
+    "category": "Test",
+    "signature": "fn randomI256!() -> I256",
+    "doc": "Generates a random I256 value",
+    "params": [],
+    "returns": "@returns a randomly generated I256 value for testing purposes"
+  },
+  {
     "name": "encodeFields",
     "category": "Contract",
     "signature": "fn <ContractName>.encodeFields!(...) -> (ByteVec, ByteVec)",
@@ -585,16 +643,6 @@
       "@param an array"
     ],
     "returns": "@returns the length of an array"
-  },
-  {
-    "name": "testCheck",
-    "category": "Utils",
-    "signature": "fn testCheck!(condition:Bool) -> ()",
-    "doc": "Tests the condition or checks invariants.",
-    "params": [
-      "@param condition the condition to be checked"
-    ],
-    "returns": "@returns "
   },
   {
     "name": "nullContractAddress",
