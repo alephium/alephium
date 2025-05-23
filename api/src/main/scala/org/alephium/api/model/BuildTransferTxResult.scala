@@ -53,9 +53,25 @@ object BuildSimpleTransferTxResult {
 
 @upickle.implicits.key("BuildGrouplessTransferTxResult")
 final case class BuildGrouplessTransferTxResult(
-    transferTxs: AVector[BuildSimpleTransferTxResult],
-    transferTx: BuildSimpleTransferTxResult
-) extends BuildTransferTxResult
+    unsignedTx: String,
+    gasAmount: GasBox,
+    gasPrice: GasPrice,
+    txId: TransactionId,
+    fromGroup: Int,
+    toGroup: Int,
+    transferTxs: AVector[BuildSimpleTransferTxResult]
+) extends BuildTransferTxResult {
+  def transferTx: BuildSimpleTransferTxResult = {
+    BuildSimpleTransferTxResult(
+      unsignedTx,
+      gasAmount,
+      gasPrice,
+      txId,
+      fromGroup,
+      toGroup
+    )
+  }
+}
 object BuildGrouplessTransferTxResult {
   def from(
       transferTxs: AVector[BuildSimpleTransferTxResult]
@@ -63,6 +79,17 @@ object BuildGrouplessTransferTxResult {
     if (transferTxs.isEmpty) {
       Left(badRequest("transferTxs is empty"))
     } else {
-      Right(BuildGrouplessTransferTxResult(transferTxs.init, transferTxs.last))
+      val transferTx = transferTxs.last
+      Right(
+        BuildGrouplessTransferTxResult(
+          transferTx.unsignedTx,
+          transferTx.gasAmount,
+          transferTx.gasPrice,
+          transferTx.txId,
+          transferTx.fromGroup,
+          transferTx.toGroup,
+          transferTxs.init
+        )
+      )
     }
 }

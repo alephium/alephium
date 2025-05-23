@@ -70,6 +70,42 @@ object SimulationResult {
 
 @upickle.implicits.key("BuildGrouplessExecuteScriptTxResult")
 final case class BuildGrouplessExecuteScriptTxResult(
-    transferTxs: AVector[BuildSimpleTransferTxResult],
-    executeScriptTx: BuildSimpleExecuteScriptTxResult
-) extends BuildExecuteScriptTxResult
+    fromGroup: Int,
+    toGroup: Int,
+    unsignedTx: String,
+    gasAmount: GasBox,
+    gasPrice: GasPrice,
+    txId: TransactionId,
+    simulationResult: SimulationResult,
+    transferTxs: AVector[BuildSimpleTransferTxResult]
+) extends BuildExecuteScriptTxResult {
+  def executeScriptTx: BuildSimpleExecuteScriptTxResult = {
+    BuildSimpleExecuteScriptTxResult(
+      fromGroup,
+      toGroup,
+      unsignedTx,
+      gasAmount,
+      gasPrice,
+      txId,
+      simulationResult
+    )
+  }
+}
+
+object BuildGrouplessExecuteScriptTxResult {
+  def from(
+      executeScriptTx: BuildSimpleExecuteScriptTxResult,
+      transferTxs: AVector[BuildSimpleTransferTxResult]
+  ): BuildGrouplessExecuteScriptTxResult = {
+    BuildGrouplessExecuteScriptTxResult(
+      executeScriptTx.fromGroup,
+      executeScriptTx.toGroup,
+      executeScriptTx.unsignedTx,
+      executeScriptTx.gasAmount,
+      executeScriptTx.gasPrice,
+      executeScriptTx.txId,
+      executeScriptTx.simulationResult,
+      transferTxs
+    )
+  }
+}

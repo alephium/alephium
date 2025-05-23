@@ -58,6 +58,42 @@ object BuildSimpleDeployContractTxResult {
 
 @upickle.implicits.key("BuildGrouplessDeployContractTxResult")
 final case class BuildGrouplessDeployContractTxResult(
-    transferTxs: AVector[BuildSimpleTransferTxResult],
-    deployContractTx: BuildSimpleDeployContractTxResult
-) extends BuildDeployContractTxResult
+    fromGroup: Int,
+    toGroup: Int,
+    unsignedTx: String,
+    gasAmount: GasBox,
+    gasPrice: GasPrice,
+    txId: TransactionId,
+    contractAddress: Address.Contract,
+    transferTxs: AVector[BuildSimpleTransferTxResult]
+) extends BuildDeployContractTxResult {
+  def deployContractTx: BuildSimpleDeployContractTxResult = {
+    BuildSimpleDeployContractTxResult(
+      fromGroup,
+      toGroup,
+      unsignedTx,
+      gasAmount,
+      gasPrice,
+      txId,
+      contractAddress
+    )
+  }
+}
+
+object BuildGrouplessDeployContractTxResult {
+  def from(
+      deployContractTx: BuildSimpleDeployContractTxResult,
+      transferTxs: AVector[BuildSimpleTransferTxResult]
+  ): BuildGrouplessDeployContractTxResult = {
+    BuildGrouplessDeployContractTxResult(
+      deployContractTx.fromGroup,
+      deployContractTx.toGroup,
+      deployContractTx.unsignedTx,
+      deployContractTx.gasAmount,
+      deployContractTx.gasPrice,
+      deployContractTx.txId,
+      deployContractTx.contractAddress,
+      transferTxs
+    )
+  }
+}
