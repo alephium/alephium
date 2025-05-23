@@ -684,6 +684,38 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         )
         .leftValue
         .detail is "`keys` can not be empty"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyIndexes = Some(AVector(1, 0)))
+        )
+        .leftValue
+        .detail is "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyIndexes = Some(AVector.empty))
+        )
+        .leftValue
+        .detail is "Invalid m in m-of-n multisig: m=0, n=3"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyIndexes = Some(AVector(0, 1, 2, 3)))
+        )
+        .leftValue
+        .detail is "Invalid m in m-of-n multisig: m=4, n=3"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyIndexes = Some(AVector(0, 100)))
+        )
+        .leftValue
+        .detail is "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
     }
   }
 

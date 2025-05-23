@@ -113,6 +113,25 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
       Hex.toHexString(Groupless.safePublicKeySerde.serialize(publicKeys(1)))
     serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, publicKeyIndexes)) is
       Hex.unsafe(s"0602${serializedPublicKey0}${serializedPublicKey1}0100")
+
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, AVector.empty))
+    ).leftValue.getMessage() is "Public key indexes can not be empty"
+
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, AVector(1, 0)))
+    ).leftValue
+      .getMessage() is "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
+
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, AVector(1, 3)))
+    ).leftValue
+      .getMessage() is "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
+
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, AVector(0, 1, 2)))
+    ).leftValue
+      .getMessage() is "Public key indexes length can not be greater than public keys length"
   }
 
   it should "validate multisig" in {

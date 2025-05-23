@@ -139,10 +139,12 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
               .P2HMPK(pubKeys, keyIndexes.length, group)
               .left
               .map(badRequest)
+            unlockScript = UnlockScript.P2HMPK(pubKeys, keyIndexes)
+            _ <- UnlockScript.P2HMPK.validate(unlockScript).left.map(badRequest)
             unsignedTx <- prepareUnsignedTransaction(
               blockFlow,
               lockupScript,
-              UnlockScript.P2HMPK(pubKeys, keyIndexes),
+              unlockScript,
               query.destinations,
               query.gas,
               query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
@@ -156,10 +158,12 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
         case (None, Some(keyIndexes)) =>
           for {
             lockupScript <- LockupScript.P2HMPK(pubKeys, keyIndexes.length).left.map(badRequest)
+            unlockScript = UnlockScript.P2HMPK(pubKeys, keyIndexes)
+            _ <- UnlockScript.P2HMPK.validate(unlockScript).left.map(badRequest)
             result <- buildGrouplessTransferTxWithoutExplicitGroup(
               blockFlow,
               lockupScript,
-              UnlockScript.P2HMPK(pubKeys, keyIndexes),
+              unlockScript,
               query.destinations,
               query.gas,
               query.gasPrice,

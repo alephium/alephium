@@ -37,11 +37,14 @@ object UnlockScript {
       Serde
         .forProduct1[AVector[(PublicKey, Int)], P2MPKH](P2MPKH.apply, t => t.indexedPublicKeys)
     val p2shSerde: Serde[P2SH] = Serde.forProduct2(P2SH.apply, t => (t.script, t.params))
-    val p2hmpkSerde: Serde[P2HMPK] =
-      Serde.forProduct2[AVector[PublicKeyLike], AVector[Int], P2HMPK](
+    val p2hmpkSerde: Serde[P2HMPK] = {
+      val underlying = Serde.forProduct2[AVector[PublicKeyLike], AVector[Int], P2HMPK](
         P2HMPK.apply,
         t => (t.publicKeys, t.publicKeyIndexes)
       )
+
+      underlying.validate(P2HMPK.validate)
+    }
 
     new Serde[UnlockScript] {
       override def serialize(input: UnlockScript): ByteString = {
@@ -107,11 +110,29 @@ object UnlockScript {
     def hash: Hash =
       Hash.hash(hashPreImageSerializer.serialize((publicKeys, publicKeyIndexes.length)))
   }
+  object P2HMPK {
+    def validate(p2hmpk: P2HMPK): Either[String, Unit] = {
+      if (p2hmpk.publicKeyIndexes.isEmpty) {
+        Left("Public key indexes can not be empty")
+      } else if (p2hmpk.publicKeyIndexes.length > p2hmpk.publicKeys.length) {
+        Left("Public key indexes length can not be greater than public keys length")
+      } else if (!validateP2hmpk(p2hmpk)) {
+        Left(
+          "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
+        )
+      } else {
+        Right(())
+      }
+    }
+  }
 
   def validateP2hmpk(unlock: UnlockScript.P2HMPK): Boolean = {
-    (0 until (unlock.publicKeyIndexes.length - 1)).forall { i =>
-      val index = unlock.publicKeyIndexes(i)
-      index >= 0 && unlock.publicKeyIndexes(i + 1) > index
+    val publicKeysLength = unlock.publicKeys.length
+    unlock.publicKeyIndexes.length > 0 && (0 until (unlock.publicKeyIndexes.length - 1)).forall {
+      i =>
+        val index     = unlock.publicKeyIndexes(i)
+        val nextIndex = unlock.publicKeyIndexes(i + 1)
+        (index >= 0 && index < publicKeysLength) && (nextIndex > index && nextIndex < publicKeysLength)
     }
   }
 }
