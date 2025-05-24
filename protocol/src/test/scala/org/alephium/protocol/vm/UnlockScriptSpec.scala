@@ -21,7 +21,6 @@ import org.scalacheck.Gen
 import org.alephium.crypto.{ED25519PublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.NoIndexModelGenerators
-import org.alephium.protocol.vm.LockupScript.Groupless
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
@@ -106,11 +105,9 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
       PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate),
       PublicKeyLike.SecP256R1(SecP256R1PublicKey.generate)
     )
-    val publicKeyIndexes = AVector(0)
-    val serializedPublicKey0 =
-      Hex.toHexString(Groupless.safePublicKeySerde.serialize(publicKeys(0)))
-    val serializedPublicKey1 =
-      Hex.toHexString(Groupless.safePublicKeySerde.serialize(publicKeys(1)))
+    val publicKeyIndexes     = AVector(0)
+    val serializedPublicKey0 = Hex.toHexString(serdeImpl[PublicKeyLike].serialize(publicKeys(0)))
+    val serializedPublicKey1 = Hex.toHexString(serdeImpl[PublicKeyLike].serialize(publicKeys(1)))
     serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, publicKeyIndexes)) is
       Hex.unsafe(s"0602${serializedPublicKey0}${serializedPublicKey1}0100")
 

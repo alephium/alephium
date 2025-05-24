@@ -36,6 +36,9 @@ sealed trait LockupScript {
 
 // scalastyle:off number.of.methods
 object LockupScript {
+  private[vm] val P2PKPrefix   = ByteString(4)
+  private[vm] val P2HMPKPrefix = ByteString(5)
+
   implicit val serde: Serde[LockupScript] = new Serde[LockupScript] {
     override def serialize(input: LockupScript): ByteString = {
       input match {
@@ -43,8 +46,8 @@ object LockupScript {
         case s: P2MPKH => ByteString(1) ++ P2MPKH.serde.serialize(s)
         case s: P2SH   => ByteString(2) ++ serdeImpl[Hash].serialize(s.scriptHash)
         case s: P2C    => ByteString(3) ++ serdeImpl[Hash].serialize(s.contractId.value)
-        case s: P2PK   => ByteString(4) ++ P2PK.serde.serialize(s)
-        case s: P2HMPK => ByteString(5) ++ P2HMPK.serde.serialize(s)
+        case s: P2PK   => P2PKPrefix ++ P2PK.serde.serialize(s)
+        case s: P2HMPK => P2HMPKPrefix ++ P2HMPK.serde.serialize(s)
       }
     }
 
@@ -127,9 +130,9 @@ object LockupScript {
       Base58
         .decode(input)
         .map { bytes =>
-          if (bytes.startsWith(ByteString(4))) {
+          if (bytes.startsWith(P2PKPrefix)) {
             halfDecodeP2PK(bytes)
-          } else if (bytes.startsWith(ByteString(5))) {
+          } else if (bytes.startsWith(P2HMPKPrefix)) {
             halfDecodeP2HMPK(bytes)
           } else {
             decodeLockupScript(bytes)
@@ -165,9 +168,9 @@ object LockupScript {
       groupByte <- input.takeRight(1).toByteOption
       bytes     <- Base58.decode(input.dropRight(2))
       lockupScriptOpt <-
-        if (bytes.startsWith(ByteString(4))) {
+        if (bytes.startsWith(P2PKPrefix)) {
           P2PK.fromDecodedBase58(bytes.drop(1), groupByte)
-        } else if (bytes.startsWith(ByteString(5))) {
+        } else if (bytes.startsWith(P2HMPKPrefix)) {
           P2HMPK.fromDecodedBase58(bytes.drop(1), groupByte)
         } else {
           None
@@ -291,6 +294,7 @@ object LockupScript {
   }
 
   object P2PK {
+    private val safePublicKeySerde: Serde[PublicKeyLike] = Groupless.safeSerde(PublicKeyLike.serde)
 
     def apply(publicKey: PublicKeyLike, groupIndex: GroupIndex): P2PK = {
       P2PK(publicKey, groupIndex.value.toByte)
@@ -301,7 +305,7 @@ object LockupScript {
     }
 
     def decodePublicKey(bytes: ByteString): Option[PublicKeyLike] = {
-      Groupless.safePublicKeySerde.deserialize(bytes).toOption
+      safePublicKeySerde.deserialize(bytes).toOption
     }
 
     def fromDecodedBase58(bytes: ByteString, groupByte: Byte): Option[P2PK] = {
@@ -310,7 +314,7 @@ object LockupScript {
 
     implicit val serde: Serde[P2PK] = {
       Serde.forProduct2(P2PK.unsafe, (p: P2PK) => (p.publicKey, p.groupByte))(
-        Groupless.safePublicKeySerde,
+        safePublicKeySerde,
         serdeImpl[Byte]
       )
     }
@@ -344,10 +348,7 @@ object LockupScript {
         groupIndex: GroupIndex
     ): Either[String, P2HMPK] = {
       checkThreshold(publicKeys, m) {
-        P2HMPK(
-          Hash.hash(hashPreImageSerializer.serialize((publicKeys, m))),
-          groupIndex.value.toByte
-        )
+        P2HMPK(calcHash(publicKeys, m), groupIndex.value.toByte)
       }
     }
 
@@ -355,7 +356,7 @@ object LockupScript {
         config: GroupConfig
     ): Either[String, P2HMPK] = {
       checkThreshold(publicKeys, m) {
-        val hash = Hash.hash(hashPreImageSerializer.serialize((publicKeys, m)))
+        val hash = calcHash(publicKeys, m)
         P2HMPK(hash, defaultGroup(hash))
       }
     }
@@ -371,61 +372,58 @@ object LockupScript {
     }
 
     def unsafe(publicKeys: AVector[PublicKeyLike], m: Int, groupByte: Byte): P2HMPK = {
-      P2HMPK(Hash.hash(hashPreImageSerializer.serialize((publicKeys, m))), groupByte)
+      P2HMPK(calcHash(publicKeys, m), groupByte)
     }
 
     def unsafe(publicKeys: AVector[PublicKeyLike], m: Int, groupIndex: GroupIndex): P2HMPK = {
       unsafe(publicKeys, m, groupIndex.value.toByte)
     }
 
+    private val safeHashSerde: Serde[Hash] = Groupless.safeSerde(serdeImpl[Hash])
+
     implicit val serde: Serde[P2HMPK] = {
       Serde.forProduct2(P2HMPK.unsafe, (p: P2HMPK) => (p.p2hmpkHash, p.groupByte))(
-        serdeImpl[Hash],
+        safeHashSerde,
         serdeImpl[Byte]
       )
     }
 
     def decodeHash(bytes: ByteString): Option[Hash] = {
-      deserialize[Hash](bytes).toOption
+      safeHashSerde.deserialize(bytes).toOption
     }
 
     def fromDecodedBase58(bytes: ByteString, groupByte: Byte): Option[P2HMPK] = {
       decodeHash(bytes).map(P2HMPK(_, groupByte))
     }
 
-    val hashPreImageSerializer: Serializer[(AVector[PublicKeyLike], Int)] =
-      new Serializer[(AVector[PublicKeyLike], Int)] {
-        override def serialize(input: (AVector[PublicKeyLike], Int)): ByteString = {
-          val (publicKeys, m) = input
-          val publicKeysBytes = Groupless.safePublicKeysSerde.serialize(publicKeys)
-          val mBytes          = serdeImpl[Int].serialize(m)
-          val nBytes          = serdeImpl[Int].serialize(publicKeys.length)
-          ByteString(5) ++ mBytes ++ nBytes ++ publicKeysBytes
-        }
-      }
+    private val publicKeysSerde: Serde[AVector[PublicKeyLike]] = avectorSerde[PublicKeyLike]
+    def calcHash(publicKeys: AVector[PublicKeyLike], m: Int): Hash = {
+      assume(m > 0 && m <= publicKeys.length)
+      val bytes =
+        P2HMPKPrefix ++ publicKeysSerde.serialize(publicKeys) ++ serdeImpl[Int].serialize(m)
+      Hash.hash(bytes)
+    }
   }
 
   object Groupless {
     val groupByteLength: Int = 1
 
-    implicit val safePublicKeySerde: Serde[PublicKeyLike] = new Serde[PublicKeyLike] {
-      override def serialize(input: PublicKeyLike): ByteString = {
-        val publicKey = PublicKeyLike.serde.serialize(input)
-        val checksum  = Checksum.calcAndSerialize(publicKey)
-        publicKey ++ checksum
+    def safeSerde[T](rawSerde: Serde[T]): Serde[T] = new Serde[T] {
+      override def serialize(input: T): ByteString = {
+        val rawBytes = rawSerde.serialize(input)
+        val checksum = Checksum.calcAndSerialize(rawBytes)
+        rawBytes ++ checksum
       }
 
-      override def _deserialize(input: ByteString): SerdeResult[Staging[PublicKeyLike]] = {
+      override def _deserialize(input: ByteString): SerdeResult[Staging[T]] = {
         for {
-          publicKeyResult <- PublicKeyLike.serde._deserialize(input)
-          data = input.take(input.length - publicKeyResult.rest.length)
-          checksumResult <- Checksum.serde._deserialize(publicKeyResult.rest)
-          _              <- checksumResult.value.check(data)
-        } yield Staging(publicKeyResult.value, checksumResult.rest)
+          dataResult <- rawSerde._deserialize(input)
+          rawBytes = input.take(input.length - dataResult.rest.length)
+          checksumResult <- Checksum.serde._deserialize(dataResult.rest)
+          _              <- checksumResult.value.check(rawBytes)
+        } yield Staging(dataResult.value, checksumResult.rest)
       }
     }
-
-    val safePublicKeysSerde: Serde[AVector[PublicKeyLike]] = avectorSerde[PublicKeyLike]
 
     def hasExplicitGroupIndex(input: String): Boolean = {
       input.length > 2 && input(input.length - 2) == ':'

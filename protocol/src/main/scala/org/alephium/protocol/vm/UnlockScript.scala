@@ -21,8 +21,6 @@ import java.nio.charset.StandardCharsets
 import akka.util.ByteString
 
 import org.alephium.protocol.{Hash, PublicKey}
-import org.alephium.protocol.vm.LockupScript.Groupless
-import org.alephium.protocol.vm.LockupScript.P2HMPK.hashPreImageSerializer
 import org.alephium.serde._
 import org.alephium.util.AVector
 
@@ -31,7 +29,6 @@ sealed trait UnlockScript
 object UnlockScript {
   implicit val serde: Serde[UnlockScript] = {
     implicit val indexedPublicKeySerde: Serde[(PublicKey, Int)] = Serde.tuple2[PublicKey, Int]
-    implicit val publicKeyLikeSerde: Serde[PublicKeyLike]       = Groupless.safePublicKeySerde
 
     val p2mpkhSerde: Serde[P2MPKH] =
       Serde
@@ -107,8 +104,7 @@ object UnlockScript {
       publicKeys: AVector[PublicKeyLike],
       publicKeyIndexes: AVector[Int]
   ) extends UnlockScript {
-    def hash: Hash =
-      Hash.hash(hashPreImageSerializer.serialize((publicKeys, publicKeyIndexes.length)))
+    def hash: Hash = LockupScript.P2HMPK.calcHash(publicKeys, publicKeyIndexes.length)
   }
   object P2HMPK {
     def validate(p2hmpk: P2HMPK): Either[String, Unit] = {

@@ -109,7 +109,9 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     LockupScript.P2HMPK.defaultGroup(lockupScript.p2hmpkHash) is
       GroupIndex.unsafe(Bytes.toPosInt(lockupScript.p2hmpkHash.bytes.last) % groups)
 
-    val bytes = Hex.unsafe(s"05${lockupScript.p2hmpkHash.toHexString}02")
+    val checksum = Checksum.calcAndSerialize(lockupScript.p2hmpkHash.bytes)
+    val bytes = LockupScript.P2HMPKPrefix ++ lockupScript.p2hmpkHash.bytes ++
+      checksum ++ ByteString(lockupScript.groupByte)
     serialize[LockupScript](lockupScript) is bytes
     deserialize[LockupScript](bytes) isE lockupScript
 
@@ -175,8 +177,10 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L") is a[HalfDecodedP2PK]
     decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0") is
       a[ValidLockupScript]
-    decodeFromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85:0") is a[ValidLockupScript]
-    decodeFromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85") is a[HalfDecodedP2HMPK]
+    decodeFromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85:0") is InvalidLockupScript
+    decodeFromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85") is InvalidLockupScript
+    decodeFromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU:2") is a[ValidLockupScript]
+    decodeFromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU") is a[HalfDecodedP2HMPK]
     decodeFromBase58(":1") is InvalidLockupScript
     decodeFromBase58("1C2:1") is InvalidLockupScript
     decodeFromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0") is InvalidLockupScript
