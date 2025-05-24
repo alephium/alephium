@@ -333,8 +333,9 @@ object LockupScript {
       P2HMPK(p2hmpkHash, groupByte)
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def defaultGroup(p2hmpkHash: Hash)(implicit config: GroupConfig): GroupIndex = {
-      ScriptHint.fromHash(p2hmpkHash).groupIndex
+      GroupIndex.unsafe(Bytes.toPosInt(p2hmpkHash.bytes.last) % config.groups)
     }
 
     def apply(

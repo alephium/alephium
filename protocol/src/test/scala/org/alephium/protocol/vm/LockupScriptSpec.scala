@@ -22,7 +22,7 @@ import org.alephium.crypto.SecP256K1PublicKey
 import org.alephium.protocol.{Checksum, Hash}
 import org.alephium.protocol.model.{ContractId, GroupIndex, NoIndexModelGenerators, ScriptHint}
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector, DjbHash, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, DjbHash, Hex}
 
 class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde correctly" in {
@@ -106,6 +106,8 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "validate p2hmpk" in {
     val lockupScript = p2hmpkLockupGen(GroupIndex.unsafe(2)).sample.get
     lockupScript.groupIndex is lockupScript.scriptHint.groupIndex
+    LockupScript.P2HMPK.defaultGroup(lockupScript.p2hmpkHash) is
+      GroupIndex.unsafe(Bytes.toPosInt(lockupScript.p2hmpkHash.bytes.last) % groups)
 
     val bytes = Hex.unsafe(s"05${lockupScript.p2hmpkHash.toHexString}02")
     serialize[LockupScript](lockupScript) is bytes
