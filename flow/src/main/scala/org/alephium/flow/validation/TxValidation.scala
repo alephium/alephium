@@ -899,13 +899,13 @@ object TxValidation {
       }
     }
 
-    protected[validation] def checkP2pk(
+    private def checkSignature(
         txEnv: TxEnv,
         preImage: ByteString,
         gasRemaining: GasBox,
-        lock: LockupScript.P2PK
+        publicKey: PublicKeyLike
     ): TxValidationResult[GasBox] = {
-      lock.publicKey match {
+      publicKey match {
         case PublicKeyLike.SecP256K1(key) =>
           checkSecP256K1Signature(txEnv, preImage, gasRemaining, key)
         case PublicKeyLike.SecP256R1(key) =>
@@ -915,6 +915,15 @@ object TxValidation {
         case PublicKeyLike.WebAuthn(key) =>
           checkWebAuthnSignature(txEnv, preImage, gasRemaining, key)
       }
+    }
+
+    protected[validation] def checkP2pk(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        lock: LockupScript.P2PK
+    ): TxValidationResult[GasBox] = {
+      checkSignature(txEnv, preImage, gasRemaining, lock.publicKey)
     }
 
     protected[validation] def checkP2hmpk(
@@ -928,16 +937,7 @@ object TxValidation {
         invalidTx(InvalidP2hmpkHash)
       } else {
         unlock.publicKeyIndexes.foldE(gasRemaining) { case (gasBox, index) =>
-          unlock.publicKeys(index) match {
-            case PublicKeyLike.SecP256K1(key) =>
-              checkSecP256K1Signature(txEnv, preImage, gasBox, key)
-            case PublicKeyLike.SecP256R1(key) =>
-              checkSecP256R1Signature(txEnv, preImage, gasBox, key)
-            case PublicKeyLike.ED25519(key) =>
-              checkED25519Signature(txEnv, preImage, gasBox, key)
-            case PublicKeyLike.WebAuthn(key) =>
-              checkWebAuthnSignature(txEnv, preImage, gasBox, key)
-          }
+          checkSignature(txEnv, preImage, gasBox, unlock.publicKeys(index))
         }
       }
     }
