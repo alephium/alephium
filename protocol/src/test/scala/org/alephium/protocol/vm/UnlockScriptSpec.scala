@@ -144,4 +144,37 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     test("Key indexes are decreasing", false, (publicKey0, 1), (publicKey1, 0))
     test("Positive case", true, (publicKey0, 0), (publicKey1, 3))
   }
+
+  it should "validate p2hmpk unlock script" in {
+    def validate(p2hmpk: UnlockScript.P2HMPK, errorMsg: String) = {
+      UnlockScript.P2HMPK.validate(p2hmpk).leftValue.contains(errorMsg) is true
+      val bytes = serialize[UnlockScript](p2hmpk)
+      deserialize[UnlockScript](bytes).leftValue.toString.contains(errorMsg) is true
+    }
+
+    val publicKeys = AVector.fill(3)(publicKeyLikeGen().sample.get)
+    val p2hmpk     = UnlockScript.P2HMPK(AVector.empty, AVector.empty)
+    validate(p2hmpk, "Public keys can not be empty")
+    validate(p2hmpk.copy(publicKeys = publicKeys), "Public key indexes can not be empty")
+
+    validate(
+      p2hmpk.copy(publicKeyIndexes = AVector(0, 1, 2, 3), publicKeys = publicKeys),
+      "Public key indexes length can not be greater than public keys length"
+    )
+
+    Seq(AVector(-1), AVector(3), AVector(4), AVector(1, 0), AVector(0, 2, 1), AVector(0, 1, 3))
+      .foreach { invalidIndexes =>
+        validate(
+          p2hmpk.copy(publicKeyIndexes = invalidIndexes, publicKeys = publicKeys),
+          "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
+        )
+      }
+
+    Seq(AVector(0), AVector(1), AVector(0, 1), AVector(0, 2), AVector(0, 1, 2), AVector(1, 2))
+      .foreach { validIndexes =>
+        UnlockScript.P2HMPK.validate(
+          p2hmpk.copy(publicKeyIndexes = validIndexes, publicKeys = publicKeys)
+        ) isE ()
+      }
+  }
 }

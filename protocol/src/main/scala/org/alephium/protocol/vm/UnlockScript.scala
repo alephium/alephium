@@ -108,7 +108,9 @@ object UnlockScript {
   }
   object P2HMPK {
     def validate(p2hmpk: P2HMPK): Either[String, Unit] = {
-      if (p2hmpk.publicKeyIndexes.isEmpty) {
+      if (p2hmpk.publicKeys.isEmpty) {
+        Left("Public keys can not be empty")
+      } else if (p2hmpk.publicKeyIndexes.isEmpty) {
         Left("Public key indexes can not be empty")
       } else if (p2hmpk.publicKeyIndexes.length > p2hmpk.publicKeys.length) {
         Left("Public key indexes length can not be greater than public keys length")
@@ -122,13 +124,15 @@ object UnlockScript {
     }
   }
 
-  def validateP2hmpk(unlock: UnlockScript.P2HMPK): Boolean = {
+  private def validateP2hmpk(unlock: UnlockScript.P2HMPK): Boolean = {
     val publicKeysLength = unlock.publicKeys.length
-    unlock.publicKeyIndexes.length > 0 && (0 until (unlock.publicKeyIndexes.length - 1)).forall {
-      i =>
-        val index     = unlock.publicKeyIndexes(i)
-        val nextIndex = unlock.publicKeyIndexes(i + 1)
-        index >= 0 && index < nextIndex && nextIndex < publicKeysLength
+    (0 until unlock.publicKeyIndexes.length).forall { i =>
+      val index = unlock.publicKeyIndexes(i)
+      unlock.publicKeyIndexes.get(i + 1) match {
+        case Some(nextIndex) =>
+          index >= 0 && index < nextIndex && nextIndex < publicKeysLength
+        case None => index >= 0 && index < publicKeysLength
+      }
     }
   }
 }
