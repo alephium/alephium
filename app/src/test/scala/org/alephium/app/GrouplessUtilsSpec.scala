@@ -31,6 +31,7 @@ import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
+// scalastyle:off file.size.limit
 class GrouplessUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 
@@ -295,6 +296,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       } :+ fromLockupScript
     }.asInstanceOf[AVector[LockupScript.GrouplessAsset]]
 
+    // scalastyle:off method.length
     def testTransfer(
         alphTransferAmount: U256,
         tokenTransferAmount: U256,
@@ -349,6 +351,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         toBalance._2 is tokenTransferAmount
       }
     }
+    // scalastyle:on method.length
 
     private def buildP2HMPKTransferTx(query: BuildMultisig) = {
       val result = serverUtils

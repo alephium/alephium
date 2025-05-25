@@ -32,6 +32,7 @@ import org.alephium.protocol.model
 import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, PublicKeyLike, UnlockScript}
+import org.alephium.protocol.vm.LockupScript.GrouplessAsset
 import org.alephium.util.{AVector, Hex, U256}
 
 trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
@@ -481,11 +482,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       allGroupedLockupScripts: AVector[LockupScript.GrouplessAsset],
       totalAmountNeeded: TotalAmountNeeded,
       targetBlockHashOpt: Option[BlockHash]
-  ): IOResult[
-    AVector[
-      (LockupScript.GrouplessAsset, AVector[AssetOutputInfo], (U256, AVector[(TokenId, U256)]))
-    ]
-  ] = {
+  ): IOResult[GrouplessAssetInfo] = {
     allGroupedLockupScripts
       .mapE { lockup =>
         blockFlow
@@ -556,6 +553,9 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 }
 
 object GrouplessUtils {
+  type GrouplessAssetInfo =
+    AVector[(GrouplessAsset, AVector[AssetOutputInfo], (U256, AVector[(TokenId, U256)]))]
+
   final case class BuildingGrouplessTransferTx(
       from: LockupScript.GrouplessAsset,
       fromUnlockScript: UnlockScript,

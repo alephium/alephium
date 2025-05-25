@@ -27,6 +27,7 @@ import org.scalacheck.Gen
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.{AssetOutput => _, ContractOutput => _, Transaction => _, _}
+import org.alephium.api.model.BuildTxCommon.PublicKeyType
 import org.alephium.crypto.{Blake2b, Byte32}
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
@@ -53,7 +54,6 @@ import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocat
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
-import org.alephium.api.model.BuildTxCommon.PublicKeyType
 
 trait ServerFixture
     extends InfoFixture
