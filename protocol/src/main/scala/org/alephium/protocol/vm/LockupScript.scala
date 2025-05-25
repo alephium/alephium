@@ -32,6 +32,8 @@ sealed trait LockupScript {
   def hintBytes: ByteString
 
   def isAssetType: Boolean
+
+  def toBase58: String = Base58.encode(serialize(this))
 }
 
 // scalastyle:off number.of.methods
@@ -228,12 +230,12 @@ object LockupScript {
   }
 
   sealed trait GrouplessAsset extends Asset with Product with Serializable {
-    val groupByte: Byte
+    def groupByte: Byte
 
     override def groupIndex(implicit config: GroupConfig): GroupIndex =
       GroupIndex.unsafe(groupByte % config.groups)
 
-    def toBase58: String = s"${toBase58WithoutGroup}:$groupByte"
+    override def toBase58: String = s"${toBase58WithoutGroup}:$groupByte"
 
     def toBase58WithoutGroup: String = {
       val bytes = serialize[LockupScript](this).dropRight(Groupless.groupByteLength)

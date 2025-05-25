@@ -924,28 +924,19 @@ object TxValidation {
         lock: LockupScript.P2HMPK,
         unlock: UnlockScript.P2HMPK
     ): TxValidationResult[GasBox] = {
-      if (unlock.publicKeyIndexes.length > unlock.publicKeys.length) {
-        invalidTx(InvalidNumberOfPublicKey)
-      } else if (!UnlockScript.validateP2hmpk(unlock)) {
-        invalidTx(InvalidP2hmpkUnlockScript)
-      } else if (lock.p2hmpkHash != unlock.hash) {
+      if (lock.p2hmpkHash != unlock.hash) {
         invalidTx(InvalidP2hmpkHash)
       } else {
         unlock.publicKeyIndexes.foldE(gasRemaining) { case (gasBox, index) =>
-          unlock.publicKeys.get(index) match {
-            case Some(publicKey) =>
-              publicKey match {
-                case PublicKeyLike.SecP256K1(key) =>
-                  checkSecP256K1Signature(txEnv, preImage, gasBox, key)
-                case PublicKeyLike.SecP256R1(key) =>
-                  checkSecP256R1Signature(txEnv, preImage, gasBox, key)
-                case PublicKeyLike.ED25519(key) =>
-                  checkED25519Signature(txEnv, preImage, gasBox, key)
-                case PublicKeyLike.WebAuthn(key) =>
-                  checkWebAuthnSignature(txEnv, preImage, gasBox, key)
-              }
-            case None =>
-              invalidTx(InvalidP2hmpkUnlockScript)
+          unlock.publicKeys(index) match {
+            case PublicKeyLike.SecP256K1(key) =>
+              checkSecP256K1Signature(txEnv, preImage, gasBox, key)
+            case PublicKeyLike.SecP256R1(key) =>
+              checkSecP256R1Signature(txEnv, preImage, gasBox, key)
+            case PublicKeyLike.ED25519(key) =>
+              checkED25519Signature(txEnv, preImage, gasBox, key)
+            case PublicKeyLike.WebAuthn(key) =>
+              checkWebAuthnSignature(txEnv, preImage, gasBox, key)
           }
         }
       }

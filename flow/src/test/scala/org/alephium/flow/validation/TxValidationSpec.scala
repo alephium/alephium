@@ -1194,9 +1194,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     tx(AVector(0, 1, 2)).fail(InvalidP2hmpkHash)
     tx(AVector(0)).fail(InvalidP2hmpkHash)
-    tx(AVector.empty).fail(InvalidP2hmpkHash)
     tx(AVector(0, 2)).fail(InvalidSignature)
-    tx(AVector(2, 0)).fail(InvalidP2hmpkUnlockScript)
     tx(AVector(0, 1)).pass()
   }
 

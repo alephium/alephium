@@ -20,7 +20,7 @@ import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.{LockupScript, PublicKeyLike, StatelessScript, UnlockScript}
-import org.alephium.serde.{deserialize, serialize}
+import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Base58}
 import org.alephium.util.Hex.HexStringSyntax
 
@@ -29,12 +29,7 @@ sealed trait Address {
 
   def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
 
-  def toBase58: String = {
-    lockupScript match {
-      case script: LockupScript.GrouplessAsset => script.toBase58
-      case _                                   => Base58.encode(serialize(lockupScript))
-    }
-  }
+  def toBase58: String = lockupScript.toBase58
 
   override def toString: String = toBase58
 }

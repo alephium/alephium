@@ -132,17 +132,6 @@ object GasEstimation extends StrictLogging {
   }
 
   private[gasestimation] def estimateInputGas(lockupScript: LockupScript.P2PK): GasBox = {
-    lockupScript.publicKey match {
-      case _: PublicKeyLike.SecP256K1 =>
-        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256K1UnlockGas)
-      case _: PublicKeyLike.SecP256R1 =>
-        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.secp256R1UnlockGas)
-      case _: PublicKeyLike.ED25519 =>
-        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.ed25519UnlockGas)
-      case _: PublicKeyLike.WebAuthn =>
-        // scalastyle:off magic.number
-        GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.webauthnUnlockGas(500))
-      // scalastyle:on magic.number
-    }
+    GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.unlockGasByPublicKey(lockupScript.publicKey))
   }
 }

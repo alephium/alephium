@@ -128,7 +128,7 @@ object UnlockScript {
       i =>
         val index     = unlock.publicKeyIndexes(i)
         val nextIndex = unlock.publicKeyIndexes(i + 1)
-        (index >= 0 && index < publicKeysLength) && (nextIndex > index && nextIndex < publicKeysLength)
+        index >= 0 && index < nextIndex && nextIndex < publicKeysLength
     }
   }
 }

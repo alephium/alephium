@@ -272,6 +272,10 @@ object GasSchedule {
   val secp256R1UnlockGas: GasBox =
     GasBox.unsafe(GasHash.gas(SecP256R1PublicKey.length).value + GasSignature.gas.value)
 
+  // Since we can't determine the size of the WebAuthn payload when building the tx,
+  // we use a 500-byte payload to estimate the gas required for WebAuthn.
+  val defaultWebAuthnUnlockGas: GasBox = webauthnUnlockGas(500)
+
   def webauthnUnlockGas(webauthnLength: Int): GasBox = {
     GasBox.unsafe(
       GasHash.gas(SecP256R1PublicKey.length + webauthnLength).value + GasSignature.gas.value
@@ -283,20 +287,18 @@ object GasSchedule {
 
   def p2mpkUnlockGas(m: Int): GasBox = secp256K1UnlockGas.mulUnsafe(m)
 
+  def unlockGasByPublicKey(publicKeyLike: PublicKeyLike): GasBox = {
+    publicKeyLike match {
+      case PublicKeyLike.SecP256K1(_) => secp256K1UnlockGas
+      case PublicKeyLike.SecP256R1(_) => secp256R1UnlockGas
+      case PublicKeyLike.ED25519(_)   => ed25519UnlockGas
+      case PublicKeyLike.WebAuthn(_)  => defaultWebAuthnUnlockGas
+    }
+  }
+
   def p2hmpkUnlockGas(publicKeysLike: AVector[PublicKeyLike]): GasBox = {
     publicKeysLike.fold(GasBox.unsafe(0)) { (acc, publicKeyLike) =>
-      val acc1 = publicKeyLike match {
-        case PublicKeyLike.SecP256K1(_) =>
-          acc.addUnsafe(secp256K1UnlockGas)
-        case PublicKeyLike.SecP256R1(_) =>
-          acc.addUnsafe(secp256R1UnlockGas)
-        case PublicKeyLike.ED25519(_) =>
-          acc.addUnsafe(ed25519UnlockGas)
-        case PublicKeyLike.WebAuthn(_) =>
-          acc.addUnsafe(webauthnUnlockGas(500))
-      }
-
-      acc1.addUnsafe(GasSignature.gas)
+      acc.addUnsafe(unlockGasByPublicKey(publicKeyLike)).addUnsafe(GasSignature.gas)
     }
   }
 }
