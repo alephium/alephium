@@ -339,10 +339,8 @@ object LockupScript {
       P2HMPK(p2hmpkHash, groupByte)
     }
 
-    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-    def defaultGroup(p2hmpkHash: Hash)(implicit config: GroupConfig): GroupIndex = {
-      GroupIndex.unsafe(Bytes.toPosInt(p2hmpkHash.bytes.last) % config.groups)
-    }
+    def defaultGroup(p2hmpkHash: Hash)(implicit config: GroupConfig): GroupIndex =
+      Groupless.defaultGroup(p2hmpkHash.bytes)
 
     def apply(
         publicKeys: AVector[PublicKeyLike],
@@ -425,6 +423,12 @@ object LockupScript {
           _              <- checksumResult.value.check(rawBytes)
         } yield Staging(dataResult.value, checksumResult.rest)
       }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+    private[vm] def defaultGroup(bytes: ByteString)(implicit config: GroupConfig): GroupIndex = {
+      assume(bytes.nonEmpty)
+      GroupIndex.unsafe(Bytes.toPosInt(bytes.last) % config.groups)
     }
 
     def hasExplicitGroupIndex(input: String): Boolean = {
