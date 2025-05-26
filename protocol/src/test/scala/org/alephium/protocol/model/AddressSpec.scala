@@ -224,7 +224,7 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
       Base58.encode(bytes) isnot address
       Address.from(script).toBase58 is address
       Address.fromBase58(address) is Some(Address.from(script))
-      Address.fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(0, 5)).sample.get)) is None
+      Address.fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(1, 5)).sample.get)) is None
 
       val addressWithoutGroup = script.toBase58WithoutGroup
       Address.fromBase58(s"$addressWithoutGroup:${script.groupIndex.value}") is Some(

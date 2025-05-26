@@ -25,7 +25,7 @@ import org.scalatest.EitherValues
 
 import org.alephium.api.{model => api}
 import org.alephium.api.UtilJson._
-import org.alephium.api.model._
+import org.alephium.api.model.{Address => _, _}
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model.{AssetOutput => _, Balance => _, ContractOutput => _, _}
@@ -2098,5 +2098,31 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       s"""{"type": "Address", "value": "${address.toBase58.dropRight(2)}"}"""
     ) is ValAddress(address)
     write(ValAddress(address)) is s"""{"type":"Address","value":"${address.toBase58}"}"""
+  }
+
+  it should "decode address from base58 string" in {
+    import api.Address._
+    import scala.reflect.ClassTag
+    def pass[T: ClassTag](str: String) = {
+      fromBase58(str).value.lockupScript is a[T]
+    }
+
+    def fail(str: String, error: String) = {
+      fromBase58(str).leftValue.startsWith(error) is true
+    }
+
+    pass[CompleteLockupScript]("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3")
+    pass[CompleteLockupScript]("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa")
+    pass[CompleteLockupScript]("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr")
+    fail("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1", "Invalid address")
+
+    pass[HalfDecodedP2PK]("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L")
+    pass[CompleteLockupScript]("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0")
+    fail("bMEQ1jQgijED5jmCgunSNs5G1W87VX33ueywrpqemY7KVCEaDys", "Invalid p2pk address")
+
+    pass[HalfDecodedP2HMPK]("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU")
+    pass[CompleteLockupScript]("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU:0")
+    fail("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85", "Invalid p2hmpk address")
+    fail("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU1:0", "Invalid groupless address")
   }
 }

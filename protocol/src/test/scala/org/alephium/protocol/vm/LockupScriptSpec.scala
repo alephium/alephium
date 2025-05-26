@@ -170,22 +170,21 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   }
 
   it should "decode from base58 string" in {
-    import LockupScript._
-    decodeFromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3") is a[ValidLockupScript]
-    decodeFromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa") is a[ValidLockupScript]
-    decodeFromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr") is a[ValidLockupScript]
-    decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L") is a[HalfDecodedP2PK]
-    decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0") is
-      a[ValidLockupScript]
-    decodeFromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85:0") is InvalidLockupScript
-    decodeFromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85") is InvalidLockupScript
-    decodeFromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU:2") is a[ValidLockupScript]
-    decodeFromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU") is a[HalfDecodedP2HMPK]
-    decodeFromBase58(":1") is InvalidLockupScript
-    decodeFromBase58("1C2:1") is InvalidLockupScript
-    decodeFromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0") is InvalidLockupScript
-    decodeFromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa:0") is InvalidLockupScript
-    decodeFromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr:0") is InvalidLockupScript
-    decodeFromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3") is InvalidLockupScript
+    import LockupScript.fromBase58
+    fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3").isDefined is true
+    fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa").isDefined is true
+    fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr").isDefined is true
+    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L").isDefined is false
+    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0").isDefined is true
+    fromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85:0").isDefined is false
+    fromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85").isDefined is false
+    fromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU:2").isDefined is true
+    fromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU").isDefined is false
+    fromBase58(":1").isDefined is false
+    fromBase58("1C2:1").isDefined is false
+    fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0").isDefined is false
+    fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa:0").isDefined is false
+    fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr:0").isDefined is false
+    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3").isDefined is false
   }
 }
