@@ -14629,7 +14629,8 @@
         ],
         "properties": {
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           }
         }
       },

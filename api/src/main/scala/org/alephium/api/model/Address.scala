@@ -39,12 +39,14 @@ final case class Address(lockupScript: Address.DecodedLockupScript) extends AnyV
     lockupScript match {
       case Address.CompleteLockupScript(lockupScript) => lockupScript.toBase58
       case lockupScript: Address.HalfDecodedLockupScript =>
-        lockupScript.getLockupScript.toBase58WithoutGroup
+        lockupScript.getLockupScript.toBase58.dropRight(Address.GrouplessSuffixSize)
     }
   }
 }
 
 object Address {
+  val GrouplessSuffixSize: Int = 2
+
   def fromProtocol(address: protocol.Address): Address =
     Address(CompleteLockupScript(address.lockupScript))
 

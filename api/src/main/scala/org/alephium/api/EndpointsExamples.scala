@@ -649,11 +649,7 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   implicit val buildMultisigAddressResultExample: List[Example[BuildMultisigAddressResult]] =
-    simpleExample(
-      BuildMultisigAddressResult(
-        address.toBase58
-      )
-    )
+    simpleExample(BuildMultisigAddressResult(api.Address.from(lockupScript)))
 
   implicit val buildMultisigTransactionExamples: List[Example[BuildMultisig]] = List(
     defaultExample(

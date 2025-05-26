@@ -2597,9 +2597,9 @@ object ServerUtils {
   )(implicit groupConfig: GroupConfig): Either[String, BuildMultisigAddressResult] = {
     for {
       pks          <- GrouplessUtils.buildPublicKeyLikes(rawKeys, keyTypesOpt)
-      lockupScript <- LockupScript.P2HMPK(pks, mrequired, GroupIndex.unsafe(0))
+      lockupScript <- LockupScript.P2HMPK(pks, mrequired)
     } yield {
-      BuildMultisigAddressResult(lockupScript.toBase58WithoutGroup)
+      BuildMultisigAddressResult(api.Address.from(lockupScript.p2hmpkHash))
     }
   }
 
@@ -2626,11 +2626,7 @@ object ServerUtils {
       publicKeys.flatMap { keys =>
         LockupScript.p2mpkh(keys, mrequired) match {
           case Some(lockupScript) =>
-            Right(
-              BuildMultisigAddressResult(
-                Address.Asset(lockupScript).toBase58
-              )
-            )
+            Right(BuildMultisigAddressResult(api.Address.from(lockupScript)))
           case None => Left(s"Invalid m-of-n multisig")
         }
       }

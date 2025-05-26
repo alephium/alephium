@@ -153,11 +153,9 @@ object LockupScript {
     override def groupIndex(implicit config: GroupConfig): GroupIndex =
       GroupIndex.unsafe(groupByte % config.groups)
 
-    override def toBase58: String = s"${toBase58WithoutGroup}:$groupByte"
-
-    def toBase58WithoutGroup: String = {
+    override def toBase58: String = {
       val bytes = serialize[LockupScript](this).dropRight(Groupless.groupByteLength)
-      Base58.encode(bytes)
+      s"${Base58.encode(bytes)}:$groupByte"
     }
   }
 

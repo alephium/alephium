@@ -194,6 +194,7 @@ object ServerFixture {
       .toOption
       .get
       .address
+      .toBase58
   }
 
   val dummyParentContractId      = ContractId.hash("parent")

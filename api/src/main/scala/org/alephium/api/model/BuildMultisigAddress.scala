@@ -28,4 +28,4 @@ final case class BuildMultisigAddress(
     multiSigType: Option[MultiSigType] = Some(MultiSigType.P2MPKH)
 )
 
-final case class BuildMultisigAddressResult(address: String)
+final case class BuildMultisigAddressResult(address: Address)

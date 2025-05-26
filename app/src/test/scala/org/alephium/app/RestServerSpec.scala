@@ -578,7 +578,7 @@ abstract class RestServerSpec(
       val result   = response.as[BuildMultisigAddressResult]
       val expected = ServerFixture.p2mpkhAddress(AVector(dummyKeyHex, dummyKeyHex2), 1)
 
-      result.address is expected
+      result.address.toBase58 is expected
     }
   }
 
@@ -615,7 +615,7 @@ abstract class RestServerSpec(
         1
       )
 
-      result.address is expected
+      result.address.toBase58 is expected
     }
 
     Post(
