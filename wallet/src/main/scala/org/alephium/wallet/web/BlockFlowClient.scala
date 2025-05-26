@@ -20,18 +20,19 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import sttp.model.{StatusCode, Uri}
 
+import org.alephium.api.{model => api}
 import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.model._
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, AddressLike, GroupIndex}
+import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait BlockFlowClient {
   def fetchBalance(
-      addressLike: AddressLike
+      address: api.Address
   ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]]
   def prepareTransaction(
       fromPublicKey: PublicKey,
@@ -107,28 +108,28 @@ object BlockFlowClient {
     }
 
     def fetchBalance(
-        addressLike: AddressLike
+        address: api.Address
     ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]] =
-      addressLike.lockupScriptResult match {
-        case LockupScript.CompleteLockupScript(_: LockupScript.P2C) =>
+      address.lockupScript match {
+        case api.Address.CompleteLockupScript(_: LockupScript.P2C) =>
           Future.successful(
             Left(
-              ApiError.BadRequest(s"Expect asset address, but was contract address: $addressLike")
+              ApiError.BadRequest(s"Expect asset address, but was contract address: $address")
             )
           )
-        case LockupScript.CompleteLockupScript(lockupScript) =>
-          getBalance(addressLike, lockupScript.groupIndex)
-        case LockupScript.HalfDecodedP2PK(publicKey) =>
-          getBalance(addressLike, publicKey.defaultGroup)
-        case LockupScript.HalfDecodedP2HMPK(hash) =>
-          getBalance(addressLike, LockupScript.P2HMPK.defaultGroup(hash))
+        case api.Address.CompleteLockupScript(lockupScript) =>
+          getBalance(address, lockupScript.groupIndex)
+        case api.Address.HalfDecodedP2PK(publicKey) =>
+          getBalance(address, publicKey.defaultGroup)
+        case api.Address.HalfDecodedP2HMPK(hash) =>
+          getBalance(address, LockupScript.P2HMPK.defaultGroup(hash))
       }
 
     private def getBalance(
-        addressLike: AddressLike,
+        address: api.Address,
         groupIndex: GroupIndex
     ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]] = {
-      requestFromGroup(groupIndex, getBalance, (addressLike, Some(true))).map(
+      requestFromGroup(groupIndex, getBalance, (address, Some(true))).map(
         _.map(res => (res.balance, res.lockedBalance))
       )
     }

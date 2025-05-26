@@ -22,6 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import akka.util.ByteString
 
+import org.alephium.api.{model => api}
 import org.alephium.api.{badRequest, failed, failedInIO, wrapResult, Try}
 import org.alephium.api.model._
 import org.alephium.crypto.{ED25519PublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
@@ -40,12 +41,12 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
   def getGrouplessBalance(
       blockFlow: BlockFlow,
-      halfDecodedLockupScript: LockupScript.HalfDecodedLockupScript,
+      halfDecodedLockupScript: api.Address.HalfDecodedLockupScript,
       getMempoolUtxos: Boolean
   ): Try[Balance] = {
     for {
       allBalances <- wrapResult(AVector.from(brokerConfig.groupIndexes).mapE { groupIndex =>
-        val lockupScript = halfDecodedLockupScript.toCompleteLockupScript(groupIndex).lockupScript
+        val lockupScript = halfDecodedLockupScript.getLockupScript(groupIndex)
         blockFlow.getBalance(lockupScript, apiConfig.defaultUtxosLimit, getMempoolUtxos)
       })
       balance <- allBalances.foldE(model.Balance.zero)(_ merge _).left.map(failed)

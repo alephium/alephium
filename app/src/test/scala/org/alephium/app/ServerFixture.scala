@@ -26,7 +26,13 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.api.ApiModelCodec
-import org.alephium.api.model.{AssetOutput => _, ContractOutput => _, Transaction => _, _}
+import org.alephium.api.model.{
+  Address => _,
+  AssetOutput => _,
+  ContractOutput => _,
+  Transaction => _,
+  _
+}
 import org.alephium.api.model.BuildTxCommon.PublicKeyType
 import org.alephium.crypto.{Blake2b, Byte32}
 import org.alephium.flow.client.Node

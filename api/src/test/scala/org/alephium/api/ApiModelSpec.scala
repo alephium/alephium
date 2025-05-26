@@ -1951,8 +1951,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   trait GrouplessModelFixture {
     val fromPublicKey           = PublicKeyLike.SecP256K1(PublicKey.generate)
     val fromLockupScript        = LockupScript.p2pk(fromPublicKey, GroupIndex.unsafe(0))
-    val fromAddressWithGroup    = AddressLike.from(fromLockupScript)
-    val fromAddressWithoutGroup = AddressLike.fromP2PKPublicKey(fromPublicKey)
+    val fromAddressWithGroup    = api.Address.from(fromLockupScript)
+    val fromAddressWithoutGroup = api.Address.from(fromPublicKey)
   }
 
   it should "getLockPair for BuildExecuteScriptTx" in new GrouplessModelFixture {

@@ -30,7 +30,7 @@ import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.metrics.prometheus.PrometheusMetrics.prometheusRegistryCodec
 
 import org.alephium.api.{badRequest, notFound, ApiError, Endpoints, Try}
-import org.alephium.api.model.{TransactionTemplate => _, _}
+import org.alephium.api.model.{Address => _, TransactionTemplate => _, _}
 import org.alephium.app.FutureTry
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo}
@@ -422,7 +422,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bt => Right(Some(bt.fromAddress.getAddress().lockupScript.groupIndex(brokerConfig)))
+    bt => Right(Some(bt.fromAddress.toProtocol().groupIndex(brokerConfig)))
   )
 
   val buildSweepMultisigLogic = serverLogicRedirect(buildSweepMultisig)(

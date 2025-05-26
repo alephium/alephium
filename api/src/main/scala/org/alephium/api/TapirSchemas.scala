@@ -23,6 +23,7 @@ import akka.util.ByteString
 import sttp.tapir.{FieldName, Schema, Validator}
 import sttp.tapir.SchemaType.{SArray, SInteger, SProduct, SProductField, SString}
 
+import org.alephium.api.{model => api}
 import org.alephium.api.model.{Amount, ApiKey, BuildTxCommon, MinerAction, Script}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, PublicKey, Signature}
@@ -37,8 +38,8 @@ trait TapirSchemasLike {
 
   implicit def optionAvectorSchema[T: Schema]: Schema[Option[AVector[T]]] = Schema.schemaForOption
 
-  implicit val addressLikeSchema: Schema[AddressLike]          = Schema(SString()).format("address")
-  implicit val addressSchema: Schema[Address]                  = Schema(SString()).format("address")
+  implicit val addressSchema: Schema[api.Address]              = Schema(SString()).format("address")
+  implicit val protocolAddressSchema: Schema[Address]          = Schema(SString()).format("address")
   implicit val addressAssetSchema: Schema[Address.Asset]       = Schema(SString()).format("address")
   implicit val addressContractSchema: Schema[Address.Contract] = Schema(SString()).format("address")
   implicit val byteStringSchema: Schema[ByteString]   = Schema(SString()).format("hex-string")

@@ -26,10 +26,11 @@ import sttp.tapir.EndpointOutput.OneOfVariant
 import sttp.tapir.generic.auto._
 import sttp.tapir.oneOfVariantValueMatcher
 
+import org.alephium.api.{model => api}
 import org.alephium.api.TapirCodecs
 import org.alephium.api.TapirSchemasLike
 import org.alephium.api.UtilJson.{avectorReadWriter, inetAddressRW}
-import org.alephium.api.model._
+import org.alephium.api.model.{Address => _, _}
 import org.alephium.json.Json.ReadWriter
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
@@ -287,9 +288,9 @@ trait Endpoints
       .out(jsonBody[Boolean])
       .summary("Check if the block is in main chain")
 
-  val getBalance: BaseEndpoint[(AddressLike, Option[Boolean]), Balance] =
+  val getBalance: BaseEndpoint[(api.Address, Option[Boolean]), Balance] =
     addressesEndpoint.get
-      .in(path[AddressLike]("address"))
+      .in(path[api.Address]("address"))
       .in("balance")
       .in(query[Option[Boolean]]("mempool"))
       .out(jsonBodyWithAlph[Balance])

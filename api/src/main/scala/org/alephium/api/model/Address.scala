@@ -18,16 +18,39 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
+import org.alephium.protocol.{model => protocol}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.{LockupScript, PublicKeyLike}
 import org.alephium.util.Base58
 
-final case class Address(lockupScript: Address.DecodedLockupScript) extends AnyVal
+final case class Address(lockupScript: Address.DecodedLockupScript) extends AnyVal {
+  def toProtocol()(implicit config: GroupConfig): protocol.Address = {
+    lockupScript match {
+      case Address.CompleteLockupScript(lockupScript) =>
+        protocol.Address.from(lockupScript)
+      case lockupScript: Address.HalfDecodedLockupScript =>
+        protocol.Address.from(lockupScript.getLockupScript)
+    }
+  }
+
+  def toBase58(implicit config: GroupConfig): String = {
+    lockupScript match {
+      case Address.CompleteLockupScript(lockupScript) => lockupScript.toBase58
+      case lockupScript: Address.HalfDecodedLockupScript =>
+        lockupScript.getLockupScript.toBase58WithoutGroup
+    }
+  }
+}
 
 object Address {
-  def from(lockupScript: LockupScript): Address =
-    Address(CompleteLockupScript(lockupScript))
+  def fromProtocol(address: protocol.Address): Address =
+    Address(CompleteLockupScript(address.lockupScript))
+
+  def from(lockupScript: LockupScript): Address = Address(CompleteLockupScript(lockupScript))
+  def from(publicKey: PublicKeyLike): Address   = Address(HalfDecodedP2PK(publicKey))
+  def from(p2hmpkHash: Hash): Address           = Address(HalfDecodedP2HMPK(p2hmpkHash))
 
   def fromBase58(input: String): Either[String, Address] = {
     if (LockupScript.Groupless.hasExplicitGroupIndex(input)) {
@@ -59,16 +82,21 @@ object Address {
 
   final case class CompleteLockupScript(lockupScript: LockupScript) extends DecodedLockupScript
   sealed trait HalfDecodedLockupScript extends DecodedLockupScript {
-    def getLockupScript(implicit config: GroupConfig): LockupScript
+    def getLockupScript(index: GroupIndex): LockupScript.GrouplessAsset
+    def getLockupScript(implicit config: GroupConfig): LockupScript.GrouplessAsset
   }
 
   final case class HalfDecodedP2PK(publicKey: PublicKeyLike) extends HalfDecodedLockupScript {
-    def getLockupScript(implicit config: GroupConfig): LockupScript =
+    def getLockupScript(index: GroupIndex): LockupScript.GrouplessAsset =
+      LockupScript.P2PK(publicKey, index)
+    def getLockupScript(implicit config: GroupConfig): LockupScript.GrouplessAsset =
       LockupScript.P2PK(publicKey)
   }
 
   final case class HalfDecodedP2HMPK(hash: Hash) extends HalfDecodedLockupScript {
-    def getLockupScript(implicit config: GroupConfig): LockupScript =
+    def getLockupScript(index: GroupIndex): LockupScript.GrouplessAsset =
+      LockupScript.P2HMPK(hash, index)
+    def getLockupScript(implicit config: GroupConfig): LockupScript.GrouplessAsset =
       LockupScript.P2HMPK(hash)
   }
 }

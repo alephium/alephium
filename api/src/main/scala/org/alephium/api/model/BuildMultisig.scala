@@ -18,17 +18,18 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
+import org.alephium.api.{model => api}
 import org.alephium.api.{badRequest, Try}
 import org.alephium.crypto.SecP256K1PublicKey
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, AddressLike, GroupIndex}
+import org.alephium.protocol.model.{Address, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{AVector, Hex}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildMultisig(
-    fromAddress: AddressLike,
+    fromAddress: api.Address,
     fromPublicKeys: AVector[ByteString],
     fromPublicKeyTypes: Option[AVector[BuildTxCommon.PublicKeyType]] = None,
     fromPublicKeyIndexes: Option[AVector[Int]] = None,
@@ -39,7 +40,7 @@ final case class BuildMultisig(
     multiSigType: Option[MultiSigType] = Some(MultiSigType.P2MPKH)
 ) {
   def getFromAddress()(implicit config: GroupConfig): Try[Address.Asset] = {
-    fromAddress.getAddress() match {
+    fromAddress.toProtocol() match {
       case address: Address.Asset =>
         Right(address)
       case address: Address.Contract =>

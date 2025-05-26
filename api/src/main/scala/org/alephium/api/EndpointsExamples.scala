@@ -21,12 +21,12 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import sttp.tapir.EndpointIO.Example
 
+import org.alephium.api.{model => api}
 import org.alephium.api.model._
 import org.alephium.protocol._
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{
   Address,
-  AddressLike,
   BlockHash,
   CliqueId,
   ContractId,
@@ -658,7 +658,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildMultisigTransactionExamples: List[Example[BuildMultisig]] = List(
     defaultExample(
       BuildMultisig(
-        AddressLike.from(address),
+        api.Address.fromProtocol(address),
         AVector(publicKey.bytes),
         None,
         None,
@@ -670,7 +670,7 @@ trait EndpointsExamples extends ErrorExamples {
     ),
     moreSettingsExample(
       BuildMultisig(
-        AddressLike.from(address),
+        api.Address.fromProtocol(address),
         AVector(publicKey.bytes),
         None,
         None,

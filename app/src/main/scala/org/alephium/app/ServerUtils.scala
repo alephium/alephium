@@ -25,9 +25,16 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.api._
+import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
 import org.alephium.api.model
-import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
+import org.alephium.api.model.{
+  Address => _,
+  AssetOutput => _,
+  Transaction => _,
+  TransactionTemplate => _,
+  _
+}
 import org.alephium.crypto.{Byte32, Byte64, SecP256K1PublicKey}
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo}
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
@@ -158,12 +165,12 @@ class ServerUtils(implicit
 
   def getBalance(
       blockFlow: BlockFlow,
-      address: AddressLike,
+      address: api.Address,
       getMempoolUtxos: Boolean
   ): Try[Balance] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
-    address.lockupScriptResult match {
-      case LockupScript.CompleteLockupScript(lockupScript) =>
+    address.lockupScript match {
+      case api.Address.CompleteLockupScript(lockupScript) =>
         for {
           _ <- checkGroup(lockupScript)
           balance <- blockFlow
@@ -176,9 +183,9 @@ class ServerUtils(implicit
             .left
             .flatMap(tooManyUtxos)
         } yield balance
-      case halfDecodedP2PK: LockupScript.HalfDecodedP2PK =>
+      case halfDecodedP2PK: api.Address.HalfDecodedP2PK =>
         getGrouplessBalance(blockFlow, halfDecodedP2PK, getMempoolUtxos)
-      case halfDecodedP2HMPK: LockupScript.HalfDecodedP2HMPK =>
+      case halfDecodedP2HMPK: api.Address.HalfDecodedP2HMPK =>
         getGrouplessBalance(blockFlow, halfDecodedP2HMPK, getMempoolUtxos)
     }
   }

@@ -32,7 +32,7 @@ import sttp.model.StatusCode
 
 import org.alephium.api.{ApiError, ApiModel, OpenAPIWriters}
 import org.alephium.api.UtilJson.avectorReadWriter
-import org.alephium.api.model._
+import org.alephium.api.model.{Address => _, _}
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.crypto.Blake2b
 import org.alephium.flow.handler.{TestUtils, ViewHandler}
