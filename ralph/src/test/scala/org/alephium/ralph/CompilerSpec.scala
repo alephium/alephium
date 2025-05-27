@@ -10017,4 +10017,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
         s"""Invalid param types List(U256, I256) for ${expr.slice(2, 4)} operator"""
     )
   }
+
+  it should "generate efficient bytecode for constant div expr" in {
+    val code0 =
+      s"""
+         |TxScript Main {
+         |  let _ = 5i / 3i
+         |  let _ = -5i / 3i
+         |  let _ = 5 / 3
+         |
+         |  let _ = 5i \\ 3i
+         |  let _ = -5i \\ 3i
+         |  let _ = 5 \\ 3
+         |}
+         |""".stripMargin
+    // format: off
+    Compiler.compileTxScript(code0).rightValue.methods.head.instrs is AVector[Instr[StatefulContext]](
+      I256Const5, I256Const3, I256Div, Pop, I256Const(Val.I256(I256.unsafe(-5))), I256Const3, I256RoundInfinityDiv, Pop,
+      U256Const5, U256Const3, U256Div, Pop, I256Const5, I256Const3, I256RoundInfinityDiv, Pop,
+      I256Const(Val.I256(I256.unsafe(-5))), I256Const3, I256Div, Pop, U256Const5, U256Const3, U256RoundInfinityDiv, Pop
+    )
+    // format: on
+  }
 }

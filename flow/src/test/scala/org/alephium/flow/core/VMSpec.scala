@@ -1130,6 +1130,20 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(5i \\ 3i == 2i, 0)
          |    assert!(-5i \\ 3i == -1i, 0)
          |    assert!(5 \\ 3 == 2, 0)
+         |
+         |    let n0 = 5i
+         |    let n1 = 3i
+         |    let n2 = -5i
+         |    let n3 = 5
+         |    let n4 = 3
+         |
+         |    assert!(n0 / n1 == 1i, 0)
+         |    assert!(n2 / n1 == -2i, 0)
+         |    assert!(n3 / n4 == 1, 0)
+         |
+         |    assert!(n0 \\ n1 == 2i, 0)
+         |    assert!(n2 \\ n1 == -1i, 0)
+         |    assert!(n3 \\ n4 == 2, 0)
          |  }
          |}
          |""".stripMargin
