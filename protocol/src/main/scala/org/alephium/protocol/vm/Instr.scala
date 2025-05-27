@@ -216,7 +216,7 @@ object Instr {
     /* Below are instructions for Rhone hard fork */
     GroupOfAddress,
     /* Below are instructions for Danube hard fork */
-    VerifySignature, GetSegregatedWebAuthnSignature, DevInstr
+    VerifySignature, GetSegregatedWebAuthnSignature, DevInstr, I256RoundInfinityDiv, U256RoundInfinityDiv
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -846,6 +846,18 @@ object I256Ge extends BinaryArithmeticInstr[Val.I256] with I256StackOps with Gas
   protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(_.>=(_))(x, y)
 }
+object I256RoundInfinityDiv
+    extends BinaryArithmeticInstr[Val.I256]
+    with DanubeInstrWithSimpleGas[StatelessContext]
+    with I256StackOps
+    with GasLow {
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[DanubeInstrWithSimpleGas]._runWith(frame)
+  override def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[BinaryArithmeticInstr]._runWith(frame)
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256SafeOp(this, _.roundInfinityDiv(_))(x, y)
+}
 object U256Add extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.add(_))(x, y)
@@ -937,6 +949,18 @@ object U256Gt extends BinaryArithmeticInstr[Val.U256] with U256StackOps with Gas
 object U256Ge extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(_.>=(_))(x, y)
+}
+object U256RoundInfinityDiv
+    extends BinaryArithmeticInstr[Val.U256]
+    with DanubeInstrWithSimpleGas[StatelessContext]
+    with U256StackOps
+    with GasLow {
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[DanubeInstrWithSimpleGas]._runWith(frame)
+  override def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[BinaryArithmeticInstr]._runWith(frame)
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256SafeOp(this, _.roundInfinityDiv(_))(x, y)
 }
 
 sealed trait ExpInstr[T <: Val]

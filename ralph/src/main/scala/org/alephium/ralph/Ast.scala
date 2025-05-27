@@ -590,17 +590,17 @@ object Ast {
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       positionedError {
-        val leftCode  = left.genCode(state)
-        val rightCode = right.genCode(state)
         op match {
           case op: LogicalOperator.BinaryLogicalOperator =>
-            val offset = 1 + rightCode.length // we need to pop the first value
+            val leftCode  = left.genCode(state)
+            val rightCode = right.genCode(state)
+            val offset    = 1 + rightCode.length // we need to pop the first value
             val instr: Instr[Ctx] = op match {
               case LogicalOperator.And => IfFalse(offset)
               case LogicalOperator.Or  => IfTrue(offset)
             }
             leftCode ++ Seq(Dup, instr, Pop) ++ rightCode
-          case _ => leftCode ++ rightCode ++ op.genCode(left.getType(state) ++ right.getType(state))
+          case _ => op.genCode(Seq(left, right), state)
         }
       }
     }
