@@ -149,12 +149,9 @@ trait ApiModelCodec {
   implicit lazy val contractAddressRW: RW[Address.Contract] = readwriter[String].bimap(
     _.toBase58,
     input =>
-      Address.fromBase58(input) match {
-        case Some(address: Address.Contract) => address
-        case Some(_: Address.Asset) =>
-          throw Abort(s"Expect contract address, but was asset address: $input")
-        case None =>
-          throw Abort(s"Unable to decode address from $input")
+      Address.contract(input) match {
+        case Right(address) => address
+        case Left(error)    => throw Abort(error)
       }
   )
 

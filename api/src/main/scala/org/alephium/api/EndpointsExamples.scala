@@ -45,7 +45,7 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val networkId = NetworkId.AlephiumMainNet
   private val lockupScript =
-    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
+    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").toOption.get
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get

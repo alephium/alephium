@@ -24,7 +24,7 @@ import org.alephium.util.{AlephiumSpec, Hex, U256}
 class ExeFailureSpec extends AlephiumSpec {
   it should "test NotEnoughApprovedBalance" in {
     val lockupScript =
-      Address.fromBase58("1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6").get.lockupScript
+      Address.fromBase58("1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6").rightValue.lockupScript
     val tokenId = TokenId
       .from(Hex.unsafe("cee16cdfad98e8943fd9a5b45e1765e0a6895608efe3eeeb41a60db55f605b46"))
       .get
@@ -37,7 +37,7 @@ class ExeFailureSpec extends AlephiumSpec {
 
   it should "test InvalidOutputBalances" in {
     val address      = "1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6"
-    val lockupScript = Address.fromBase58(address).get.lockupScript
+    val lockupScript = Address.fromBase58(address).rightValue.lockupScript
 
     InvalidOutputBalances(lockupScript, 2, U256.Zero).toString is
       s"Invalid ALPH balance for address $address, expected 0.002 ALPH, got 0 ALPH, you need to transfer more ALPH to this address"
@@ -60,7 +60,7 @@ class ExeFailureSpec extends AlephiumSpec {
 
   it should "test EmptyContractAsset" in {
     val address         = "22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr"
-    val contractAddress = Address.fromBase58(address).get.asInstanceOf[Address.Contract]
+    val contractAddress = Address.fromBase58(address).rightValue.asInstanceOf[Address.Contract]
 
     EmptyContractAsset(contractAddress).toString is
       s"No assets for contract 22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr, a minimum of 0.1 ALPH is required"

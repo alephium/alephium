@@ -141,10 +141,15 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   it should "calculate correct script hint for p2hmpk address" in {
     forAll(groupIndexGen) { groupIndex =>
-      forAll(p2hmpkLockupGen(groupIndex)) { lockupScript =>
-        lockupScript.groupIndex is groupIndex
-        lockupScript.scriptHint.groupIndex is groupIndex
-        lockupScript.scriptHint.groupIndex.value.toByte is lockupScript.groupByte
+      forAll(p2hmpkLockupGen(groupIndex)) { lockupScript0 =>
+        lockupScript0.groupIndex is groupIndex
+        lockupScript0.scriptHint.groupIndex is groupIndex
+        lockupScript0.scriptHint.groupIndex.value.toByte is lockupScript0.groupByte
+
+        val defaultGroupIndex = LockupScript.P2HMPK.defaultGroup(lockupScript0.p2hmpkHash)
+        val lockupScript1     = LockupScript.P2HMPK(lockupScript0.p2hmpkHash, defaultGroupIndex)
+        lockupScript1.scriptHint.groupIndex is defaultGroupIndex
+        lockupScript1.scriptHint.groupIndex.value.toByte is lockupScript1.groupByte
       }
     }
   }
@@ -171,20 +176,47 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   it should "decode from base58 string" in {
     import LockupScript.fromBase58
-    fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3").isDefined is true
-    fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa").isDefined is true
-    fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr").isDefined is true
-    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L").isDefined is false
-    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0").isDefined is true
-    fromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85:0").isDefined is false
-    fromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85").isDefined is false
-    fromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU:2").isDefined is true
-    fromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU").isDefined is false
-    fromBase58(":1").isDefined is false
-    fromBase58("1C2:1").isDefined is false
-    fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0").isDefined is false
-    fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa:0").isDefined is false
-    fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr:0").isDefined is false
-    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3").isDefined is false
+    fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3").isRight is true
+    fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa").isRight is true
+    fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr").isRight is true
+    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L").leftValue.startsWith(
+      "Expected a grouped address, but got a groupless one"
+    ) is true
+    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0").isRight is true
+    fromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85:0").leftValue.startsWith(
+      "Invalid grouped address"
+    ) is true
+    fromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85").leftValue.startsWith(
+      "Expected a grouped address, but got a groupless one"
+    ) is true
+    fromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU:2").isRight is true
+    fromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU").leftValue.startsWith(
+      "Expected a grouped address, but got a groupless one"
+    ) is true
+    fromBase58(":1").leftValue.startsWith("Invalid base58 string") is true
+    fromBase58("1C2:1").leftValue.startsWith("Invalid grouped address") is true
+    fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0").leftValue.startsWith(
+      "Invalid grouped address"
+    ) is true
+    fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa:0").leftValue.startsWith(
+      "Invalid grouped address"
+    ) is true
+    fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr:0").leftValue.startsWith(
+      "Invalid grouped address"
+    ) is true
+    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3").leftValue.startsWith(
+      "Invalid address"
+    ) is true
+
+    LockupScript.asset("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3").isRight is true
+    LockupScript
+      .asset("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr")
+      .leftValue
+      .startsWith("Expected an asset address, but got a contract address") is true
+    LockupScript.p2c("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr").isRight is true
+    LockupScript
+      .p2c("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3")
+      .leftValue
+      .startsWith("Expected a contract address, but got an asset address") is true
   }
 }

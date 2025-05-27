@@ -933,7 +933,7 @@ object TxValidation {
         lock: LockupScript.P2HMPK,
         unlock: UnlockScript.P2HMPK
     ): TxValidationResult[GasBox] = {
-      if (lock.p2hmpkHash != unlock.hash) {
+      if (lock.p2hmpkHash != unlock.calHash()) {
         invalidTx(InvalidP2hmpkHash)
       } else {
         unlock.publicKeyIndexes.foldE(gasRemaining) { case (gasBox, index) =>

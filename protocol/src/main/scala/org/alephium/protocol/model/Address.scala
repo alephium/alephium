@@ -21,7 +21,7 @@ import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.{LockupScript, StatelessScript, UnlockScript}
 import org.alephium.serde.deserialize
-import org.alephium.util.{AVector, Base58}
+import org.alephium.util.AVector
 import org.alephium.util.Hex.HexStringSyntax
 
 sealed trait Address {
@@ -51,25 +51,19 @@ object Address {
     Contract(LockupScript.p2c(contractId))
   }
 
-  def contract(input: String): Option[Address.Contract] = {
-    Base58.decode(input).flatMap(deserialize[LockupScript](_).toOption) match {
-      case Some(lockupScript: LockupScript.P2C) => Some(Address.Contract(lockupScript))
-      case _                                    => None
-    }
+  def contract(input: String): Either[String, Address.Contract] = {
+    LockupScript.p2c(input).map(Contract.apply)
   }
 
-  def fromBase58(input: String): Option[Address] = {
+  def fromBase58(input: String): Either[String, Address] = {
     LockupScript.fromBase58(input).map(from)
   }
 
-  def asset(input: String): Option[Address.Asset] = {
-    fromBase58(input) match {
-      case Some(address: Asset) => Some(address)
-      case _                    => None
-    }
+  def asset(input: String): Either[String, Address.Asset] = {
+    LockupScript.asset(input).map(Asset.apply)
   }
 
-  def extractLockupScript(address: String): Option[LockupScript] = {
+  def extractLockupScript(address: String): Either[String, LockupScript] = {
     LockupScript.fromBase58(address)
   }
 

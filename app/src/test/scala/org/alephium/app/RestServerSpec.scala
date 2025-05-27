@@ -811,7 +811,7 @@ abstract class RestServerSpec(
   }
 
   it should "call POST /miners" in {
-    val address      = Address.asset(dummyKeyAddress).get
+    val address      = Address.asset(dummyKeyAddress).rightValue
     val lockupScript = address.lockupScript
     allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
       msg match {
@@ -900,7 +900,7 @@ abstract class RestServerSpec(
   }
 
   it should "call GET /miners/addresses" in {
-    val address      = Address.asset(dummyKeyAddress).get
+    val address      = Address.asset(dummyKeyAddress).rightValue
     val lockupScript = address.lockupScript
 
     allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
@@ -940,7 +940,7 @@ abstract class RestServerSpec(
     val body = s"""{"addresses":${writeJs(newAddresses)}}"""
 
     Put(s"/miners/addresses", body) check { response =>
-      val addresses = newAddresses.map(Address.asset(_).get)
+      val addresses = newAddresses.map(Address.asset(_).rightValue)
       allHandlersProbe.viewHandler.fishForSpecificMessage()(_ =>
         ViewHandler.UpdateMinerAddresses(addresses)
       )

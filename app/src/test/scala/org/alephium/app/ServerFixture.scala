@@ -474,8 +474,10 @@ object ServerFixture {
         start: Int,
         end: Int
     ): IOResult[(Int, AVector[LogStates])] = {
-      lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
-      lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
+      lazy val address1 =
+        Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").toOption.get
+      lazy val address2 =
+        Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").toOption.get
 
       val eventKeysWithoutEvents: Seq[ContractId] = Seq(
         ContractId.unsafe(

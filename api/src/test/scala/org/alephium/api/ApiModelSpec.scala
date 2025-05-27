@@ -49,7 +49,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   val zeroHash: String = BlockHash.zero.toHexString
   val ghostUncleHash: BlockHash =
     BlockHash.unsafe(Hex.unsafe("bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"))
-  val lockupScript = LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
+  val lockupScript = LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").rightValue
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(
       BlockHash.zero,
@@ -95,7 +95,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   def generateAddress(): Address.Asset = Address.p2pkh(PublicKey.generate)
   def generateContractAddress(): Address.Contract =
-    Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").get)
+    Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").rightValue)
 
   def blockEntryJson(blockEntry: BlockEntry): String = {
     s"""

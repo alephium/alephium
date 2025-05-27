@@ -65,7 +65,7 @@ object Address {
           } else if (bytes.startsWith(LockupScript.P2HMPKPrefix)) {
             halfDecodeP2HMPK(bytes).toRight(s"Invalid p2hmpk address $input")
           } else {
-            LockupScript.decodeLockupScript(bytes).map(from).toRight(s"Invalid address $input")
+            LockupScript.serde.deserialize(bytes).map(from).left.map(_ => s"Invalid address $input")
           }
         case None => Left(s"Invalid address $input")
       }
@@ -84,21 +84,21 @@ object Address {
 
   final case class CompleteLockupScript(lockupScript: LockupScript) extends DecodedLockupScript
   sealed trait HalfDecodedLockupScript extends DecodedLockupScript {
-    def getLockupScript(index: GroupIndex): LockupScript.GrouplessAsset
-    def getLockupScript(implicit config: GroupConfig): LockupScript.GrouplessAsset
+    def getLockupScript(index: GroupIndex): LockupScript.GroupedAsset
+    def getLockupScript(implicit config: GroupConfig): LockupScript.GroupedAsset
   }
 
   final case class HalfDecodedP2PK(publicKey: PublicKeyLike) extends HalfDecodedLockupScript {
-    def getLockupScript(index: GroupIndex): LockupScript.GrouplessAsset =
+    def getLockupScript(index: GroupIndex): LockupScript.GroupedAsset =
       LockupScript.P2PK(publicKey, index)
-    def getLockupScript(implicit config: GroupConfig): LockupScript.GrouplessAsset =
+    def getLockupScript(implicit config: GroupConfig): LockupScript.GroupedAsset =
       LockupScript.P2PK(publicKey)
   }
 
   final case class HalfDecodedP2HMPK(hash: Hash) extends HalfDecodedLockupScript {
-    def getLockupScript(index: GroupIndex): LockupScript.GrouplessAsset =
+    def getLockupScript(index: GroupIndex): LockupScript.GroupedAsset =
       LockupScript.P2HMPK(hash, index)
-    def getLockupScript(implicit config: GroupConfig): LockupScript.GrouplessAsset =
+    def getLockupScript(implicit config: GroupConfig): LockupScript.GroupedAsset =
       LockupScript.P2HMPK(hash)
   }
 }

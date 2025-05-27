@@ -104,7 +104,7 @@ object UnlockScript {
       publicKeys: AVector[PublicKeyLike],
       publicKeyIndexes: AVector[Int]
   ) extends UnlockScript {
-    def hash: Hash = LockupScript.P2HMPK.calcHash(publicKeys, publicKeyIndexes.length)
+    def calHash(): Hash = LockupScript.P2HMPK.calcHash(publicKeys, publicKeyIndexes.length)
   }
   object P2HMPK {
     def validate(p2hmpk: P2HMPK): Either[String, Unit] = {

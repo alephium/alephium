@@ -75,16 +75,21 @@ object LockupScript {
 
   val vmDefault: LockupScript = p2pkh(Hash.zero)
 
-  def fromBase58(input: String): Option[LockupScript] = {
+  def fromBase58(input: String): Either[String, LockupScript] = {
     if (Groupless.hasExplicitGroupIndex(input)) {
-      decodeGroupless(input)
+      decodeGroupless(input).toRight(s"Invalid grouped address $input")
     } else {
-      Base58.decode(input).flatMap(decodeLockupScript)
+      for {
+        bytes <- Base58.decode(input).toRight(s"Invalid base58 string $input")
+        lockupScript <- deserialize[LockupScript](bytes).left.map { error =>
+          if (bytes.startsWith(P2PKPrefix) || bytes.startsWith(P2HMPKPrefix)) {
+            s"Expected a grouped address, but got a groupless one: $input"
+          } else {
+            s"Invalid address $input: ${error.getMessage}"
+          }
+        }
+      } yield lockupScript
     }
-  }
-
-  def decodeLockupScript(bytes: ByteString): Option[LockupScript] = {
-    deserialize[LockupScript](bytes).toOption
   }
 
   def decodeGroupless(input: String): Option[LockupScript] = {
@@ -102,10 +107,12 @@ object LockupScript {
     } yield lockupScriptOpt
   }
 
-  def asset(input: String): Option[LockupScript.Asset] = {
-    fromBase58(input).flatMap {
-      case e: LockupScript.Asset => Some(e)
-      case _                     => None
+  def asset(input: String): Either[String, LockupScript.Asset] = {
+    fromBase58(input) match {
+      case Right(e: LockupScript.Asset) => Right(e)
+      case Right(_: LockupScript.P2C) =>
+        Left(s"Expected an asset address, but got a contract address: $input")
+      case Left(error) => Left(error)
     }
   }
 
@@ -121,10 +128,11 @@ object LockupScript {
     P2SH(Hash.hash(serdeImpl[StatelessScript].serialize(script)))
   def p2sh(scriptHash: Hash): P2SH     = P2SH(scriptHash)
   def p2c(contractId: ContractId): P2C = P2C(contractId)
-  def p2c(input: String): Option[LockupScript.P2C] = {
-    fromBase58(input).flatMap {
-      case e: LockupScript.P2C => Some(e)
-      case _                   => None
+  def p2c(input: String): Either[String, LockupScript.P2C] = {
+    fromBase58(input) match {
+      case Right(e: LockupScript.P2C) => Right(e)
+      case Right(_)    => Left(s"Expected a contract address, but got an asset address: $input")
+      case Left(error) => Left(error)
     }
   }
   def p2pk(key: PublicKeyLike, groupIndex: GroupIndex): P2PK = P2PK(key, groupIndex)
@@ -147,7 +155,7 @@ object LockupScript {
     )
   }
 
-  sealed trait GrouplessAsset extends Asset with Product with Serializable {
+  sealed trait GroupedAsset extends Asset with Product with Serializable {
     def groupByte: Byte
 
     override def groupIndex(implicit config: GroupConfig): GroupIndex =
@@ -202,7 +210,7 @@ object LockupScript {
     implicit val serde: Serde[P2C] = Serde.forProduct1(P2C.apply, t => t.contractId)
   }
 
-  final case class P2PK private (publicKey: PublicKeyLike, groupByte: Byte) extends GrouplessAsset {
+  final case class P2PK private (publicKey: PublicKeyLike, groupByte: Byte) extends GroupedAsset {
     // We need to use `scriptHint` to calculate the group index in the `AssetOutputRef`,
     // so we need to find a `scriptHint` that matches the group index.
     // Since the least significant byte is already used to distinguish the output type,
@@ -245,7 +253,7 @@ object LockupScript {
   final case class P2HMPK private (
       p2hmpkHash: Hash,
       groupByte: Byte
-  ) extends GrouplessAsset {
+  ) extends GroupedAsset {
     override lazy val scriptHint: ScriptHint = Groupless.calcScriptHint(p2hmpkHash.bytes, groupByte)
   }
 

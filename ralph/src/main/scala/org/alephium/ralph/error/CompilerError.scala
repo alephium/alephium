@@ -191,10 +191,16 @@ object CompilerError {
       address.length
   }
 
-  final case class `Invalid address`(address: String, position: Int, fileURI: Option[java.net.URI])
-      extends TypeError {
+  final case class `Invalid address`(
+      address: String,
+      position: Int,
+      fileURI: Option[java.net.URI],
+      detail: String
+  ) extends TypeError {
     override def foundLength: Int =
       address.length
+
+    override def message: String = detail
   }
 
   /** ****** Section: Default Error ****** This error is used when a specific error is not

@@ -33,7 +33,7 @@ import org.alephium.protocol.model
 import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, PublicKeyLike, UnlockScript}
-import org.alephium.protocol.vm.LockupScript.GrouplessAsset
+import org.alephium.protocol.vm.LockupScript.GroupedAsset
 import org.alephium.util.{AVector, Hex, U256}
 
 trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
@@ -55,23 +55,23 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   protected def allGroupedLockupScripts(
-      lockup: LockupScript.GrouplessAsset
-  ): AVector[LockupScript.GrouplessAsset] = {
+      lockup: LockupScript.GroupedAsset
+  ): AVector[LockupScript.GroupedAsset] = {
     lockup match {
       case lockup: LockupScript.P2PK =>
         self.brokerConfig.groupIndexes
           .map(groupIndex => LockupScript.P2PK(lockup.publicKey, groupIndex))
-          .asInstanceOf[AVector[LockupScript.GrouplessAsset]]
+          .asInstanceOf[AVector[LockupScript.GroupedAsset]]
       case lockup: LockupScript.P2HMPK =>
         self.brokerConfig.groupIndexes
           .map(groupIndex => LockupScript.P2HMPK(lockup.p2hmpkHash, groupIndex))
-          .asInstanceOf[AVector[LockupScript.GrouplessAsset]]
+          .asInstanceOf[AVector[LockupScript.GroupedAsset]]
     }
   }
 
   protected def otherGroupsLockupScripts(
-      lockupScript: LockupScript.GrouplessAsset
-  ): AVector[LockupScript.GrouplessAsset] = {
+      lockupScript: LockupScript.GroupedAsset
+  ): AVector[LockupScript.GroupedAsset] = {
     allGroupedLockupScripts(lockupScript).filter(_ != lockupScript)
   }
 
@@ -179,7 +179,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   // scalastyle:off method.length
   def buildGrouplessTransferTxWithoutExplicitGroup(
       blockFlow: BlockFlow,
-      lockupScript: LockupScript.GrouplessAsset,
+      lockupScript: LockupScript.GroupedAsset,
       unlockScript: UnlockScript,
       destinations: AVector[Destination],
       gasAmountOpt: Option[GasBox],
@@ -367,7 +367,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
   def buildGrouplessTransferTxWithEachGroupedAddress(
       blockFlow: BlockFlow,
-      lockupScript: LockupScript.GrouplessAsset,
+      lockupScript: LockupScript.GroupedAsset,
       unlockScript: UnlockScript,
       outputInfos: AVector[TxOutputInfo],
       totalAmountNeeded: TotalAmountNeeded,
@@ -401,7 +401,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
   def buildGrouplessTransferTxWithEachSortedGroupedAddress(
       blockFlow: BlockFlow,
-      allLockupScriptsWithUtxos: AVector[(LockupScript.GrouplessAsset, AVector[AssetOutputInfo])],
+      allLockupScriptsWithUtxos: AVector[(LockupScript.GroupedAsset, AVector[AssetOutputInfo])],
       unlockScript: UnlockScript,
       outputInfos: AVector[TxOutputInfo],
       totalAmountNeeded: TotalAmountNeeded,
@@ -480,7 +480,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
   def sortedGroupedLockupScripts(
       blockFlow: BlockFlow,
-      allGroupedLockupScripts: AVector[LockupScript.GrouplessAsset],
+      allGroupedLockupScripts: AVector[LockupScript.GroupedAsset],
       totalAmountNeeded: TotalAmountNeeded,
       targetBlockHashOpt: Option[BlockHash]
   ): IOResult[GrouplessAssetInfo] = {
@@ -555,13 +555,13 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
 object GrouplessUtils {
   type GrouplessAssetInfo =
-    AVector[(GrouplessAsset, AVector[AssetOutputInfo], (U256, AVector[(TokenId, U256)]))]
+    AVector[(GroupedAsset, AVector[AssetOutputInfo], (U256, AVector[(TokenId, U256)]))]
 
   final case class BuildingGrouplessTransferTx(
-      from: LockupScript.GrouplessAsset,
+      from: LockupScript.GroupedAsset,
       fromUnlockScript: UnlockScript,
       utxos: AVector[AssetOutputInfo],
-      remainingLockupScripts: AVector[LockupScript.GrouplessAsset],
+      remainingLockupScripts: AVector[LockupScript.GroupedAsset],
       remainingAmounts: (U256, AVector[(TokenId, U256)]),
       builtUnsignedTxsSoFar: AVector[UnsignedTransaction]
   )

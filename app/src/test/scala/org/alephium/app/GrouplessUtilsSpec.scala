@@ -152,7 +152,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     implicit class RichUnsignedTransaction(tx: UnsignedTransaction) {
       def gasFee: U256 = tx.gasPrice * tx.gasAmount
     }
-    def allLockupScripts: AVector[LockupScript.GrouplessAsset]
+    def allLockupScripts: AVector[LockupScript.GroupedAsset]
 
     def failTransfer(
         alphTransferAmount: U256,
@@ -180,7 +180,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     val fromAddressWithGroup            = api.Address.from(fromLockupScript)
     val fromAddressWithoutGroup         = api.Address.from(publicKeyLike)
 
-    def allLockupScripts: AVector[LockupScript.GrouplessAsset] = {
+    def allLockupScripts: AVector[LockupScript.GroupedAsset] = {
       brokerConfig.cliqueGroups.fold(AVector.empty[LockupScript.P2PK]) { case (acc, group) =>
         if (group == chainIndex.from) {
           acc
@@ -188,7 +188,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
           acc :+ LockupScript.p2pk(publicKeyLike, group)
         }
       } :+ fromLockupScript
-    }.asInstanceOf[AVector[LockupScript.GrouplessAsset]]
+    }.asInstanceOf[AVector[LockupScript.GroupedAsset]]
 
     def testTransfer(
         alphTransferAmount: U256,
@@ -287,7 +287,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     val fromAddressWithGroup    = api.Address.from(fromLockupScript)
     val fromAddressWithoutGroup = api.Address.from(fromP2HMPKHash)
 
-    def allLockupScripts: AVector[LockupScript.GrouplessAsset] = {
+    def allLockupScripts: AVector[LockupScript.GroupedAsset] = {
       brokerConfig.cliqueGroups.fold(AVector.empty[LockupScript.P2HMPK]) { case (acc, group) =>
         if (group == chainIndex.from) {
           acc
@@ -295,7 +295,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
           acc :+ LockupScript.p2hmpk(fromP2HMPKHash, group)
         }
       } :+ fromLockupScript
-    }.asInstanceOf[AVector[LockupScript.GrouplessAsset]]
+    }.asInstanceOf[AVector[LockupScript.GroupedAsset]]
 
     // scalastyle:off method.length
     def testTransfer(
