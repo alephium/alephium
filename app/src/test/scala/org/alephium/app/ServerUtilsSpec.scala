@@ -5937,9 +5937,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       def code(str: String) =
         s"""
            |Contract Foo() {
-           |  pub fn foo0() -> () {
-           |    let v = 1 / 0
-           |    let _ = v
+           |  pub fn foo0(v: U256) -> () {
+           |    let _ = v / 0
            |  }
            |  fn foo1() -> U256 {
            |    return 0
@@ -5950,7 +5949,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      Seq("foo0()", "1 / 0", "1 / foo1()", "foo1() / foo1()").foreach { expr =>
+      Seq("foo0(1)", "1 / foo1()", "foo1() / foo1()").foreach { expr =>
         serverUtils.compileProject(blockFlow, api.Compile.Project(code(expr))).isRight is true
       }
 
@@ -5958,8 +5957,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         .compileProject(blockFlow, api.Compile.Project(code("foo1() / 1")))
         .leftValue
         .detail is
-        s"""|-- error (11:5): Testing error
-            |11 |    testFail!(foo1() / 1)
+        s"""|-- error (10:5): Testing error
+            |10 |    testFail!(foo1() / 1)
             |   |    ^^^^^^^^^^^^^^^^^^^^^
             |   |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: the test code did not throw an exception
             |""".stripMargin
