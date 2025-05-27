@@ -200,9 +200,9 @@ object ArithOperator {
   val Mul: ArithOperator = binary("*", I256Mul, U256Mul, _ mul _, _ mul _)
   val Exp: ArithOperator = exp(I256Exp, U256Exp, _ pow _, _ pow _)
 
+  // scalastyle:off method.length
   def divOperator(
       name: String,
-      i256ConstInstr: (I256, I256) => BinaryArithmeticInstr[Val.I256],
       i256Instrs: Seq[Instr[StatelessContext]],
       u256Instr: BinaryArithmeticInstr[Val.U256],
       i256Func: (I256, I256) => Option[I256],
@@ -219,38 +219,51 @@ object ArithOperator {
       }
     }
     def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = ???
+
     override def genCode[Ctx <: StatelessContext](
         args: Seq[Ast.Expr[Ctx]],
         state: Compiler.State[Ctx]
     ): Seq[Instr[Ctx]] = {
       assume(args.length == 2)
-      val argsType    = args.flatMap(_.getType(state))
-      val leftInstrs  = args(0).genCode(state)
-      val rightInstrs = args(1).genCode(state)
+      val argsType = args.flatMap(_.getType(state))
       argsType(0) match {
         case Type.I256 =>
           (state.tryCalcConstant(args(0)), state.tryCalcConstant(args(1))) match {
             case (Some(left: Val.I256), Some(right: Val.I256)) =>
-              leftInstrs ++ rightInstrs :+ i256ConstInstr(left.v, right.v)
+              val instr = i256Func(left.v, right.v)
+                .map(Val.I256(_).toConstInstr)
+                .getOrElse(
+                  throw Compiler.Error(s"I256 overflow: `${left.v.v} $name ${right.v.v}`", None)
+                )
+              Seq(instr)
             case _ =>
-              leftInstrs ++ Seq(Dup, Dup) ++ rightInstrs ++
+              // We need to ensure that the instructions for `args(0)` and `args(1)` are only generated once to avoid side effects.
+              // Take `a / b` (where `a` is args(0) and `b` is args(1)) as an example:
+              // The first part of the generated code is `a, a, a, b, xor, dup`.
+              // We first compute `a xor b`, then duplicate the result on the stack using `dup`,
+              // and finally recover `b` using `a xor (a xor b)`.
+              args(0).genCode(state) ++ Seq(Dup, Dup) ++ args(1).genCode(state) ++
                 Seq(NumericXor, Dup, I256Const0, I256Ge) ++ i256Instrs
           }
-        case Type.U256 => leftInstrs ++ rightInstrs :+ u256Instr
-        case _         => throw Compiler.Error(s"Expect I256/U256 for $operatorName operator", None)
+        case Type.U256 =>
+          (state.tryCalcConstant(args(0)), state.tryCalcConstant(args(1))) match {
+            case (Some(left: Val.U256), Some(right: Val.U256)) =>
+              val instr = u256Func(left.v, right.v)
+                .map(Val.U256(_).toConstInstr)
+                .getOrElse(
+                  throw Compiler.Error(s"U256 overflow: `${left.v.v} $name ${right.v.v}`", None)
+                )
+              Seq(instr)
+            case _ => args.flatMap(_.genCode(state)) :+ u256Instr
+          }
+        case _ => throw Compiler.Error(s"Expect I256/U256 for $operatorName operator", None)
       }
     }
   }
+  // scalastyle:on method.length
 
   val RoundDownDiv: ArithOperator = divOperator(
     "/",
-    (left, right) => {
-      if (left.xor(right) >= I256.Zero) {
-        I256Div
-      } else {
-        I256RoundInfinityDiv
-      }
-    },
     Seq(IfTrue(3), NumericXor, I256RoundInfinityDiv, Jump(2), NumericXor, I256Div),
     U256Div,
     (left, right) => {
@@ -264,13 +277,6 @@ object ArithOperator {
   )
   val RoundUpDiv: ArithOperator = divOperator(
     "\\",
-    (left, right) => {
-      if (left.xor(right) >= I256.Zero) {
-        I256RoundInfinityDiv
-      } else {
-        I256Div
-      }
-    },
     Seq(IfTrue(3), NumericXor, I256Div, Jump(2), NumericXor, I256RoundInfinityDiv),
     U256RoundInfinityDiv,
     (left, right) => {

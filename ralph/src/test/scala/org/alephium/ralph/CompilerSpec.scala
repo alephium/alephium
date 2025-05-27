@@ -10018,7 +10018,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
     )
   }
 
-  it should "generate efficient bytecode for constant div expr" in {
+  it should "generate bytecode for div expr" in {
     val code0 =
       s"""
          |TxScript Main {
@@ -10033,10 +10033,48 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
          |""".stripMargin
     // format: off
     Compiler.compileTxScript(code0).rightValue.methods.head.instrs is AVector[Instr[StatefulContext]](
-      I256Const5, I256Const3, I256Div, Pop, I256Const(Val.I256(I256.unsafe(-5))), I256Const3, I256RoundInfinityDiv, Pop,
-      U256Const5, U256Const3, U256Div, Pop, I256Const5, I256Const3, I256RoundInfinityDiv, Pop,
-      I256Const(Val.I256(I256.unsafe(-5))), I256Const3, I256Div, Pop, U256Const5, U256Const3, U256RoundInfinityDiv, Pop
+      I256Const1, Pop, I256Const(Val.I256(I256.unsafe(-2))), Pop, U256Const1,
+      Pop, I256Const2, Pop, I256ConstN1, Pop, U256Const2, Pop
     )
     // format: on
+
+    val code1 =
+      s"""
+         |TxScript Main {
+         |  let n0 = 5i
+         |  let n1 = -5i
+         |
+         |  let _ = n0 / 3i
+         |  let _ = n1 / 3i
+         |
+         |  let _ = n0 \\ 3i
+         |  let _ = n1 \\ 3i
+         |}
+         |""".stripMargin
+    // format: off
+    Compiler.compileTxScript(code1).rightValue.methods.head.instrs is AVector[Instr[StatefulContext]](
+      I256Const5, StoreLocal(0), I256Const(Val.I256(I256.unsafe(-5))), StoreLocal(1), LoadLocal(0), Dup, Dup, I256Const3, NumericXor, Dup,
+      I256Const0, I256Ge, IfTrue(3), NumericXor, I256RoundInfinityDiv, Jump(2), NumericXor, I256Div, Pop, LoadLocal(1), Dup, Dup, I256Const3,
+      NumericXor, Dup, I256Const0, I256Ge, IfTrue(3), NumericXor, I256RoundInfinityDiv, Jump(2), NumericXor, I256Div, Pop, LoadLocal(0), Dup,
+      Dup, I256Const3, NumericXor, Dup, I256Const0, I256Ge, IfTrue(3), NumericXor, I256Div, Jump(2), NumericXor, I256RoundInfinityDiv, Pop,
+      LoadLocal(1), Dup, Dup, I256Const3, NumericXor, Dup, I256Const0, I256Ge, IfTrue(3), NumericXor, I256Div, Jump(2), NumericXor, I256RoundInfinityDiv, Pop
+    )
+    // format: on
+  }
+
+  it should "throw an error if the constant div expr overflow" in {
+    def code(expr: String) =
+      s"""
+         |TxScript Main {
+         |  let _ = $$$expr$$
+         |}
+         |""".stripMargin
+
+    testTxScriptError(code("1 / 0"), "U256 overflow: `1 / 0`")
+    testTxScriptError(code("1 \\ 0"), "U256 overflow: `1 \\ 0`")
+    testTxScriptError(code("1i / 0i"), "I256 overflow: `1 / 0`")
+    testTxScriptError(code("1i \\ 0i"), "I256 overflow: `1 \\ 0`")
+    testTxScriptError(code(s"${I256.MinValue}i / -1i"), s"I256 overflow: `${I256.MinValue} / -1`")
+    testTxScriptError(code(s"${I256.MinValue}i \\ -1i"), s"I256 overflow: `${I256.MinValue} \\ -1`")
   }
 }

@@ -1125,11 +1125,30 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |    assert!(5i / 3i == 1i, 0)
          |    assert!(-5i / 3i == -2i, 0)
+         |    assert!(5i / -3i == -2i, 0)
+         |    assert!(-5i / -3i == 1i, 0)
          |    assert!(5 / 3 == 1, 0)
          |
          |    assert!(5i \\ 3i == 2i, 0)
          |    assert!(-5i \\ 3i == -1i, 0)
+         |    assert!(5i \\ -3i == -1i, 0)
+         |    assert!(-5i \\ -3i == 2i, 0)
          |    assert!(5 \\ 3 == 2, 0)
+         |
+         |    let halfI256Max = i256Max!() / 2i
+         |    assert!(i256Max!() / halfI256Max == 2i, 0)
+         |    assert!(i256Max!() / -halfI256Max == -3i, 0)
+         |    assert!(i256Min!() / halfI256Max == -3i, 0)
+         |    assert!(i256Min!() / -halfI256Max == 2i, 0)
+         |
+         |    assert!(i256Max!() \\ halfI256Max == 3i, 0)
+         |    assert!(i256Max!() \\ -halfI256Max == -2i, 0)
+         |    assert!(i256Min!() \\ halfI256Max == -2i, 0)
+         |    assert!(i256Min!() \\ -halfI256Max == 3i, 0)
+         |
+         |    let halfU256Max = u256Max!() / 2
+         |    assert!(u256Max!() / halfU256Max == 2, 0)
+         |    assert!(u256Max!() \\ halfU256Max == 3, 0)
          |
          |    let n0 = 5i
          |    let n1 = 3i
@@ -1139,10 +1158,14 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |    assert!(n0 / n1 == 1i, 0)
          |    assert!(n2 / n1 == -2i, 0)
+         |    assert!(n0 / -n1 == -2i, 0)
+         |    assert!(-n0 / -n1 == 1i, 0)
          |    assert!(n3 / n4 == 1, 0)
          |
          |    assert!(n0 \\ n1 == 2i, 0)
          |    assert!(n2 \\ n1 == -1i, 0)
+         |    assert!(n0 \\ -n1 == -1i, 0)
+         |    assert!(-n0 \\ -n1 == 2i, 0)
          |    assert!(n3 \\ n4 == 2, 0)
          |  }
          |}
@@ -5413,7 +5436,7 @@ class VMSpec extends AlephiumSpec with Generators {
     // format: off
     Seq(
       ("A + B", "3"), ("B - A", "1"), ("A * B", "2"), ("A / B", "0"), ("A % B", "1"),
-      ("C + D", "1i"), ("C - D", "-3i"), ("C * D", "-2i"), ("C / D", "0i"), ("C % D", "-1i"),
+      ("C + D", "1i"), ("C - D", "-3i"), ("C * D", "-2i"), ("C / D", "-1i"), ("C % D", "-1i"),
       ("A ** B", "1"), ("C ** B", "1i"), ("A |+| B", "3"), ("A |-| B", "u256Max!()"), ("A |*| B", "2"), ("A |**| B", "1"),
       ("#01 ++ E", "#0100"), ("A << B", "4"), ("A >> B", "0"), ("A & B", "0"), ("A | B", "3"), ("A ^ B", "3"),
       ("A == B", "false"), ("A != B", "true"), ("A > B", "false"), ("A >= B", "false"), ("A < B", "true"), ("A <= B", "true"),
