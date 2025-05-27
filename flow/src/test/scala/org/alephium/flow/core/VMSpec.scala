@@ -1122,6 +1122,14 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(!true == false, 0)
          |    assert!(!false == true, 0)
          |    assert!((2 * (if (true) 1 else 2)) / 2 == 1, 0)
+         |
+         |    assert!(5i / 3i == 1i, 0)
+         |    assert!(-5i / 3i == -2i, 0)
+         |    assert!(5 / 3 == 1, 0)
+         |
+         |    assert!(5i \\ 3i == 2i, 0)
+         |    assert!(-5i \\ 3i == -1i, 0)
+         |    assert!(5 \\ 3 == 2, 0)
          |  }
          |}
          |""".stripMargin

@@ -74,8 +74,18 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse("x / y |**| z + u", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,
-        Binop(Div, Variable(Ident("x")), Binop(ModExp, Variable(Ident("y")), Variable(Ident("z")))),
+        Binop(
+          RoundDownDiv,
+          Variable(Ident("x")),
+          Binop(ModExp, Variable(Ident("y")), Variable(Ident("z")))
+        ),
         Variable(Ident("u"))
+      )
+    parse("x \\ y * z", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](
+        Mul,
+        Binop(RoundUpDiv, Variable(Ident("x")), Variable(Ident("y"))),
+        Variable(Ident("z"))
       )
     parse("x + y * z + u", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
@@ -93,7 +103,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       )
     parse("(x * if (true) a else b) / y", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
-        Div,
+        RoundDownDiv,
         ParenExpr(
           Binop(
             Mul,
