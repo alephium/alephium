@@ -130,6 +130,19 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     }
   }
 
+  def roundInfinityDivUnsafe(that: U256): U256 = {
+    assume(!that.isZero)
+    U256.unsafe(v.add(that.v).subtract(BigInteger.ONE).divide(that.v))
+  }
+
+  def roundInfinityDiv(that: U256): Option[U256] = {
+    if (that.isZero) {
+      None
+    } else {
+      Some(roundInfinityDivUnsafe(that))
+    }
+  }
+
   def modUnsafe(that: U256): U256 = {
     assume(!that.isZero)
     U256.unsafe(this.v.remainder(that.v))
