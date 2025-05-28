@@ -16,7 +16,7 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.{Address, BlockHash}
+import org.alephium.protocol.model.{Address, BlockHash, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.TimeStamp
 
@@ -28,4 +28,5 @@ trait BuildSweepCommon {
   def gasPrice: Option[GasPrice]
   def targetBlockHash: Option[BlockHash]
   def utxosLimit: Option[Int]
+  def group: Option[GroupIndex]
 }

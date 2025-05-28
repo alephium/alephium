@@ -562,8 +562,8 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
   def prepareGrouplessSweepAddressTransaction(
       blockFlow: BlockFlow,
-      fromLockPair: (LockupScript.P2PK, UnlockScript),
-      query: BuildSweepAddressTransactions
+      fromLockPair: (LockupScript.GroupedAsset, UnlockScript),
+      query: BuildSweepCommon
   ): Try[AVector[UnsignedTransaction]] = {
     if (query.group.isDefined) {
       // sweep from one group
@@ -617,20 +617,11 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       pubKeys <- buildPublicKeyLikes(query.fromPublicKeys, query.fromPublicKeyTypes).left
         .map(badRequest)
       keyIndexes <- query.getP2HMPKKeyIndexes()
-      unsignedTxs <- query.group match {
-        case Some(group) =>
-          // sweep from one group
-          for {
-            lockPair    <- buildP2PKHMPKLockPairWithGroup(pubKeys, keyIndexes, group)
-            unsignedTxs <- prepareSweepAddressTransaction(blockFlow, lockPair, query)
-          } yield unsignedTxs
-        case None =>
-          // sweep from all groups
-          for {
-            lockPair    <- buildP2PKHMPKLockPairWithDefaultGroup(pubKeys, keyIndexes)
-            unsignedTxs <- sweepFromAllGroups(blockFlow, lockPair, query)
-          } yield unsignedTxs
+      lockPair <- query.group match {
+        case Some(group) => buildP2PKHMPKLockPairWithGroup(pubKeys, keyIndexes, group)
+        case None        => buildP2PKHMPKLockPairWithDefaultGroup(pubKeys, keyIndexes)
       }
+      unsignedTxs <- prepareGrouplessSweepAddressTransaction(blockFlow, lockPair, query)
     } yield {
       BuildSweepAddressTransactionsResult.from(
         unsignedTxs,
