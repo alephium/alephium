@@ -811,7 +811,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         2000000
       ), AVector.empty)
       nextBuildingGrouplessTransferTxs(1).from is allLockupScripts(1)
-      nextBuildingGrouplessTransferTxs(1).remainingLockupScripts is AVector(allLockupScripts(0))
+      nextBuildingGrouplessTransferTxs(1).remainingLockupScripts is AVector.empty[LockupScript.P2PK]
       nextBuildingGrouplessTransferTxs(1).remainingAmounts is (ALPH.nanoAlph(0), AVector(
         (tokenId, ALPH.alph(1))
       ))

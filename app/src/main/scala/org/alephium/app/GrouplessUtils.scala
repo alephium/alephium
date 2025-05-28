@@ -239,7 +239,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
           case Left(_) =>
             buildingGrouplessTransferTxs += currentBuildingGrouplessTx.copy(
               remainingLockupScripts =
-                currentBuildingGrouplessTx.remainingLockupScripts.remove(index)
+                currentBuildingGrouplessTx.remainingLockupScripts.drop(index + 1)
             )
             rec(index + 1)
           case Right((unsignedTx, newRemainingAlph, newRemainingTokens)) =>
@@ -267,11 +267,11 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
                     .map(Right(_))
                 }
             } else {
+              val remainingLockupScripts = currentBuildingGrouplessTx.remainingLockupScripts.drop(index + 1)
               buildingGrouplessTransferTxs += currentBuildingGrouplessTx.copy(
                 builtUnsignedTxsSoFar =
                   currentBuildingGrouplessTx.builtUnsignedTxsSoFar :+ unsignedTx,
-                remainingLockupScripts =
-                  currentBuildingGrouplessTx.remainingLockupScripts.remove(index),
+                remainingLockupScripts = remainingLockupScripts,
                 remainingAmounts = (newRemainingAlph, newRemainingTokens)
               )
               rec(index + 1)
