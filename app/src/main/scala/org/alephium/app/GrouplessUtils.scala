@@ -551,6 +551,27 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       Left(failed(notEnoughBalanceError(missingAlph, missingTokens)))
     }
   }
+
+  def prepareGrouplessSweepAddressTransaction(
+      blockFlow: BlockFlow,
+      fromLockPair: (LockupScript.P2PK, UnlockScript),
+      query: BuildSweepAddressTransactions
+  ): Try[AVector[UnsignedTransaction]] = {
+    if (query.group.isDefined) {
+      // sweep from one group
+      prepareSweepAddressTransaction(blockFlow, fromLockPair, query)
+    } else {
+      // sweep from all groups
+      val (lockupScript, unlockScript) = fromLockPair
+      allGroupedLockupScripts(lockupScript).foldE(AVector.empty[UnsignedTransaction]) {
+        case (acc, fromLockupScript) =>
+          prepareSweepAddressTransaction(blockFlow, (fromLockupScript, unlockScript), query) match {
+            case Right(txs)  => Right(acc ++ txs)
+            case Left(error) => Left(error)
+          }
+      }
+    }
+  }
 }
 
 object GrouplessUtils {

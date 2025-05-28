@@ -808,13 +808,12 @@ class ServerUtilsSpec extends AlephiumSpec {
         .prepareSweepAddressTransaction(
           blockFlow,
           getLockPair(fromPublicKey),
-          destinations.head.address,
-          None,
-          None,
-          None,
-          nonCoinbaseMinGasPrice,
-          targetBlockHash,
-          None
+          BuildSweepAddressTransactions(
+            fromPublicKey.bytes,
+            None,
+            destinations.head.address,
+            targetBlockHash = targetBlockHash
+          )
         )
         .rightValue
       txs.length is 1

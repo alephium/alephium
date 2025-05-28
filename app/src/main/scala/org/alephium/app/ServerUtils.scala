@@ -452,17 +452,11 @@ class ServerUtils(implicit
   ): Try[BuildSweepAddressTransactionsResult] = {
     for {
       fromLockPair <- query.getLockPair(query.group)
-      unsignedTxs <- prepareSweepAddressTransaction(
-        blockFlow,
-        fromLockPair,
-        query.toAddress,
-        query.maxAttoAlphPerUTXO,
-        query.lockTime,
-        query.gasAmount,
-        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-        query.targetBlockHash,
-        query.utxosLimit
-      )
+      unsignedTxs <- fromLockPair._1 match {
+        case p2pk: LockupScript.P2PK =>
+          prepareGrouplessSweepAddressTransaction(blockFlow, (p2pk, fromLockPair._2), query)
+        case _ => prepareSweepAddressTransaction(blockFlow, fromLockPair, query)
+      }
     } yield {
       BuildSweepAddressTransactionsResult.from(
         unsignedTxs,
@@ -1102,34 +1096,26 @@ class ServerUtils(implicit
     }
   }
 
-  // scalastyle:off parameter.number
   def prepareSweepAddressTransaction(
       blockFlow: BlockFlow,
       fromLockPair: (LockupScript.Asset, UnlockScript),
-      toAddress: Address.Asset,
-      maxAttoAlphPerUTXO: Option[Amount],
-      lockTimeOpt: Option[TimeStamp],
-      gasOpt: Option[GasBox],
-      gasPrice: GasPrice,
-      targetBlockHashOpt: Option[BlockHash],
-      utxosLimit: Option[Int]
+      query: BuildSweepAddressTransactions
   ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAddress(
-      targetBlockHashOpt,
+      query.targetBlockHash,
       fromLockPair,
-      toAddress.lockupScript,
-      lockTimeOpt,
-      gasOpt,
-      gasPrice,
-      maxAttoAlphPerUTXO.map(_.value),
-      getUtxosLimit(utxosLimit)
+      query.toAddress.lockupScript,
+      query.lockTime,
+      query.gasAmount,
+      query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
+      query.maxAttoAlphPerUTXO.map(_.value),
+      getUtxosLimit(query.utxosLimit)
     ) match {
       case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
       case Right(Left(error))        => Left(failed(error))
       case Left(error)               => failed(error)
     }
   }
-  // scalastyle:on parameter.number
 
   // scalastyle:off parameter.number
   def prepareSweepAddressTransactionFromScripts(
