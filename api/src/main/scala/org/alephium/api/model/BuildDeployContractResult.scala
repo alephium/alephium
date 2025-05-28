@@ -22,7 +22,15 @@ import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex}
 
-sealed trait BuildDeployContractTxResult extends Product with Serializable
+sealed trait BuildDeployContractTxResult extends Product with Serializable {
+  def fromGroup: Int
+  def toGroup: Int
+  def unsignedTx: String
+  def gasAmount: GasBox
+  def gasPrice: GasPrice
+  def txId: TransactionId
+  def contractAddress: Address.Contract
+}
 
 @upickle.implicits.key("BuildSimpleDeployContractTxResult")
 final case class BuildSimpleDeployContractTxResult(
@@ -66,19 +74,7 @@ final case class BuildGrouplessDeployContractTxResult(
     txId: TransactionId,
     contractAddress: Address.Contract,
     transferTxs: AVector[BuildSimpleTransferTxResult]
-) extends BuildDeployContractTxResult {
-  def deployContractTx: BuildSimpleDeployContractTxResult = {
-    BuildSimpleDeployContractTxResult(
-      fromGroup,
-      toGroup,
-      unsignedTx,
-      gasAmount,
-      gasPrice,
-      txId,
-      contractAddress
-    )
-  }
-}
+) extends BuildDeployContractTxResult
 
 object BuildGrouplessDeployContractTxResult {
   def from(
