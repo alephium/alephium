@@ -23,7 +23,15 @@ import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex}
 
-sealed trait BuildExecuteScriptTxResult extends Product with Serializable
+sealed trait BuildExecuteScriptTxResult extends Product with Serializable {
+  def fromGroup: Int
+  def toGroup: Int
+  def unsignedTx: String
+  def gasAmount: GasBox
+  def gasPrice: GasPrice
+  def txId: TransactionId
+  def simulationResult: SimulationResult
+}
 
 @upickle.implicits.key("BuildSimpleExecuteScriptTxResult")
 final case class BuildSimpleExecuteScriptTxResult(
@@ -70,6 +78,30 @@ object SimulationResult {
 
 @upickle.implicits.key("BuildGrouplessExecuteScriptTxResult")
 final case class BuildGrouplessExecuteScriptTxResult(
-    transferTxs: AVector[BuildSimpleTransferTxResult],
-    executeScriptTx: BuildSimpleExecuteScriptTxResult
+    fromGroup: Int,
+    toGroup: Int,
+    unsignedTx: String,
+    gasAmount: GasBox,
+    gasPrice: GasPrice,
+    txId: TransactionId,
+    simulationResult: SimulationResult,
+    transferTxs: AVector[BuildSimpleTransferTxResult]
 ) extends BuildExecuteScriptTxResult
+
+object BuildGrouplessExecuteScriptTxResult {
+  def from(
+      executeScriptTx: BuildSimpleExecuteScriptTxResult,
+      transferTxs: AVector[BuildSimpleTransferTxResult]
+  ): BuildGrouplessExecuteScriptTxResult = {
+    BuildGrouplessExecuteScriptTxResult(
+      executeScriptTx.fromGroup,
+      executeScriptTx.toGroup,
+      executeScriptTx.unsignedTx,
+      executeScriptTx.gasAmount,
+      executeScriptTx.gasPrice,
+      executeScriptTx.txId,
+      executeScriptTx.simulationResult,
+      transferTxs
+    )
+  }
+}

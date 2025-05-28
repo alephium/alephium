@@ -23,8 +23,7 @@ import akka.util.ByteString
 import sttp.tapir.{FieldName, Schema, Validator}
 import sttp.tapir.SchemaType.{SArray, SInteger, SProduct, SProductField, SString}
 
-import org.alephium.api.{model => api}
-import org.alephium.api.model.{Amount, ApiKey, BuildTxCommon, MinerAction, Script}
+import org.alephium.api.model.{Address => ApiAddress, _}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.model._
@@ -38,7 +37,7 @@ trait TapirSchemasLike {
 
   implicit def optionAvectorSchema[T: Schema]: Schema[Option[AVector[T]]] = Schema.schemaForOption
 
-  implicit val addressSchema: Schema[api.Address]              = Schema(SString()).format("address")
+  implicit val addressSchema: Schema[ApiAddress]               = Schema(SString()).format("address")
   implicit val protocolAddressSchema: Schema[Address]          = Schema(SString()).format("address")
   implicit val addressAssetSchema: Schema[Address.Asset]       = Schema(SString()).format("address")
   implicit val addressContractSchema: Schema[Address.Contract] = Schema(SString()).format("address")
@@ -91,6 +90,23 @@ trait TapirSchemasLike {
 
   implicit val transactionIdSchema: Schema[TransactionId] = Schema(SString()).format("32-byte-hash")
   implicit val minerActionSchema: Schema[MinerAction]     = Schema(SString())
+
+  implicit val buildSimpleTransferTxResultSchema: Schema[BuildSimpleTransferTxResult] =
+    Schema.derived
+  implicit val buildTransferTxResultSchema: Schema[BuildTransferTxResult] = Schema.derived
+
+  implicit val tokenIdSchema: Schema[TokenId]                     = Schema.derived
+  implicit val tokenSchema: Schema[Token]                         = Schema.derived
+  implicit val addressAssetStateSchema: Schema[AddressAssetState] = Schema.derived
+  implicit val simulationResultSchema: Schema[SimulationResult]   = Schema.derived
+  implicit val buildSimpleExecuteScriptTxResultSchema: Schema[BuildSimpleExecuteScriptTxResult] =
+    Schema.derived
+  implicit val buildExecuteScriptTxResultSchema: Schema[BuildExecuteScriptTxResult] = Schema.derived
+
+  implicit val buildSimpleDeployContractTxResultSchema: Schema[BuildSimpleDeployContractTxResult] =
+    Schema.derived
+  implicit val buildDeployContractTxResultSchema: Schema[BuildDeployContractTxResult] =
+    Schema.derived
 }
 
 object TapirSchemas extends TapirSchemasLike

@@ -220,8 +220,8 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     }
 
     def getAllUnsignedTxs(result: BuildGrouplessTransferTxResult) = {
-      val txs = result.transferTxs :+ result.transferTx
-      txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx.unsignedTx)).rightValue)
+      val txs = result.transferTxs.map(_.unsignedTx) :+ result.unsignedTx
+      txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
     }
 
     def prepareDestinations(
@@ -726,7 +726,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         .buildExecuteScriptTx(blockFlow, query)
         .rightValue
         .asInstanceOf[BuildGrouplessExecuteScriptTxResult]
-      val txs = result.transferTxs.map(_.unsignedTx) :+ result.executeScriptTx.unsignedTx
+      val txs = result.transferTxs.map(_.unsignedTx) :+ result.unsignedTx
       txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
     }
 
@@ -831,9 +831,9 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         .buildDeployContractTx(blockFlow, query)
         .rightValue
         .asInstanceOf[BuildGrouplessDeployContractTxResult]
-      val txs         = result.transferTxs.map(_.unsignedTx) :+ result.deployContractTx.unsignedTx
+      val txs         = result.transferTxs.map(_.unsignedTx) :+ result.unsignedTx
       val unsignedTxs = txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
-      (unsignedTxs, result.deployContractTx.contractAddress.contractId)
+      (unsignedTxs, result.contractAddress.contractId)
     }
 
     def testDeployContract(alphAmount: U256, tokenAmount: U256, expectedTxSize: Int) = {
@@ -1001,7 +1001,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       val toAddress = Address.Asset(assetLockupGen(chainIndex.from).sample.get)
       val result =
         testTransferWithEachGroupedAddress(toAddress, alphAmount, tokenAmount).rightValue.rightValue
-      verifyBalance(toAddress, result.transferTx.unsignedTx, alphAmount, tokenAmount)
+      verifyBalance(toAddress, result.unsignedTx, alphAmount, tokenAmount)
     }
 
     def transferWithoutEnoughBalance(alphAmount: U256, tokenAmount: U256) = {
@@ -1097,7 +1097,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
           .rightValue
 
         result.transferTxs.length is 1
-        verifyBalance(toAddress, result.transferTx.unsignedTx, alphAmount, tokenAmount)
+        verifyBalance(toAddress, result.unsignedTx, alphAmount, tokenAmount)
       }
 
       buildingGrouplessTransferTx.from is allLockupScripts(0)

@@ -1190,6 +1190,12 @@ trait EndpointsExamples extends ErrorExamples {
   val buildGrouplessTransferTxResultExamples: List[Example[BuildGrouplessTransferTxResult]] =
     simpleExample(
       BuildGrouplessTransferTxResult(
+        unsignedTx = hexString2,
+        model.minimalGas,
+        model.nonCoinbaseMinGasPrice,
+        txId2,
+        fromGroup = 1,
+        toGroup = 3,
         transferTxs = AVector(
           BuildSimpleTransferTxResult(
             unsignedTx = hexString,
@@ -1199,14 +1205,6 @@ trait EndpointsExamples extends ErrorExamples {
             fromGroup = 2,
             toGroup = 1
           )
-        ),
-        transferTx = BuildSimpleTransferTxResult(
-          unsignedTx = hexString2,
-          model.minimalGas,
-          model.nonCoinbaseMinGasPrice,
-          txId2,
-          fromGroup = 1,
-          toGroup = 3
         )
       )
     )
@@ -1224,6 +1222,12 @@ trait EndpointsExamples extends ErrorExamples {
     ),
     moreSettingsExample(
       BuildGrouplessTransferTxResult(
+        unsignedTx = hexString2,
+        model.minimalGas,
+        model.nonCoinbaseMinGasPrice,
+        txId2,
+        fromGroup = 1,
+        toGroup = 3,
         transferTxs = AVector(
           BuildSimpleTransferTxResult(
             unsignedTx = hexString,
@@ -1233,14 +1237,6 @@ trait EndpointsExamples extends ErrorExamples {
             fromGroup = 2,
             toGroup = 1
           )
-        ),
-        transferTx = BuildSimpleTransferTxResult(
-          unsignedTx = hexString2,
-          model.minimalGas,
-          model.nonCoinbaseMinGasPrice,
-          txId2,
-          fromGroup = 1,
-          toGroup = 3
         )
       )
     )
@@ -1249,18 +1245,8 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildGrouplessExecuteScriptTxResultExamples
       : List[Example[BuildGrouplessExecuteScriptTxResult]] =
     simpleExample(
-      BuildGrouplessExecuteScriptTxResult(
-        transferTxs = AVector(
-          BuildSimpleTransferTxResult(
-            unsignedTx = hexString,
-            model.minimalGas,
-            model.nonCoinbaseMinGasPrice,
-            txId,
-            fromGroup = 2,
-            toGroup = 1
-          )
-        ),
-        executeScriptTx = BuildSimpleExecuteScriptTxResult(
+      BuildGrouplessExecuteScriptTxResult.from(
+        BuildSimpleExecuteScriptTxResult(
           fromGroup = 2,
           toGroup = 2,
           unsignedTx = hexString,
@@ -1268,14 +1254,7 @@ trait EndpointsExamples extends ErrorExamples {
           model.nonCoinbaseMinGasPrice,
           txId = txId,
           simulationResult
-        )
-      )
-    )
-
-  implicit val buildGrouplessDeployContractTxResultExamples
-      : List[Example[BuildGrouplessDeployContractTxResult]] =
-    simpleExample(
-      BuildGrouplessDeployContractTxResult(
+        ),
         transferTxs = AVector(
           BuildSimpleTransferTxResult(
             unsignedTx = hexString,
@@ -1285,8 +1264,15 @@ trait EndpointsExamples extends ErrorExamples {
             fromGroup = 2,
             toGroup = 1
           )
-        ),
-        deployContractTx = BuildSimpleDeployContractTxResult(
+        )
+      )
+    )
+
+  implicit val buildGrouplessDeployContractTxResultExamples
+      : List[Example[BuildGrouplessDeployContractTxResult]] =
+    simpleExample(
+      BuildGrouplessDeployContractTxResult.from(
+        BuildSimpleDeployContractTxResult(
           fromGroup = 2,
           toGroup = 2,
           unsignedTx = hexString,
@@ -1294,6 +1280,16 @@ trait EndpointsExamples extends ErrorExamples {
           model.nonCoinbaseMinGasPrice,
           txId = txId,
           contractAddress = Address.contract(contractId)
+        ),
+        transferTxs = AVector(
+          BuildSimpleTransferTxResult(
+            unsignedTx = hexString,
+            model.minimalGas,
+            model.nonCoinbaseMinGasPrice,
+            txId,
+            fromGroup = 2,
+            toGroup = 1
+          )
         )
       )
     )
