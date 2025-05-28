@@ -28,6 +28,9 @@ trait BrokerConfig extends GroupConfig with CliqueConfig with BrokerGroupInfo {
 
   lazy val groupRange: Range = BrokerConfig.range(brokerId, groups, brokerNum)
 
+  lazy val groupIndexes: AVector[GroupIndex] =
+    AVector.from(groupRange).map(GroupIndex.unsafe(_)(this))
+
   def randomGroupIndex(): GroupIndex = {
     GroupIndex.unsafe(groupRange(Random.nextInt(groupRange.size)))(this)
   }
