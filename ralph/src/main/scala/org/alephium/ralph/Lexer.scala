@@ -146,7 +146,7 @@ class Lexer(fileURI: Option[java.net.URI]) {
         case Some(bytes) => (ByteVec(bytes), string.length)
         case None =>
           Address.extractLockupScript(string) match {
-            case Some(LockupScript.P2C(contractId)) =>
+            case Right(LockupScript.P2C(contractId)) =>
               (ByteVec(contractId.bytes), string.length)
             case _ => throw CompilerError.`Invalid byteVec`(string, index, fileURI)
           }
@@ -175,8 +175,8 @@ class Lexer(fileURI: Option[java.net.URI]) {
         val input = groupIndexOpt.map(groupIndex => s"$input0:${groupIndex}").getOrElse(input0)
         val lockupScriptOpt = Address.extractLockupScript(input)
         lockupScriptOpt match {
-          case Some(lockupScript) => (Val.Address(lockupScript), index, input.length)
-          case None               => throw CompilerError.`Invalid address`(input, index, fileURI)
+          case Right(lockupScript) => (Val.Address(lockupScript), index, input.length)
+          case Left(error) => throw CompilerError.`Invalid address`(input, index, fileURI, error)
         }
     }
   def address[Ctx <: StatelessContext, Unknown: P]: P[Ast.Const[Ctx]] =
@@ -225,7 +225,8 @@ class Lexer(fileURI: Option[java.net.URI]) {
   def opMul[Unknown: P]: P[Operator]           = P("*").map(_ => Mul)
   def opExp[Unknown: P]: P[Operator]           = P("**").map(_ => Exp)
   def opModExp[Unknown: P]: P[Operator]        = P("|**|").map(_ => ModExp)
-  def opDiv[Unknown: P]: P[Operator]           = P("/").map(_ => Div)
+  def opDiv[Unknown: P]: P[Operator]           = P("/").map(_ => RoundDownDiv)
+  def opRoundUpDiv[Unknown: P]: P[Operator]    = P("\\").map(_ => RoundUpDiv)
   def opMod[Unknown: P]: P[Operator]           = P("%").map(_ => Mod)
   def opModAdd[Unknown: P]: P[Operator]        = P("⊕" | "|+|").map(_ => ModAdd)
   def opModSub[Unknown: P]: P[Operator]        = P("⊖" | "|-|").map(_ => ModSub)

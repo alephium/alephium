@@ -26,7 +26,7 @@ import org.scalatest.Assertion
 
 import org.alephium.api.{model => api}
 import org.alephium.api.{ApiError, Try}
-import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
+import org.alephium.api.model.{Address => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.api.model.BuildDeployContractTx.Code
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.{FlowFixture, GhostUncleFixture}
@@ -5608,20 +5608,20 @@ class ServerUtilsSpec extends AlephiumSpec {
       val block = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(1))
       addAndCheck(blockFlow, block)
     }
-    val lockupScript     = LockupScript.p2pkh(publicKey)
-    val assetAddress     = Address.from(lockupScript)
-    val assetAddressLike = AddressLike.from(lockupScript)
+    val lockupScript = LockupScript.p2pkh(publicKey)
+    val assetAddress = Address.from(lockupScript)
+    val apiAddress   = api.Address.from(lockupScript)
     blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 10
 
     val serverUtils0 = createServerUtils(9)
-    serverUtils0.getBalance(blockFlow, assetAddressLike, true).leftValue.detail is
+    serverUtils0.getBalance(blockFlow, apiAddress, true).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
     serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
 
     val serverUtils1 = createServerUtils(10)
     serverUtils1
-      .getBalance(blockFlow, assetAddressLike, true)
+      .getBalance(blockFlow, apiAddress, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
@@ -5633,7 +5633,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val serverUtils2 = createServerUtils(11)
     serverUtils2
-      .getBalance(blockFlow, assetAddressLike, true)
+      .getBalance(blockFlow, apiAddress, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
@@ -5937,9 +5937,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       def code(str: String) =
         s"""
            |Contract Foo() {
-           |  pub fn foo0() -> () {
-           |    let v = 1 / 0
-           |    let _ = v
+           |  pub fn foo0(v: U256) -> () {
+           |    let _ = v / 0
            |  }
            |  fn foo1() -> U256 {
            |    return 0
@@ -5950,7 +5949,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      Seq("foo0()", "1 / 0", "1 / foo1()", "foo1() / foo1()").foreach { expr =>
+      Seq("foo0(1)", "1 / foo1()", "foo1() / foo1()").foreach { expr =>
         serverUtils.compileProject(blockFlow, api.Compile.Project(code(expr))).isRight is true
       }
 
@@ -5958,8 +5957,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         .compileProject(blockFlow, api.Compile.Project(code("foo1() / 1")))
         .leftValue
         .detail is
-        s"""|-- error (11:5): Testing error
-            |11 |    testFail!(foo1() / 1)
+        s"""|-- error (10:5): Testing error
+            |10 |    testFail!(foo1() / 1)
             |   |    ^^^^^^^^^^^^^^^^^^^^^
             |   |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: the test code did not throw an exception
             |""".stripMargin
@@ -6226,7 +6225,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       blockFlow: BlockFlow
   ) = {
     serverUtils
-      .getBalance(blockFlow, AddressLike.from(address.lockupScript), true) isE Balance.from(
+      .getBalance(blockFlow, api.Address.from(address.lockupScript), true) isE Balance.from(
       Amount(amount),
       Amount.Zero,
       None,

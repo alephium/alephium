@@ -123,7 +123,7 @@ object ALPH {
   lazy val testnetWhitelistedMiners = {
     @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
     def miner(address: String) = {
-      Address.fromBase58(address).get.lockupScript
+      Address.fromBase58(address).toOption.get.lockupScript
     }
     Set(
       miner("1AuWeE5Cwt2ES3473qnpKFV96z57CYL6mbTY7hva9Xz3h"),

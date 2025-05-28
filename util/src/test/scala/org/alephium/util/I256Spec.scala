@@ -404,4 +404,63 @@ class I256Spec extends AlephiumSpec {
     I256.unsafe(2).shr(U256.One) is I256.unsafe(1)
     I256.unsafe(3).shr(U256.One) is I256.unsafe(1)
   }
+
+  it should "test roundInfinityDiv" in {
+    test(
+      _.roundInfinityDiv(_),
+      _.roundInfinityDivUnsafe(_),
+      (a, b) => {
+        val sameSign = (a.signum() >= 0 && b.signum() > 0) || (a.signum() <= 0 && b.signum() < 0)
+        val absA     = a.abs()
+        val absB     = b.abs()
+        val res      = absA.add(absB).subtract(BigInteger.ONE).divide(absB)
+        if (sameSign) res else res.negate()
+      },
+      (a, b) =>
+        b != BigInteger.ZERO && !(a.equals(I256.lowerBound) && b.equals(I256.NegOne.toBigInt))
+    )
+
+    I256.One.roundInfinityDiv(I256.Zero) is None
+    I256.MinValue.roundInfinityDiv(I256.NegOne) is None
+
+    I256.Zero.roundInfinityDiv(I256.One) is Some(I256.Zero)
+    I256.MaxValue.roundInfinityDiv(I256.NegOne) is Some(I256.MinValue.addUnsafe(I256.One))
+
+    I256.One.roundInfinityDiv(I256.MaxValue) is Some(I256.One)
+    I256.One.roundInfinityDiv(I256.MinValue) is Some(I256.NegOne)
+    I256.NegOne.roundInfinityDiv(I256.MaxValue) is Some(I256.NegOne)
+    I256.NegOne.roundInfinityDiv(I256.MinValue) is Some(I256.One)
+
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue) is Some(I256.unsafe(3))
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.One)) is Some(I256.unsafe(2))
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.Two)) is Some(I256.unsafe(2))
+    I256.MaxValue.roundInfinityDiv(I256.MaxValue.subUnsafe(I256.One)) is Some(I256.unsafe(2))
+
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue.negateUnsafe()) is Some(I256.unsafe(-3))
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.One).negateUnsafe()) is Some(
+      I256.unsafe(-2)
+    )
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.Two).negateUnsafe()) is Some(
+      I256.unsafe(-2)
+    )
+    I256.MaxValue.roundInfinityDiv(I256.MaxValue.subUnsafe(I256.One).negateUnsafe()) is Some(
+      I256.unsafe(-2)
+    )
+
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue) is Some(I256.unsafe(-3))
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.One)) is Some(I256.unsafe(-2))
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.Two)) is Some(I256.unsafe(-2))
+    I256.MinValue.roundInfinityDiv(I256.MinValue.addUnsafe(I256.One)) is Some(I256.unsafe(2))
+
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue.negateUnsafe()) is Some(I256.unsafe(3))
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.One).negateUnsafe()) is Some(
+      I256.unsafe(2)
+    )
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.Two).negateUnsafe()) is Some(
+      I256.unsafe(2)
+    )
+    I256.MinValue.roundInfinityDiv(I256.MinValue.addUnsafe(I256.One).negateUnsafe()) is Some(
+      I256.unsafe(-2)
+    )
+  }
 }

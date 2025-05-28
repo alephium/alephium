@@ -194,7 +194,11 @@ class AlephiumConfigSpec extends AlephiumSpec {
       "1HMSFdhPpvPybfWLZiHeBxVbnfTc2L6gkVPHfuJWoZrMA"
     )
     val genesisSetting = GenesisSetting(addresses.map { address =>
-      Allocation(Address.asset(address).get, Allocation.Amount(amount), Duration.ofDaysUnsafe(2))
+      Allocation(
+        Address.asset(address).rightValue,
+        Allocation.Amount(amount),
+        Duration.ofDaysUnsafe(2)
+      )
     })
 
     val configs =
@@ -269,7 +273,9 @@ class AlephiumConfigSpec extends AlephiumSpec {
   it should "load if miner's addresses are of correct indexes" in new MinerFixture(
     Seq(0, 1, 2)
   ) {
-    config.mining.minerAddresses.get.toSeq is minerAddresses.map(str => Address.asset(str).get)
+    config.mining.minerAddresses.get.toSeq is minerAddresses.map(str =>
+      Address.asset(str).rightValue
+    )
   }
 
   it should "check root path for mainnet" in {

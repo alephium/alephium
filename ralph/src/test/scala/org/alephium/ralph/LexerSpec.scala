@@ -90,9 +90,15 @@ abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parsePositioned(s"@$address2Base58", Lexer.address(_)).get.value.v is Val.Address(
       address2.lockupScript
     )
+    val invalidGroupedAddress = address2Base58.dropRight(2)
     intercept[CompilerError.`Invalid address`] {
-      parsePositioned(s"@${address2Base58.dropRight(2)}", Lexer.address(_))
-    } is CompilerError.`Invalid address`(s"${address2Base58.dropRight(2)}", 1, fileURI)
+      parsePositioned(s"@$invalidGroupedAddress", Lexer.address(_))
+    } is CompilerError.`Invalid address`(
+      s"$invalidGroupedAddress",
+      1,
+      fileURI,
+      s"Expected a grouped address, but got a groupless one: $invalidGroupedAddress"
+    )
     parsePositioned("x", Lexer.ident(_)).get.value is Ast.Ident("x")
     parsePositioned("U256", Lexer.typeId(_)).get.value is Ast.TypeId("U256")
     parsePositioned("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
@@ -327,14 +333,19 @@ abstract class LexerSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         fastparse.parse(contractAddress, Lexer.contractAddress(_))
       }
 
-    error is CompilerError.`Invalid address`(contractAddress, 0, fileURI)
+    error is CompilerError.`Invalid address`(
+      contractAddress,
+      0,
+      fileURI,
+      s"Invalid address $contractAddress: Negative array size: -23"
+    )
 
     error.format(contractAddress) is
-      """-- error (1:1): Type error
-        |1 |abcefgh
-        |  |^^^^^^^
-        |  |Invalid address
-        |""".stripMargin
+      s"""-- error (1:1): Type error
+         |1 |abcefgh
+         |  |^^^^^^^
+         |  |Invalid address $contractAddress: Negative array size: -23
+         |""".stripMargin
   }
 }
 

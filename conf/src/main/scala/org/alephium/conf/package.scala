@@ -123,11 +123,9 @@ package object conf {
 
   implicit val contractAddressValueReader: ValueReader[Address.Contract] = {
     ValueReader[String].map { str =>
-      Address.fromBase58(str) match {
-        case Some(address: Address.Contract) =>
-          address
-        case _ =>
-          throw new ConfigException.BadValue("ContractAddress", "oops")
+      Address.contract(str) match {
+        case Right(address) => address
+        case Left(error)    => throw new ConfigException.BadValue("ContractAddress", error)
       }
     }
   }

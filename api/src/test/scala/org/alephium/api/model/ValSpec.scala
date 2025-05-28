@@ -26,7 +26,7 @@ import org.alephium.util.{AVector, Hex, I256, U256}
 
 class ValSpec extends ApiModelCodec with JsonFixture with GroupConfigFixture.Default {
   def generateContractAddress(): Address.Contract =
-    Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").get)
+    Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").rightValue)
 
   it should "encode/decode Val.Bool" in {
     checkData[Val](Val.True, """{"type": "Bool", "value": true}""")

@@ -110,7 +110,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       AVector[DanubeInstr[StatelessContext]](
         VerifySignature,
         GetSegregatedWebAuthnSignature,
-        DevInstr(TestCheckStart)
+        DevInstr(TestCheckStart),
+        I256RoundInfinityDiv,
+        U256RoundInfinityDiv
       )
     val danubeStatefulInstrs = AVector[DanubeInstr[StatefulContext]](
       ExternalCallerContractId,
@@ -937,6 +939,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
+  it should "I256RoundInfinityDiv" in new I256BinaryArithmeticInstrFixture {
+    override val i256Gen: Gen[I256] = arbitrary[Long].retryUntil(_ != 0).map(I256.from)
+    testOp(I256RoundInfinityDiv, _ roundInfinityDivUnsafe _)
+    testOp(I256RoundInfinityDiv, _ roundInfinityDivUnsafe _, I256.Zero, I256.One)
+    fail(I256RoundInfinityDiv, I256.One, I256.Zero)
+    fail(I256RoundInfinityDiv, I256.MinValue, I256.NegOne)
+    testOp(I256RoundInfinityDiv, _ roundInfinityDivUnsafe _, I256.NegOne, I256.MinValue)
+  }
+
   trait U256BinaryArithmeticInstrFixture extends BinaryArithmeticInstrFixture {
     override val u256Gen: Gen[U256] = posLongGen.map(U256.unsafe)
 
@@ -1073,6 +1084,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "U256SHR" in new U256BinaryArithmeticInstrFixture {
     testOp(NumericSHR, _ shr _)
+  }
+
+  it should "U256RoundInfinityDiv" in new U256BinaryArithmeticInstrFixture {
+    override val u256Gen: Gen[U256] = posLongGen.retryUntil(_ != 0).map(U256.unsafe)
+    testOp(U256RoundInfinityDiv, _ roundInfinityDivUnsafe _)
+    testOp(U256RoundInfinityDiv, _ roundInfinityDivUnsafe _, U256.Zero, U256.One)
+    fail(U256RoundInfinityDiv, U256.One, U256.Zero)
   }
 
   trait ExpArithmeticInstrFixture extends StatelessInstrFixture {
@@ -4982,7 +5000,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Rhone hard fork */
       GroupOfAddress -> 5,
       /* Below are instructions for Danube hard fork */
-      VerifySignature -> 2000, GetSegregatedWebAuthnSignature -> 8, DevInstr(TestCheckStart) -> 0
+      VerifySignature -> 2000, GetSegregatedWebAuthnSignature -> 8, DevInstr(TestCheckStart) -> 0,
+      I256RoundInfinityDiv -> 5, U256RoundInfinityDiv -> 5
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadMutField(byte) -> 3, StoreMutField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -5121,6 +5140,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       GroupOfAddress -> 140,
       /* Below are instructions for Danube hard fork */
       VerifySignature -> 141, GetSegregatedWebAuthnSignature -> 142, DevInstr(TestCheckStart) -> 143,
+      I256RoundInfinityDiv -> 144, U256RoundInfinityDiv -> 145,
       // stateful instructions
       LoadMutField(byte) -> 160, StoreMutField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -5199,7 +5219,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Rhone hard fork */
       GroupOfAddress,
       /* Below are instructions for Danube hard fork */
-      VerifySignature, GetSegregatedWebAuthnSignature, DevInstr(TestCheckStart)
+      VerifySignature, GetSegregatedWebAuthnSignature, DevInstr(TestCheckStart),
+      I256RoundInfinityDiv, U256RoundInfinityDiv
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadMutField(byte), StoreMutField(byte), CallExternal(byte),

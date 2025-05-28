@@ -21,6 +21,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import sttp.tapir.EndpointIO.Example
 
+import org.alephium.api.{model => api}
 import org.alephium.api.model._
 import org.alephium.protocol._
 import org.alephium.protocol.model
@@ -44,7 +45,7 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val networkId = NetworkId.AlephiumMainNet
   private val lockupScript =
-    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
+    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").toOption.get
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
@@ -640,35 +641,39 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildMultisigAddressExample: List[Example[BuildMultisigAddress]] =
     simpleExample(
       BuildMultisigAddress(
-        AVector(publicKey, publicKey),
-        1
+        AVector(publicKey.bytes, publicKey.bytes),
+        Some(AVector(BuildTxCommon.Default, BuildTxCommon.Default)),
+        1,
+        Some(MultiSigType.P2MPKH)
       )
     )
 
   implicit val buildMultisigAddressResultExample: List[Example[BuildMultisigAddressResult]] =
-    simpleExample(
-      BuildMultisigAddressResult(
-        address
-      )
-    )
+    simpleExample(BuildMultisigAddressResult(api.Address.from(lockupScript)))
 
   implicit val buildMultisigTransactionExamples: List[Example[BuildMultisig]] = List(
     defaultExample(
       BuildMultisig(
-        address,
-        AVector(publicKey),
+        api.Address.fromProtocol(address),
+        AVector(publicKey.bytes),
+        None,
+        None,
         defaultDestinations,
+        None,
         None,
         None
       )
     ),
     moreSettingsExample(
       BuildMultisig(
-        address,
-        AVector(publicKey),
+        api.Address.fromProtocol(address),
+        AVector(publicKey.bytes),
+        None,
+        None,
         moreSettingsDestinations,
         Some(model.minimalGas),
-        Some(model.nonCoinbaseMinGasPrice)
+        Some(model.nonCoinbaseMinGasPrice),
+        None
       )
     )
   )

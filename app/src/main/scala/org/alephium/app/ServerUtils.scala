@@ -20,14 +20,22 @@ import java.math.BigInteger
 
 import scala.concurrent._
 
+import akka.util.ByteString
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.api._
+import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
 import org.alephium.api.model
-import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
-import org.alephium.crypto.{Byte32, Byte64}
+import org.alephium.api.model.{
+  Address => _,
+  AssetOutput => _,
+  Transaction => _,
+  TransactionTemplate => _,
+  _
+}
+import org.alephium.crypto.{Byte32, Byte64, SecP256K1PublicKey}
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, ExtraUtxosInfo}
 import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, MemPoolOutput}
 import org.alephium.flow.core.TxUtils
@@ -157,12 +165,12 @@ class ServerUtils(implicit
 
   def getBalance(
       blockFlow: BlockFlow,
-      address: AddressLike,
+      address: api.Address,
       getMempoolUtxos: Boolean
   ): Try[Balance] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
-    address.lockupScriptResult match {
-      case LockupScript.CompleteLockupScript(lockupScript) =>
+    address.lockupScript match {
+      case api.Address.CompleteLockupScript(lockupScript) =>
         for {
           _ <- checkGroup(lockupScript)
           balance <- blockFlow
@@ -175,8 +183,10 @@ class ServerUtils(implicit
             .left
             .flatMap(tooManyUtxos)
         } yield balance
-      case halfDecodedP2PK: LockupScript.HalfDecodedP2PK =>
+      case halfDecodedP2PK: api.Address.HalfDecodedP2PK =>
         getGrouplessBalance(blockFlow, halfDecodedP2PK, getMempoolUtxos)
+      case halfDecodedP2HMPK: api.Address.HalfDecodedP2HMPK =>
+        getGrouplessBalance(blockFlow, halfDecodedP2HMPK, getMempoolUtxos)
     }
   }
 
@@ -294,7 +304,7 @@ class ServerUtils(implicit
       extraUtxosInfo: ExtraUtxosInfo
   ): Try[UnsignedTransaction] = {
     for {
-      lockPair <- query.getLockPair()
+      lockPair <- query.getLockPair(query.group)
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
         lockPair._1,
@@ -319,17 +329,7 @@ class ServerUtils(implicit
       lockupPair <- query.getLockPair(query.group)
       result <- lockupPair._1 match {
         case lockupScript: LockupScript.P2PK =>
-          for {
-            txs <- buildTransferTxWithFallbackAddresses(
-              blockFlow,
-              lockupPair,
-              otherGroupsLockupPairs(lockupScript),
-              query.destinations,
-              query.gasPrice,
-              query.targetBlockHash
-            )
-            result <- BuildGrouplessTransferTxResult.from(txs)
-          } yield result
+          buildP2PKTransferTx(blockFlow, query, lockupScript, extraUtxosInfo)
         case _ =>
           buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
             .map(BuildSimpleTransferTxResult.from)
@@ -350,19 +350,33 @@ class ServerUtils(implicit
       BuildSimpleTransferTxResult.from(unsignedTx)
     }
   }
+
   def buildMultisig(
+      blockFlow: BlockFlow,
+      query: BuildMultisig
+  ): Try[BuildTransferTxResult] = {
+    if (query.multiSigType == Some(MultiSigType.P2HMPK)) {
+      buildP2HMPKTransferTx(blockFlow, query)
+    } else {
+      buildP2MPKHTransferTx(blockFlow, query)
+    }
+  }
+
+  private def buildP2MPKHTransferTx(
       blockFlow: BlockFlow,
       query: BuildMultisig
   ): Try[BuildSimpleTransferTxResult] = {
     for {
-      _ <- checkGroup(query.fromAddress.lockupScript)
-      unlockScript <- buildMultisigUnlockScript(
-        query.fromAddress.lockupScript,
-        query.fromPublicKeys
+      fromAddress <- query.getFromAddress()
+      _           <- checkGroup(fromAddress.lockupScript)
+      publicKeys  <- query.getFromPublicKeys()
+      unlockScript <- buildP2MPKHUnlockScript(
+        fromAddress.lockupScript,
+        publicKeys
       )
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
-        query.fromAddress.lockupScript,
+        fromAddress.lockupScript,
         unlockScript,
         query.destinations,
         query.gas,
@@ -382,7 +396,7 @@ class ServerUtils(implicit
     val lockupScript = query.fromAddress.lockupScript
     for {
       _            <- checkGroup(lockupScript)
-      unlockScript <- buildMultisigUnlockScript(lockupScript, query.fromPublicKeys)
+      unlockScript <- buildP2MPKHUnlockScript(lockupScript, query.fromPublicKeys)
       unsignedTxs <- prepareSweepAddressTransactionFromScripts(
         blockFlow,
         lockupScript,
@@ -404,7 +418,7 @@ class ServerUtils(implicit
     }
   }
 
-  private def buildMultisigUnlockScript(
+  private def buildP2MPKHUnlockScript(
       lockupScript: LockupScript,
       pubKeys: AVector[PublicKey]
   ): Try[UnlockScript.P2MPKH] = {
@@ -920,7 +934,9 @@ class ServerUtils(implicit
     }
   }
 
-  protected def prepareOutputInfos(destinations: AVector[Destination]): AVector[TxOutputInfo] = {
+  protected[app] def prepareOutputInfos(
+      destinations: AVector[Destination]
+  ): AVector[TxOutputInfo] = {
     destinations.map { destination =>
       val tokensInfo = destination.tokens match {
         case Some(tokens) =>
@@ -1243,17 +1259,15 @@ class ServerUtils(implicit
     }
 
   def buildMultisigAddress(
-      keys: AVector[PublicKey],
-      mrequired: Int
+      rawKeys: AVector[ByteString],
+      mrequired: Int,
+      keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]],
+      multiSigType: Option[MultiSigType]
   ): Either[String, BuildMultisigAddressResult] = {
-    LockupScript.p2mpkh(keys, mrequired) match {
-      case Some(lockupScript) =>
-        Right(
-          BuildMultisigAddressResult(
-            Address.Asset(lockupScript)
-          )
-        )
-      case None => Left(s"Invalid m-of-n multisig")
+    if (multiSigType == Some(MultiSigType.P2HMPK)) {
+      ServerUtils.buildP2HMPKAddress(rawKeys, mrequired, keyTypesOpt)
+    } else {
+      ServerUtils.buildP2MPKHAddress(rawKeys, mrequired, keyTypesOpt)
     }
   }
 
@@ -2477,5 +2491,48 @@ object ServerUtils {
     )
 
     wrapCompilerResult(Compiler.compileTxScript(scriptRaw))
+  }
+
+  def buildP2HMPKAddress(
+      rawKeys: AVector[ByteString],
+      mrequired: Int,
+      keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]]
+  )(implicit groupConfig: GroupConfig): Either[String, BuildMultisigAddressResult] = {
+    for {
+      pks          <- GrouplessUtils.buildPublicKeyLikes(rawKeys, keyTypesOpt)
+      lockupScript <- LockupScript.P2HMPK(pks, mrequired)
+    } yield {
+      BuildMultisigAddressResult(api.Address.from(lockupScript.p2hmpkHash))
+    }
+  }
+
+  def buildP2MPKHAddress(
+      rawKeys: AVector[ByteString],
+      mrequired: Int,
+      keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]]
+  ): Either[String, BuildMultisigAddressResult] = {
+    val isWrongKeyTypes = keyTypesOpt.isDefined && keyTypesOpt.exists(keyTypes =>
+      keyTypes.length != rawKeys.length || keyTypes.exists(_ != BuildTxCommon.Default)
+    )
+
+    if (isWrongKeyTypes) {
+      Left(s"Wrong keyTypes ${keyTypesOpt.map(_.mkString(", "))}")
+    } else {
+      val publicKeys = rawKeys.foldE(AVector.empty[SecP256K1PublicKey]) { (publicKeys, rawKey) =>
+        SecP256K1PublicKey.from(rawKey) match {
+          case Some(publicKey) =>
+            Right(publicKeys :+ publicKey)
+          case None =>
+            Left(s"Invalid SecP256K1 public key: ${Hex.toHexString(rawKey)}")
+        }
+      }
+      publicKeys.flatMap { keys =>
+        LockupScript.p2mpkh(keys, mrequired) match {
+          case Some(lockupScript) =>
+            Right(BuildMultisigAddressResult(api.Address.from(lockupScript)))
+          case None => Left(s"Invalid m-of-n multisig")
+        }
+      }
+    }
   }
 }

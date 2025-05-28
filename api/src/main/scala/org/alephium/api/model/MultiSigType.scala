@@ -16,16 +16,9 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
+sealed trait MultiSigType extends Product with Serializable
 
-import org.alephium.util.AVector
-
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildMultisigAddress(
-    keys: AVector[ByteString],
-    keyTypes: Option[AVector[BuildTxCommon.PublicKeyType]] = None,
-    mrequired: Int,
-    multiSigType: Option[MultiSigType] = Some(MultiSigType.P2MPKH)
-)
-
-final case class BuildMultisigAddressResult(address: Address)
+object MultiSigType {
+  case object P2MPKH extends MultiSigType
+  case object P2HMPK extends MultiSigType
+}

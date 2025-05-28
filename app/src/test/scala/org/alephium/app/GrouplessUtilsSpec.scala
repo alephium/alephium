@@ -16,45 +16,31 @@
 
 package org.alephium.app
 
+import scala.collection.mutable
 import scala.language.implicitConversions
 
-import org.alephium.api.model.{Transaction => _, Val => _, _}
-import org.alephium.crypto.SecP256R1
+import org.alephium.api.{model => api}
+import org.alephium.api.model.{Address => _, AssetOutput => _, Transaction => _, Val => _, _}
+import org.alephium.crypto.{Byte64, ED25519, SecP256K1, SecP256R1}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{Balance => _, _}
+import org.alephium.protocol.model.UnsignedTransaction.TotalAmountNeeded
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
+// scalastyle:off file.size.limit
 class GrouplessUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 
-  trait Fixture extends FlowFixture with ApiConfigFixture with ModelGenerators {
+  sealed trait GrouplessFixture extends FlowFixture with ApiConfigFixture with ModelGenerators {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
-    val serverUtils                     = new ServerUtils
-    val (fromPrivateKey, fromPublicKey) = SecP256R1.generatePriPub()
-
-    val chainIndex              = ChainIndex(GroupIndex.unsafe(0), GroupIndex.unsafe(0))
-    val publicKeyLike           = PublicKeyLike.WebAuthn(fromPublicKey)
-    lazy val fromLockupScript   = LockupScript.p2pk(publicKeyLike, chainIndex.from)
-    val fromAddress             = Address.Asset(fromLockupScript)
-    val fromAddressWithGroup    = AddressLike.from(fromLockupScript)
-    val fromAddressWithoutGroup = AddressLike.fromP2PKPublicKey(publicKeyLike)
-
-    def allLockupScripts: AVector[LockupScript.Asset] = {
-      brokerConfig.cliqueGroups.fold(AVector.empty[LockupScript.Asset]) { case (acc, group) =>
-        if (group == chainIndex.from) {
-          acc
-        } else {
-          acc :+ LockupScript.p2pk(publicKeyLike, group)
-        }
-      } :+ fromLockupScript
-    }
-
+    val serverUtils = new ServerUtils
+    val chainIndex  = ChainIndex(GroupIndex.unsafe(0), GroupIndex.unsafe(0))
     val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(chainIndex.from.value)
     val tokenId                                  = issueToken()
 
@@ -66,6 +52,35 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       val contractId =
         createContract(tokenContract, tokenIssuanceInfo = issuanceInfo, chainIndex = chainIndex)._1
       TokenId.from(contractId)
+    }
+
+    def getBalance(address: api.Address): (U256, U256) = {
+      address.lockupScript match {
+        case api.Address.CompleteLockupScript(lockupScript) =>
+          getBalance(lockupScript)
+        case halfDecodedLockupScript: api.Address.HalfDecodedLockupScript =>
+          val balance =
+            serverUtils.getGrouplessBalance(blockFlow, halfDecodedLockupScript, false).rightValue
+          val tokenAmount = balance.tokenBalances.flatMap(_.find(_.id == tokenId).map(_.amount))
+          (balance.balance.value, tokenAmount.getOrElse(U256.Zero))
+      }
+    }
+
+    def getBalance(lockupScript: LockupScript): (U256, U256) = {
+      val balance     = blockFlow.getBalance(lockupScript, Int.MaxValue, false).rightValue
+      val tokenAmount = balance.totalTokens.find(_._1 == tokenId).map(_._2).getOrElse(U256.Zero)
+      (balance.totalAlph, tokenAmount)
+    }
+
+    def mineWithTx(tx: Transaction) = {
+      val block = mineWithTxs(blockFlow, tx.chainIndex, AVector(tx))
+      addAndCheck(blockFlow, block)
+      if (!tx.chainIndex.isIntraGroup) {
+        addAndCheck(
+          blockFlow,
+          emptyBlock(blockFlow, ChainIndex(tx.chainIndex.from, tx.chainIndex.from))
+        )
+      }
     }
 
     def prepare(
@@ -114,50 +129,74 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       balances.totalTokens is AVector(tokenId -> tokenAmount)
     }
 
-    def getBalance(lockupScript: LockupScript): (U256, U256) = {
-      val balance     = blockFlow.getBalance(lockupScript, Int.MaxValue, false).rightValue
-      val tokenAmount = balance.totalTokens.find(_._1 == tokenId).map(_._2).getOrElse(U256.Zero)
-      (balance.totalAlph, tokenAmount)
-    }
-
-    def getBalance(addressLike: AddressLike): (U256, U256) = {
-      addressLike.lockupScriptResult match {
-        case LockupScript.CompleteLockupScript(lockupScript) =>
-          getBalance(lockupScript)
-        case halfDecodedP2PK: LockupScript.HalfDecodedP2PK =>
-          val balance =
-            serverUtils.getGrouplessBalance(blockFlow, halfDecodedP2PK, false).rightValue
-          val tokenAmount = balance.tokenBalances.flatMap(_.find(_.id == tokenId).map(_.amount))
-          (balance.balance.value, tokenAmount.getOrElse(U256.Zero))
+    def getBalance(
+        address: Address.Asset,
+        outputs: AVector[AssetOutput]
+    ): (U256, AVector[(TokenId, U256)]) = {
+      var alphBalance   = U256.Zero
+      val tokenBalances = mutable.Map.empty[TokenId, U256]
+      for (output <- outputs) {
+        if (output.lockupScript == address.lockupScript) {
+          alphBalance = alphBalance.addUnsafe(output.amount)
+          output.tokens.foreach { token =>
+            val amount = tokenBalances.getOrElse(token._1, U256.Zero)
+            tokenBalances.put(token._1, amount.addUnsafe(token._2))
+          }
+        }
       }
+      (alphBalance, AVector.from(tokenBalances))
     }
 
-    def mineWithTx(tx: Transaction) = {
-      val block = mineWithTxs(blockFlow, tx.chainIndex, AVector(tx))
-      addAndCheck(blockFlow, block)
-      if (!tx.chainIndex.isIntraGroup) {
-        addAndCheck(
-          blockFlow,
-          emptyBlock(blockFlow, ChainIndex(tx.chainIndex.from, tx.chainIndex.from))
-        )
-      }
-    }
+    implicit def toAmount(amount: U256): Amount = Amount(amount)
 
-    private def buildGrouplessTransferTx(query: BuildTransferTx) = {
-      val result = serverUtils
-        .buildTransferTransaction(blockFlow, query)
-        .rightValue
-        .asInstanceOf[BuildGrouplessTransferTxResult]
-      val txs = result.transferTxs :+ result.transferTx
-      txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx.unsignedTx)).rightValue)
+    implicit class RichUnsignedTransaction(tx: UnsignedTransaction) {
+      def gasFee: U256 = tx.gasPrice * tx.gasAmount
     }
+    def allLockupScripts: AVector[LockupScript.GroupedAsset]
+
+    def failTransfer(
+        alphTransferAmount: U256,
+        tokenTransferAmount: Option[U256],
+        group: Option[GroupIndex],
+        destinationSize: Int,
+        expectedError: String
+    ): Unit
 
     def testTransfer(
         alphTransferAmount: U256,
         tokenTransferAmount: U256,
+        group: Option[GroupIndex],
         expectedTxSize: Int,
         destinationSize: Int = 1
-    ) = {
+    ): Unit
+  }
+
+  trait P2PKFixture extends GrouplessFixture {
+
+    val (fromPrivateKey, fromPublicKey) = SecP256R1.generatePriPub()
+    val publicKeyLike                   = PublicKeyLike.WebAuthn(fromPublicKey)
+    lazy val fromLockupScript           = LockupScript.p2pk(publicKeyLike, chainIndex.from)
+    val fromAddress                     = Address.Asset(fromLockupScript)
+    val fromAddressWithGroup            = api.Address.from(fromLockupScript)
+    val fromAddressWithoutGroup         = api.Address.from(publicKeyLike)
+
+    def allLockupScripts: AVector[LockupScript.GroupedAsset] = {
+      brokerConfig.cliqueGroups.fold(AVector.empty[LockupScript.P2PK]) { case (acc, group) =>
+        if (group == chainIndex.from) {
+          acc
+        } else {
+          acc :+ LockupScript.p2pk(publicKeyLike, group)
+        }
+      } :+ fromLockupScript
+    }.asInstanceOf[AVector[LockupScript.GroupedAsset]]
+
+    def testTransfer(
+        alphTransferAmount: U256,
+        tokenTransferAmount: U256,
+        group: Option[GroupIndex],
+        expectedTxSize: Int,
+        destinationSize: Int = 1
+    ): Unit = {
       val groupIndex = groupIndexGen.sample.get
       val destinations = AVector.fill(destinationSize) {
         val toAddress = Address.Asset(assetLockupGen(groupIndex).sample.get)
@@ -171,11 +210,11 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       val query = BuildTransferTx(
         fromPublicKey.bytes,
         fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
-        group = Some(chainIndex.from),
+        group = group,
         destinations = destinations
       )
 
-      val txs = buildGrouplessTransferTx(query)
+      val txs = buildP2PKTransferTx(query)
       txs.length is expectedTxSize
 
       val fromBalance0 = getBalance(fromAddressWithoutGroup)
@@ -189,119 +228,502 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       fromBalance0._2 is fromBalance1._2.addUnsafe(totalTokenTransferAmount)
 
       destinations.foreach { destination =>
-        val toBalance = getBalance(AddressLike.from(destination.address.lockupScript))
+        val toBalance = getBalance(api.Address.from(destination.address.lockupScript))
         toBalance._1 is alphTransferAmount
         toBalance._2 is tokenTransferAmount
       }
     }
 
-    implicit def toAmount(amount: U256): Amount = Amount(amount)
+    private def buildP2PKTransferTx(query: BuildTransferTx) = {
+      val result = serverUtils
+        .buildTransferTransaction(blockFlow, query)
+        .rightValue
+        .asInstanceOf[BuildGrouplessTransferTxResult]
+      val txs = result.transferTxs :+ result.transferTx
+      txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx.unsignedTx)).rightValue)
+    }
+    def failTransfer(
+        alphTransferAmount: U256,
+        tokenTransferAmount: Option[U256],
+        group: Option[GroupIndex],
+        destinationSize: Int,
+        expectedError: String
+    ): Unit = {
+      val groupIndex = groupIndexGen.sample.get
+      val destinations = AVector.fill(destinationSize) {
+        val toAddress = Address.Asset(assetLockupGen(groupIndex).sample.get)
+        Destination(
+          toAddress,
+          Some(Amount(alphTransferAmount)),
+          tokenTransferAmount.map(amount => AVector(Token(tokenId, amount)))
+        )
+      }
 
-    implicit class RichUnsignedTransaction(tx: UnsignedTransaction) {
-      def gasFee: U256 = tx.gasPrice * tx.gasAmount
+      val query = BuildTransferTx(
+        fromPublicKey.bytes,
+        fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
+        group = group,
+        destinations = destinations
+      )
+
+      serverUtils.buildTransferTransaction(blockFlow, query).leftValue.detail is expectedError
+      ()
     }
   }
 
-  it should "build a transfer tx without cross-group transfers" in new Fixture {
-    prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
-    testTransfer(ALPH.oneAlph, ALPH.oneAlph, 1)
-  }
+  trait P2HMPKFixture extends GrouplessFixture {
+    val (fromPrivateKey0, fromPublicKey0) = SecP256R1.generatePriPub()
+    val publicKeyLike0                    = PublicKeyLike.WebAuthn(fromPublicKey0)
+    val (fromPrivateKey1, fromPublicKey1) = SecP256K1.generatePriPub()
+    val publicKeyLike1                    = PublicKeyLike.SecP256K1(fromPublicKey1)
+    val (fromPrivateKey2, fromPublicKey2) = ED25519.generatePriPub()
+    val publicKeyLike2                    = PublicKeyLike.ED25519(fromPublicKey2)
 
-  it should "build a transfer tx with one cross-group transfer when the from address has no balance" in new Fixture {
-    prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts.head)
-    testTransfer(ALPH.oneAlph, ALPH.oneAlph, 2)
-  }
+    val allPubicKeyLikes = AVector(publicKeyLike0, publicKeyLike1, publicKeyLike2)
 
-  it should "build a transfer tx with one cross-group transfer when the from address does not have enough balance" in new Fixture {
-    allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
-    testTransfer(ALPH.alph(2), ALPH.alph(4), 2)
-  }
+    lazy val fromLockupScript   = LockupScript.P2HMPK.unsafe(allPubicKeyLikes, 2, chainIndex.from)
+    val fromP2HMPKHash          = fromLockupScript.p2hmpkHash
+    val fromAddress             = Address.Asset(fromLockupScript)
+    val fromAddressWithGroup    = api.Address.from(fromLockupScript)
+    val fromAddressWithoutGroup = api.Address.from(fromP2HMPKHash)
 
-  it should "build a transfer tx with multiple cross-group transfers" in new Fixture {
-    allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
-    testTransfer(ALPH.alph(4), ALPH.alph(5), 3)
-  }
+    def allLockupScripts: AVector[LockupScript.GroupedAsset] = {
+      brokerConfig.cliqueGroups.fold(AVector.empty[LockupScript.P2HMPK]) { case (acc, group) =>
+        if (group == chainIndex.from) {
+          acc
+        } else {
+          acc :+ LockupScript.p2hmpk(fromP2HMPKHash, group)
+        }
+      } :+ fromLockupScript
+    }.asInstanceOf[AVector[LockupScript.GroupedAsset]]
 
-  it should "transfer to multiple destinations" in new Fixture {
-    allLockupScripts.foreach(prepare(ALPH.alph(8), ALPH.alph(8), _))
-    testTransfer(ALPH.oneAlph, ALPH.oneAlph, 3, 20)
-  }
+    // scalastyle:off method.length
+    def testTransfer(
+        alphTransferAmount: U256,
+        tokenTransferAmount: U256,
+        group: Option[GroupIndex],
+        expectedTxSize: Int,
+        destinationSize: Int = 1
+    ): Unit = {
+      val groupIndex = groupIndexGen.sample.get
+      val destinations = AVector.fill(destinationSize) {
+        val toAddress = Address.Asset(assetLockupGen(groupIndex).sample.get)
+        Destination(
+          toAddress,
+          Some(Amount(alphTransferAmount)),
+          Some(AVector(Token(tokenId, tokenTransferAmount)))
+        )
+      }
 
-  it should "fail if the from address does not have enough balance when building transfer txs" in new Fixture {
-    prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
-    val toAddress = Address.Asset(assetLockupGen(groupIndexGen.sample.get).sample.get)
-    val destination0 =
-      Destination(
-        toAddress,
-        Some(Amount(ALPH.alph(2))),
-        Some(AVector(Token(tokenId, ALPH.alph(2))))
+      val query = BuildMultisig(
+        fromAddressWithGroup,
+        fromPublicKeys = AVector(fromPublicKey0.bytes, fromPublicKey1.bytes, fromPublicKey2.bytes),
+        fromPublicKeyTypes = Some(
+          AVector(BuildTxCommon.GLWebAuthn, BuildTxCommon.GLSecP256K1, BuildTxCommon.GLED25519)
+        ),
+        fromPublicKeyIndexes = Some(AVector(0, 1)),
+        group = group,
+        destinations = destinations,
+        multiSigType = Some(MultiSigType.P2HMPK)
       )
-    val query0 = BuildTransferTx(
-      fromPublicKey.bytes,
-      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
-      group = Some(chainIndex.from),
-      destinations = AVector(destination0)
-    )
-    serverUtils
-      .buildTransferTransaction(blockFlow, query0)
-      .leftValue
-      .detail is "Not enough ALPH balance, requires an additional 0.502 ALPH"
 
-    val destination1 =
-      Destination(
-        toAddress,
-        Some(Amount(ALPH.oneAlph)),
-        Some(AVector(Token(tokenId, ALPH.alph(3))))
+      val txs = buildP2HMPKTransferTx(query)
+      txs.length is expectedTxSize
+
+      val fromBalance0 = getBalance(fromAddressWithoutGroup)
+
+      txs.foreach { tx =>
+        val (_, signedTx0) = signWithWebAuthn(tx, fromPrivateKey0)
+        val signature      = Byte64.from(SecP256K1.sign(tx.id, fromPrivateKey1))
+        val signedTx = signedTx0.copy(inputSignatures = signedTx0.inputSignatures :+ signature)
+        mineWithTx(signedTx)
+      }
+      val fromBalance1 = getBalance(fromAddressWithoutGroup)
+
+      val gasFee                   = txs.fold(U256.Zero)((acc, tx) => acc.addUnsafe(tx.gasFee))
+      val totalAlphTransferAmount  = alphTransferAmount * destinationSize
+      val totalTokenTransferAmount = tokenTransferAmount * destinationSize
+      fromBalance0._1 is fromBalance1._1.addUnsafe(totalAlphTransferAmount).addUnsafe(gasFee)
+      fromBalance0._2 is fromBalance1._2.addUnsafe(totalTokenTransferAmount)
+
+      destinations.foreach { destination =>
+        val toBalance = getBalance(api.Address.from(destination.address.lockupScript))
+        toBalance._1 is alphTransferAmount
+        toBalance._2 is tokenTransferAmount
+      }
+    }
+    // scalastyle:on method.length
+
+    private def buildP2HMPKTransferTx(query: BuildMultisig) = {
+      val result = serverUtils
+        .buildMultisig(blockFlow, query)
+        .rightValue
+        .asInstanceOf[BuildGrouplessTransferTxResult]
+      val txs = result.transferTxs :+ result.transferTx
+      txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx.unsignedTx)).rightValue)
+    }
+
+    def failTransfer(
+        alphTransferAmount: U256,
+        tokenTransferAmount: Option[U256],
+        group: Option[GroupIndex],
+        destinationSize: Int,
+        expectedError: String
+    ): Unit = {
+      val groupIndex = groupIndexGen.sample.get
+      val destinations = AVector.fill(destinationSize) {
+        val toAddress = Address.Asset(assetLockupGen(groupIndex).sample.get)
+        Destination(
+          toAddress,
+          Some(Amount(alphTransferAmount)),
+          tokenTransferAmount.map(amount => AVector(Token(tokenId, amount)))
+        )
+      }
+
+      val query = BuildMultisig(
+        fromAddressWithoutGroup,
+        fromPublicKeys = AVector(fromPublicKey0.bytes, fromPublicKey1.bytes, fromPublicKey2.bytes),
+        fromPublicKeyTypes = Some(
+          AVector(BuildTxCommon.GLWebAuthn, BuildTxCommon.GLSecP256K1, BuildTxCommon.GLED25519)
+        ),
+        fromPublicKeyIndexes = Some(AVector(0, 1)),
+        group = group,
+        destinations = destinations,
+        multiSigType = Some(MultiSigType.P2HMPK)
       )
-    val query1 = BuildTransferTx(
-      fromPublicKey.bytes,
-      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
-      group = Some(chainIndex.from),
-      destinations = AVector(destination1)
-    )
-    serverUtils
-      .buildTransferTransaction(blockFlow, query1)
-      .leftValue
-      .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
+
+      serverUtils.buildMultisig(blockFlow, query).leftValue.detail is expectedError
+      ()
+    }
   }
 
-  it should "fail if the balance is locked" in new Fixture {
-    val toAddress = Address.Asset(assetLockupGen(groupIndexGen.sample.get).sample.get)
+  it should "build a transfer tx without cross-group transfers" in {
+    new P2PKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 1)
+    }
 
-    val lockTime = TimeStamp.now().plusHoursUnsafe(1)
-    prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript, Some(lockTime))
-    val destination0 = Destination(toAddress, Some(Amount(ALPH.oneAlph)), None)
-    val query0 = BuildTransferTx(
-      fromPublicKey.bytes,
-      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
-      group = Some(chainIndex.from),
-      destinations = AVector(destination0)
-    )
-    serverUtils
-      .buildTransferTransaction(blockFlow, query0)
-      .leftValue
-      .detail is "Not enough ALPH balance, requires an additional 1.501 ALPH"
+    new P2PKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(0))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 1)
+    }
 
-    prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts.head)
-    val destination1 =
-      Destination(
-        toAddress,
-        Some(Amount(ALPH.oneAlph)),
-        Some(AVector(Token(tokenId, ALPH.alph(2))))
-      )
-    val query1 = BuildTransferTx(
-      fromPublicKey.bytes,
-      fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
-      group = Some(chainIndex.from),
-      destinations = AVector(destination1)
-    )
-    serverUtils
-      .buildTransferTransaction(blockFlow, query1)
-      .leftValue
-      .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
+    new P2PKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(1))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 1)
+    }
+
+    new P2HMPKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 1)
+    }
+
+    new P2HMPKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(0))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 1)
+    }
+
+    new P2HMPKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(1))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 1)
+    }
   }
 
-  trait BuildExecuteScriptTxFixture extends Fixture {
+  it should "build a transfer tx without cross-group transfers with explicit group with enough balance" in {
+    new P2PKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, Some(fromLockupScript.groupIndex), 1)
+    }
+
+    new P2PKFixture {
+      val lockupScript = allLockupScripts(0)
+      prepare(ALPH.alph(2), ALPH.alph(2), lockupScript)
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, Some(lockupScript.groupIndex), 1)
+    }
+
+    new P2PKFixture {
+      val lockupScript = allLockupScripts(1)
+      prepare(ALPH.alph(2), ALPH.alph(2), lockupScript)
+      failTransfer(
+        ALPH.oneAlph,
+        Some(ALPH.oneAlph),
+        Some(fromLockupScript.groupIndex),
+        1,
+        "Not enough balance: got 0, expected 1000000000000000000"
+      )
+    }
+
+    new P2HMPKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, Some(fromLockupScript.groupIndex), 1)
+    }
+
+    new P2HMPKFixture {
+      val lockupScript = allLockupScripts(0)
+      prepare(ALPH.alph(2), ALPH.alph(2), lockupScript)
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, Some(lockupScript.groupIndex), 1)
+    }
+
+    new P2HMPKFixture {
+      val lockupScript = allLockupScripts(1)
+      prepare(ALPH.alph(2), ALPH.alph(2), lockupScript)
+      failTransfer(
+        ALPH.oneAlph,
+        Some(ALPH.oneAlph),
+        Some(fromLockupScript.groupIndex),
+        1,
+        "Not enough balance: got 0, expected 1000000000000000000"
+      )
+    }
+  }
+
+  it should "build a transfer tx with one cross-group transfer when the from address has no balance" in {
+    new P2PKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(1) / 2, allLockupScripts(0))
+      prepare(ALPH.alph(2), ALPH.alph(1) / 2, allLockupScripts(1))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 2)
+    }
+
+    new P2HMPKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(1) / 2, allLockupScripts(0))
+      prepare(ALPH.alph(2), ALPH.alph(1) / 2, allLockupScripts(1))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 2)
+    }
+  }
+
+  it should "build a transfer tx with minimal cross-group transfers" in {
+    new P2PKFixture {
+      val indices = AVector(0, 1, 2).shuffle()
+      prepare(ALPH.alph(2) / 10, ALPH.alph(1) / 10, allLockupScripts(indices(0)))
+      prepare(ALPH.alph(2), ALPH.alph(1) / 2, allLockupScripts(indices(1)))
+      prepare(ALPH.alph(2), ALPH.alph(1) / 2, allLockupScripts(indices(2)))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 2)
+    }
+
+    new P2HMPKFixture {
+      val indices = AVector(0, 1, 2).shuffle()
+      prepare(ALPH.alph(2) / 10, ALPH.alph(1) / 10, allLockupScripts(indices(0)))
+      prepare(ALPH.alph(2), ALPH.alph(1) / 2, allLockupScripts(indices(1)))
+      prepare(ALPH.alph(2), ALPH.alph(1) / 2, allLockupScripts(indices(2)))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 2)
+    }
+  }
+
+  it should "build a transfer tx with one cross-group transfer when the from address does not have enough balance" in {
+    new P2PKFixture {
+      allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+      testTransfer(ALPH.alph(2), ALPH.alph(4), None, 2)
+    }
+
+    new P2HMPKFixture {
+      allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+      testTransfer(ALPH.alph(2), ALPH.alph(4), None, 2)
+    }
+  }
+
+  it should "build a transfer tx with multiple cross-group transfers" in {
+    new P2PKFixture {
+      allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+      testTransfer(ALPH.alph(4), ALPH.alph(5), None, 3)
+    }
+
+    new P2PKFixture {
+      allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+      failTransfer(
+        ALPH.alph(4),
+        Some(ALPH.alph(7)),
+        None,
+        3,
+        s"Not enough balance: 7.502 ALPH, ${tokenId.toHexString}: 15000000000000000000"
+      )
+    }
+
+    new P2HMPKFixture {
+      allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+      testTransfer(ALPH.alph(4), ALPH.alph(5), None, 3)
+    }
+
+    new P2HMPKFixture {
+      allLockupScripts.foreach(prepare(ALPH.alph(2), ALPH.alph(2), _))
+      failTransfer(
+        ALPH.alph(4),
+        Some(ALPH.alph(7)),
+        None,
+        3,
+        s"Not enough balance: 7.502 ALPH, ${tokenId.toHexString}: 15000000000000000000"
+      )
+    }
+  }
+
+  it should "transfer to multiple destinations" in {
+    new P2PKFixture {
+      allLockupScripts.foreach(prepare(ALPH.alph(8), ALPH.alph(8), _))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 3, 20)
+    }
+
+    new P2HMPKFixture {
+      allLockupScripts.foreach(prepare(ALPH.alph(8), ALPH.alph(8), _))
+      testTransfer(ALPH.oneAlph, ALPH.oneAlph, None, 3, 20)
+    }
+  }
+
+  it should "fail if the from address does not have enough balance when building transfer txs" in {
+    new P2PKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+      failTransfer(ALPH.alph(2), Some(ALPH.alph(2)), None, 1, "Not enough balance: 0.502 ALPH")
+      failTransfer(
+        ALPH.oneAlph,
+        Some(ALPH.alph(3)),
+        None,
+        1,
+        s"Not enough balance: ${tokenId.toHexString}: 1000000000000000000"
+      )
+    }
+
+    new P2HMPKFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
+      failTransfer(ALPH.alph(2), Some(ALPH.alph(2)), None, 1, "Not enough balance: 0.502 ALPH")
+      failTransfer(
+        ALPH.oneAlph,
+        Some(ALPH.alph(3)),
+        None,
+        1,
+        s"Not enough balance: ${tokenId.toHexString}: 1000000000000000000"
+      )
+    }
+  }
+
+  it should "fail if the balance is locked" in {
+    new P2PKFixture {
+      prepare(
+        ALPH.alph(2),
+        ALPH.alph(2),
+        fromLockupScript,
+        Some(TimeStamp.now().plusHoursUnsafe(1))
+      )
+      failTransfer(ALPH.alph(2), ALPH.alph(0), None, 1, "Not enough balance: 2.502 ALPH")
+
+      prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts.head)
+      failTransfer(
+        ALPH.alph(2),
+        Some(ALPH.alph(2)),
+        None,
+        1,
+        s"Not enough balance: 0.502 ALPH, ${tokenId.toHexString}: 1000000000000000000"
+      )
+    }
+
+    new P2HMPKFixture {
+      prepare(
+        ALPH.alph(2),
+        ALPH.alph(2),
+        fromLockupScript,
+        Some(TimeStamp.now().plusHoursUnsafe(1))
+      )
+      failTransfer(ALPH.alph(2), ALPH.alph(0), None, 1, "Not enough balance: 2.502 ALPH")
+
+      prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts.head)
+      failTransfer(
+        ALPH.alph(2),
+        Some(ALPH.alph(2)),
+        None,
+        1,
+        s"Not enough balance: 0.502 ALPH, ${tokenId.toHexString}: 1000000000000000000"
+      )
+    }
+  }
+
+  it should "validate the P2HMPK transfer request" in {
+    new P2HMPKFixture {
+      val groupIndex = groupIndexGen.sample.get
+      val toAddress  = Address.Asset(assetLockupGen(groupIndex).sample.get)
+      val destinations = AVector(
+        Destination(
+          toAddress,
+          Some(Amount(ALPH.oneAlph)),
+          Some(AVector(Token(tokenId, ALPH.oneAlph)))
+        )
+      )
+
+      val query = BuildMultisig(
+        fromAddressWithoutGroup,
+        fromPublicKeys = AVector(fromPublicKey0.bytes, fromPublicKey1.bytes, fromPublicKey2.bytes),
+        fromPublicKeyTypes = Some(
+          AVector(BuildTxCommon.GLWebAuthn, BuildTxCommon.GLSecP256K1, BuildTxCommon.GLED25519)
+        ),
+        fromPublicKeyIndexes = Some(AVector(0, 1)),
+        group = Some(chainIndex.from),
+        destinations = destinations,
+        multiSigType = Some(MultiSigType.P2HMPK)
+      )
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyTypes = Some(AVector(BuildTxCommon.GLWebAuthn)))
+        )
+        .leftValue
+        .detail is "`keyTypes` length should be the same as `keys` length"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyTypes = None)
+        )
+        .leftValue
+        .detail is s"Invalid public key ${Hex.toHexString(fromPublicKey2.bytes)} for keyType SecP256K1"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyTypes = Some(AVector.fill(3)(BuildTxCommon.GLED25519)))
+        )
+        .leftValue
+        .detail is s"Invalid public key ${Hex.toHexString(fromPublicKey0.bytes)} for keyType GLED25519"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeys = AVector.empty, fromPublicKeyTypes = None)
+        )
+        .leftValue
+        .detail is "`keys` can not be empty"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyIndexes = Some(AVector(1, 0)))
+        )
+        .leftValue
+        .detail is "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyIndexes = Some(AVector.empty))
+        )
+        .leftValue
+        .detail is "Invalid m in m-of-n multisig: m=0, n=3"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyIndexes = Some(AVector(0, 1, 2, 3)))
+        )
+        .leftValue
+        .detail is "Invalid m in m-of-n multisig: m=4, n=3"
+
+      serverUtils
+        .buildMultisig(
+          blockFlow,
+          query.copy(fromPublicKeyIndexes = Some(AVector(0, 100)))
+        )
+        .leftValue
+        .detail is "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
+    }
+  }
+
+  trait BuildExecuteScriptTxFixture extends P2PKFixture {
     val contract =
       s"""
          |Contract Foo() {
@@ -485,12 +907,12 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
   }
 
-  it should "get the balance of the groupless address" in new Fixture {
+  it should "get the balance of the groupless address" in new P2PKFixture {
     allLockupScripts.length is 3
 
     val lockTime          = TimeStamp.now().plusHoursUnsafe(1)
     val lockupScript1     = allLockupScripts.head
-    val address1WithGroup = AddressLike.from(lockupScript1)
+    val address1WithGroup = api.Address.from(lockupScript1)
     prepare(ALPH.alph(2), ALPH.alph(2), lockupScript1, Some(lockTime))
     val balance0 = serverUtils.getBalance(blockFlow, fromAddressWithoutGroup, true).rightValue
     balance0.balance.value is ALPH.alph(2)
@@ -500,7 +922,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     balance0.utxoNum is 2
 
     val lockupScript2     = allLockupScripts(1)
-    val address2WithGroup = AddressLike.from(lockupScript2)
+    val address2WithGroup = api.Address.from(lockupScript2)
     prepare(ALPH.alph(2), ALPH.alph(2), lockupScript2)
     val balance1 = serverUtils.getBalance(blockFlow, fromAddressWithoutGroup, true).rightValue
     balance1.balance.value is ALPH.alph(4)
@@ -510,7 +932,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     balance1.utxoNum is 4
 
     val lockupScript3     = allLockupScripts.last
-    val address3WithGroup = AddressLike.from(lockupScript3)
+    val address3WithGroup = api.Address.from(lockupScript3)
     prepare(ALPH.alph(2), ALPH.alph(2), lockupScript3)
     val balance2 = serverUtils.getBalance(blockFlow, fromAddressWithoutGroup, true).rightValue
     balance2.balance.value is ALPH.alph(6)
@@ -546,5 +968,190 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     balance6.tokenBalances is Some(AVector(Token(tokenId, ALPH.alph(2))))
     balance6.lockedTokenBalances is None
     balance6.utxoNum is 2
+  }
+
+  trait BuildGrouplessTransferTxWithEachGroupedAddressFixture extends P2PKFixture {
+    def testTransferWithEachGroupedAddress(
+        toAddress: Address.Asset,
+        alphAmount: U256,
+        tokenAmount: U256
+    ) = {
+      val destination = Destination(
+        address = toAddress,
+        attoAlphAmount = Some(Amount(alphAmount)),
+        tokens = Some(AVector(Token(tokenId, tokenAmount)))
+      )
+      val outputInfos = serverUtils.prepareOutputInfos(AVector(destination))
+      val totalAmountNeeded = blockFlow
+        .checkAndCalcTotalAmountNeeded(
+          fromLockupScript,
+          outputInfos,
+          None,
+          nonCoinbaseMinGasPrice
+        )
+        .rightValue
+
+      serverUtils
+        .buildGrouplessTransferTxWithEachGroupedAddress(
+          blockFlow,
+          fromLockupScript,
+          UnlockScript.P2PK,
+          outputInfos,
+          totalAmountNeeded,
+          nonCoinbaseMinGasPrice,
+          None
+        )
+    }
+
+    def verifyBalance(
+        toAddress: Address.Asset,
+        rawUnsignedTx: String,
+        alphAmount: U256,
+        tokenAmount: U256
+    ) = {
+      val unsignedTx = deserialize[UnsignedTransaction](Hex.unsafe(rawUnsignedTx)).rightValue
+      val (alphBalance, tokenBalances) = getBalance(toAddress, unsignedTx.fixedOutputs)
+      alphBalance is alphAmount
+      tokenBalances is AVector((tokenId, tokenAmount))
+    }
+
+    def testTransferWithEnoughBalance(alphAmount: U256, tokenAmount: U256) = {
+      val toAddress = Address.Asset(assetLockupGen(chainIndex.from).sample.get)
+      val result =
+        testTransferWithEachGroupedAddress(toAddress, alphAmount, tokenAmount).rightValue.rightValue
+      verifyBalance(toAddress, result.transferTx.unsignedTx, alphAmount, tokenAmount)
+    }
+
+    def transferWithoutEnoughBalance(alphAmount: U256, tokenAmount: U256) = {
+      val toAddress = Address.Asset(assetLockupGen(chainIndex.from).sample.get)
+      testTransferWithEachGroupedAddress(toAddress, alphAmount, tokenAmount).rightValue.leftValue
+    }
+  }
+
+  it should "test buildGrouplessTransferTxWithEachGroupedAddress" in {
+    new BuildGrouplessTransferTxWithEachGroupedAddressFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(0))
+      testTransferWithEnoughBalance(ALPH.alph(1), ALPH.alph(1))
+    }
+
+    new BuildGrouplessTransferTxWithEachGroupedAddressFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(1))
+      testTransferWithEnoughBalance(ALPH.alph(1), ALPH.alph(1))
+    }
+
+    new BuildGrouplessTransferTxWithEachGroupedAddressFixture {
+      prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(2))
+      testTransferWithEnoughBalance(ALPH.alph(1), ALPH.alph(1))
+    }
+
+    new BuildGrouplessTransferTxWithEachGroupedAddressFixture {
+      prepare(ALPH.alph(2).addUnsafe(dustUtxoAmount), ALPH.alph(2), allLockupScripts(1))
+      prepare(ALPH.alph(1).addUnsafe(dustUtxoAmount), ALPH.alph(1), allLockupScripts(2))
+
+      val buildingGrouplessTransferTx = transferWithoutEnoughBalance(ALPH.alph(3), ALPH.alph(3))
+
+      buildingGrouplessTransferTx.from is allLockupScripts(1)
+      buildingGrouplessTransferTx.remainingAmounts._1 is ALPH.alphFromString("1.501 ALPH").get
+      buildingGrouplessTransferTx.remainingAmounts._2 is AVector((tokenId, ALPH.alph(1)))
+      buildingGrouplessTransferTx.remainingLockupScripts is AVector(
+        allLockupScripts(2),
+        allLockupScripts(0)
+      )
+    }
+  }
+
+  it should "test tryBuildGrouplessTransferTxFromSingleGroupedAddress" in {
+    new BuildGrouplessTransferTxWithEachGroupedAddressFixture {
+      prepare(ALPH.alph(2), ALPH.alph(3), allLockupScripts(0))
+      prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(1))
+      prepare(ALPH.alph(3), ALPH.alph(2), allLockupScripts(2))
+
+      val toAddress = Address.Asset(assetLockupGen(chainIndex.from).sample.get)
+
+      val alphAmount  = ALPH.alph(3)
+      val tokenAmount = ALPH.alph(5)
+
+      val destination = Destination(
+        address = toAddress,
+        attoAlphAmount = Some(Amount(alphAmount)),
+        tokens = Some(AVector(Token(tokenId, tokenAmount)))
+      )
+      val outputInfos = serverUtils.prepareOutputInfos(AVector(destination))
+      val totalAmountNeeded = blockFlow
+        .checkAndCalcTotalAmountNeeded(
+          fromLockupScript,
+          outputInfos,
+          None,
+          nonCoinbaseMinGasPrice
+        )
+        .rightValue
+
+      val buildingGrouplessTransferTx = serverUtils
+        .buildGrouplessTransferTxWithEachGroupedAddress(
+          blockFlow,
+          fromLockupScript,
+          UnlockScript.P2PK,
+          outputInfos,
+          totalAmountNeeded,
+          nonCoinbaseMinGasPrice,
+          None
+        )
+        .rightValue
+        .leftValue
+
+      def verifyFinalResult(
+          currentBuildingGrouplessTx: GrouplessUtils.BuildingGrouplessTransferTx
+      ) = {
+        val result = serverUtils
+          .tryBuildGrouplessTransferTxFromSingleGroupedAddress(
+            blockFlow,
+            nonCoinbaseMinGasPrice,
+            None,
+            outputInfos,
+            totalAmountNeeded,
+            currentBuildingGrouplessTx
+          )
+          .rightValue
+          .rightValue
+
+        result.transferTxs.length is 1
+        verifyBalance(toAddress, result.transferTx.unsignedTx, alphAmount, tokenAmount)
+      }
+
+      buildingGrouplessTransferTx.from is allLockupScripts(0)
+      buildingGrouplessTransferTx.remainingLockupScripts is AVector(
+        allLockupScripts(2),
+        allLockupScripts(1)
+      )
+      verifyFinalResult(buildingGrouplessTransferTx)
+    }
+  }
+
+  it should "sortedGroupedLockupScripts" in new P2PKFixture {
+    val totalAmountNeeded = TotalAmountNeeded(
+      ALPH.alph(2),
+      AVector(tokenId -> ALPH.alph(2)),
+      1
+    )
+
+    prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts(0))
+    prepare(ALPH.alph(2), ALPH.alph(2), allLockupScripts(1))
+    prepare(ALPH.alph(3), ALPH.alph(2), allLockupScripts(2))
+
+    val sortedGroupedLockupScripts = serverUtils
+      .sortedGroupedLockupScripts(
+        blockFlow,
+        allLockupScripts,
+        totalAmountNeeded,
+        None
+      )
+      .rightValue
+
+    sortedGroupedLockupScripts.length is 3
+    sortedGroupedLockupScripts.map(_._1) is AVector(
+      allLockupScripts(2),
+      allLockupScripts(1),
+      allLockupScripts(0)
+    )
   }
 }
