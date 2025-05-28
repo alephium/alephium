@@ -17,7 +17,6 @@
 package org.alephium.ralph
 
 import scala.collection.mutable
-import scala.util.Random
 
 import akka.util.ByteString
 import org.scalatest.Assertion
@@ -30,75 +29,7 @@ import org.alephium.serde._
 import org.alephium.util._
 
 // scalastyle:off no.equal file.size.limit number.of.methods
-class CompilerSpec extends AlephiumSpec with ContextGenerators {
-
-  def replace(code: String): String = code.replace("$", "")
-  def replaceFirst(code: String): String = {
-    val i = index(code)
-    code.substring(0, i) + code.substring(i + 1)
-  }
-  def index(code: String): Int = code.indexOf("$")
-
-  def testContractError(code: String, message: String): Compiler.Error = {
-    testErrorT(code, message, compileContract(_))
-  }
-
-  def testContractFullError(code: String, message: String): Compiler.Error = {
-    testErrorT(code, message, compileContractFull(_))
-  }
-
-  def testMultiContractError(code: String, message: String): Compiler.Error = {
-    testErrorT(code, message, Compiler.compileMultiContract(_))
-  }
-
-  def testTxScriptError(code: String, message: String): Compiler.Error = {
-    testErrorT(code, message, Compiler.compileTxScript(_))
-  }
-
-  def testErrorT[T](
-      code: String,
-      message: String,
-      f: String => Either[Compiler.Error, T]
-  ): Compiler.Error = {
-    val startIndex = index(code)
-    val newCode    = replaceFirst(code)
-    val endIndex   = index(newCode)
-    val error      = f(replace(newCode)).leftValue
-
-    error.message is message
-    error.position is startIndex
-    error.foundLength is (endIndex - startIndex)
-
-    error
-  }
-
-  def methodSelectorOf(signature: String): MethodSelector = {
-    MethodSelector(Method.Selector(DjbHash.intHash(ByteString.fromString(signature))))
-  }
-
-  def compileContract(input: String, index: Int = 0): Either[Compiler.Error, StatefulContract] =
-    compileContractFull(input, index).map(_.debugCode)
-
-  def compileContractFull(
-      input: String,
-      index: Int = 0
-  ): Either[Compiler.Error, CompiledContract] = {
-    try {
-      Compiler.compileMultiContract(input) match {
-        case Right(multiContract) =>
-          var result = multiContract.genStatefulContract(index)(CompilerOptions.Default)
-          if (Random.nextBoolean()) {
-            multiContract.contracts.foreach(_.reset())
-            result = multiContract.genStatefulContract(index)(CompilerOptions.Default)
-          }
-          Right(result)
-        case Left(error) => throw error
-      }
-    } catch {
-      case e: Compiler.Error => Left(e)
-    }
-  }
-
+class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixture {
   it should "compile asset script" in {
     def runScript(assetScript: StatelessScript, args: AVector[Val]): AVector[Val] = {
       val (scriptObj, statelessContext) = prepareStatelessScript(assetScript)
@@ -2603,7 +2534,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          }
            |""".stripMargin
       val script = Compiler.compileTxScript(code).rightValue
-      script.toTemplateString() is "010100000700402c{1}{2}{3}{4}1703170217011700{6}{7}{8}170617051704{5}18{0}1816030f2f16000c2f1a0c7b16021603181816060e2f16050d2f1a16040c2f1a0c7b"
+      script.toTemplateString() is "0101000007004032{1}{2}{3}{4}1703170217011700{6}{7}{8}170617051704{5}18{0}1816030f2f7a4c041816000c2f0c7b16021603181816060e2f7a4c041816050d2f7a4c041816040c2f0c7b"
       runScript(
         script,
         AVector(
@@ -2704,7 +2635,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       val script = Compiler.compileTxScript(code).rightValue
-      script.toTemplateString() is "010100000600402f{1}{2}17011700{3}{4}{5}{6}1705170417031702{0}0c2f0c7b{7}0c7b16000c2f1601140100411a0c7b16031401014116020d2f1a0c7b16051401024116040e2f1a0c7b"
+      script.toTemplateString() is "0101000006004035{1}{2}17011700{3}{4}{5}{6}1705170417031702{0}0c2f0c7b{7}0c7b16000c2f7a4c04181601140100410c7b1603140101417a4c041816020d2f0c7b1605140102417a4c041816040e2f0c7b"
       runScript(
         script,
         AVector(
@@ -10085,5 +10016,65 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       compileContract(code(expr, "I256")).leftValue.message is
         s"""Invalid param types List(U256, I256) for ${expr.slice(2, 4)} operator"""
     )
+  }
+
+  it should "generate bytecode for div expr" in {
+    val code0 =
+      s"""
+         |TxScript Main {
+         |  let _ = 5i / 3i
+         |  let _ = -5i / 3i
+         |  let _ = 5 / 3
+         |
+         |  let _ = 5i \\ 3i
+         |  let _ = -5i \\ 3i
+         |  let _ = 5 \\ 3
+         |}
+         |""".stripMargin
+    // format: off
+    Compiler.compileTxScript(code0).rightValue.methods.head.instrs is AVector[Instr[StatefulContext]](
+      I256Const1, Pop, I256Const(Val.I256(I256.unsafe(-2))), Pop, U256Const1,
+      Pop, I256Const2, Pop, I256ConstN1, Pop, U256Const2, Pop
+    )
+    // format: on
+
+    val code1 =
+      s"""
+         |TxScript Main {
+         |  let n0 = 5i
+         |  let n1 = -5i
+         |
+         |  let _ = n0 / 3i
+         |  let _ = n1 / 3i
+         |
+         |  let _ = n0 \\ 3i
+         |  let _ = n1 \\ 3i
+         |}
+         |""".stripMargin
+    // format: off
+    Compiler.compileTxScript(code1).rightValue.methods.head.instrs is AVector[Instr[StatefulContext]](
+      I256Const5, StoreLocal(0), I256Const(Val.I256(I256.unsafe(-5))), StoreLocal(1), LoadLocal(0), Dup, Dup, I256Const3, NumericXor, Dup,
+      I256Const0, I256Ge, IfTrue(3), NumericXor, I256RoundInfinityDiv, Jump(2), NumericXor, I256Div, Pop, LoadLocal(1), Dup, Dup, I256Const3,
+      NumericXor, Dup, I256Const0, I256Ge, IfTrue(3), NumericXor, I256RoundInfinityDiv, Jump(2), NumericXor, I256Div, Pop, LoadLocal(0), Dup,
+      Dup, I256Const3, NumericXor, Dup, I256Const0, I256Ge, IfTrue(3), NumericXor, I256Div, Jump(2), NumericXor, I256RoundInfinityDiv, Pop,
+      LoadLocal(1), Dup, Dup, I256Const3, NumericXor, Dup, I256Const0, I256Ge, IfTrue(3), NumericXor, I256Div, Jump(2), NumericXor, I256RoundInfinityDiv, Pop
+    )
+    // format: on
+  }
+
+  it should "throw an error if the constant div expr overflow" in {
+    def code(expr: String) =
+      s"""
+         |TxScript Main {
+         |  let _ = $$$expr$$
+         |}
+         |""".stripMargin
+
+    testTxScriptError(code("1 / 0"), "U256 overflow: `1 / 0`")
+    testTxScriptError(code("1 \\ 0"), "U256 overflow: `1 \\ 0`")
+    testTxScriptError(code("1i / 0i"), "I256 overflow: `1 / 0`")
+    testTxScriptError(code("1i \\ 0i"), "I256 overflow: `1 \\ 0`")
+    testTxScriptError(code(s"${I256.MinValue}i / -1i"), s"I256 overflow: `${I256.MinValue} / -1`")
+    testTxScriptError(code(s"${I256.MinValue}i \\ -1i"), s"I256 overflow: `${I256.MinValue} \\ -1`")
   }
 }

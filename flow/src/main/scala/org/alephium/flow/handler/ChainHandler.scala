@@ -183,7 +183,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
             publishEvent(ChainHandler.FlowDataAdded(data, origin, TimeStamp.now()))
             notifyBroker(broker, data)
             log.info(show(data))
-            measure(data)
+            measure(data)(networkConfig)
         }
       case Left(error) => handleIOError(error)
     }
@@ -199,7 +199,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
 
   def show(data: T): String
 
-  def measure(data: T): Unit
+  def measure(data: T)(implicit networkConfig: NetworkConfig): Unit
 
   def showHeader(header: BlockHeader): String = {
     val total           = blockFlow.numHashes

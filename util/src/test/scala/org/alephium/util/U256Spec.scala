@@ -510,4 +510,23 @@ class U256Spec extends AlephiumSpec {
       x.addModN(y, n) is Some(U256.unsafe(x.v.add(y.v).remainder(n.v)))
     }
   }
+
+  it should "test roundInfinityDiv" in {
+    test(
+      _.roundInfinityDiv(_),
+      _.roundInfinityDivUnsafe(_),
+      (a, b) => a.add(b).subtract(BigInteger.ONE).divide(b),
+      _ > BigInteger.ZERO
+    )
+
+    U256.One.roundInfinityDiv(U256.Zero) is None
+    U256.Zero.roundInfinityDiv(U256.One) is Some(U256.Zero)
+    U256.MaxValue.roundInfinityDiv(U256.One) is Some(U256.MaxValue)
+    U256.One.roundInfinityDiv(U256.MaxValue) is Some(U256.One)
+    U256.MaxValue.roundInfinityDiv(U256.HalfMaxValue) is Some(U256.unsafe(3))
+    U256.MaxValue.roundInfinityDiv(U256.HalfMaxValue.subOneUnsafe()) is Some(U256.unsafe(3))
+    U256.MaxValue.roundInfinityDiv(U256.HalfMaxValue.addOneUnsafe()) is Some(U256.unsafe(2))
+    U256.MaxValue.roundInfinityDiv(U256.MaxValue.subOneUnsafe()) is Some(U256.unsafe(2))
+    U256.MaxValue.roundInfinityDiv(U256.MaxValue) is Some(U256.One)
+  }
 }

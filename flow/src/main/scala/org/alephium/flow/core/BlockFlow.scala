@@ -118,7 +118,7 @@ trait BlockFlow
 
   def updateBestFlowSkeleton(): IOResult[Unit]
 
-  def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Unit]
+  def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Boolean]
 }
 
 object BlockFlow extends StrictLogging {
@@ -466,6 +466,10 @@ object BlockFlow extends StrictLogging {
         updateBestDepsPreDanube(mainGroup, deps)
       }
       updateBestFlowSkeletonUnsafe()
+      brokerConfig.chainIndexes.foreach { chainIndex =>
+        val deps = calBestFlowPerChainIndexUnsafe(chainIndex)
+        updateBestDepsDanube(chainIndex, deps)
+      }
     }
 
     def updateAccountViewAfterLoadingUnsafe(): Unit = {
@@ -490,9 +494,20 @@ object BlockFlow extends StrictLogging {
       updateBestFlowSkeleton(bestFlowSkeleton)
     }
 
-    def updateViewPerChainIndexDanubeUnsafe(chainIndex: ChainIndex): Unit = {
-      if (chainIndex.isIntraGroup) {
+    private def isSkeletonCompatibleUnsafe(previous: BlockFlowSkeleton): Boolean = {
+      val current = getBestFlowSkeleton()
+      current.intraGroupTips.forallWithIndex { case (currentTip, index) =>
+        isExtendingUnsafe(currentTip, previous.intraGroupTips(index))
+      }
+    }
+
+    def updateViewPerChainIndexDanubeUnsafe(chainIndex: ChainIndex): Boolean = {
+      val rebuildTemplates = if (chainIndex.isIntraGroup) {
+        val previous = getBestFlowSkeleton()
         updateBestFlowSkeletonUnsafe()
+        !isSkeletonCompatibleUnsafe(previous)
+      } else {
+        false
       }
 
       if (brokerConfig.contains(chainIndex.from)) {
@@ -501,9 +516,10 @@ object BlockFlow extends StrictLogging {
         updateGrandPoolUnsafe(chainIndex.from, newDeps, oldDeps)
         updateBestDepsDanube(chainIndex, newDeps)
       }
+      rebuildTemplates
     }
 
-    def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Unit] = {
+    def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Boolean] = {
       IOUtils.tryExecute(updateViewPerChainIndexDanubeUnsafe(chainIndex))
     }
 

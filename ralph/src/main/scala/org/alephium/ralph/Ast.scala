@@ -33,10 +33,10 @@ import org.alephium.util.{AVector, DjbHash, Hex, I256, U256}
 object Ast {
   type StdInterfaceId = Val.ByteVec
   val StdInterfaceIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
-  private val stdArg: Argument =
+  private[ralph] val stdArg: Argument =
     Argument(Ident("__stdInterfaceId"), Type.ByteVec, isMutable = false, isUnused = true)
 
-  trait Positioned {
+  trait Positioned extends Product with Serializable {
     var sourceIndex: Option[SourceIndex] = None
 
     def atSourceIndex(fromIndex: Int, endIndex: Int, fileURI: Option[java.net.URI]): this.type = {
@@ -589,11 +589,20 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      positionedError(
-        left.genCode(state) ++ right.genCode(state) ++ op.genCode(
-          left.getType(state) ++ right.getType(state)
-        )
-      )
+      positionedError {
+        op match {
+          case op: LogicalOperator.BinaryLogicalOperator =>
+            val leftCode  = left.genCode(state)
+            val rightCode = right.genCode(state)
+            val offset    = 1 + rightCode.length // we need to pop the first value
+            val instr: Instr[Ctx] = op match {
+              case LogicalOperator.And => IfFalse(offset)
+              case LogicalOperator.Or  => IfTrue(offset)
+            }
+            leftCode ++ Seq(Dup, instr, Pop) ++ rightCode
+          case _ => op.genCode(Seq(left, right), state)
+        }
+      }
     }
     override def reset(): Unit = {
       left.reset()
@@ -652,18 +661,9 @@ object Ast {
           if (func.inline && state.genInlineCode) {
             func.genInlineCode(args, state, this)
           } else {
-            val argsType = args.flatMap(_.getType(state))
-            val variadicInstrs = if (func.isVariadic) {
-              Seq(U256Const(Val.U256.unsafe(state.flattenTypeLength(argsType))))
-            } else {
-              Seq.empty
-            }
-            val instrs = genApproveCode(state, func) ++
-              func.genCodeForArgs(args, state) ++
-              variadicInstrs ++
-              func.genCode(argsType)
+            val instrs = genApproveCode(state, func) ++ func.genCode(this, args, state)
             if (ignoreReturn) {
-              val returnType = positionedError(func.getReturnType(argsType, state))
+              val returnType = positionedError(func.getReturnType(this, args, state))
               instrs ++ Seq.fill(state.flattenTypeLength(returnType))(Pop)
             } else {
               instrs
@@ -699,7 +699,7 @@ object Ast {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
-      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      positionedError(funcInfo.getReturnType(this, args, state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -732,7 +732,7 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      positionedError(funcInfo.getReturnType(this, args, state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -779,7 +779,7 @@ object Ast {
       val funcInfo = state.getFunc(contractType.id, callId)
       checkNonStaticContractFunction(contractType.id, callId, funcInfo)
       state.addExternalCall(contractType.id, callId)
-      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      val retTypes = positionedError(funcInfo.getReturnType(this, args, state))
       (contractType.id, retTypes)
     }
 
@@ -790,8 +790,7 @@ object Ast {
     ): Seq[Instr[StatefulContext]] = {
       val contract  = obj.getType(state)(0).asInstanceOf[Type.Contract]
       val func      = state.getFunc(contract.id, callId)
-      val argTypes  = args.flatMap(_.getType(state))
-      val retTypes  = func.getReturnType(argTypes, state)
+      val retTypes  = func.getReturnType(this, args, state)
       val retLength = state.flattenTypeLength(retTypes)
       genApproveCode(state, func) ++
         args.flatMap(_.genCode(state)) ++
@@ -1953,7 +1952,7 @@ object Ast {
     override def check(state: Compiler.State[Ctx]): Unit = {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
-      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      val retTypes = positionedError(funcInfo.getReturnType(this, args, state))
       checkReturnValueUsed(state, state.typeId, id, retTypes)
     }
 
@@ -1984,7 +1983,7 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      val retTypes = positionedError(funcInfo.getReturnType(this, args, state))
       checkReturnValueUsed(state, contractId, id, retTypes)
     }
 
@@ -2194,7 +2193,7 @@ object Ast {
           )
       }
     }
-    def addConstant(ident: Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
+    def addConstant(ident: Ident, value: Val, constantDef: Option[Ast.ConstantDefinition]): Unit = {
       val tpe = Type.fromVal(value)
       constants(ident) =
         Compiler.VarInfo.Constant(ident, tpe, value, Seq(value.toConstInstr), constantDef)
@@ -2587,7 +2586,8 @@ object Ast {
       events: Seq[EventDef],
       constantVars: Seq[ConstantVarDef[StatefulContext]],
       enums: Seq[EnumDef[StatefulContext]],
-      inheritances: Seq[Inheritance]
+      inheritances: Seq[Inheritance],
+      unitTests: Seq[Testing.UnitTestDef[StatefulContext]]
   ) extends ContractWithState {
     lazy val hasStdIdField: Boolean = stdIdEnabled.exists(identity) && stdInterfaceId.nonEmpty
     lazy val contractFields: Seq[Argument] = if (hasStdIdField) fields :+ Ast.stdArg else fields
@@ -2741,6 +2741,12 @@ object Ast {
       StatefulContract(fieldsLength, genMethods(state))
     }
 
+    def genUnitTestCode(
+        state: Compiler.State[StatefulContext]
+    ): Testing.CompiledUnitTests[StatefulContext] = {
+      state.genUnitTestCode(unitTests)
+    }
+
     // the state must have been updated in the check pass
     def buildCheckExternalCallerTable(
         state: Compiler.State[StatefulContext]
@@ -2821,7 +2827,7 @@ object Ast {
         case txContract: Ast.Contract =>
           Compiler.ContractKind.Contract(txContract.isAbstract)
       }
-      contract.ident -> Compiler.ContractInfo(kind, contract.funcTable(globalState))
+      contract.ident -> Compiler.ContractInfo(contract, kind, contract.funcTable(globalState))
     }.toMap
 
     def structs: Seq[Struct]                 = globalState.structs
@@ -2921,7 +2927,7 @@ object Ast {
         case script: TxScript =>
           script.withTemplateVarDefs(globalState).atSourceIndex(script.sourceIndex)
         case c: Contract =>
-          val (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums) =
+          val (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums, unitTests) =
             MultiContract.extractContract(parentsCache, methodSelectorTable, c)
           Contract(
             Some(stdIdEnabled),
@@ -2935,7 +2941,8 @@ object Ast {
             events,
             constantVars,
             enums,
-            c.inheritances
+            c.inheritances,
+            unitTests
           ).atSourceIndex(c.sourceIndex)
         case i: ContractInterface =>
           val (stdId, funcs, events) =
@@ -3117,7 +3124,8 @@ object Ast {
           inlinedReleaseCode,
           contract,
           state.getWarnings,
-          inlinedDebugCode
+          inlinedDebugCode,
+          Option.unless(compilerOptions.skipTests)(contract.genUnitTestCode(state))
         ) -> index
       }
       (warnings, compiled)
@@ -3368,14 +3376,17 @@ object Ast {
         Seq[MapDef],
         Seq[EventDef],
         Seq[ConstantVarDef[StatefulContext]],
-        Seq[EnumDef[StatefulContext]]
+        Seq[EnumDef[StatefulContext]],
+        Seq[Testing.UnitTestDef[StatefulContext]]
     ) = {
-      val parents                       = parentsCache(contract.ident)
-      val (allContracts, allInterfaces) = (parents :+ contract).partition(_.isInstanceOf[Contract])
-      val sortedInterfaces =
-        sortInterfaces(parentsCache, allInterfaces.map(_.asInstanceOf[ContractInterface]))
-      val stdId        = getStdId(sortedInterfaces)
-      val stdIdEnabled = getStdIdEnabled(allContracts.map(_.asInstanceOf[Contract]), contract.ident)
+      val parents = parentsCache(contract.ident)
+      val (parentContracts, parentInterfaces) =
+        (parents :+ contract).partition(_.isInstanceOf[Contract])
+      val allContracts     = parentContracts.map(_.asInstanceOf[Contract])
+      val allInterfaces    = parentInterfaces.map(_.asInstanceOf[ContractInterface])
+      val sortedInterfaces = sortInterfaces(parentsCache, allInterfaces)
+      val stdId            = getStdId(sortedInterfaces)
+      val stdIdEnabled     = getStdIdEnabled(allContracts, contract.ident)
 
       val interfaceFuncs = sortedInterfaces.flatMap { interface =>
         interface.funcs.foreach(func =>
@@ -3407,7 +3418,8 @@ object Ast {
       } else {
         rearrangeFuncs(sortedInterfaces, allUniqueFuncs)
       }
-      (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums)
+      val allUnitTests = allContracts.flatMap(_.unitTests)
+      (stdIdEnabled, stdId, funcs, maps, events, constantVars, enums, allUnitTests)
     }
     // scalastyle:on method.length
 

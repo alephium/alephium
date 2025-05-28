@@ -20,7 +20,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.Byte64
 import org.alephium.io.IOError
-import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.nodeindexes.TxOutputLocator
 import org.alephium.util.{discard, AVector, EitherF, Math, TimeStamp, U256}
@@ -76,6 +76,21 @@ object BlockEnv {
       networkConfig.getHardFork(header.timestamp),
       Some(scala.collection.mutable.HashMap.empty)
     )
+
+  def mockup(
+      groupIndex: GroupIndex,
+      blockHash: BlockHash,
+      blockTimeStamp: TimeStamp
+  )(implicit networkConfig: NetworkConfig, consensusConfigs: ConsensusConfigs): BlockEnv = {
+    val consensusConfig = consensusConfigs.getConsensusConfig(blockTimeStamp)
+    BlockEnv(
+      ChainIndex(groupIndex, groupIndex),
+      networkConfig.networkId,
+      blockTimeStamp,
+      consensusConfig.maxMiningTarget,
+      Some(blockHash)
+    )
+  }
 }
 
 sealed trait TxEnv {
@@ -108,6 +123,18 @@ object TxEnv {
       prevOutputs: AVector[AssetOutput],
       signatures: Stack[Byte64]
   ): TxEnv = apply(tx, prevOutputs, signatures, 0)
+
+  def mockup(txId: TransactionId, prevOutputs: AVector[AssetOutput]): TxEnv = {
+    mockup(
+      txId,
+      Stack.popOnly(AVector.empty[Byte64]),
+      prevOutputs,
+      AVector.empty[AssetOutput],
+      nonCoinbaseMinGasPrice,
+      maximalGasPerTx,
+      isEntryMethodPayable = true
+    )
+  }
 
   def mockup(
       txId: TransactionId,
@@ -191,7 +218,41 @@ final case class NodeIndexesConfig(
     subcontractIndex: Boolean
 )
 
-trait StatelessContext extends CostStrategy {
+final class TestEnv(
+    val sourcePosIndex: Int,
+    val expectedErrorCode: Option[Int],
+    val testFrame: Frame[_],
+    private var _exeFailure: Option[ExeFailure]
+) {
+  def setExeFailure(error: ExeFailure): Unit = {
+    if (_exeFailure.isEmpty) _exeFailure = Some(error)
+  }
+  def exeFailure: Option[ExeFailure] = _exeFailure
+}
+object TestEnv {
+  def apply(errorCode: Int, expectedErrorCode: Option[Int], testFrame: Frame[_]): TestEnv =
+    new TestEnv(errorCode, expectedErrorCode, testFrame, None)
+}
+
+trait TestContext {
+  private var _testEnv: Option[TestEnv] = None
+  def initTestEnv(errorCode: Int, expectedErrorCode: Option[Int], testFrame: Frame[_]): Unit = {
+    assume(_testEnv.isEmpty)
+    _testEnv = Some(TestEnv(errorCode, expectedErrorCode, testFrame))
+  }
+  def resetTestEnv(): Unit = {
+    assume(_testEnv.isDefined)
+    _testEnv = None
+  }
+  def testEnvOpt: Option[TestEnv] = _testEnv
+
+  def setTestError(error: ExeFailure): Unit = {
+    assume(_testEnv.isDefined)
+    _testEnv.foreach(_.setExeFailure(error))
+  }
+}
+
+trait StatelessContext extends CostStrategy with TestContext {
   def networkConfig: NetworkConfig
   def groupConfig: GroupConfig
   def blockEnv: BlockEnv

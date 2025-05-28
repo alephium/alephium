@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "3.14.1"
+    "version": "3.14.4"
   },
   "servers": [
     {
@@ -15589,6 +15589,9 @@
             "type": "boolean"
           },
           "skipAbstractContractCheck": {
+            "type": "boolean"
+          },
+          "skipTests": {
             "type": "boolean"
           }
         }
