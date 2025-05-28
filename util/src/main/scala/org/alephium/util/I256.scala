@@ -103,6 +103,24 @@ class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
     }
   }
 
+  def roundInfinityDivUnsafe(that: I256): I256 = {
+    assume(!(that.isZero || (that == I256.NegOne && this == I256.MinValue)))
+    val sameSign =
+      (v.signum() >= 0 && that.v.signum() > 0) || (v.signum() <= 0 && that.v.signum() < 0)
+    val absThis = v.abs()
+    val absThat = that.v.abs()
+    val res     = absThis.add(absThat).subtract(BigInteger.ONE).divide(absThat)
+    I256.unsafe(if (sameSign) res else res.negate())
+  }
+
+  def roundInfinityDiv(that: I256): Option[I256] = {
+    if (that.isZero || (that == I256.NegOne && this == I256.MinValue)) {
+      None
+    } else {
+      Some(roundInfinityDivUnsafe(that))
+    }
+  }
+
   def modUnsafe(that: I256): I256 = {
     assume(!(that.isZero || (this.v == I256.lowerBound && that.v == I256.NegOne.toBigInt)))
     I256.unsafe(this.v.remainder(that.v))

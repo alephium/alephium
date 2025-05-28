@@ -23,34 +23,35 @@ import akka.io.{IO, Tcp}
 import akka.testkit.{TestActor, TestProbe}
 import akka.util.ByteString
 
-import org.alephium.flow.AlephiumFlowActorSpec
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.validation.InvalidBlockVersion
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Block, ChainIndex, Target}
+import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, Target}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
-import org.alephium.util.{AVector, SocketUtil}
+import org.alephium.util.{AlephiumActorSpec, AVector, Duration, SocketUtil, TimeStamp}
 
-class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
-  trait Fixture {
+class MinerApiControllerSpec extends AlephiumActorSpec with SocketUtil {
+  trait Fixture extends FlowFixture {
     val apiPort                         = generatePort()
     val (allHandlers, allHandlerProbes) = TestUtils.createAllHandlersProbe
     val minerApiController =
       newTestActorRef[MinerApiController](
-        MinerApiController.props(allHandlers)(
+        MinerApiController.props(blockFlow, allHandlers)(
           brokerConfig,
           networkConfig.copy(minerApiPort = apiPort),
           miningSetting
         )
       )
-    val bindAddress = minerApiController.underlyingActor.apiAddress
+    val minerApiControllerActor = minerApiController.underlyingActor
+    val bindAddress             = minerApiControllerActor.apiAddress
 
     def connectToServer(probe: TestProbe): ActorRef = {
       probe.send(IO(Tcp), Tcp.Connect(bindAddress))
       allHandlerProbes.viewHandler.expectMsg(ViewHandler.Subscribe)
-      eventually(minerApiController.underlyingActor.pendings.length is 0)
+      eventually(minerApiControllerActor.pendings.length is 0)
       probe.expectMsgType[Tcp.Connected]
       val connection = probe.lastSender
       probe.reply(Tcp.Register(probe.ref))
@@ -104,16 +105,8 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val parentHash  = block.blockDeps.parentHash(chainIndex)
     val blockHeight = blockFlow.getHeightUnsafe(parentHash) + 1
 
-    val blockFlowTemplate = BlockFlowTemplate(
-      chainIndex,
-      block.blockDeps.deps,
-      block.header.depStateHash,
-      block.target,
-      block.timestamp,
-      block.transactions,
-      blockHeight
-    )
-    val headerBlob = Job.from(blockFlowTemplate).headerBlob
+    val blockFlowTemplate = BlockFlowTemplate.from(block, blockHeight)
+    val headerBlob        = Job.from(blockFlowTemplate).headerBlob
 
     def blockRejected(block: Block, blockBlob: ByteString, errorMessage: String) = {
       expectErrorMsg(errorMessage) {
@@ -287,14 +280,14 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
   }
 
   it should "publish jobs once the new template is received" in new SyncedFixture with Generators {
-    val minerApiControllerActor = minerApiController.underlyingActor
+    import MinerApiController.CachedTemplate
     minerApiControllerActor.latestJobs.isEmpty is true
     val templates = ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
     minerApiController ! ViewHandler.NewTemplates(templates)
-    val templates0 = AVector.from(templates.flatten)
+    val templates0 = AVector.from(templates.flatten).map(CachedTemplate.apply)
     eventually {
       minerApiControllerActor.latestJobs.isEmpty is false
-      minerApiControllerActor.latestJobs.value.map(_._2) is templates0
+      minerApiControllerActor.templates.value is templates0
     }
 
     val probe = TestProbe()
@@ -307,20 +300,21 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     probe.expectMsgPF() { case Tcp.Received(data) =>
       ServerMessage.deserialize(data).rightValue.value.payload is a[Jobs]
     }
+    eventually(minerApiControllerActor.buildJobsState.isUpdating is false)
     eventually {
       val index        = MinerApiController.calcJobIndex(chainIndex)
-      val newTemplates = templates0.replace(index, newTemplate)
+      val newTemplates = templates0.replace(index, CachedTemplate(newTemplate))
       minerApiControllerActor.latestJobs.isEmpty is false
-      minerApiControllerActor.latestJobs.value.map(_._2) is newTemplates
+      minerApiControllerActor.templates.value is newTemplates
     }
   }
 
   it should "not publish jobs if using lazy broadcast" in new SyncedFixture {
-    val minerApiControllerActor = minerApiController.underlyingActor
-    val templates               = ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
+    import MinerApiController.CachedTemplate
+    val templates = ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
     minerApiController ! ViewHandler.NewTemplates(templates)
-    val jobs = AVector.from(templates.flatten)
-    eventually(minerApiControllerActor.latestJobs.value.map(_._2) is jobs)
+    val jobs = AVector.from(templates.flatten).map(CachedTemplate.apply)
+    eventually(minerApiControllerActor.templates.value is jobs)
     val probe = TestProbe()
     connectToServer(probe)
     probe.expectMsgPF() { case Tcp.Received(data) =>
@@ -333,8 +327,8 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     minerApiController ! ViewHandler.NewTemplate(newTemplate0, true)
     eventually {
       val index   = MinerApiController.calcJobIndex(chainIndex0)
-      val newJobs = jobs.replace(index, newTemplate0)
-      minerApiControllerActor.latestJobs.value.map(_._2) is newJobs
+      val newJobs = jobs.replace(index, CachedTemplate(newTemplate0))
+      minerApiControllerActor.templates.value is newJobs
     }
     probe.expectNoMessage()
 
@@ -342,15 +336,127 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     val block1       = emptyBlock(blockFlow, chainIndex1)
     val newTemplate1 = BlockFlowTemplate.from(block1, 1)
     minerApiController ! ViewHandler.NewTemplate(newTemplate1, false)
+    eventually(minerApiControllerActor.buildJobsState.isUpdating is false)
     eventually {
-      val index0  = MinerApiController.calcJobIndex(chainIndex0)
-      val index1  = MinerApiController.calcJobIndex(chainIndex1)
-      val newJobs = jobs.replace(index0, newTemplate0).replace(index1, newTemplate1)
-      minerApiControllerActor.latestJobs.value.map(_._2) is newJobs
+      val index0 = MinerApiController.calcJobIndex(chainIndex0)
+      val index1 = MinerApiController.calcJobIndex(chainIndex1)
+      val newJobs = jobs
+        .replace(index0, CachedTemplate(newTemplate0))
+        .replace(index1, CachedTemplate(newTemplate1))
+      minerApiControllerActor.templates.value is newJobs
     }
     probe.expectMsgPF() { case Tcp.Received(data) =>
       val jobs = ServerMessage.deserialize(data).rightValue.value.payload.asInstanceOf[Jobs]
-      jobs is Jobs(minerApiControllerActor.latestJobs.value.map(_._1))
+      jobs is Jobs(minerApiControllerActor.latestJobs.value)
     }
+  }
+
+  trait PublishJobsFixture extends SyncedFixture {
+    def createJobsMessage(): ByteString = {
+      val templates = ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue
+      val jobs      = AVector.from(templates.flatten).map(Job.fromWithoutTxs)
+      ServerMessage.serialize(ServerMessage.from(Jobs(jobs)))
+    }
+
+    val jobsMessage = createJobsMessage()
+    val probe       = TestProbe()
+    connectToServer(probe)
+  }
+
+  it should "publish mining jobs immediately" in new PublishJobsFixture {
+    minerApiControllerActor.lastPublishTimestamp.isEmpty is true
+    minerApiControllerActor.publishJobs(jobsMessage)
+    eventually(probe.expectMsgPF() { case Tcp.Received(data) =>
+      ServerMessage.deserialize(data).rightValue.value.payload is a[Jobs]
+    })
+    eventually(minerApiControllerActor.lastPublishTimestamp.isDefined is true)
+  }
+
+  it should "delay publishing mining jobs" in new PublishJobsFixture {
+    minerApiControllerActor.lastPublishTimestamp = Some(TimeStamp.now())
+    minerApiControllerActor.publishJobs(jobsMessage)
+    eventually(minerApiControllerActor.publishJobsTask.isDefined is true)
+    eventually(probe.expectMsgPF() { case Tcp.Received(data) =>
+      ServerMessage.deserialize(data).rightValue.value.payload is a[Jobs]
+    })
+    eventually {
+      minerApiControllerActor.publishJobsTask.isDefined is false
+      minerApiControllerActor.lastPublishTimestamp.isDefined is true
+    }
+  }
+
+  it should "skip publishing stale mining jobs" in new PublishJobsFixture {
+    val newJobsMessage = createJobsMessage()
+    newJobsMessage isnot jobsMessage
+    minerApiControllerActor.lastPublishTimestamp = Some(TimeStamp.now())
+    minerApiControllerActor.publishJobs(jobsMessage)
+    minerApiControllerActor.publishJobs(newJobsMessage)
+    eventually {
+      probe.expectMsgPF() { case Tcp.Received(data) =>
+        data is newJobsMessage
+      }
+      minerApiControllerActor.publishJobsTask.isDefined is false
+      minerApiControllerActor.lastPublishTimestamp.isDefined is true
+    }
+  }
+
+  it should "test calcPublishDelay" in {
+    val now = TimeStamp.now()
+    MinerApiController.calcPublishDelay(now, now.plusMillisUnsafe(1)) is Some(
+      MinerApiController.publishJobsDelay
+    )
+    MinerApiController.calcPublishDelay(now, now) is Some(MinerApiController.publishJobsDelay)
+    MinerApiController.calcPublishDelay(now, now.minusUnsafe(Duration.unsafe(1))) is
+      MinerApiController.publishJobsDelay - Duration.unsafe(1)
+    MinerApiController.calcPublishDelay(now, now.minusUnsafe(Duration.unsafe(9))) is
+      MinerApiController.publishJobsDelay - Duration.unsafe(9)
+    MinerApiController.calcPublishDelay(
+      now,
+      now.minusUnsafe(MinerApiController.publishJobsDelay)
+    ) is None
+    MinerApiController.calcPublishDelay(
+      now,
+      now.minusUnsafe(MinerApiController.publishJobsDelay + Duration.unsafe(1))
+    ) is None
+    MinerApiController.calcPublishDelay(
+      now,
+      now.minusUnsafe(MinerApiController.publishJobsDelay + Duration.unsafe(2))
+    ) is None
+    MinerApiController.calcPublishDelay(
+      now,
+      now.minusUnsafe(MinerApiController.publishJobsDelay.timesUnsafe(2))
+    ) is None
+  }
+
+  it should "ignore duplicate blocks" in new SubmissionFixture {
+    val cacheKey = MinerApiController.getCacheKey(headerBlob)
+    minerApiControllerActor.jobCache.put(
+      cacheKey,
+      blockFlowTemplate -> serialize(blockFlowTemplate.transactions)
+    )
+    val blockBlob = serialize(block.copy(transactions = AVector.empty))
+    blockAccepted(block, blockBlob)
+    eventually(minerApiControllerActor.jobCache.contains(cacheKey) is false)
+
+    val newBlockFlowTemplate = BlockFlowTemplate
+      .from(block, blockHeight)
+      .copy(templateTs = block.timestamp.plusMillisUnsafe(1))
+    val newBlock      = mine(blockFlow, newBlockFlowTemplate)
+    val newHeaderBlob = Job.from(newBlockFlowTemplate).headerBlob
+    val newBlockBlob  = serialize(newBlock.copy(transactions = AVector.empty))
+    BlockHeader.fromSameTemplate(newBlock.header, block.header) is true
+
+    addAndCheck(blockFlow, block)
+    val newCacheKey = MinerApiController.getCacheKey(newHeaderBlob)
+    minerApiControllerActor.jobCache.put(
+      newCacheKey,
+      newBlockFlowTemplate -> serialize(newBlockFlowTemplate.transactions)
+    )
+    blockRejected(
+      newBlock,
+      newBlockBlob,
+      s"Ignore block ${newBlock.hash.toHexString} because another block from the same mining job is already mined, there will be no mining rewards"
+    )
+    eventually(minerApiControllerActor.jobCache.contains(newCacheKey) is false)
   }
 }

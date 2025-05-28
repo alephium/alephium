@@ -1,5 +1,3 @@
-version: "3.3"
-
 services:
   alephium_gpu_miner:
     image: alephium/gpu-miner:latest

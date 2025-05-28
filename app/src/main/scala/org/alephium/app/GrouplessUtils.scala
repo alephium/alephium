@@ -17,7 +17,6 @@
 package org.alephium.app
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import akka.util.ByteString
@@ -33,7 +32,6 @@ import org.alephium.protocol.model
 import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, PublicKeyLike, UnlockScript}
-import org.alephium.protocol.vm.LockupScript.GroupedAsset
 import org.alephium.util.{AVector, Hex, U256}
 
 trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
@@ -91,7 +89,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   // we could end up building more txs than needed.
   //
   // Here we use the breadth-first search to build the txs. First we try to build the tx with
-  // single groupled address, then 2, 3 and 4 until we either succeed or run out of balance.
+  // single grouped address, then 2, 3 and 4 until we either succeed or run out of balance.
   //
   // Before the breadth-first search, we sort the grouped addresses by the amount of first
   // token (if exists) and ALPH that we want to transfer. The hope is that this could make us
@@ -210,14 +208,14 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       buildResult1 <- buildResult0 match {
         case Right(finalResult) =>
           Right(Right(finalResult))
-        case Left(buildingTxs) =>
+        case Left(buildingTx) =>
           tryBuildGrouplessTransferTx(
             blockFlow,
             gasPrice,
             targetBlockHashOpt,
             outputInfos,
             totalAmountNeeded,
-            buildingTxs
+            AVector(buildingTx)
           )
       }
       buildResult <- buildResult1 match {
@@ -317,7 +315,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
           case Left(_) =>
             buildingGrouplessTransferTxs += currentBuildingGrouplessTx.copy(
               remainingLockupScripts =
-                currentBuildingGrouplessTx.remainingLockupScripts.remove(index)
+                currentBuildingGrouplessTx.remainingLockupScripts.drop(index + 1)
             )
             rec(index + 1)
           case Right((unsignedTx, newRemainingAlph, newRemainingTokens)) =>
@@ -345,11 +343,12 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
                     .map(Right(_))
                 }
             } else {
+              val remainingLockupScripts =
+                currentBuildingGrouplessTx.remainingLockupScripts.drop(index + 1)
               buildingGrouplessTransferTxs += currentBuildingGrouplessTx.copy(
                 builtUnsignedTxsSoFar =
                   currentBuildingGrouplessTx.builtUnsignedTxsSoFar :+ unsignedTx,
-                remainingLockupScripts =
-                  currentBuildingGrouplessTx.remainingLockupScripts.remove(index),
+                remainingLockupScripts = remainingLockupScripts,
                 remainingAmounts = (newRemainingAlph, newRemainingTokens)
               )
               rec(index + 1)
@@ -373,7 +372,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       totalAmountNeeded: TotalAmountNeeded,
       gasPrice: GasPrice,
       targetBlockHashOpt: Option[BlockHash]
-  ): TryBuildGrouplessTransferTx = {
+  ): Try[Either[BuildingGrouplessTransferTx, BuildGrouplessTransferTxResult]] = {
     val allLockupScripts = allGroupedLockupScripts(lockupScript)
 
     sortedGroupedLockupScripts(
@@ -384,7 +383,6 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     ) match {
       case Right(sortedScripts) =>
         for {
-          _ <- checkEnoughBalance(totalAmountNeeded, sortedScripts.map(_._3))
           result <- buildGrouplessTransferTxWithEachSortedGroupedAddress(
             blockFlow,
             sortedScripts.map(script => (script._1, script._2)),
@@ -399,6 +397,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def buildGrouplessTransferTxWithEachSortedGroupedAddress(
       blockFlow: BlockFlow,
       allLockupScriptsWithUtxos: AVector[(LockupScript.GroupedAsset, AVector[AssetOutputInfo])],
@@ -406,14 +405,16 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       outputInfos: AVector[TxOutputInfo],
       totalAmountNeeded: TotalAmountNeeded,
       gasPrice: GasPrice
-  ): TryBuildGrouplessTransferTx = {
+  ): Try[Either[BuildingGrouplessTransferTx, BuildGrouplessTransferTxResult]] = {
     val allLockupScriptsLength       = allLockupScriptsWithUtxos.length
     val buildingGrouplessTransferTxs = ArrayBuffer.empty[BuildingGrouplessTransferTx]
 
     @tailrec
-    def rec(index: Int): TryBuildGrouplessTransferTx = {
+    def rec(
+        index: Int
+    ): Try[Either[BuildingGrouplessTransferTx, BuildGrouplessTransferTxResult]] = {
       if (index == allLockupScriptsLength) {
-        Right(Left(AVector.from(buildingGrouplessTransferTxs)))
+        Right(Left(buildingGrouplessTransferTxs.head))
       } else {
         val (lockup, utxos) = allLockupScriptsWithUtxos(index)
         blockFlow.transfer(
@@ -478,6 +479,8 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     }
   }
 
+  type GrouplessAssetInfo =
+    AVector[(LockupScript.GroupedAsset, AVector[AssetOutputInfo], (U256, AVector[(TokenId, U256)]))]
   def sortedGroupedLockupScripts(
       blockFlow: BlockFlow,
       allGroupedLockupScripts: AVector[LockupScript.GroupedAsset],
@@ -520,43 +523,9 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
     ordering.reverse
   }
-
-  // Priliminary check to see if the balance is enough, if not enough reject directly
-  // otherwise proceed to build the txs, which could still return not enough balance error
-  // due to gas fee and dust amounts.
-  def checkEnoughBalance(
-      totalAmountNeeded: TotalAmountNeeded,
-      balances: AVector[(U256, AVector[(TokenId, U256)])]
-  ): Try[Unit] = {
-    val totalAlphBalance   = balances.map(_._1).fold(U256.Zero)(_ addUnsafe _)
-    val totalTokenBalances = mutable.Map.empty[TokenId, U256]
-    for ((_, tokenBalances) <- balances) {
-      for ((tokenId, amount) <- tokenBalances) {
-        totalTokenBalances(tokenId) =
-          totalTokenBalances.getOrElse(tokenId, U256.Zero).addUnsafe(amount)
-      }
-    }
-
-    val missingAlph = totalAmountNeeded.alphAmount.sub(totalAlphBalance).getOrElse(U256.Zero)
-    val missingTokens = totalAmountNeeded.tokens.collect { case (tokenId, amount) =>
-      amount
-        .sub(totalTokenBalances.getOrElse(tokenId, U256.Zero))
-        .filter(_ > U256.Zero)
-        .map(tokenId -> _)
-    }
-
-    if (missingAlph == U256.Zero && missingTokens.isEmpty) {
-      Right(())
-    } else {
-      Left(failed(notEnoughBalanceError(missingAlph, missingTokens)))
-    }
-  }
 }
 
 object GrouplessUtils {
-  type GrouplessAssetInfo =
-    AVector[(GroupedAsset, AVector[AssetOutputInfo], (U256, AVector[(TokenId, U256)]))]
-
   final case class BuildingGrouplessTransferTx(
       from: LockupScript.GroupedAsset,
       fromUnlockScript: UnlockScript,

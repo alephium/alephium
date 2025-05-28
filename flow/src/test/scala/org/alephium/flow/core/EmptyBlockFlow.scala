@@ -51,7 +51,7 @@ trait EmptyBlockFlow extends BlockFlow {
   }
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps                                          = ???
   def updateBestFlowSkeleton(): IOResult[Unit]                                                 = ???
-  def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Unit]                    = ???
+  def updateViewPerChainIndexDanube(chainIndex: ChainIndex): IOResult[Boolean]                 = ???
   def updateViewPreDanube(): IOResult[Unit]                                                    = ???
   def updateAccountView(block: Block): IOResult[Unit]                                          = ???
   def getBestIntraGroupTip(): BlockHash                                                        = ???

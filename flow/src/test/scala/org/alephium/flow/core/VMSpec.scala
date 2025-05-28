@@ -1122,6 +1122,51 @@ class VMSpec extends AlephiumSpec with Generators {
          |    assert!(!true == false, 0)
          |    assert!(!false == true, 0)
          |    assert!((2 * (if (true) 1 else 2)) / 2 == 1, 0)
+         |
+         |    assert!(5i / 3i == 1i, 0)
+         |    assert!(-5i / 3i == -2i, 0)
+         |    assert!(5i / -3i == -2i, 0)
+         |    assert!(-5i / -3i == 1i, 0)
+         |    assert!(5 / 3 == 1, 0)
+         |
+         |    assert!(5i \\ 3i == 2i, 0)
+         |    assert!(-5i \\ 3i == -1i, 0)
+         |    assert!(5i \\ -3i == -1i, 0)
+         |    assert!(-5i \\ -3i == 2i, 0)
+         |    assert!(5 \\ 3 == 2, 0)
+         |
+         |    let halfI256Max = i256Max!() / 2i
+         |    assert!(i256Max!() / halfI256Max == 2i, 0)
+         |    assert!(i256Max!() / -halfI256Max == -3i, 0)
+         |    assert!(i256Min!() / halfI256Max == -3i, 0)
+         |    assert!(i256Min!() / -halfI256Max == 2i, 0)
+         |
+         |    assert!(i256Max!() \\ halfI256Max == 3i, 0)
+         |    assert!(i256Max!() \\ -halfI256Max == -2i, 0)
+         |    assert!(i256Min!() \\ halfI256Max == -2i, 0)
+         |    assert!(i256Min!() \\ -halfI256Max == 3i, 0)
+         |
+         |    let halfU256Max = u256Max!() / 2
+         |    assert!(u256Max!() / halfU256Max == 2, 0)
+         |    assert!(u256Max!() \\ halfU256Max == 3, 0)
+         |
+         |    let n0 = 5i
+         |    let n1 = 3i
+         |    let n2 = -5i
+         |    let n3 = 5
+         |    let n4 = 3
+         |
+         |    assert!(n0 / n1 == 1i, 0)
+         |    assert!(n2 / n1 == -2i, 0)
+         |    assert!(n0 / -n1 == -2i, 0)
+         |    assert!(-n0 / -n1 == 1i, 0)
+         |    assert!(n3 / n4 == 1, 0)
+         |
+         |    assert!(n0 \\ n1 == 2i, 0)
+         |    assert!(n2 \\ n1 == -1i, 0)
+         |    assert!(n0 \\ -n1 == -1i, 0)
+         |    assert!(-n0 \\ -n1 == 2i, 0)
+         |    assert!(n3 \\ n4 == 2, 0)
          |  }
          |}
          |""".stripMargin
@@ -5397,7 +5442,7 @@ class VMSpec extends AlephiumSpec with Generators {
     // format: off
     Seq(
       ("A + B", "3"), ("B - A", "1"), ("A * B", "2"), ("A / B", "0"), ("A % B", "1"),
-      ("C + D", "1i"), ("C - D", "-3i"), ("C * D", "-2i"), ("C / D", "0i"), ("C % D", "-1i"),
+      ("C + D", "1i"), ("C - D", "-3i"), ("C * D", "-2i"), ("C / D", "-1i"), ("C % D", "-1i"),
       ("A ** B", "1"), ("C ** B", "1i"), ("A |+| B", "3"), ("A |-| B", "u256Max!()"), ("A |*| B", "2"), ("A |**| B", "1"),
       ("#01 ++ E", "#0100"), ("A << B", "4"), ("A >> B", "0"), ("A & B", "0"), ("A | B", "3"), ("A ^ B", "3"),
       ("A == B", "false"), ("A != B", "true"), ("A > B", "false"), ("A >= B", "false"), ("A < B", "true"), ("A <= B", "true"),
@@ -8434,6 +8479,68 @@ class VMSpec extends AlephiumSpec with Generators {
   it should "test bitwise operators for I256 since Danube" in new I256BitwiseFixture {
     setHardForkSince(HardFork.Danube)
     testSimpleScript(code)
+  }
+
+  it should "support short-circuit evaluation for && and || operators" in new ContractFixture {
+    val contract =
+      s"""
+         |Contract Foo(mut count: U256) {
+         |  @using(checkExternalCaller = false, updateFields = true)
+         |  pub fn foo() -> Bool {
+         |    count += 1
+         |    return count % 2 == 0
+         |  }
+         |  pub fn getCount() -> U256 { return count }
+         |}
+         |""".stripMargin
+    val foo = createContract(contract, AVector.empty, AVector(Val.U256(0)))._1
+
+    val script =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  let foo = Foo(#${foo.toHexString})
+         |  assert!(foo.getCount() == 0, 0)
+         |  if (true || foo.foo()) {
+         |    assert!(foo.getCount() == 0, 0)
+         |  }
+         |  assert!(foo.getCount() == 0, 0)
+         |  if (false && foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 1, 0)
+         |  }
+         |  assert!(foo.getCount() == 0, 0)
+         |
+         |  if (false || true || foo.foo()) {
+         |    assert!(foo.getCount() == 0, 0)
+         |  }
+         |  if (true && false && foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 1, 0)
+         |  }
+         |
+         |  assert!(foo.getCount() == 0, 0)
+         |  if (false || foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 0, 0)
+         |  }
+         |  if (false || foo.foo()) {
+         |    assert!(foo.getCount() == 2, 0)
+         |  }
+         |  assert!(foo.getCount() == 2, 0)
+         |
+         |  if (true && foo.foo()) {
+         |    // this line of code will not be executed
+         |    assert!(foo.getCount() == 2, 0)
+         |  }
+         |  if (true && foo.foo()) {
+         |    assert!(foo.getCount() == 4, 0)
+         |  }
+         |  assert!(foo.getCount() == 4, 0)
+         |}
+         |$contract
+         |""".stripMargin
+    testSimpleScript(script)
   }
 
   private def getEvents(

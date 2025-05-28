@@ -42,8 +42,14 @@ final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
   def checkUpgrade()(implicit networkConfig: NetworkConfig): Boolean = {
     networkConfig.getHardFork(TimeStamp.now()) match {
       case HardFork.Danube =>
-        // TODO: Update this once we release the version for the Danube upgrade
-        networkConfig.networkId != NetworkId.AlephiumMainNet
+        if (networkConfig.networkId == NetworkId.AlephiumMainNet) {
+          // TODO: Update this once we release the version for the Danube upgrade
+          false
+        } else if (networkConfig.networkId == NetworkId.AlephiumTestNet) {
+          this >= ReleaseVersion(3, 14, 3)
+        } else {
+          true
+        }
       case HardFork.Rhone =>
         if (networkConfig.networkId == NetworkId.AlephiumMainNet) {
           this >= ReleaseVersion(3, 0, 0)

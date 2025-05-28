@@ -23,17 +23,19 @@ import akka.pattern.pipe
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.BlockFlowTemplate
+import org.alephium.flow.model.{AsyncUpdateState, BlockFlowTemplate}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Address, ChainIndex, HardFork}
+import org.alephium.protocol.model.{Address, BlockHash, ChainIndex, FlowData, HardFork}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 import org.alephium.util.EventStream.Publisher
 
 object ViewHandler {
+  val skipBuildTemplateThreshold: Duration = Duration.ofSecondsUnsafe(1)
+
   def build(system: ActorSystem, blockFlow: BlockFlow, namePostfix: String)(implicit
       brokerConfig: BrokerConfig,
       miningSetting: MiningSetting
@@ -48,9 +50,10 @@ object ViewHandler {
   }
 
   sealed trait Command
-  case object BestDepsUpdatedPreDanube                                     extends Command
-  case object BestDepsUpdateFailedPreDanube                                extends Command
-  final case class BestDepsUpdatedDanube(chainIndex: ChainIndex)           extends Command
+  case object BestDepsUpdatedPreDanube      extends Command
+  case object BestDepsUpdateFailedPreDanube extends Command
+  final case class BestDepsUpdatedDanube(chainIndex: ChainIndex, rebuildTemplates: Boolean)
+      extends Command
   final case class BestDepsUpdateFailedDanube(chainIndex: ChainIndex)      extends Command
   case object Subscribe                                                    extends Command
   case object Unsubscribe                                                  extends Command
@@ -58,6 +61,7 @@ object ViewHandler {
   final case class UpdateSubscribersDanube(chainIndex: ChainIndex)         extends Command
   case object GetMinerAddresses                                            extends Command
   final case class UpdateMinerAddresses(addresses: AVector[Address.Asset]) extends Command
+  case object RebuildTemplatesComplete                                     extends Command
 
   sealed trait Event
   final case class NewTemplates(
@@ -68,6 +72,8 @@ object ViewHandler {
       extends Event
       with EventStream.Event
   final case class SubscribeResult(succeeded: Boolean) extends Event
+
+  final case class LastBlockPerChain(flowData: FlowData, height: Int, receivedAt: TimeStamp)
 
   def needUpdatePreDanube(chainIndex: ChainIndex)(implicit brokerConfig: BrokerConfig): Boolean = {
     brokerConfig.contains(chainIndex.from)
@@ -104,7 +110,7 @@ class ViewHandler(
     with InterCliqueManager.NodeSyncStatus {
   override def receive: Receive = handle orElse updateNodeSyncStatus
 
-  // scalastyle:off cyclomatic.complexity
+  // scalastyle:off cyclomatic.complexity method.length
   def handle: Receive = {
     case ChainHandler.FlowDataAdded(data, _, _) =>
       val hardFork = getHardForkNow()
@@ -113,7 +119,7 @@ class ViewHandler(
       //  2. the header belongs to intra-group chain
       if (isNodeSynced) {
         if (hardFork.isDanubeEnabled() && ViewHandler.needUpdateDanube(data.chainIndex)) {
-          requestDanubeUpdate(data.chainIndex)
+          requestDanubeUpdate(data)
           tryUpdateBestViewDanube(data.chainIndex)
         }
         if (!hardFork.isDanubeEnabled() && ViewHandler.needUpdatePreDanube(data.chainIndex)) {
@@ -132,10 +138,10 @@ class ViewHandler(
       preDanubeUpdateState.setCompleted()
       log.warning("Updating pre-danube blockflow deps failed")
 
-    case ViewHandler.BestDepsUpdatedDanube(chainIndex) =>
+    case ViewHandler.BestDepsUpdatedDanube(chainIndex, rebuildTemplates) =>
       setDanubeUpdateCompleted(chainIndex)
       if (isNodeSynced) {
-        scheduleUpdateDanube(chainIndex)
+        scheduleUpdateDanube(chainIndex, rebuildTemplates)
         tryUpdateBestViewDanube(chainIndex)
       }
     case ViewHandler.BestDepsUpdateFailedDanube(chainIndex) =>
@@ -146,14 +152,18 @@ class ViewHandler(
     case ViewHandler.Unsubscribe                         => unsubscribe()
     case ViewHandler.UpdateSubscribersPreDanube          => updateSubscribersPreDanube()
     case ViewHandler.UpdateSubscribersDanube(chainIndex) => updateSubscribersDanube(chainIndex)
-    case ViewHandler.GetMinerAddresses                   => sender() ! minerAddressesOpt
+    case ViewHandler.RebuildTemplatesComplete =>
+      rebuildTemplatesState.setCompleted()
+      rescheduleUpdateDanube()
+      if (minerAddressesOpt.isDefined && subscribers.nonEmpty) tryRebuildTemplates()
+    case ViewHandler.GetMinerAddresses => sender() ! minerAddressesOpt
     case ViewHandler.UpdateMinerAddresses(addresses) =>
       Miner.validateAddresses(addresses) match {
         case Right(_)    => minerAddressesOpt = Some(addresses.map(_.lockupScript))
         case Left(error) => log.error(s"Updating invalid miner addresses: $error")
       }
   }
-  // scalastyle:on cyclomatic.complexity
+  // scalastyle:on cyclomatic.complexity method.length
 }
 
 trait ViewHandlerState extends IOBaseActor {
@@ -167,6 +177,7 @@ trait ViewHandlerState extends IOBaseActor {
   var updateScheduledPreDanube: Option[Cancellable]     = None
   val updateScheduledDanube: Array[Option[Cancellable]] = Array.fill(brokerConfig.chainNum)(None)
   val subscribers: ArrayBuffer[ActorRef]                = ArrayBuffer.empty
+  val rebuildTemplatesState                             = AsyncUpdateState()
 
   def subscribe(): Unit = {
     if (subscribers.contains(sender())) {
@@ -206,21 +217,53 @@ trait ViewHandlerState extends IOBaseActor {
     }
   }
 
-  def scheduleUpdateDanube(chainIndex: ChainIndex): Unit = {
+  protected def scheduleUpdateDanube(chainIndex: ChainIndex): Unit = {
+    val index = chainIndex.flattenIndex
+    updateScheduledDanube(index).foreach(_.cancel())
+    updateScheduledDanube(index) = Some(
+      scheduleCancellableOnce(
+        self,
+        ViewHandler.UpdateSubscribersDanube(chainIndex),
+        miningSetting.pollingInterval
+      )
+    )
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  protected def tryRebuildTemplates(): Unit = {
+    if (rebuildTemplatesState.isUpdating) {
+      log.debug("Skip rebuilding templates due to pending updates")
+    }
+    if (rebuildTemplatesState.tryUpdate()) {
+      assume(minerAddressesOpt.isDefined)
+      val minerAddresses = minerAddressesOpt.get
+      val subscribers    = AVector.from(this.subscribers)
+      poolAsync {
+        escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
+          subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
+        }
+        ViewHandler.RebuildTemplatesComplete
+      }.pipeTo(self)
+      ()
+    }
+  }
+
+  protected def rescheduleUpdateDanube(): Unit = {
+    brokerConfig.chainIndexes.foreach(scheduleUpdateDanube)
+  }
+
+  def scheduleUpdateDanube(chainIndex: ChainIndex, rebuildTemplates: Boolean): Unit = {
     if (
       brokerConfig.contains(chainIndex.from) &&
       minerAddressesOpt.nonEmpty &&
       subscribers.nonEmpty
     ) {
-      val index = chainIndex.flattenIndex
-      updateScheduledDanube(index).foreach(_.cancel())
-      updateScheduledDanube(index) = Some(
-        scheduleCancellableOnce(
-          self,
-          ViewHandler.UpdateSubscribersDanube(chainIndex),
-          miningSetting.pollingInterval
-        )
-      )
+      if (rebuildTemplates) {
+        rebuildTemplatesState.requestUpdate()
+        tryRebuildTemplates()
+      } else {
+        scheduleUpdateDanube(chainIndex)
+      }
     }
   }
 
@@ -311,9 +354,40 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
   protected[handler] val danubeUpdateStates: Array[AsyncUpdateState] =
     Array.fill(brokerConfig.chainNum)(AsyncUpdateState())
 
-  def requestDanubeUpdate(chainIndex: ChainIndex): Unit = {
-    danubeUpdateStates(chainIndex.flattenIndex).requestUpdate()
+  protected[handler] val lastBlocks: Array[Option[ViewHandler.LastBlockPerChain]] =
+    Array.fill(brokerConfig.chainNum)(None)
+
+  def requestDanubeUpdate(flowData: FlowData): Unit = {
+    val index = flowData.chainIndex.flattenIndex
+    val now   = TimeStamp.now()
+    escapeIOError(blockFlow.getHeight(flowData.hash)) { height =>
+      lastBlocks(index) match {
+        case Some(last) =>
+          if (!shouldSkipBuildTemplate(last, flowData.hash, height, now)) {
+            requestDanubeUpdate(flowData, height, now)
+          }
+        case None => requestDanubeUpdate(flowData, height, now)
+      }
+    }
   }
+  @inline private[handler] def shouldSkipBuildTemplate(
+      last: ViewHandler.LastBlockPerChain,
+      currentHash: BlockHash,
+      currentHeight: Int,
+      now: TimeStamp
+  ): Boolean = {
+    currentHeight == last.height &&
+    last.receivedAt.isBefore(now) &&
+    now.deltaUnsafe(last.receivedAt) < ViewHandler.skipBuildTemplateThreshold &&
+    blockFlow.blockHashOrdering.lt(currentHash, last.flowData.hash)
+  }
+
+  @inline private def requestDanubeUpdate(flowData: FlowData, height: Int, ts: TimeStamp): Unit = {
+    val index = flowData.chainIndex.flattenIndex
+    lastBlocks(index) = Some(ViewHandler.LastBlockPerChain(flowData, height, ts))
+    danubeUpdateStates(index).requestUpdate()
+  }
+
   def setDanubeUpdateCompleted(chainIndex: ChainIndex): Unit = {
     danubeUpdateStates(chainIndex.flattenIndex).setCompleted()
   }
@@ -329,17 +403,20 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
       val allSubscribers = AVector.from(subscribers)
       poolAsync[ViewHandler.Command] {
         val result = for {
-          _ <- blockFlow.updateViewPerChainIndexDanube(chainIndex)
+          rebuildTemplates <- blockFlow.updateViewPerChainIndexDanube(chainIndex)
           needToUpdate = brokerConfig.contains(chainIndex.from)
           _ <-
-            if (needToUpdate && minerAddress.nonEmpty && allSubscribers.nonEmpty) {
+            if (
+              !rebuildTemplates && needToUpdate && minerAddress.nonEmpty && allSubscribers.nonEmpty
+            ) {
               updateBlockTemplate(chainIndex, minerAddress.get, allSubscribers)
             } else {
               Right(())
             }
-        } yield ()
+        } yield rebuildTemplates
         result match {
-          case Right(_) => ViewHandler.BestDepsUpdatedDanube(chainIndex)
+          case Right(rebuildTemplates) =>
+            ViewHandler.BestDepsUpdatedDanube(chainIndex, rebuildTemplates)
           case Left(error) =>
             log.error(s"Failed to update best view: $error")
             ViewHandler.BestDepsUpdateFailedDanube(chainIndex)
@@ -359,25 +436,4 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
       subscribers.foreach(_ ! ViewHandler.NewTemplate(template, lazyBroadcast = false))
     }
   }
-}
-
-final class AsyncUpdateState(private var _requestCount: Int, private var _isUpdating: Boolean) {
-  @inline def requestCount: Int   = _requestCount
-  @inline def isUpdating: Boolean = _isUpdating
-
-  @inline def tryUpdate(): Boolean = {
-    val needToUpdate = _requestCount > 0 && !_isUpdating
-    if (needToUpdate) {
-      _requestCount = 0
-      _isUpdating = true
-    }
-    needToUpdate
-  }
-
-  @inline def requestUpdate(): Unit = _requestCount += 1
-  @inline def setCompleted(): Unit  = _isUpdating = false
-}
-
-object AsyncUpdateState {
-  def apply(): AsyncUpdateState = new AsyncUpdateState(0, false)
 }

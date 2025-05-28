@@ -124,7 +124,7 @@ class HeaderChainHandler(
   private val headersTotalLabeled = headersTotal.labels(chainIndexFromString, chainIndexToString)
   private val headersReceivedTotalLabeled =
     headersReceivedTotal.labels(chainIndexFromString, chainIndexToString)
-  override def measure(header: BlockHeader): Unit = {
+  override def measure(header: BlockHeader)(implicit networkConfig: NetworkConfig): Unit = {
     val chain = measureCommon(header)
 
     headersTotalLabeled.set(chain.numHashes.toDouble)

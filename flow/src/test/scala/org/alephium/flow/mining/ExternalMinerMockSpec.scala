@@ -21,9 +21,8 @@ import java.net.InetSocketAddress
 import akka.actor.ActorRef
 import akka.testkit.{TestActor, TestProbe}
 
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.{TestUtils, ViewHandler}
-import org.alephium.flow.mining.{ExternalMinerMock, Miner, MinerApiController}
-import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.util.{AlephiumActorSpec, AVector, Duration, SocketUtil}
 
 class ExternalMinerMockSpec extends AlephiumActorSpec {
@@ -92,7 +91,7 @@ class ExternalMinerMockSpec extends AlephiumActorSpec {
     minerApiControllers.tail.foreach(system.stop)
   }
 
-  trait ExternalMinerMockFixture extends SocketUtil with AlephiumConfigFixture {
+  trait ExternalMinerMockFixture extends SocketUtil with FlowFixture {
     lazy val controllersAddresses =
       (1 to groups0).map(_ => new InetSocketAddress(config.mining.apiInterface, generatePort()))
 
@@ -117,7 +116,7 @@ class ExternalMinerMockSpec extends AlephiumActorSpec {
     lazy val minerApiControllers =
       controllersAddresses.zip(handlers).map { case (address, allHandlers) =>
         newTestActorRef[MinerApiController](
-          MinerApiController.props(allHandlers)(
+          MinerApiController.props(blockFlow, allHandlers)(
             config.broker,
             config.network.copy(minerApiPort = address.getPort()),
             config.mining

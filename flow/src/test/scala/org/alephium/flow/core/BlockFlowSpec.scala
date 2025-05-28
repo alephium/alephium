@@ -331,6 +331,15 @@ class BlockFlowSpec extends AlephiumSpec {
     val blockFlow1 = storageBlockFlow()
     newBlocks1.map(_.hash).diff(blockFlow1.getAllTips.toArray).isEmpty is true
 
+    for {
+      i <- 0 to 1
+      j <- 0 to 1
+    } yield {
+      val chainIndex = ChainIndex.unsafe(i, j)
+      val deps       = blockFlow1.getBestDeps(chainIndex, HardFork.Danube)
+      deps.getOutDep(chainIndex.to) is newBlocks1(i * 2 + j).hash
+    }
+
     val newBlocks2 = for {
       i <- 0 to 1
       j <- 0 to 1
@@ -1305,6 +1314,32 @@ class BlockFlowSpec extends AlephiumSpec {
     accountView1.outBlocks.contains(block1) is true
     accountView1.inBlocks.contains(block0) is true
     accountView1.inBlocks.contains(block1) is false
+  }
+
+  it should "update view per chain index" in new FlowFixture with Generators {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+
+    brokerConfig.cliqueChainIndexes.foreach { chainIndex =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      addWithoutViewUpdate(blockFlow, block)
+      blockFlow.updateViewPerChainIndexDanube(chainIndex) isE false
+      if (chainIndex.isIntraGroup) {
+        blockFlow.getBestFlowSkeleton().intraGroupTips.contains(block.hash) is true
+      }
+    }
+
+    forAll(chainIndexGenForBroker(brokerConfig)) { chainIndex =>
+      val block0 = emptyBlock(blockFlow, chainIndex)
+      val block1 = emptyBlock(blockFlow, chainIndex)
+      val sorted = AVector(block0, block1).sortBy(_.hash.bytes)(Bytes.byteStringOrdering)
+      addWithoutViewUpdate(blockFlow, sorted.head)
+      blockFlow.updateViewPerChainIndexDanube(chainIndex) isE false
+      addWithoutViewUpdate(blockFlow, sorted.last)
+      blockFlow.updateViewPerChainIndexDanube(chainIndex) isE chainIndex.isIntraGroup
+      if (chainIndex.isIntraGroup) {
+        blockFlow.getBestFlowSkeleton().intraGroupTips.contains(sorted.last.hash) is true
+      }
+    }
   }
 
   trait Fixture extends FlowFixture {

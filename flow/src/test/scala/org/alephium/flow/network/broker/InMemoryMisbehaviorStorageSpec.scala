@@ -14,20 +14,22 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.flow.network.broker
 
-import akka.util.ByteString
+import org.alephium.protocol.Generators
+import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
 
-import org.alephium.protocol.model.{Address, AssetOutput}
-import org.alephium.util.TimeStamp
+class InMemoryMisbehaviorStorageSpec extends AlephiumSpec with Generators {
+  it should "check until for isBanned" in {
+    val storage = new InMemoryMisbehaviorStorage(Duration.ofSecondsUnsafe(10))
+    val address = socketAddressGen.sample.get.getAddress
+    val until   = TimeStamp.now().plusUnsafe(Duration.ofMillisUnsafe(100))
 
-final case class TestInputAsset(address: Address.Asset, asset: AssetState) {
-  def toAssetOutput: AssetOutput =
-    AssetOutput(
-      asset.attoAlphAmount,
-      address.lockupScript,
-      TimeStamp.zero,
-      asset.flatTokens.map(token => (token.id, token.amount)),
-      ByteString.empty
-    )
+    storage.ban(address, until)
+    storage.isBanned(address) is true
+
+    Thread.sleep(100)
+    storage.isBanned(address) is false
+  }
+
 }

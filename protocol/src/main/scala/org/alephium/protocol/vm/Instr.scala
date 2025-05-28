@@ -216,7 +216,7 @@ object Instr {
     /* Below are instructions for Rhone hard fork */
     GroupOfAddress,
     /* Below are instructions for Danube hard fork */
-    VerifySignature, GetSegregatedWebAuthnSignature
+    VerifySignature, GetSegregatedWebAuthnSignature, DevInstr, I256RoundInfinityDiv, U256RoundInfinityDiv
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -846,6 +846,18 @@ object I256Ge extends BinaryArithmeticInstr[Val.I256] with I256StackOps with Gas
   protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(_.>=(_))(x, y)
 }
+object I256RoundInfinityDiv
+    extends BinaryArithmeticInstr[Val.I256]
+    with DanubeInstrWithSimpleGas[StatelessContext]
+    with I256StackOps
+    with GasLow {
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[DanubeInstrWithSimpleGas]._runWith(frame)
+  override def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[BinaryArithmeticInstr]._runWith(frame)
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256SafeOp(this, _.roundInfinityDiv(_))(x, y)
+}
 object U256Add extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.add(_))(x, y)
@@ -937,6 +949,18 @@ object U256Gt extends BinaryArithmeticInstr[Val.U256] with U256StackOps with Gas
 object U256Ge extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(_.>=(_))(x, y)
+}
+object U256RoundInfinityDiv
+    extends BinaryArithmeticInstr[Val.U256]
+    with DanubeInstrWithSimpleGas[StatelessContext]
+    with U256StackOps
+    with GasLow {
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[DanubeInstrWithSimpleGas]._runWith(frame)
+  override def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[BinaryArithmeticInstr]._runWith(frame)
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256SafeOp(this, _.roundInfinityDiv(_))(x, y)
 }
 
 sealed trait ExpInstr[T <: Val]
@@ -3194,3 +3218,108 @@ final case class DEBUG(stringParts: AVector[Val.ByteVec])
   }
 }
 object DEBUG extends StatelessInstrCompanion1[AVector[Val.ByteVec]]
+
+sealed trait DevInstrBase
+case object TestCheckStart extends DevInstrBase
+case object TestErrorStart extends DevInstrBase
+case object TestCheckEnd   extends DevInstrBase
+case object TestEqual      extends DevInstrBase
+case object RandomU256     extends DevInstrBase
+case object RandomI256     extends DevInstrBase
+object DevInstrBase {
+  implicit val serde: Serde[DevInstrBase] = new Serde[DevInstrBase] {
+    override def serialize(input: DevInstrBase): ByteString = {
+      input match {
+        case TestCheckStart => ByteString(0)
+        case TestErrorStart => ByteString(1)
+        case TestCheckEnd   => ByteString(2)
+        case TestEqual      => ByteString(3)
+        case RandomU256     => ByteString(4)
+        case RandomI256     => ByteString(5)
+      }
+    }
+
+    override def _deserialize(input: ByteString): SerdeResult[Staging[DevInstrBase]] = {
+      byteSerde._deserialize(input).flatMap {
+        case Staging(0, content) => Right(Staging(TestCheckStart, content))
+        case Staging(1, content) => Right(Staging(TestErrorStart, content))
+        case Staging(2, content) => Right(Staging(TestCheckEnd, content))
+        case Staging(3, content) => Right(Staging(TestEqual, content))
+        case Staging(4, content) => Right(Staging(RandomU256, content))
+        case Staging(5, content) => Right(Staging(RandomI256, content))
+        case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid dev instr prefix $n"))
+      }
+    }
+  }
+}
+
+@ByteCode
+final case class DevInstr(instr: DevInstrBase)
+    extends DanubeInstrWithSimpleGas[StatelessContext]
+    with GasZero {
+  def serialize(): ByteString =
+    ByteString(code) ++ serdeImpl[DevInstrBase].serialize(instr)
+
+  private def popInt[C <: StatelessContext](frame: Frame[C]): ExeResult[Int] = {
+    for {
+      errorCodeU256 <- frame.popOpStackU256()
+      errorCode     <- errorCodeU256.v.toInt.toRight(Right(InvalidErrorCode(errorCodeU256.v)))
+    } yield errorCode
+  }
+
+  private def checkError(testEnv: TestEnv): ExeResult[Unit] = {
+    (testEnv.exeFailure, testEnv.expectedErrorCode) match {
+      case (None, _) => failed(ExpectedAnExeFailure(testEnv.sourcePosIndex))
+      case (_, None) => okay
+      case (Some(AssertionFailedWithErrorCode(_, errorCode)), Some(expectedErrorCode)) =>
+        if (errorCode == expectedErrorCode) {
+          okay
+        } else {
+          failed(NotExpectedErrorInTest(expectedErrorCode, Left(errorCode), testEnv.sourcePosIndex))
+        }
+      case (Some(error), Some(expectedErrorCode)) =>
+        failed(NotExpectedErrorInTest(expectedErrorCode, Right(error), testEnv.sourcePosIndex))
+    }
+  }
+
+  def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    if (
+      frame.ctx.networkConfig.networkId == model.NetworkId.AlephiumMainNet ||
+      frame.ctx.networkConfig.networkId == model.NetworkId.AlephiumTestNet
+    ) {
+      failed(DevInstrIsOnlySupportedOnDevnet)
+    } else {
+      instr match {
+        case TestCheckStart =>
+          popInt(frame).map(sourcePosIndex => frame.ctx.initTestEnv(sourcePosIndex, None, frame))
+        case TestErrorStart =>
+          for {
+            sourcePosIndex    <- popInt(frame)
+            expectedErrorCode <- popInt(frame)
+          } yield frame.ctx.initTestEnv(sourcePosIndex, Some(expectedErrorCode), frame)
+        case TestCheckEnd =>
+          frame.ctx.testEnvOpt match {
+            case Some(testEnv) =>
+              frame.ctx.resetTestEnv()
+              checkError(testEnv)
+            case None => failed(InvalidTestCheckInstr)
+          }
+        case TestEqual =>
+          for {
+            errorCode <- popInt(frame)
+            right     <- frame.popOpStack()
+            left      <- frame.popOpStack()
+            _ <-
+              if (left == right) {
+                okay
+              } else {
+                failed(NotEqualInTest(left, right, errorCode))
+              }
+          } yield ()
+        case RandomU256 => frame.pushOpStack(Val.U256(util.UnsecureRandom.nextU256()))
+        case RandomI256 => frame.pushOpStack(Val.I256(util.UnsecureRandom.nextI256()))
+      }
+    }
+  }
+}
+object DevInstr extends StatelessInstrCompanion1[DevInstrBase]
