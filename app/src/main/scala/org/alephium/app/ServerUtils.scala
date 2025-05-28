@@ -393,26 +393,31 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildSweepMultisig
   ): Try[BuildSweepAddressTransactionsResult] = {
-    val lockupScript = query.fromAddress.lockupScript
+    if (query.multiSigType.contains(MultiSigType.P2HMPK)) {
+      buildP2HMPKSweepMultisig(blockFlow, query)
+    } else {
+      buildP2MPKHSweepMultisig(blockFlow, query)
+    }
+  }
+
+  private def buildP2MPKHSweepMultisig(
+      blockFlow: BlockFlow,
+      query: BuildSweepMultisig
+  ): Try[BuildSweepAddressTransactionsResult] = {
     for {
-      _            <- checkGroup(lockupScript)
-      unlockScript <- buildP2MPKHUnlockScript(lockupScript, query.fromPublicKeys)
-      unsignedTxs <- prepareSweepAddressTransactionFromScripts(
+      fromAddress  <- query.getFromAddress()
+      _            <- checkGroup(fromAddress.lockupScript)
+      publicKeys   <- query.getFromPublicKeys()
+      unlockScript <- buildP2MPKHUnlockScript(fromAddress.lockupScript, publicKeys)
+      unsignedTxs <- prepareSweepAddressTransaction(
         blockFlow,
-        lockupScript,
-        unlockScript,
-        query.toAddress,
-        query.maxAttoAlphPerUTXO,
-        query.lockTime,
-        query.gasAmount,
-        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-        query.targetBlockHash,
-        query.utxosLimit
+        (fromAddress.lockupScript, unlockScript),
+        query
       )
     } yield {
       BuildSweepAddressTransactionsResult.from(
         unsignedTxs,
-        lockupScript.groupIndex,
+        fromAddress.groupIndex,
         query.toAddress.groupIndex
       )
     }
@@ -450,24 +455,17 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildSweepAddressTransactions
   ): Try[BuildSweepAddressTransactionsResult] = {
-    val lockupScript = LockupScript.p2pkh(query.fromPublicKey)
     for {
-      _ <- checkGroup(lockupScript)
-      unsignedTxs <- prepareSweepAddressTransaction(
-        blockFlow,
-        query.fromPublicKey,
-        query.toAddress,
-        query.maxAttoAlphPerUTXO,
-        query.lockTime,
-        query.gasAmount,
-        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-        query.targetBlockHash,
-        query.utxosLimit
-      )
+      fromLockPair <- query.getLockPair(query.group)
+      unsignedTxs <- fromLockPair._1 match {
+        case p2pk: LockupScript.P2PK =>
+          prepareGrouplessSweepAddressTransaction(blockFlow, (p2pk, fromLockPair._2), query)
+        case _ => prepareSweepAddressTransaction(blockFlow, fromLockPair, query)
+      }
     } yield {
       BuildSweepAddressTransactionsResult.from(
         unsignedTxs,
-        lockupScript.groupIndex,
+        fromLockPair._1.groupIndex,
         query.toAddress.groupIndex
       )
     }
@@ -1103,58 +1101,20 @@ class ServerUtils(implicit
     }
   }
 
-  // scalastyle:off parameter.number
   def prepareSweepAddressTransaction(
       blockFlow: BlockFlow,
-      fromPublicKey: PublicKey,
-      toAddress: Address.Asset,
-      maxAttoAlphPerUTXO: Option[Amount],
-      lockTimeOpt: Option[TimeStamp],
-      gasOpt: Option[GasBox],
-      gasPrice: GasPrice,
-      targetBlockHashOpt: Option[BlockHash],
-      utxosLimit: Option[Int]
+      fromLockPair: (LockupScript.Asset, UnlockScript),
+      query: BuildSweepCommon
   ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAddress(
-      targetBlockHashOpt,
-      fromPublicKey,
-      toAddress.lockupScript,
-      lockTimeOpt,
-      gasOpt,
-      gasPrice,
-      maxAttoAlphPerUTXO.map(_.value),
-      getUtxosLimit(utxosLimit)
-    ) match {
-      case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
-      case Right(Left(error))        => Left(failed(error))
-      case Left(error)               => failed(error)
-    }
-  }
-  // scalastyle:on parameter.number
-
-  // scalastyle:off parameter.number
-  def prepareSweepAddressTransactionFromScripts(
-      blockFlow: BlockFlow,
-      fromLockupScript: LockupScript.Asset,
-      fromUnlockupScript: UnlockScript,
-      toAddress: Address.Asset,
-      maxAttoAlphPerUTXO: Option[Amount],
-      lockTimeOpt: Option[TimeStamp],
-      gasOpt: Option[GasBox],
-      gasPrice: GasPrice,
-      targetBlockHashOpt: Option[BlockHash],
-      utxosLimit: Option[Int]
-  ): Try[AVector[UnsignedTransaction]] = {
-    blockFlow.sweepAddressFromScripts(
-      targetBlockHashOpt,
-      fromLockupScript,
-      fromUnlockupScript,
-      toAddress.lockupScript,
-      lockTimeOpt,
-      gasOpt,
-      gasPrice,
-      maxAttoAlphPerUTXO.map(_.value),
-      getUtxosLimit(utxosLimit)
+      query.targetBlockHash,
+      fromLockPair,
+      query.toAddress.lockupScript,
+      query.lockTime,
+      query.gasAmount,
+      query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
+      query.maxAttoAlphPerUTXO.map(_.value),
+      getUtxosLimit(query.utxosLimit)
     ) match {
       case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
       case Right(Left(error))        => Left(failed(error))
@@ -1271,6 +1231,7 @@ class ServerUtils(implicit
     }
   }
 
+  // scalastyle:off parameter.number
   private def unsignedTxFromScript(
       blockFlow: BlockFlow,
       script: StatefulScript,
@@ -1385,6 +1346,7 @@ class ServerUtils(implicit
       )
     )
   }
+  // scalastyle:on parameter.number
 
   @inline private def getAllUtxos(
       blockFlow: BlockFlow,

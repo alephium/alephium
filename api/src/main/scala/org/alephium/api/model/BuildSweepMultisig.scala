@@ -16,20 +16,27 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, BlockHash}
+import akka.util.ByteString
+
+import org.alephium.api.{model => api}
+import org.alephium.protocol.model.{Address, BlockHash, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{AVector, TimeStamp}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildSweepMultisig(
-    fromAddress: Address.Asset,
-    fromPublicKeys: AVector[PublicKey],
+    fromAddress: api.Address,
+    fromPublicKeys: AVector[ByteString],
+    fromPublicKeyTypes: Option[AVector[BuildTxCommon.PublicKeyType]] = None,
+    fromPublicKeyIndexes: Option[AVector[Int]] = None,
     toAddress: Address.Asset,
     maxAttoAlphPerUTXO: Option[Amount] = None,
     lockTime: Option[TimeStamp] = None,
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     utxosLimit: Option[Int] = None,
-    targetBlockHash: Option[BlockHash] = None
-)
+    targetBlockHash: Option[BlockHash] = None,
+    group: Option[GroupIndex] = None,
+    multiSigType: Option[MultiSigType] = Some(MultiSigType.P2MPKH)
+) extends BuildMultisigCommon
+    with BuildSweepCommon

@@ -604,7 +604,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildSweepAddressTransactionsRes = serverUtils
         .buildSweepAddressTransactions(
           blockFlow,
-          BuildSweepAddressTransactions(fromPublicKey, sweepAddressDestination)
+          BuildSweepAddressTransactions(fromPublicKey.bytes, None, sweepAddressDestination)
         )
         .rightValue
       val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
@@ -698,7 +698,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildSweepAddressTransactionsRes = serverUtils
         .buildSweepAddressTransactions(
           blockFlow,
-          BuildSweepAddressTransactions(toPublicKey, sweepAddressDestination)
+          BuildSweepAddressTransactions(toPublicKey.bytes, None, sweepAddressDestination)
         )
         .rightValue
       val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
@@ -744,7 +744,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val result0 = serverUtils
       .buildSweepAddressTransactions(
         blockFlow,
-        BuildSweepAddressTransactions(fromPublicKey, Address.p2pkh(toPublicKey), None)
+        BuildSweepAddressTransactions(fromPublicKey.bytes, None, Address.p2pkh(toPublicKey), None)
       )
       .rightValue
     result0.unsignedTxs.length is 1
@@ -753,7 +753,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       .buildSweepAddressTransactions(
         blockFlow,
         BuildSweepAddressTransactions(
-          fromPublicKey,
+          fromPublicKey.bytes,
+          None,
           Address.p2pkh(toPublicKey),
           Some(Amount(U256.One))
         )
@@ -806,14 +807,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       val txs = serverUtils
         .prepareSweepAddressTransaction(
           blockFlow,
-          fromPublicKey,
-          destinations.head.address,
-          None,
-          None,
-          None,
-          nonCoinbaseMinGasPrice,
-          targetBlockHash,
-          None
+          getLockPair(fromPublicKey),
+          BuildSweepAddressTransactions(
+            fromPublicKey.bytes,
+            None,
+            destinations.head.address,
+            targetBlockHash = targetBlockHash
+          )
         )
         .rightValue
       txs.length is 1
@@ -841,19 +841,34 @@ class ServerUtilsSpec extends AlephiumSpec {
     blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 6
 
     val params0 =
-      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = Some(2))
+      BuildSweepAddressTransactions(
+        pubKey.bytes,
+        None,
+        Address.Asset(lockupScript),
+        utxosLimit = Some(2)
+      )
     val result0 = serverUtils.buildSweepAddressTransactions(blockFlow, params0).rightValue
     result0.unsignedTxs.length is 1
     checkInputSize(result0.unsignedTxs.head.unsignedTx, 2)
 
     val params1 =
-      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = None)
+      BuildSweepAddressTransactions(
+        pubKey.bytes,
+        None,
+        Address.Asset(lockupScript),
+        utxosLimit = None
+      )
     val result1 = serverUtils.buildSweepAddressTransactions(blockFlow, params1).rightValue
     result1.unsignedTxs.length is 1
     checkInputSize(result1.unsignedTxs.head.unsignedTx, utxosLimitInApiConfig)
 
     val params2 =
-      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = Some(6))
+      BuildSweepAddressTransactions(
+        pubKey.bytes,
+        None,
+        Address.Asset(lockupScript),
+        utxosLimit = Some(6)
+      )
     val result2 = serverUtils.buildSweepAddressTransactions(blockFlow, params2).rightValue
     result2.unsignedTxs.length is 1
     checkInputSize(result2.unsignedTxs.head.unsignedTx, utxosLimitInApiConfig)

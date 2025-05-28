@@ -1161,6 +1161,9 @@ trait FlowFixture
     hashes.length is 2
     (blockFlow.getBlockUnsafe(hashes(0)), blockFlow.getBlockUnsafe(hashes(1)))
   }
+
+  def getLockPair(publicKey: PublicKey): (LockupScript.Asset, UnlockScript) =
+    (LockupScript.p2pkh(publicKey), UnlockScript.p2pkh(publicKey))
 }
 
 trait GhostUncleFixture extends FlowFixture {

@@ -360,7 +360,7 @@ object ServerFixture {
 
     override def sweepAddress(
         targetBlockHashOpt: Option[BlockHash],
-        fromPublicKey: PublicKey,
+        fromLockPair: (LockupScript.Asset, UnlockScript),
         toLockupScript: LockupScript.Asset,
         lockTimeOpt: Option[TimeStamp],
         gasOpt: Option[GasBox],

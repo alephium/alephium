@@ -882,7 +882,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val unsignedTxs = blockflow
         .sweepAddress(
           None,
-          keyManager(output.lockupScript).publicKey,
+          getLockPair(keyManager(output.lockupScript).publicKey),
           output.lockupScript,
           None,
           None,
@@ -1035,7 +1035,7 @@ class TxUtilsSpec extends AlephiumSpec {
       blockFlow
         .sweepAddress(
           None,
-          publicKey,
+          getLockPair(publicKey),
           toLockupScript,
           None,
           None,
@@ -1622,7 +1622,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val unsignedTxs = blockFlow
         .sweepAddress(
           None,
-          keyManager(this.output.lockupScript).publicKey,
+          getLockPair(keyManager(this.output.lockupScript).publicKey),
           this.output.lockupScript,
           None,
           None,
@@ -1646,7 +1646,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val unsignedTxs = blockFlow
         .sweepAddress(
           None,
-          keyManager(this.output.lockupScript).publicKey,
+          getLockPair(keyManager(this.output.lockupScript).publicKey),
           this.output.lockupScript,
           None,
           None,
