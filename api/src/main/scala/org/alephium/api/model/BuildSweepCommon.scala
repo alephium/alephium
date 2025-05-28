@@ -16,20 +16,16 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.{Address, BlockHash}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.TimeStamp
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildSweepMultisig(
-    fromAddress: Address.Asset,
-    fromPublicKeys: AVector[PublicKey],
-    toAddress: Address.Asset,
-    maxAttoAlphPerUTXO: Option[Amount] = None,
-    lockTime: Option[TimeStamp] = None,
-    gasAmount: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
-    utxosLimit: Option[Int] = None,
-    targetBlockHash: Option[BlockHash] = None
-) extends BuildSweepCommon
+trait BuildSweepCommon {
+  def toAddress: Address.Asset
+  def maxAttoAlphPerUTXO: Option[Amount]
+  def lockTime: Option[TimeStamp]
+  def gasAmount: Option[GasBox]
+  def gasPrice: Option[GasPrice]
+  def targetBlockHash: Option[BlockHash]
+  def utxosLimit: Option[Int]
+}

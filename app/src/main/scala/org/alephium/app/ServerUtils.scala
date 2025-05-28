@@ -397,18 +397,7 @@ class ServerUtils(implicit
     for {
       _            <- checkGroup(lockupScript)
       unlockScript <- buildP2MPKHUnlockScript(lockupScript, query.fromPublicKeys)
-      unsignedTxs <- prepareSweepAddressTransactionFromScripts(
-        blockFlow,
-        lockupScript,
-        unlockScript,
-        query.toAddress,
-        query.maxAttoAlphPerUTXO,
-        query.lockTime,
-        query.gasAmount,
-        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-        query.targetBlockHash,
-        query.utxosLimit
-      )
+      unsignedTxs  <- prepareSweepAddressTransaction(blockFlow, (lockupScript, unlockScript), query)
     } yield {
       BuildSweepAddressTransactionsResult.from(
         unsignedTxs,
@@ -1099,7 +1088,7 @@ class ServerUtils(implicit
   def prepareSweepAddressTransaction(
       blockFlow: BlockFlow,
       fromLockPair: (LockupScript.Asset, UnlockScript),
-      query: BuildSweepAddressTransactions
+      query: BuildSweepCommon
   ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAddress(
       query.targetBlockHash,
@@ -1110,36 +1099,6 @@ class ServerUtils(implicit
       query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
       query.maxAttoAlphPerUTXO.map(_.value),
       getUtxosLimit(query.utxosLimit)
-    ) match {
-      case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
-      case Right(Left(error))        => Left(failed(error))
-      case Left(error)               => failed(error)
-    }
-  }
-
-  // scalastyle:off parameter.number
-  def prepareSweepAddressTransactionFromScripts(
-      blockFlow: BlockFlow,
-      fromLockupScript: LockupScript.Asset,
-      fromUnlockupScript: UnlockScript,
-      toAddress: Address.Asset,
-      maxAttoAlphPerUTXO: Option[Amount],
-      lockTimeOpt: Option[TimeStamp],
-      gasOpt: Option[GasBox],
-      gasPrice: GasPrice,
-      targetBlockHashOpt: Option[BlockHash],
-      utxosLimit: Option[Int]
-  ): Try[AVector[UnsignedTransaction]] = {
-    blockFlow.sweepAddressFromScripts(
-      targetBlockHashOpt,
-      fromLockupScript,
-      fromUnlockupScript,
-      toAddress.lockupScript,
-      lockTimeOpt,
-      gasOpt,
-      gasPrice,
-      maxAttoAlphPerUTXO.map(_.value),
-      getUtxosLimit(utxosLimit)
     ) match {
       case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
       case Right(Left(error))        => Left(failed(error))
@@ -1256,6 +1215,7 @@ class ServerUtils(implicit
     }
   }
 
+  // scalastyle:off parameter.number
   private def unsignedTxFromScript(
       blockFlow: BlockFlow,
       script: StatefulScript,
@@ -1370,6 +1330,7 @@ class ServerUtils(implicit
       )
     )
   }
+  // scalastyle:on parameter.number
 
   @inline private def getAllUtxos(
       blockFlow: BlockFlow,

@@ -36,3 +36,4 @@ final case class BuildSweepAddressTransactions(
     group: Option[GroupIndex] = None
 ) extends BuildTxCommon
     with BuildTxCommon.FromPublicKey
+    with BuildSweepCommon
