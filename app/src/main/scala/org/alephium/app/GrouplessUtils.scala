@@ -79,7 +79,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   // we could end up building more txs than needed.
   //
   // Here we use the breadth-first search to build the txs. First we try to build the tx with
-  // single groupled address, then 2, 3 and 4 until we either succeed or run out of balance.
+  // single grouped address, then 2, 3 and 4 until we either succeed or run out of balance.
   //
   // Before the breadth-first search, we sort the grouped addresses by the amount of first
   // token (if exists) and ALPH that we want to transfer. The hope is that this could make us
@@ -149,7 +149,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
             query.targetBlockHash,
             outputInfos,
             totalAmountNeeded,
-            buildingTxs
+            AVector(buildingTxs.head)
           )
       }
     } yield {
@@ -457,7 +457,6 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       }
     }
 
-    val missingAlph = totalAmountNeeded.alphAmount.sub(totalAlphBalance).getOrElse(U256.Zero)
     val missingTokens = totalAmountNeeded.tokens.collect { case (tokenId, amount) =>
       amount
         .sub(totalTokenBalances.getOrElse(tokenId, U256.Zero))
@@ -465,9 +464,10 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
         .map(tokenId -> _)
     }
 
-    if (missingAlph == U256.Zero && missingTokens.isEmpty) {
+    if (totalAmountNeeded.alphAmount <= totalAlphBalance && missingTokens.isEmpty) {
       Right(())
     } else {
+      val missingAlph = totalAmountNeeded.alphAmount.sub(totalAlphBalance).getOrElse(U256.Zero)
       Left(failed(notEnoughBalanceError(missingAlph, missingTokens)))
     }
   }
