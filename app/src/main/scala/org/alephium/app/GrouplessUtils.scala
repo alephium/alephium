@@ -19,29 +19,32 @@ package org.alephium.app
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
+import akka.util.ByteString
+
+import org.alephium.api.{model => api}
 import org.alephium.api.{badRequest, failed, failedInIO, wrapResult, Try}
 import org.alephium.api.model._
+import org.alephium.crypto.{ED25519PublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.io.IOResult
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
-import org.alephium.protocol.vm.{GasPrice, LockupScript, UnlockScript}
-import org.alephium.util.AVector
-import org.alephium.util.U256
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, PublicKeyLike, UnlockScript}
+import org.alephium.util.{AVector, Hex, U256}
 
 trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
-  import GrouplessUtils.BuildingGrouplessTransferTx
+  import GrouplessUtils._
 
   def getGrouplessBalance(
       blockFlow: BlockFlow,
-      halfDecodedP2PK: LockupScript.HalfDecodedP2PK,
+      halfDecodedLockupScript: api.Address.HalfDecodedLockupScript,
       getMempoolUtxos: Boolean
   ): Try[Balance] = {
     for {
       allBalances <- wrapResult(AVector.from(brokerConfig.groupIndexes).mapE { groupIndex =>
-        val lockupScript = LockupScript.p2pk(halfDecodedP2PK.publicKey, groupIndex)
+        val lockupScript = halfDecodedLockupScript.getLockupScript(groupIndex)
         blockFlow.getBalance(lockupScript, apiConfig.defaultUtxosLimit, getMempoolUtxos)
       })
       balance <- allBalances.foldE(model.Balance.zero)(_ merge _).left.map(failed)
@@ -50,15 +53,23 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   protected def allGroupedLockupScripts(
-      lockup: LockupScript.P2PK
-  ): AVector[LockupScript.P2PK] = {
-    self.brokerConfig.groupIndexes
-      .map(groupIndex => LockupScript.P2PK(lockup.publicKey, groupIndex))
+      lockup: LockupScript.GroupedAsset
+  ): AVector[LockupScript.GroupedAsset] = {
+    lockup match {
+      case lockup: LockupScript.P2PK =>
+        self.brokerConfig.groupIndexes
+          .map(groupIndex => LockupScript.P2PK(lockup.publicKey, groupIndex))
+          .asInstanceOf[AVector[LockupScript.GroupedAsset]]
+      case lockup: LockupScript.P2HMPK =>
+        self.brokerConfig.groupIndexes
+          .map(groupIndex => LockupScript.P2HMPK(lockup.p2hmpkHash, groupIndex))
+          .asInstanceOf[AVector[LockupScript.GroupedAsset]]
+    }
   }
 
   protected def otherGroupsLockupScripts(
-      lockupScript: LockupScript.P2PK
-  ): AVector[LockupScript.P2PK] = {
+      lockupScript: LockupScript.GroupedAsset
+  ): AVector[LockupScript.GroupedAsset] = {
     allGroupedLockupScripts(lockupScript).filter(_ != lockupScript)
   }
 
@@ -87,22 +98,22 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   // Before the breadth-first search, we also do a preliminary check to see if the balance is
   // enough, if not enough, we reject directly.
 
-  def buildGrouplessTransferTx(
+  def buildP2PKTransferTx(
       blockFlow: BlockFlow,
       query: BuildTransferTx,
       lockupScript: LockupScript.P2PK,
       extraUtxosInfo: ExtraUtxosInfo
   ): Try[BuildGrouplessTransferTxResult] = {
     if (query.group.isEmpty) {
-      buildGrouplessTransferTxWithoutExplicitGroup(blockFlow, query, lockupScript).flatMap {
-        case Right(result) =>
-          Right(result)
-        case Left(buildingTxsInProgress) =>
-          val buildingTxInProgress = buildingTxsInProgress.sortBy(_.remainingAmounts._1).head
-          val remmainingAlph       = buildingTxInProgress.remainingAmounts._1
-          val remainingTokens      = buildingTxInProgress.remainingAmounts._2
-          Left(failed(notEnoughBalanceError(remmainingAlph, remainingTokens)))
-      }
+      buildGrouplessTransferTxWithoutExplicitGroup(
+        blockFlow,
+        lockupScript,
+        UnlockScript.P2PK,
+        query.destinations,
+        query.gasAmount,
+        query.gasPrice,
+        query.targetBlockHash
+      )
     } else {
       for {
         unsignedTx <- buildTransferUnsignedTransaction(blockFlow, query, extraUtxosInfo)
@@ -113,48 +124,114 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     }
   }
 
+  def buildP2HMPKTransferTx(
+      blockFlow: BlockFlow,
+      query: BuildMultisig
+  ): Try[BuildGrouplessTransferTxResult] = {
+    val publicKeyLikes = buildPublicKeyLikes(query.fromPublicKeys, query.fromPublicKeyTypes)
+    publicKeyLikes.left.map(badRequest).flatMap { pubKeys =>
+      (query.group, query.fromPublicKeyIndexes) match {
+        case (_, None) =>
+          Left(badRequest("fromPublicKeyIndexes is required for P2HMPK multisig"))
+        case (Some(group), Some(keyIndexes)) =>
+          for {
+            lockupScript <- LockupScript
+              .P2HMPK(pubKeys, keyIndexes.length, group)
+              .left
+              .map(badRequest)
+            unlockScript = UnlockScript.P2HMPK(pubKeys, keyIndexes)
+            _ <- UnlockScript.P2HMPK.validate(unlockScript).left.map(badRequest)
+            unsignedTx <- prepareUnsignedTransaction(
+              blockFlow,
+              lockupScript,
+              unlockScript,
+              query.destinations,
+              query.gas,
+              query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
+              None,
+              ExtraUtxosInfo.empty
+            )
+            result <- BuildGrouplessTransferTxResult.from(
+              AVector(BuildSimpleTransferTxResult.from(unsignedTx))
+            )
+          } yield result
+        case (None, Some(keyIndexes)) =>
+          for {
+            lockupScript <- LockupScript.P2HMPK(pubKeys, keyIndexes.length).left.map(badRequest)
+            unlockScript = UnlockScript.P2HMPK(pubKeys, keyIndexes)
+            _ <- UnlockScript.P2HMPK.validate(unlockScript).left.map(badRequest)
+            result <- buildGrouplessTransferTxWithoutExplicitGroup(
+              blockFlow,
+              lockupScript,
+              unlockScript,
+              query.destinations,
+              query.gas,
+              query.gasPrice,
+              None
+            )
+          } yield result
+      }
+    }
+  }
+
+  // scalastyle:off method.length
   def buildGrouplessTransferTxWithoutExplicitGroup(
       blockFlow: BlockFlow,
-      query: BuildTransferTx,
-      lockupScript: LockupScript.P2PK
-  ): TryBuildGrouplessTransferTx = {
-    val outputInfos = prepareOutputInfos(query.destinations)
-    val gasPrice    = query.gasPrice.getOrElse(nonCoinbaseMinGasPrice)
+      lockupScript: LockupScript.GroupedAsset,
+      unlockScript: UnlockScript,
+      destinations: AVector[Destination],
+      gasAmountOpt: Option[GasBox],
+      gasPriceOpt: Option[GasPrice],
+      targetBlockHashOpt: Option[BlockHash]
+  ): Try[BuildGrouplessTransferTxResult] = {
+    val outputInfos = prepareOutputInfos(destinations)
+    val gasPrice    = gasPriceOpt.getOrElse(nonCoinbaseMinGasPrice)
     for {
       totalAmountNeeded <- blockFlow
         .checkAndCalcTotalAmountNeeded(
           lockupScript,
           outputInfos,
-          query.gasAmount,
+          gasAmountOpt,
           gasPrice
         )
         .left
         .map(badRequest)
-      buildResult <- buildGrouplessTransferTxWithEachGroupedAddress(
+      buildResult0 <- buildGrouplessTransferTxWithEachGroupedAddress(
         blockFlow,
         lockupScript,
+        unlockScript,
         outputInfos,
         totalAmountNeeded,
         gasPrice,
-        query.targetBlockHash
+        targetBlockHashOpt
       )
-      result <- buildResult match {
+      buildResult1 <- buildResult0 match {
         case Right(finalResult) =>
           Right(Right(finalResult))
         case Left(buildingTx) =>
           tryBuildGrouplessTransferTx(
             blockFlow,
             gasPrice,
-            query.targetBlockHash,
+            targetBlockHashOpt,
             outputInfos,
             totalAmountNeeded,
             AVector(buildingTx)
           )
       }
+      buildResult <- buildResult1 match {
+        case Right(result) =>
+          Right(result)
+        case Left(buildingTxsInProgress) =>
+          val buildingTxInProgress = buildingTxsInProgress.sortBy(_.remainingAmounts._1).head
+          val remmainingAlph       = buildingTxInProgress.remainingAmounts._1
+          val remainingTokens      = buildingTxInProgress.remainingAmounts._2
+          Left(failed(notEnoughBalanceError(remmainingAlph, remainingTokens)))
+      }
     } yield {
-      result
+      buildResult
     }
   }
+  // scalastyle:on method.length
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def tryBuildGrouplessTransferTx(
@@ -228,7 +305,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
         transferFromFallbackAddress(
           blockFlow,
-          (selectedLockupScript, UnlockScript.P2PK),
+          (selectedLockupScript, currentBuildingGrouplessTx.fromUnlockScript),
           currentBuildingGrouplessTx.from,
           remainingAmounts._1,
           remainingAmounts._2,
@@ -247,7 +324,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
               blockFlow
                 .transfer(
                   currentBuildingGrouplessTx.from,
-                  UnlockScript.P2PK,
+                  currentBuildingGrouplessTx.fromUnlockScript,
                   outputInfos,
                   totalAmountNeeded,
                   currentBuildingGrouplessTx.utxos ++ getExtraUtxos(
@@ -289,7 +366,8 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
   def buildGrouplessTransferTxWithEachGroupedAddress(
       blockFlow: BlockFlow,
-      lockupScript: LockupScript.P2PK,
+      lockupScript: LockupScript.GroupedAsset,
+      unlockScript: UnlockScript,
       outputInfos: AVector[TxOutputInfo],
       totalAmountNeeded: TotalAmountNeeded,
       gasPrice: GasPrice,
@@ -308,6 +386,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
           result <- buildGrouplessTransferTxWithEachSortedGroupedAddress(
             blockFlow,
             sortedScripts.map(script => (script._1, script._2)),
+            unlockScript,
             outputInfos,
             totalAmountNeeded,
             gasPrice
@@ -321,7 +400,8 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def buildGrouplessTransferTxWithEachSortedGroupedAddress(
       blockFlow: BlockFlow,
-      allLockupScriptsWithUtxos: AVector[(LockupScript.P2PK, AVector[AssetOutputInfo])],
+      allLockupScriptsWithUtxos: AVector[(LockupScript.GroupedAsset, AVector[AssetOutputInfo])],
+      unlockScript: UnlockScript,
       outputInfos: AVector[TxOutputInfo],
       totalAmountNeeded: TotalAmountNeeded,
       gasPrice: GasPrice
@@ -339,7 +419,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
         val (lockup, utxos) = allLockupScriptsWithUtxos(index)
         blockFlow.transfer(
           lockup,
-          UnlockScript.P2PK,
+          unlockScript,
           outputInfos,
           totalAmountNeeded,
           utxos,
@@ -361,6 +441,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
             buildingGrouplessTransferTxs += BuildingGrouplessTransferTx(
               lockup,
+              unlockScript,
               utxos,
               allLockupScriptsWithUtxos.remove(index).map(_._1),
               (remainAlph, remainTokens),
@@ -398,14 +479,14 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     }
   }
 
-  type P2PKAssetInfo =
-    AVector[(LockupScript.P2PK, AVector[AssetOutputInfo], (U256, AVector[(TokenId, U256)]))]
+  type GrouplessAssetInfo =
+    AVector[(LockupScript.GroupedAsset, AVector[AssetOutputInfo], (U256, AVector[(TokenId, U256)]))]
   def sortedGroupedLockupScripts(
       blockFlow: BlockFlow,
-      allGroupedLockupScripts: AVector[LockupScript.P2PK],
+      allGroupedLockupScripts: AVector[LockupScript.GroupedAsset],
       totalAmountNeeded: TotalAmountNeeded,
       targetBlockHashOpt: Option[BlockHash]
-  ): IOResult[P2PKAssetInfo] = {
+  ): IOResult[GrouplessAssetInfo] = {
     allGroupedLockupScripts
       .mapE { lockup =>
         blockFlow
@@ -446,10 +527,76 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
 object GrouplessUtils {
   final case class BuildingGrouplessTransferTx(
-      from: LockupScript.P2PK,
+      from: LockupScript.GroupedAsset,
+      fromUnlockScript: UnlockScript,
       utxos: AVector[AssetOutputInfo],
-      remainingLockupScripts: AVector[LockupScript.P2PK],
+      remainingLockupScripts: AVector[LockupScript.GroupedAsset],
       remainingAmounts: (U256, AVector[(TokenId, U256)]),
       builtUnsignedTxsSoFar: AVector[UnsignedTransaction]
   )
+
+  def buildPublicKeyLikes(
+      rawKeys: AVector[ByteString],
+      keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]]
+  ): Either[String, AVector[PublicKeyLike]] = {
+    for {
+      _          <- checkPublicKeys(rawKeys)
+      keyTypes   <- checkPublicKeyTypes(rawKeys, keyTypesOpt)
+      publicKeys <- convertPublicKeys(rawKeys, keyTypes)
+    } yield publicKeys
+  }
+
+  private def checkPublicKeys(rawKeys: AVector[ByteString]): Either[String, Unit] = {
+    if (rawKeys.length == 0) {
+      Left("`keys` can not be empty")
+    } else {
+      Right(())
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  private def checkPublicKeyTypes(
+      rawKeys: AVector[ByteString],
+      keyTypesOpt: Option[AVector[BuildTxCommon.PublicKeyType]]
+  ): Either[String, AVector[BuildTxCommon.PublicKeyType]] = {
+    if (keyTypesOpt.isDefined) {
+      if (keyTypesOpt.get.length != rawKeys.length) {
+        Left("`keyTypes` length should be the same as `keys` length")
+      } else {
+        Right(keyTypesOpt.get)
+      }
+    } else {
+      Right(AVector.fill(rawKeys.length)(BuildTxCommon.Default))
+    }
+  }
+
+  private def convertPublicKeys(
+      rawKeys: AVector[ByteString],
+      keyTypes: AVector[BuildTxCommon.PublicKeyType]
+  ): Either[String, AVector[PublicKeyLike]] = {
+    keyTypes.foldWithIndexE(AVector.empty[PublicKeyLike]) { (publicKeys, keyType, index) =>
+      val rawKey = rawKeys(index)
+      val publicKey = keyType match {
+        case BuildTxCommon.Default =>
+          SecP256K1PublicKey.from(rawKey).map(PublicKeyLike.SecP256K1.apply)
+        case BuildTxCommon.GLED25519 =>
+          ED25519PublicKey.from(rawKey).map(PublicKeyLike.ED25519.apply)
+        case BuildTxCommon.GLSecP256K1 =>
+          SecP256K1PublicKey.from(rawKey).map(PublicKeyLike.SecP256K1.apply)
+        case BuildTxCommon.GLSecP256R1 =>
+          SecP256R1PublicKey.from(rawKey).map(PublicKeyLike.SecP256R1.apply)
+        case BuildTxCommon.GLWebAuthn =>
+          SecP256R1PublicKey.from(rawKey).map(PublicKeyLike.WebAuthn.apply)
+        case BuildTxCommon.BIP340Schnorr =>
+          None // BIP340Schnorr not supported
+      }
+
+      publicKey match {
+        case Some(publicKey) =>
+          Right(publicKeys :+ publicKey)
+        case None =>
+          Left(s"Invalid public key ${Hex.toHexString(rawKey)} for keyType ${keyType.name}")
+      }
+    }
+  }
 }

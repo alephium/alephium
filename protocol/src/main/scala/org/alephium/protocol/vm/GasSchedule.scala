@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import org.alephium.crypto.{ED25519PublicKey, SecP256R1PublicKey}
 import org.alephium.macros.Gas
 import org.alephium.protocol.PublicKey
-
+import org.alephium.util.AVector
 //scalastyle:off magic.number number.of.types
 
 trait GasSchedule
@@ -272,6 +272,10 @@ object GasSchedule {
   val secp256R1UnlockGas: GasBox =
     GasBox.unsafe(GasHash.gas(SecP256R1PublicKey.length).value + GasSignature.gas.value)
 
+  // Since we can't determine the size of the WebAuthn payload when building the tx,
+  // we use a 500-byte payload to estimate the gas required for WebAuthn.
+  val defaultWebAuthnUnlockGas: GasBox = webauthnUnlockGas(500)
+
   def webauthnUnlockGas(webauthnLength: Int): GasBox = {
     GasBox.unsafe(
       GasHash.gas(SecP256R1PublicKey.length + webauthnLength).value + GasSignature.gas.value
@@ -282,4 +286,19 @@ object GasSchedule {
     GasBox.unsafe(GasHash.gas(ED25519PublicKey.length).value + GasSignature.gas.value)
 
   def p2mpkUnlockGas(m: Int): GasBox = secp256K1UnlockGas.mulUnsafe(m)
+
+  def unlockGasByPublicKey(publicKeyLike: PublicKeyLike): GasBox = {
+    publicKeyLike match {
+      case PublicKeyLike.SecP256K1(_) => secp256K1UnlockGas
+      case PublicKeyLike.SecP256R1(_) => secp256R1UnlockGas
+      case PublicKeyLike.ED25519(_)   => ed25519UnlockGas
+      case PublicKeyLike.WebAuthn(_)  => defaultWebAuthnUnlockGas
+    }
+  }
+
+  def p2hmpkUnlockGas(publicKeysLike: AVector[PublicKeyLike]): GasBox = {
+    publicKeysLike.fold(GasBox.unsafe(0)) { (acc, publicKeyLike) =>
+      acc.addUnsafe(unlockGasByPublicKey(publicKeyLike)).addUnsafe(GasSignature.gas)
+    }
+  }
 }

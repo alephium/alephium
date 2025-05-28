@@ -18,7 +18,14 @@ package org.alephium.flow.gasestimation
 
 import org.scalacheck.Gen
 
-import org.alephium.crypto.{ED25519, SecP256K1, SecP256R1}
+import org.alephium.crypto.{
+  ED25519,
+  ED25519PublicKey,
+  SecP256K1,
+  SecP256K1PublicKey,
+  SecP256R1,
+  SecP256R1PublicKey
+}
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.ExtraUtxosInfo
 import org.alephium.flow.core.UtxoSelectionAlgo.TxInputWithAsset
@@ -114,6 +121,34 @@ class GasEstimationSpec extends AlephiumFlowSpec with LockupScriptGenerators {
         .unsafe(22120)
       GasEstimation.estimateWithInputScript(lockPair, 10, 2, mockEstimator).rightValue is GasBox
         .unsafe(34120)
+    }
+
+    info("P2HMPK")
+
+    {
+      val pubKey0 = SecP256K1PublicKey.generate
+      val pubKey1 = SecP256R1PublicKey.generate
+      val pubKey2 = ED25519PublicKey.generate
+      val publicKeys = AVector(
+        PublicKeyLike.SecP256K1(pubKey0),
+        PublicKeyLike.SecP256R1(pubKey1),
+        PublicKeyLike.ED25519(pubKey2)
+      )
+      val lockup        = LockupScript.P2HMPK.unsafe(publicKeys, 2, groupIndex)
+      val unlock        = UnlockScript.P2HMPK(publicKeys, AVector(0, 1))
+      val mockEstimator = AssetScriptGasEstimator.Mock
+      GasEstimation
+        .estimateWithInputScript((lockup, unlock), 1, 2, mockEstimator)
+        .rightValue is GasBox
+        .unsafe(20120)
+      GasEstimation
+        .estimateWithInputScript((lockup, unlock), 4, 2, mockEstimator)
+        .rightValue is GasBox
+        .unsafe(26120)
+      GasEstimation
+        .estimateWithInputScript((lockup, unlock), 10, 2, mockEstimator)
+        .rightValue is GasBox
+        .unsafe(38120)
     }
 
     info("P2SH, no signature required")

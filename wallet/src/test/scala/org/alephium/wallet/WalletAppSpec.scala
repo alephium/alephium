@@ -333,7 +333,7 @@ class WalletAppSpec
         "okay teach order cycle slight angle battle enact problem ostrich wise faint office brush lava people walk arrive exit traffic thrive angle manual alley"
       )
       .get
-    address = Address.asset("15L9J68punrrGAoXGQjLu9dX5k1kDKehqfG5tFVWqJbG9").get
+    address = Address.asset("15L9J68punrrGAoXGQjLu9dX5k1kDKehqfG5tFVWqJbG9").rightValue
 
     restore(mnemonic, "new-wallet") check { response =>
       wallet = response.as[WalletRestoreResult].walletName

@@ -21,11 +21,12 @@ import scala.util.{Failure, Success, Try}
 import sttp.tapir.{Codec, DecodeResult, Schema, Validator}
 import sttp.tapir.CodecFormat.TextPlain
 
+import org.alephium.api.{model => api}
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, AddressLike, BlockHash, GroupIndex, TransactionId}
+import org.alephium.protocol.model.{Address, BlockHash, GroupIndex, TransactionId}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{TimeStamp, U256}
 
@@ -49,11 +50,11 @@ trait TapirCodecs extends ApiModelCodec with TapirSchemasLike {
   implicit val contractAddressTapirCodec: Codec[String, Address.Contract, TextPlain] =
     fromJson[Address.Contract]
 
-  implicit val addressTapirCodec: Codec[String, Address, TextPlain] =
+  implicit val protocolAddressTapirCodec: Codec[String, Address, TextPlain] =
     fromJson[Address]
 
-  implicit val addressLikeTapirCodec: Codec[String, AddressLike, TextPlain] =
-    fromJson[AddressLike]
+  implicit val addressTapirCodec: Codec[String, api.Address, TextPlain] =
+    fromJson[api.Address]
 
   implicit val apiKeyTapirCodec: Codec[String, ApiKey, TextPlain] =
     fromJson[ApiKey]

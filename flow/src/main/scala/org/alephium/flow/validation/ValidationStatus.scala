@@ -208,3 +208,4 @@ final case object InvalidScriptExecutionFlag                    extends InvalidT
 final case object UsingBreakingInstrs                           extends InvalidTxStatus
 case object InvalidLockupScriptPreDanube                        extends InvalidTxStatus
 final case class InvalidWebauthnPayload(error: SerdeError)      extends InvalidTxStatus
+final case object InvalidP2hmpkHash                             extends InvalidTxStatus

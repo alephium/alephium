@@ -154,8 +154,8 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
   "Address.asset" should "parse asset address only" in {
     val lock    = LockupScript.P2C(ContractId.random)
     val address = Address.from(lock).toBase58
-    Address.asset(address) is None
-    Address.fromBase58(address).value.lockupScript is lock
+    Address.asset(address).isLeft is true
+    Address.fromBase58(address).rightValue.lockupScript is lock
   }
 
   it should "encode and decode between p2pk address and public key" in {
@@ -166,42 +166,18 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
-  it should "decode address from string" in {
-    Address.fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3").isDefined is true
-    Address.fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa").isDefined is true
-    Address.fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr").isDefined is true
-    Address
-      .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L")
-      .isDefined is false
-    Address
-      .fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0")
-      .isDefined is true
-
-    Address.fromBase58(":1").isDefined is false
-    Address.fromBase58("1C2:1").isDefined is false
-    Address.fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0").isDefined is false
-    Address.fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa:0").isDefined is false
-    Address.fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr:0").isDefined is false
-    Address.fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3").isDefined is false
-    Address
-      .fromBase58(
-        s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:${groupConfig.groups + 1}"
-      )
-      .isDefined is true
-  }
-
   sealed trait AddressVerify {
     val address: String
     def script: LockupScript
 
     def success(): Assertion = {
       Address.from(script).toBase58 is address
-      Address.fromBase58(address).value.lockupScript is script
+      Address.fromBase58(address).rightValue.lockupScript is script
     }
 
     def fail(): Assertion = {
       Address.from(script).toBase58 is address
-      Address.fromBase58(address) is None
+      Address.fromBase58(address).isLeft is true
     }
   }
 
@@ -223,14 +199,18 @@ class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
       val bytes = serialize[LockupScript](script)
       Base58.encode(bytes) isnot address
       Address.from(script).toBase58 is address
-      Address.fromBase58(address) is Some(Address.from(script))
-      Address.fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(0, 5)).sample.get)) is None
+      Address.fromBase58(address) isE Address.from(script)
+      Address
+        .fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(1, 5)).sample.get))
+        .isLeft is true
 
-      val addressWithoutGroup = script.toBase58WithoutGroup
-      Address.fromBase58(s"$addressWithoutGroup:${script.groupIndex.value}") is Some(
-        Address.Asset(script)
+      val addressWithoutGroup = script.toBase58.dropRight(2)
+      Address.fromBase58(s"$addressWithoutGroup:${script.groupIndex.value}") isE Address.Asset(
+        script
       )
-      Address.fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(1, 5)).sample.get)) is None
+      Address
+        .fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(1, 5)).sample.get))
+        .isLeft is true
     }
 
     def script: LockupScript.P2PK = LockupScript.p2pk(pubKey.get, groupIndex.get)

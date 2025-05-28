@@ -30,7 +30,7 @@ class ValSpec extends AlephiumSpec {
     Val.ByteVec(ByteString(0, 1, 2, 3)).toDebugString() is ByteString.fromString("00010203")
     val addressString = "1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3"
     Val
-      .Address(Address.fromBase58(addressString).value.lockupScript)
+      .Address(Address.fromBase58(addressString).rightValue.lockupScript)
       .toDebugString() is ByteString.fromString(addressString)
   }
 }

@@ -380,8 +380,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       test.settings.isEmpty is true
       val assets = test.assets.value.assets
       assets.length is 2
-      assets(0) is LockupScript.asset(address0).value -> AVector(TokenId.alph -> ALPH.alph(1))
-      assets(1)._1 is LockupScript.asset(address1).value
+      assets(0) is LockupScript.asset(address0).rightValue -> AVector(TokenId.alph -> ALPH.alph(1))
+      assets(1)._1 is LockupScript.asset(address1).rightValue
       assets(1)._2.toSet is Set(TokenId.alph -> ALPH.alph(2), tokenId -> ALPH.alph(1))
     }
 

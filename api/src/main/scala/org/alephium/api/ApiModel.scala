@@ -23,6 +23,7 @@ import scala.util.{Failure, Success, Try}
 import akka.util.ByteString
 import upickle.core.Abort
 
+import org.alephium.api.{model => api}
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
@@ -33,7 +34,6 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{
   Address,
-  AddressLike,
   BlockHash,
   CliqueId,
   ContractId,
@@ -43,7 +43,7 @@ import org.alephium.protocol.model.{
   TokenId,
   TransactionId
 }
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
+import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
 import org.alephium.serde.{deserialize, serialize, RandomBytes}
 import org.alephium.util._
 
@@ -139,8 +139,8 @@ trait ApiModelCodec {
   implicit val transactionIdReader: Reader[TransactionId] = hashReader.map(TransactionId.unsafe(_))
 
   implicit lazy val assetAddressWriter: Writer[Address.Asset] =
-    StringWriter.comap[Address.Asset](_.toBase58)
-  implicit lazy val assetAddressReader: Reader[Address.Asset] = addressReader.map {
+    StringWriter.comap[Address.Asset](address => api.Address.fromProtocol(address).toBase58)
+  implicit lazy val assetAddressReader: Reader[Address.Asset] = protocolAddressReader.map {
     case address: Address.Asset => address
     case address: Address.Contract =>
       throw Abort(s"Expect asset address, but was contract address: ${address.toBase58}")
@@ -149,33 +149,27 @@ trait ApiModelCodec {
   implicit lazy val contractAddressRW: RW[Address.Contract] = readwriter[String].bimap(
     _.toBase58,
     input =>
-      Address.fromBase58(input) match {
-        case Some(address: Address.Contract) => address
-        case Some(_: Address.Asset) =>
-          throw Abort(s"Expect contract address, but was asset address: $input")
-        case None =>
-          throw Abort(s"Unable to decode address from $input")
+      Address.contract(input) match {
+        case Right(address) => address
+        case Left(error)    => throw Abort(error)
       }
   )
 
-  implicit lazy val addressWriter: Writer[Address] = StringWriter.comap[Address](_.toBase58)
-  implicit lazy val addressReader: Reader[Address] = StringReader.map { input =>
-    LockupScript.decodeFromBase58(input) match {
-      case LockupScript.CompleteLockupScript(lockupScript) => Address.from(lockupScript)
-      case LockupScript.HalfDecodedP2PK(publicKey) =>
-        val groupIndex = publicKey.defaultGroup
-        Address.Asset(LockupScript.p2pk(publicKey, groupIndex))
-      case LockupScript.InvalidLockupScript =>
-        throw Abort(s"Unable to decode address from $input")
+  implicit lazy val protocolAddressWriter: Writer[Address] =
+    StringWriter.comap[Address](address => api.Address.fromProtocol(address).toBase58)
+  implicit lazy val protocolAddressReader: Reader[Address] = StringReader.map { input =>
+    api.Address.fromBase58(input) match {
+      case Right(address) => address.toProtocol()
+      case Left(error)    => throw Abort(error)
     }
   }
 
-  implicit lazy val addressLikeWriter: Writer[AddressLike] =
-    StringWriter.comap[AddressLike](_.toBase58)
-  implicit lazy val addressLikeReader: Reader[AddressLike] = StringReader.map { input =>
-    AddressLike.fromBase58(input) match {
-      case Some(addressLike) => addressLike
-      case None              => throw Abort(s"Unable to decode address from $input")
+  implicit lazy val addressWriter: Writer[api.Address] =
+    StringWriter.comap[api.Address](_.toBase58)
+  implicit lazy val addressReader: Reader[api.Address] = StringReader.map { input =>
+    api.Address.fromBase58(input) match {
+      case Right(address) => address
+      case Left(error)    => throw Abort(error)
     }
   }
 
@@ -339,6 +333,18 @@ trait ApiModelCodec {
   implicit val buildTransactionExecuteScriptResultRW: RW[BuildChainedExecuteScriptTxResult] =
     macroRW
   implicit val buildChainedTxResultRW: RW[BuildChainedTxResult] = macroRW
+
+  implicit val multiSigTypeRW: RW[MultiSigType] = readwriter[String].bimap(
+    {
+      case MultiSigType.P2MPKH => "p2mpkh"
+      case MultiSigType.P2HMPK => "p2hmpk"
+    },
+    {
+      case "p2mpkh" => MultiSigType.P2MPKH
+      case "p2hmpk" => MultiSigType.P2HMPK
+      case other    => throw Abort(s"Invalid multi-sig type: $other")
+    }
+  )
 
   implicit val buildMultisigAddressRW: RW[BuildMultisigAddress] = macroRW
 
