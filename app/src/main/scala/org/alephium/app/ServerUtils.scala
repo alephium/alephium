@@ -450,12 +450,11 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildSweepAddressTransactions
   ): Try[BuildSweepAddressTransactionsResult] = {
-    val lockupScript = LockupScript.p2pkh(query.fromPublicKey)
     for {
-      _ <- checkGroup(lockupScript)
+      fromLockPair <- query.getLockPair(query.group)
       unsignedTxs <- prepareSweepAddressTransaction(
         blockFlow,
-        query.fromPublicKey,
+        fromLockPair,
         query.toAddress,
         query.maxAttoAlphPerUTXO,
         query.lockTime,
@@ -467,7 +466,7 @@ class ServerUtils(implicit
     } yield {
       BuildSweepAddressTransactionsResult.from(
         unsignedTxs,
-        lockupScript.groupIndex,
+        fromLockPair._1.groupIndex,
         query.toAddress.groupIndex
       )
     }
@@ -1106,7 +1105,7 @@ class ServerUtils(implicit
   // scalastyle:off parameter.number
   def prepareSweepAddressTransaction(
       blockFlow: BlockFlow,
-      fromPublicKey: PublicKey,
+      fromLockPair: (LockupScript.Asset, UnlockScript),
       toAddress: Address.Asset,
       maxAttoAlphPerUTXO: Option[Amount],
       lockTimeOpt: Option[TimeStamp],
@@ -1117,7 +1116,7 @@ class ServerUtils(implicit
   ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAddress(
       targetBlockHashOpt,
-      fromPublicKey,
+      fromLockPair,
       toAddress.lockupScript,
       lockTimeOpt,
       gasOpt,

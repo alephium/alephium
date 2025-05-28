@@ -467,7 +467,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bst => Right(Some(LockupScript.p2pkh(bst.fromPublicKey).groupIndex(brokerConfig)))
+    bst => bst.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
   )
 
   val submitTransactionLogic =

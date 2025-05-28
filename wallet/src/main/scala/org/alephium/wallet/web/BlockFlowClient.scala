@@ -169,7 +169,8 @@ object BlockFlowClient {
         lockupScript.groupIndex,
         buildSweepAddressTransactions,
         BuildSweepAddressTransactions(
-          fromPublicKey,
+          fromPublicKey.bytes,
+          None,
           address,
           None,
           lockTime,

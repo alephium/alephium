@@ -993,7 +993,7 @@ trait TxUtils { Self: FlowUtils =>
 
   def sweepAddress(
       targetBlockHashOpt: Option[BlockHash],
-      fromPublicKey: PublicKey,
+      fromLockPair: (LockupScript.Asset, UnlockScript),
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
@@ -1001,8 +1001,7 @@ trait TxUtils { Self: FlowUtils =>
       maxAttoAlphPerUTXOOpt: Option[U256],
       utxosLimit: Int
   ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
-    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
-    val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
+    val (fromLockupScript, fromUnlockScript) = fromLockPair
     sweepAddressFromScripts(
       targetBlockHashOpt,
       fromLockupScript,

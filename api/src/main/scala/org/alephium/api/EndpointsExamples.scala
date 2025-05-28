@@ -564,13 +564,15 @@ trait EndpointsExamples extends ErrorExamples {
     List(
       defaultExample(
         BuildSweepAddressTransactions(
-          publicKey,
+          publicKey.bytes,
+          None,
           address
         )
       ),
       moreSettingsExample(
         BuildSweepAddressTransactions(
-          publicKey,
+          publicKey.bytes,
+          None,
           address,
           Some(Amount(ALPH.oneAlph)),
           Some(ts),
