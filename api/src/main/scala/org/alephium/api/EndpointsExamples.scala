@@ -683,8 +683,10 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildSweepMultisigTransactionExamples: List[Example[BuildSweepMultisig]] = List(
     defaultExample(
       BuildSweepMultisig(
-        address,
-        AVector(publicKey),
+        api.Address.fromProtocol(address),
+        AVector(publicKey.bytes),
+        None,
+        None,
         address,
         None,
         None,
@@ -696,8 +698,10 @@ trait EndpointsExamples extends ErrorExamples {
     ),
     moreSettingsExample(
       BuildSweepMultisig(
-        address,
-        AVector(publicKey),
+        api.Address.fromProtocol(address),
+        AVector(publicKey.bytes),
+        None,
+        None,
         address,
         Some(Amount(ALPH.oneAlph)),
         Some(ts),

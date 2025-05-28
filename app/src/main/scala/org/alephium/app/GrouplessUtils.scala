@@ -130,23 +130,18 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       blockFlow: BlockFlow,
       query: BuildMultisig
   ): Try[BuildGrouplessTransferTxResult] = {
-    val publicKeyLikes = buildPublicKeyLikes(query.fromPublicKeys, query.fromPublicKeyTypes)
-    publicKeyLikes.left.map(badRequest).flatMap { pubKeys =>
-      (query.group, query.fromPublicKeyIndexes) match {
-        case (_, None) =>
-          Left(badRequest("fromPublicKeyIndexes is required for P2HMPK multisig"))
-        case (Some(group), Some(keyIndexes)) =>
+    for {
+      pubKeys <- buildPublicKeyLikes(query.fromPublicKeys, query.fromPublicKeyTypes).left
+        .map(badRequest)
+      keyIndexes <- query.getP2HMPKKeyIndexes()
+      result <- query.group match {
+        case Some(group) =>
           for {
-            lockupScript <- LockupScript
-              .P2HMPK(pubKeys, keyIndexes.length, group)
-              .left
-              .map(badRequest)
-            unlockScript = UnlockScript.P2HMPK(pubKeys, keyIndexes)
-            _ <- UnlockScript.P2HMPK.validate(unlockScript).left.map(badRequest)
+            lockPair <- buildP2PKHMPKLockPairWithGroup(pubKeys, keyIndexes, group)
             unsignedTx <- prepareUnsignedTransaction(
               blockFlow,
-              lockupScript,
-              unlockScript,
+              lockPair._1,
+              lockPair._2,
               query.destinations,
               query.gas,
               query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
@@ -157,15 +152,13 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
               AVector(BuildSimpleTransferTxResult.from(unsignedTx))
             )
           } yield result
-        case (None, Some(keyIndexes)) =>
+        case None =>
           for {
-            lockupScript <- LockupScript.P2HMPK(pubKeys, keyIndexes.length).left.map(badRequest)
-            unlockScript = UnlockScript.P2HMPK(pubKeys, keyIndexes)
-            _ <- UnlockScript.P2HMPK.validate(unlockScript).left.map(badRequest)
+            lockPair <- buildP2PKHMPKLockPairWithDefaultGroup(pubKeys, keyIndexes)
             result <- buildGrouplessTransferTxWithoutExplicitGroup(
               blockFlow,
-              lockupScript,
-              unlockScript,
+              lockPair._1,
+              lockPair._2,
               query.destinations,
               query.gas,
               query.gasPrice,
@@ -173,7 +166,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
             )
           } yield result
       }
-    }
+    } yield result
   }
 
   // scalastyle:off method.length
@@ -552,6 +545,21 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     }
   }
 
+  private def sweepFromAllGroups(
+      blockFlow: BlockFlow,
+      fromLockPair: (LockupScript.GroupedAsset, UnlockScript),
+      query: BuildSweepCommon
+  ): Try[AVector[UnsignedTransaction]] = {
+    val (lockupScript, unlockScript) = fromLockPair
+    allGroupedLockupScripts(lockupScript).foldE(AVector.empty[UnsignedTransaction]) {
+      case (acc, fromLockupScript) =>
+        prepareSweepAddressTransaction(blockFlow, (fromLockupScript, unlockScript), query) match {
+          case Right(txs)  => Right(acc ++ txs)
+          case Left(error) => Left(error)
+        }
+    }
+  }
+
   def prepareGrouplessSweepAddressTransaction(
       blockFlow: BlockFlow,
       fromLockPair: (LockupScript.P2PK, UnlockScript),
@@ -562,14 +570,73 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       prepareSweepAddressTransaction(blockFlow, fromLockPair, query)
     } else {
       // sweep from all groups
-      val (lockupScript, unlockScript) = fromLockPair
-      allGroupedLockupScripts(lockupScript).foldE(AVector.empty[UnsignedTransaction]) {
-        case (acc, fromLockupScript) =>
-          prepareSweepAddressTransaction(blockFlow, (fromLockupScript, unlockScript), query) match {
-            case Right(txs)  => Right(acc ++ txs)
-            case Left(error) => Left(error)
-          }
+      sweepFromAllGroups(blockFlow, fromLockPair, query)
+    }
+  }
+
+  private def buildP2PKHMPKLockPairWithGroup(
+      pubKeys: AVector[PublicKeyLike],
+      keyIndexes: AVector[Int],
+      groupIndex: GroupIndex
+  ): Try[(LockupScript.P2HMPK, UnlockScript.P2HMPK)] = {
+    LockupScript
+      .P2HMPK(pubKeys, keyIndexes.length, groupIndex)
+      .left
+      .map(badRequest)
+      .flatMap(buildP2PKHMPKLockPair(pubKeys, keyIndexes, _))
+  }
+
+  private def buildP2PKHMPKLockPairWithDefaultGroup(
+      pubKeys: AVector[PublicKeyLike],
+      keyIndexes: AVector[Int]
+  ): Try[(LockupScript.P2HMPK, UnlockScript.P2HMPK)] = {
+    LockupScript
+      .P2HMPK(pubKeys, keyIndexes.length)
+      .left
+      .map(badRequest)
+      .flatMap(buildP2PKHMPKLockPair(pubKeys, keyIndexes, _))
+  }
+
+  private def buildP2PKHMPKLockPair(
+      pubKeys: AVector[PublicKeyLike],
+      keyIndexes: AVector[Int],
+      lockupScript: LockupScript.P2HMPK
+  ): Try[(LockupScript.P2HMPK, UnlockScript.P2HMPK)] = {
+    val unlockScript = UnlockScript.P2HMPK(pubKeys, keyIndexes)
+    UnlockScript.P2HMPK.validate(unlockScript).left.map(badRequest).map { _ =>
+      (lockupScript, unlockScript)
+    }
+  }
+
+  def buildP2HMPKSweepMultisig(
+      blockFlow: BlockFlow,
+      query: BuildSweepMultisig
+  ): Try[BuildSweepAddressTransactionsResult] = {
+    for {
+      fromAddress <- query.getFromAddress()
+      pubKeys <- buildPublicKeyLikes(query.fromPublicKeys, query.fromPublicKeyTypes).left
+        .map(badRequest)
+      keyIndexes <- query.getP2HMPKKeyIndexes()
+      unsignedTxs <- query.group match {
+        case Some(group) =>
+          // sweep from one group
+          for {
+            lockPair    <- buildP2PKHMPKLockPairWithGroup(pubKeys, keyIndexes, group)
+            unsignedTxs <- prepareSweepAddressTransaction(blockFlow, lockPair, query)
+          } yield unsignedTxs
+        case None =>
+          // sweep from all groups
+          for {
+            lockPair    <- buildP2PKHMPKLockPairWithDefaultGroup(pubKeys, keyIndexes)
+            unsignedTxs <- sweepFromAllGroups(blockFlow, lockPair, query)
+          } yield unsignedTxs
       }
+    } yield {
+      BuildSweepAddressTransactionsResult.from(
+        unsignedTxs,
+        fromAddress.groupIndex,
+        query.toAddress.groupIndex
+      )
     }
   }
 }

@@ -436,7 +436,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
+    bt => Right(Some(bt.fromAddress.toProtocol().groupIndex(brokerConfig)))
   )
 
   val buildMultiInputsTransactionLogic = serverLogicRedirect(buildMultiAddressesTransaction)(

@@ -393,15 +393,31 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildSweepMultisig
   ): Try[BuildSweepAddressTransactionsResult] = {
-    val lockupScript = query.fromAddress.lockupScript
+    if (query.multiSigType.contains(MultiSigType.P2HMPK)) {
+      buildP2HMPKSweepMultisig(blockFlow, query)
+    } else {
+      buildP2MPKHSweepMultisig(blockFlow, query)
+    }
+  }
+
+  private def buildP2MPKHSweepMultisig(
+      blockFlow: BlockFlow,
+      query: BuildSweepMultisig
+  ): Try[BuildSweepAddressTransactionsResult] = {
     for {
-      _            <- checkGroup(lockupScript)
-      unlockScript <- buildP2MPKHUnlockScript(lockupScript, query.fromPublicKeys)
-      unsignedTxs  <- prepareSweepAddressTransaction(blockFlow, (lockupScript, unlockScript), query)
+      fromAddress  <- query.getFromAddress()
+      _            <- checkGroup(fromAddress.lockupScript)
+      publicKeys   <- query.getFromPublicKeys()
+      unlockScript <- buildP2MPKHUnlockScript(fromAddress.lockupScript, publicKeys)
+      unsignedTxs <- prepareSweepAddressTransaction(
+        blockFlow,
+        (fromAddress.lockupScript, unlockScript),
+        query
+      )
     } yield {
       BuildSweepAddressTransactionsResult.from(
         unsignedTxs,
-        lockupScript.groupIndex,
+        fromAddress.groupIndex,
         query.toAddress.groupIndex
       )
     }
