@@ -436,7 +436,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
+    bt => Right(Some(bt.fromAddress.toProtocol().groupIndex(brokerConfig)))
   )
 
   val buildMultiInputsTransactionLogic = serverLogicRedirect(buildMultiAddressesTransaction)(
@@ -467,7 +467,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bst => Right(Some(LockupScript.p2pkh(bst.fromPublicKey).groupIndex(brokerConfig)))
+    bst => bst.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
   )
 
   val submitTransactionLogic =

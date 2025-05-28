@@ -893,8 +893,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val targetBlockHash    = BlockHash.generate
 
     val buildSweep = BuildSweepMultisig(
-      fromAddress,
-      fromPublicKeys,
+      api.Address.fromProtocol(fromAddress),
+      fromPublicKeys.map(_.bytes),
+      None,
+      None,
       toAddress,
       Some(maxAttoAlphPerUTXO),
       Some(lockTime),

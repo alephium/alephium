@@ -1491,61 +1491,55 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       .leftValue isE TxScriptExeFailed(OutOfGas)
   }
 
-  it should "validate p2pk lockup script" in new Fixture {
+  trait GroupedLockupScriptFixture extends Fixture {
     val groupIndex = GroupIndex.unsafe(0)
-    val lockup     = p2pkLockupGen(groupIndex).sample.get
-    val fromPriKey = genesisKeys(groupIndex.value)._1
-    val unsignedTx = blockFlow
-      .transfer(
-        fromPriKey.publicKey,
-        AVector(TxOutputInfo(lockup, ALPH.alph(1), AVector.empty, None)),
-        None,
-        nonCoinbaseMinGasPrice,
-        defaultUtxoLimit,
-        ExtraUtxosInfo.empty
+    def lockup: LockupScript.GroupedAsset
+
+    def test() = {
+      val fromPriKey = genesisKeys(groupIndex.value)._1
+      val unsignedTx = blockFlow
+        .transfer(
+          fromPriKey.publicKey,
+          AVector(TxOutputInfo(lockup, ALPH.alph(1), AVector.empty, None)),
+          None,
+          nonCoinbaseMinGasPrice,
+          defaultUtxoLimit,
+          ExtraUtxosInfo.empty
+        )
+        .rightValue
+        .rightValue
+      val tx = Transaction.from(unsignedTx, fromPriKey)
+      tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
+      tx.fail(InvalidLockupScriptPreDanube)(
+        validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone))
       )
-      .rightValue
-      .rightValue
-    val tx = Transaction.from(unsignedTx, fromPriKey)
-    tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
-    tx.fail(InvalidLockupScriptPreDanube)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
-    tx.fail(InvalidLockupScriptPreDanube)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
-    tx.fail(InvalidLockupScriptPreDanube)(
-      validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet))
-    )
+      tx.fail(InvalidLockupScriptPreDanube)(
+        validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman))
+      )
+      tx.fail(InvalidLockupScriptPreDanube)(
+        validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet))
+      )
+    }
   }
 
-  it should "validate p2hmpk lockup script" in new Fixture {
-    val groupIndex = GroupIndex.unsafe(0)
-    val lockup     = p2hmpkLockupGen(groupIndex).sample.get
-    val fromPriKey = genesisKeys(groupIndex.value)._1
-    val unsignedTx = blockFlow
-      .transfer(
-        fromPriKey.publicKey,
-        AVector(TxOutputInfo(lockup, ALPH.alph(1), AVector.empty, None)),
-        None,
-        nonCoinbaseMinGasPrice,
-        defaultUtxoLimit,
-        ExtraUtxosInfo.empty
-      )
-      .rightValue
-      .rightValue
-    val tx = Transaction.from(unsignedTx, fromPriKey)
-    tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
-    tx.fail(InvalidLockupScriptPreDanube)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
-    tx.fail(InvalidLockupScriptPreDanube)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
-    tx.fail(InvalidLockupScriptPreDanube)(
-      validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet))
-    )
+  it should "validate p2pk lockup script" in new GroupedLockupScriptFixture {
+    val lockup: LockupScript.GroupedAsset = p2pkLockupGen(groupIndex).sample.get
+    test()
   }
 
-  trait P2PKUnlockScriptFixture extends Fixture {
+  it should "validate p2hmpk lockup script" in new GroupedLockupScriptFixture {
+    val lockup: LockupScript.GroupedAsset = p2hmpkLockupGen(groupIndex).sample.get
+    test()
+  }
+
+  trait GroupedUnlockScriptFixture extends Fixture {
     val groupIndex    = GroupIndex.unsafe(0)
     val genesisPriKey = genesisKeys(groupIndex.value)._1
 
-    def lockup: LockupScript.P2PK
-    def sign(unsignedTx: UnsignedTransaction): Transaction
+    def lockup: LockupScript.GroupedAsset
+    def unlock: UnlockScript
     def unlockGas: GasBox
+    def sign(unsignedTx: UnsignedTransaction): Transaction
 
     def prepare(): Unit = {
       val block =
@@ -1558,7 +1552,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       utxos.length is 1
 
       val unsignedTx = UnsignedTransaction(
-        utxos.map(utxo => TxInput(utxo.ref, UnlockScript.P2PK)),
+        utxos.map(utxo => TxInput(utxo.ref, unlock)),
         AVector(
           AssetOutput(
             ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee),
@@ -1598,6 +1592,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube))
       )
     }
+  }
+
+  trait P2PKUnlockScriptFixture extends GroupedUnlockScriptFixture {
+    def lockup: LockupScript.P2PK
+    override def unlock: UnlockScript = UnlockScript.P2PK
   }
 
   it should "validate p2pk(secp256k1) unlock script" in new P2PKUnlockScriptFixture {
@@ -1649,68 +1648,12 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     checkValidTx(createTx())
   }
 
-  trait P2HMPKUnlockScriptFixture extends Fixture {
-    val groupIndex    = GroupIndex.unsafe(0)
-    val genesisPriKey = genesisKeys(groupIndex.value)._1
-
+  trait P2HMPKUnlockScriptFixture extends GroupedUnlockScriptFixture {
     def publicKeys: AVector[PublicKeyLike]
     def publicKeyIndexes: AVector[Int]
     def lockup: LockupScript.P2HMPK =
       LockupScript.P2HMPK.unsafe(publicKeys, publicKeyIndexes.length, groupIndex)
-    def sign(unsignedTx: UnsignedTransaction): Transaction
-    def unlockGas: GasBox
-
-    def prepare(): Unit = {
-      val block =
-        transfer(blockFlow, genesisPriKey, lockup, AVector.empty[(TokenId, U256)], ALPH.oneAlph)
-      addAndCheck(blockFlow, block)
-    }
-
-    def createTx(): Transaction = {
-      val utxos = blockFlow.getUsableUtxos(None, lockup, Int.MaxValue).rightValue
-      utxos.length is 1
-
-      val unsignedTx = UnsignedTransaction(
-        utxos.map(utxo => TxInput(utxo.ref, UnlockScript.P2HMPK(publicKeys, publicKeyIndexes))),
-        AVector(
-          AssetOutput(
-            ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee),
-            LockupScript.p2pkh(genesisPriKey.publicKey),
-            TimeStamp.zero,
-            AVector.empty,
-            ByteString.empty
-          )
-        )
-      )
-      sign(unsignedTx)
-    }
-
-    private def checkUnlockGas(tx: Transaction) = {
-      import GasSchedule._
-      val blockEnv =
-        BlockEnv(tx.chainIndex, networkConfig.networkId, TimeStamp.now(), Target.Max, None)
-      val worldState  = blockFlow.getBestPersistedWorldState(tx.chainIndex.from).rightValue
-      val prevOutputs = worldState.getPreOutputs(tx).rightValue
-      val initialGas  = tx.unsigned.gasAmount
-      val gasLeft     = checkGasAndWitnesses(tx, prevOutputs, blockEnv, false, 0).rightValue
-      val gasUsed     = initialGas.use(gasLeft).rightValue
-      gasUsed is (txBaseGas addUnsafe txInputBaseGas addUnsafe txOutputBaseGas addUnsafe unlockGas)
-    }
-
-    def checkValidTx(tx: Transaction) = {
-      tx.pass()(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube)))
-      checkUnlockGas(tx)
-      blockFlow.updateViewPreDanube() isE ()
-      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Rhone)))
-      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Leman)))
-      tx.fail(InvalidUnlockScriptType)(validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet)))
-    }
-
-    def checkInvalidTx(invalidTx: Transaction) = {
-      invalidTx.fail(InvalidUnlockScriptType)(
-        validateTxOnlyForTest(_, blockFlow, Some(HardFork.Danube))
-      )
-    }
+    def unlock: UnlockScript = UnlockScript.P2HMPK(publicKeys, publicKeyIndexes)
   }
 
   it should "validate p2hmpk(secp256k1) unlock script" in new P2HMPKUnlockScriptFixture {
