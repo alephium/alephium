@@ -17,7 +17,6 @@
 package org.alephium.app
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.api.{badRequest, failed, failedInIO, wrapResult, Try}
@@ -306,7 +305,6 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     ) match {
       case Right(sortedScripts) =>
         for {
-          _ <- checkEnoughBalance(totalAmountNeeded, sortedScripts.map(_._3))
           result <- buildGrouplessTransferTxWithEachSortedGroupedAddress(
             blockFlow,
             sortedScripts.map(script => (script._1, script._2)),
@@ -443,37 +441,6 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       }
 
     ordering.reverse
-  }
-
-  // Priliminary check to see if the balance is enough, if not enough reject directly
-  // otherwise proceed to build the txs, which could still return not enough balance error
-  // due to gas fee and dust amounts.
-  def checkEnoughBalance(
-      totalAmountNeeded: TotalAmountNeeded,
-      balances: AVector[(U256, AVector[(TokenId, U256)])]
-  ): Try[Unit] = {
-    val totalAlphBalance   = balances.map(_._1).fold(U256.Zero)(_ addUnsafe _)
-    val totalTokenBalances = mutable.Map.empty[TokenId, U256]
-    for ((_, tokenBalances) <- balances) {
-      for ((tokenId, amount) <- tokenBalances) {
-        totalTokenBalances(tokenId) =
-          totalTokenBalances.getOrElse(tokenId, U256.Zero).addUnsafe(amount)
-      }
-    }
-
-    val missingTokens = totalAmountNeeded.tokens.collect { case (tokenId, amount) =>
-      amount
-        .sub(totalTokenBalances.getOrElse(tokenId, U256.Zero))
-        .filter(_ > U256.Zero)
-        .map(tokenId -> _)
-    }
-
-    if (totalAmountNeeded.alphAmount <= totalAlphBalance && missingTokens.isEmpty) {
-      Right(())
-    } else {
-      val missingAlph = totalAmountNeeded.alphAmount.sub(totalAlphBalance).getOrElse(U256.Zero)
-      Left(failed(notEnoughBalanceError(missingAlph, missingTokens)))
-    }
   }
 }
 

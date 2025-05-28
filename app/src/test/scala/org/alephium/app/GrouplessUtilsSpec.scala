@@ -324,7 +324,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(ALPH.alph(7)),
         None,
         3,
-        s"Not enough balance: 6.002 ALPH, ${tokenId.toHexString}: 15000000000000000000"
+        s"Not enough balance: 7.502 ALPH, ${tokenId.toHexString}: 15000000000000000000"
       )
     }
   }
@@ -336,7 +336,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
   it should "fail if the from address does not have enough balance when building transfer txs" in new Fixture {
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
-    failTransfer(ALPH.alph(2), Some(ALPH.alph(2)), None, 1, "Not enough balance: 0.002 ALPH")
+    failTransfer(ALPH.alph(2), Some(ALPH.alph(2)), None, 1, "Not enough balance: 0.502 ALPH")
     failTransfer(
       ALPH.oneAlph,
       Some(ALPH.alph(3)),
@@ -350,7 +350,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     val lockTime = TimeStamp.now().plusHoursUnsafe(1)
 
     prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript, Some(lockTime))
-    failTransfer(ALPH.alph(2), ALPH.alph(0), None, 1, "Not enough balance: 2.002 ALPH")
+    failTransfer(ALPH.alph(2), ALPH.alph(0), None, 1, "Not enough balance: 2.502 ALPH")
 
     prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts.head)
     failTransfer(
@@ -358,7 +358,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       Some(ALPH.alph(2)),
       None,
       1,
-      s"Not enough balance: 0.002 ALPH, ${tokenId.toHexString}: 1000000000000000000"
+      s"Not enough balance: 0.502 ALPH, ${tokenId.toHexString}: 1000000000000000000"
     )
   }
 
@@ -790,40 +790,5 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       allLockupScripts(1),
       allLockupScripts(0)
     )
-  }
-
-  it should "test checkEnoughBalance" in new Fixture {
-    val totalAmountNeeded = TotalAmountNeeded(
-      ALPH.alph(2),
-      AVector(tokenId -> ALPH.alph(2)),
-      1
-    )
-
-    val balances0 = AVector((ALPH.alph(3), AVector((tokenId, ALPH.alph(5)))))
-    serverUtils.checkEnoughBalance(totalAmountNeeded, balances0).rightValue is ()
-
-    val balances1 = AVector(
-      (ALPH.alph(1), AVector((tokenId, ALPH.alph(2)))),
-      (ALPH.alph(2), AVector((tokenId, ALPH.alph(3))))
-    )
-    serverUtils.checkEnoughBalance(totalAmountNeeded, balances1).rightValue is ()
-
-    val balances2 = AVector((ALPH.alph(2), AVector((tokenId, ALPH.alph(1)))))
-    serverUtils
-      .checkEnoughBalance(totalAmountNeeded, balances2)
-      .leftValue
-      .detail is s"Not enough balance: ${tokenId.toHexString}: ${ALPH.alph(1)}"
-
-    val balances3 = AVector((ALPH.alph(1), AVector((tokenId, ALPH.alph(2)))))
-    serverUtils
-      .checkEnoughBalance(totalAmountNeeded, balances3)
-      .leftValue
-      .detail is s"Not enough balance: 1 ALPH"
-
-    val balances4 = AVector((ALPH.alph(1), AVector((tokenId, ALPH.alph(1)))))
-    serverUtils
-      .checkEnoughBalance(totalAmountNeeded, balances4)
-      .leftValue
-      .detail is s"Not enough balance: 1 ALPH, ${tokenId.toHexString}: ${ALPH.alph(1)}"
   }
 }
