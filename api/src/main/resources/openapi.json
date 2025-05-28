@@ -14896,7 +14896,11 @@
         "properties": {
           "fromPublicKey": {
             "type": "string",
-            "format": "public-key"
+            "format": "hex-string"
+          },
+          "fromPublicKeyType": {
+            "type": "string",
+            "format": "hex-string"
           },
           "toAddress": {
             "type": "string",
@@ -14925,6 +14929,10 @@
           "utxosLimit": {
             "type": "integer",
             "format": "int32"
+          },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
           }
         }
       },
@@ -14970,7 +14978,21 @@
             "type": "array",
             "items": {
               "type": "string",
-              "format": "public-key"
+              "format": "hex-string"
+            }
+          },
+          "fromPublicKeyTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "hex-string"
+            }
+          },
+          "fromPublicKeyIndexes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
             }
           },
           "toAddress": {
@@ -15000,6 +15022,13 @@
           "targetBlockHash": {
             "type": "string",
             "format": "block-hash"
+          },
+          "group": {
+            "type": "integer",
+            "format": "group-index"
+          },
+          "multiSigType": {
+            "$ref": "#/components/schemas/MultiSigType"
           }
         }
       },
