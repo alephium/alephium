@@ -398,14 +398,14 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     }
   }
 
+  type P2PKAssetInfo =
+    AVector[(LockupScript.P2PK, AVector[AssetOutputInfo], (U256, AVector[(TokenId, U256)]))]
   def sortedGroupedLockupScripts(
       blockFlow: BlockFlow,
       allGroupedLockupScripts: AVector[LockupScript.P2PK],
       totalAmountNeeded: TotalAmountNeeded,
       targetBlockHashOpt: Option[BlockHash]
-  ): IOResult[
-    AVector[(LockupScript.P2PK, AVector[AssetOutputInfo], (U256, AVector[(TokenId, U256)]))]
-  ] = {
+  ): IOResult[P2PKAssetInfo] = {
     allGroupedLockupScripts
       .mapE { lockup =>
         blockFlow
