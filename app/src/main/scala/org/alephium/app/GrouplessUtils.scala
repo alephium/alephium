@@ -142,14 +142,14 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       result <- buildResult match {
         case Right(finalResult) =>
           Right(Right(finalResult))
-        case Left(buildingTxs) =>
+        case Left(buildingTx) =>
           tryBuildGrouplessTransferTx(
             blockFlow,
             gasPrice,
             query.targetBlockHash,
             outputInfos,
             totalAmountNeeded,
-            AVector(buildingTxs.head)
+            AVector(buildingTx)
           )
       }
     } yield {
@@ -267,7 +267,8 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
                     .map(Right(_))
                 }
             } else {
-              val remainingLockupScripts = currentBuildingGrouplessTx.remainingLockupScripts.drop(index + 1)
+              val remainingLockupScripts =
+                currentBuildingGrouplessTx.remainingLockupScripts.drop(index + 1)
               buildingGrouplessTransferTxs += currentBuildingGrouplessTx.copy(
                 builtUnsignedTxsSoFar =
                   currentBuildingGrouplessTx.builtUnsignedTxsSoFar :+ unsignedTx,
@@ -294,7 +295,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
       totalAmountNeeded: TotalAmountNeeded,
       gasPrice: GasPrice,
       targetBlockHashOpt: Option[BlockHash]
-  ): TryBuildGrouplessTransferTx = {
+  ): Try[Either[BuildingGrouplessTransferTx, BuildGrouplessTransferTxResult]] = {
     val allLockupScripts = allGroupedLockupScripts(lockupScript)
 
     sortedGroupedLockupScripts(
@@ -319,20 +320,23 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def buildGrouplessTransferTxWithEachSortedGroupedAddress(
       blockFlow: BlockFlow,
       allLockupScriptsWithUtxos: AVector[(LockupScript.P2PK, AVector[AssetOutputInfo])],
       outputInfos: AVector[TxOutputInfo],
       totalAmountNeeded: TotalAmountNeeded,
       gasPrice: GasPrice
-  ): TryBuildGrouplessTransferTx = {
+  ): Try[Either[BuildingGrouplessTransferTx, BuildGrouplessTransferTxResult]] = {
     val allLockupScriptsLength       = allLockupScriptsWithUtxos.length
     val buildingGrouplessTransferTxs = ArrayBuffer.empty[BuildingGrouplessTransferTx]
 
     @tailrec
-    def rec(index: Int): TryBuildGrouplessTransferTx = {
+    def rec(
+        index: Int
+    ): Try[Either[BuildingGrouplessTransferTx, BuildGrouplessTransferTxResult]] = {
       if (index == allLockupScriptsLength) {
-        Right(Left(AVector.from(buildingGrouplessTransferTxs)))
+        Right(Left(buildingGrouplessTransferTxs.head))
       } else {
         val (lockup, utxos) = allLockupScriptsWithUtxos(index)
         blockFlow.transfer(

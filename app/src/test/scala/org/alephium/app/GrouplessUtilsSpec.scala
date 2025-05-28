@@ -686,31 +686,14 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       prepare(ALPH.alph(2).addUnsafe(dustUtxoAmount), ALPH.alph(2), allLockupScripts(1))
       prepare(ALPH.alph(1).addUnsafe(dustUtxoAmount), ALPH.alph(1), allLockupScripts(2))
 
-      val buildingGrouplessTransferTxs = transferWithoutEnoughBalance(ALPH.alph(3), ALPH.alph(3))
-      buildingGrouplessTransferTxs.length is 3
+      val buildingGrouplessTransferTx = transferWithoutEnoughBalance(ALPH.alph(3), ALPH.alph(3))
 
-      buildingGrouplessTransferTxs(0).from is allLockupScripts(1)
-      buildingGrouplessTransferTxs(0).remainingAmounts._1 is ALPH.alphFromString("1.501 ALPH").get
-      buildingGrouplessTransferTxs(0).remainingAmounts._2 is AVector((tokenId, ALPH.alph(1)))
-      buildingGrouplessTransferTxs(0).remainingLockupScripts is AVector(
+      buildingGrouplessTransferTx.from is allLockupScripts(1)
+      buildingGrouplessTransferTx.remainingAmounts._1 is ALPH.alphFromString("1.501 ALPH").get
+      buildingGrouplessTransferTx.remainingAmounts._2 is AVector((tokenId, ALPH.alph(1)))
+      buildingGrouplessTransferTx.remainingLockupScripts is AVector(
         allLockupScripts(2),
         allLockupScripts(0)
-      )
-
-      buildingGrouplessTransferTxs(1).from is allLockupScripts(2)
-      buildingGrouplessTransferTxs(1).remainingAmounts._1 is ALPH.alphFromString("2.501 ALPH").get
-      buildingGrouplessTransferTxs(1).remainingAmounts._2 is AVector((tokenId, ALPH.alph(2)))
-      buildingGrouplessTransferTxs(1).remainingLockupScripts is AVector(
-        allLockupScripts(1),
-        allLockupScripts(0)
-      )
-
-      buildingGrouplessTransferTxs(2).from is allLockupScripts(0)
-      buildingGrouplessTransferTxs(2).remainingAmounts._1 is ALPH.alphFromString("3.502 ALPH").get
-      buildingGrouplessTransferTxs(2).remainingAmounts._2 is AVector((tokenId, ALPH.alph(3)))
-      buildingGrouplessTransferTxs(2).remainingLockupScripts is AVector(
-        allLockupScripts(1),
-        allLockupScripts(2)
       )
     }
   }
@@ -741,7 +724,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         )
         .rightValue
 
-      val buildingGrouplessTransferTxs = serverUtils
+      val buildingGrouplessTransferTx = serverUtils
         .buildGrouplessTransferTxWithEachGroupedAddress(
           blockFlow,
           fromLockupScript,
@@ -772,49 +755,12 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         verifyBalance(toAddress, result.transferTx.unsignedTx, alphAmount, tokenAmount)
       }
 
-      buildingGrouplessTransferTxs(0).from is allLockupScripts(0)
-      buildingGrouplessTransferTxs(0).remainingLockupScripts is AVector(
+      buildingGrouplessTransferTx.from is allLockupScripts(0)
+      buildingGrouplessTransferTx.remainingLockupScripts is AVector(
         allLockupScripts(2),
         allLockupScripts(1)
       )
-      verifyFinalResult(buildingGrouplessTransferTxs(0))
-
-      buildingGrouplessTransferTxs(1).from is allLockupScripts(2)
-      buildingGrouplessTransferTxs(1).remainingLockupScripts is AVector(
-        allLockupScripts(0),
-        allLockupScripts(1)
-      )
-      verifyFinalResult(buildingGrouplessTransferTxs(1))
-
-      buildingGrouplessTransferTxs(2).from is allLockupScripts(1)
-      buildingGrouplessTransferTxs(2).remainingLockupScripts is AVector(
-        allLockupScripts(0),
-        allLockupScripts(2)
-      )
-
-      val nextBuildingGrouplessTransferTxs = serverUtils
-        .tryBuildGrouplessTransferTxFromSingleGroupedAddress(
-          blockFlow,
-          nonCoinbaseMinGasPrice,
-          None,
-          outputInfos,
-          totalAmountNeeded,
-          buildingGrouplessTransferTxs(2)
-        )
-        .rightValue
-        .leftValue
-
-      nextBuildingGrouplessTransferTxs.length is 2
-      nextBuildingGrouplessTransferTxs(0).from is allLockupScripts(1)
-      nextBuildingGrouplessTransferTxs(0).remainingLockupScripts is AVector(allLockupScripts(2))
-      nextBuildingGrouplessTransferTxs(0).remainingAmounts is (ALPH.nanoAlph(
-        2000000
-      ), AVector.empty)
-      nextBuildingGrouplessTransferTxs(1).from is allLockupScripts(1)
-      nextBuildingGrouplessTransferTxs(1).remainingLockupScripts is AVector.empty[LockupScript.P2PK]
-      nextBuildingGrouplessTransferTxs(1).remainingAmounts is (ALPH.nanoAlph(0), AVector(
-        (tokenId, ALPH.alph(1))
-      ))
+      verifyFinalResult(buildingGrouplessTransferTx)
     }
   }
 
