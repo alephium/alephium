@@ -29,7 +29,7 @@ trait MinerState {
     Array.fill[U256](brokerConfig.groupNumPerBroker, brokerConfig.groups)(U256.Zero)
   protected val running = Array.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(false)
   protected val pendingTasks =
-    Array.fill(brokerConfig.groupNumPerBroker)(Array.ofDim[Option[Job]](brokerConfig.groups))
+    Array.fill(brokerConfig.groupNumPerBroker)(Array.fill[Option[Job]](brokerConfig.groups)(None))
 
   def getMiningCount(fromShift: Int, to: Int): U256 = miningCounts(fromShift)(to)
 
@@ -57,7 +57,16 @@ trait MinerState {
     Array("org.wartremover.warts.IterableOps", "org.wartremover.warts.OptionPartial")
   )
   protected def pickTasks(): IndexedSeq[(Int, Int, Job)] = {
-    val minCount   = miningCounts.map(_.min).min
+    // When a block is mined, we remove the corresponding mining job from `pendingTasks` to avoid mining the same job again.
+    // However, if the block is invalid (e.g., it's a duplicate), the `MinerApiController` won't send a new mining job.
+    // If the chain index of this block has the lowest mining count, then due to the `countBound` constraint, `pickTasks` might
+    // return an empty array. Therefore, when calculating `minCount`, we need to exclude chain indexes whose `pendingTasks` are empty.
+    val filteredCounts = for {
+      fromShift <- 0 until brokerConfig.groupNumPerBroker
+      to        <- 0 until brokerConfig.groups
+      if pendingTasks(fromShift)(to).nonEmpty
+    } yield miningCounts(fromShift)(to)
+    val minCount   = filteredCounts.minOption.getOrElse(miningCounts.map(_.min).min)
     val countBound = minCount.addUnsafe(miningConfig.nonceStep)
     for {
       fromShift <- 0 until brokerConfig.groupNumPerBroker

@@ -1036,6 +1036,15 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
   }
 
+  it should "encode/decode CompilerOptions" in {
+    val options0 = CompilerOptions()
+    checkData(options0, "{}")
+    options0.toLangCompilerOptions().skipTests is false
+    val options1 = CompilerOptions(skipTests = Some(true))
+    checkData(options1, s"""{ "skipTests": true }""")
+    options1.toLangCompilerOptions().skipTests is true
+  }
+
   it should "encode/decode Compile.Script" in {
     {
       info("Without CompilerOptions")

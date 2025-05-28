@@ -34,6 +34,7 @@ final case class Configs(
     ignoreCheckExternalCallerWarnings: Boolean = false,
     ignoreUnusedFunctionReturnWarnings: Boolean = false,
     skipAbstractContractCheck: Boolean = false,
+    skipTests: Boolean = false,
     contracts: ArraySeq[Path] = ArraySeq(Paths.get(".")),
     artifacts: ArraySeq[Path] = ArraySeq(Paths.get("."))
 ) {
@@ -46,7 +47,8 @@ final case class Configs(
       ignoreUnusedPrivateFunctionsWarnings = ignoreUnusedPrivateFunctionsWarnings,
       ignoreCheckExternalCallerWarnings = ignoreCheckExternalCallerWarnings,
       ignoreUnusedFunctionReturnWarnings = ignoreUnusedFunctionReturnWarnings,
-      skipAbstractContractCheck = skipAbstractContractCheck
+      skipAbstractContractCheck = skipAbstractContractCheck,
+      skipTests = false
     )
   }
 

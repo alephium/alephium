@@ -74,8 +74,18 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse("x / y |**| z + u", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,
-        Binop(Div, Variable(Ident("x")), Binop(ModExp, Variable(Ident("y")), Variable(Ident("z")))),
+        Binop(
+          RoundDownDiv,
+          Variable(Ident("x")),
+          Binop(ModExp, Variable(Ident("y")), Variable(Ident("z")))
+        ),
         Variable(Ident("u"))
+      )
+    parse("x \\ y * z", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](
+        Mul,
+        Binop(RoundUpDiv, Variable(Ident("x")), Variable(Ident("y"))),
+        Variable(Ident("z"))
       )
     parse("x + y * z + u", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
@@ -93,7 +103,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       )
     parse("(x * if (true) a else b) / y", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
-        Div,
+        RoundDownDiv,
         ParenExpr(
           Binop(
             Mul,
@@ -624,25 +634,28 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   }
 
   it should "parse if-else statements" in {
-    fastparse
-      .parse("if (x) { return }", StatelessParser.statement(_))
-      .get
-      .value is
+    def test(str: String, expected: IfElseStatement[StatelessContext]) = {
+      val parsed = fastparse.parse(str, StatelessParser.statement(_)).get.value
+      parsed is expected
+      parsed.sourceIndex.get.width is str.length
+    }
+
+    test(
+      "if (x) { return }",
       Ast.IfElseStatement[StatelessContext](
         Seq(Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("x"))), Seq(ReturnStmt(Seq.empty)))),
         None
       )
-
-    val error = intercept[Compiler.Error](
-      fastparse
-        .parse("if (x) { return } else if (y) { return }", StatelessParser.statement(_))
     )
-    error.message is "If ... else if constructs should be terminated with an else statement"
-
-    fastparse
-      .parse("if (x) { return } else if (y) { return } else {}", StatelessParser.statement(_))
-      .get
-      .value is
+    test(
+      "if (x) { return } else { return }",
+      Ast.IfElseStatement[StatelessContext](
+        Seq(Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("x"))), Seq(ReturnStmt(Seq.empty)))),
+        Some(ElseBranchStatement(Seq(ReturnStmt(Seq.empty))))
+      )
+    )
+    test(
+      "if (x) { return } else if (y) { return } else {}",
       Ast.IfElseStatement[StatelessContext](
         Seq(
           Ast.IfBranchStatement(ParenExpr(Variable(Ast.Ident("x"))), Seq(ReturnStmt(Seq.empty))),
@@ -650,6 +663,13 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         ),
         Some(Ast.ElseBranchStatement(Seq.empty))
       )
+    )
+
+    val error = intercept[Compiler.Error](
+      fastparse
+        .parse("if (x) { return } else if (y) { return }", StatelessParser.statement(_))
+    )
+    error.message is "If ... else if constructs should be terminated with an else statement"
   }
 
   it should "parse if-else expressions" in {
@@ -1596,7 +1616,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         List(
           ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
           ContractInheritance(TypeId("Parent1"), Seq(Ident("x")))
-        )
+        ),
+        Seq.empty
       )
       fastparse
         .parse(code(Keyword.`extends`.name), StatefulParser.contract(_))
@@ -1965,7 +1986,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
-        Seq(InterfaceInheritance(TypeId("Parent")))
+        Seq(InterfaceInheritance(TypeId("Parent"))),
+        Seq.empty
       )
     }
 
@@ -2012,7 +2034,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           ContractInheritance(TypeId("Parent0"), Seq.empty),
           ContractInheritance(TypeId("Parent1"), Seq.empty),
           InterfaceInheritance(TypeId("Parent2"))
-        )
+        ),
+        Seq.empty
       )
     }
 
@@ -2183,6 +2206,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
+        Seq.empty,
         Seq.empty
       )
     }
@@ -2236,7 +2260,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq.empty,
-        Seq(InterfaceInheritance(TypeId("Bar")))
+        Seq(InterfaceInheritance(TypeId("Bar"))),
+        Seq.empty
       )
     }
   }
@@ -2827,6 +2852,334 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       UnaryOp[StatelessContext](Not, Variable(Ident("x")))
     parse("-x", StatelessParser.expr(_)).get.value is
       UnaryOp[StatelessContext](Negate, Variable(Ident("x")))
+  }
+
+  it should "parse unit test defs" in {
+    val statements = Seq(
+      FuncCall[StatefulContext](
+        FuncId("assert", true),
+        Seq.empty,
+        Seq(
+          Binop(
+            Eq,
+            CallExpr(FuncId("foo", false), Seq.empty, Seq.empty),
+            Const(Val.U256(U256.unsafe(10)))
+          ),
+          Const(Val.U256(U256.unsafe(0)))
+        )
+      )
+    )
+
+    val simpleTest =
+      s"""
+         |test "foo" {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(simpleTest, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        None,
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs.empty,
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
+    val withoutSettings =
+      s"""
+         |test "foo"
+         |before Self(10) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withoutSettings, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        None,
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
+    val withSettings =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |before Self(10) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withSettings, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
+    val withAfter =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |before Self(10)
+         |after Self(11) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withAfter, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(11)))),
+                  None
+                )
+              )
+            ),
+            None,
+            statements
+          )
+        )
+      )
+
+    val withAssets =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |before Self(10)
+         |approve{ From -> ALPH: 1 }
+         |{
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withAssets, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            Some(
+              Testing.ApprovedAssetsDef(
+                Seq(
+                  ApproveAsset(
+                    Variable(Ident("From")),
+                    Seq((ALPHTokenId(), Const(Val.U256(U256.One))))
+                  )
+                )
+              )
+            ),
+            statements
+          )
+        )
+      )
+
+    val withMultipleContracts =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |before
+         |  Self(10)
+         |  Bar(20)@address1
+         |  Bar(30)@address2
+         |{
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withMultipleContracts, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                ),
+                Testing.CreateContractDef(
+                  TypeId("Bar"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(20)))),
+                  Some(Ident("address1"))
+                ),
+                Testing.CreateContractDef(
+                  TypeId("Bar"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(30)))),
+                  Some(Ident("address2"))
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
+    val withMultipleTests =
+      s"""
+         |test "foo"
+         |with Settings(group = GroupIndex)
+         |before Self(10) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |before Self(11) {
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withMultipleTests, StatefulParser.unitTestDef(_)).get.value is
+      Testing.UnitTestDef[StatefulContext](
+        "foo",
+        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Seq(
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(10)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          ),
+          Testing.SingleTestDef(
+            Testing.CreateContractDefs(
+              Seq(
+                Testing.CreateContractDef(
+                  TypeId("Self"),
+                  Seq.empty,
+                  Seq(Const(Val.U256(U256.unsafe(11)))),
+                  None
+                )
+              )
+            ),
+            Testing.CreateContractDefs.empty,
+            None,
+            statements
+          )
+        )
+      )
+
+    val contractWithTests =
+      s"""
+         |Contract Foo(v: U256) {
+         |  pub fn foo() -> U256 {
+         |    return v
+         |  }
+         |  test "foo" before Self(10) {
+         |    assert!(foo() == 10, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val parsed = parse(contractWithTests, StatefulParser.contract(_)).get.value
+    parsed.unitTests.length is 1
+  }
+
+  it should "parse test assert statements" in {
+    val stmt = FuncCall[StatefulContext](
+      FuncId("testCheck", true),
+      Seq.empty,
+      Seq(Binop(Eq, Variable(Ident("a")), Const(Val.U256(U256.One))))
+    )
+    parse("testCheck!(a == 1)", StatefulParser.statement(_)).get.value is stmt
+    parse("testCheck!(foo())", StatefulParser.statement(_)).get.value is
+      stmt.copy(args =
+        Seq[Expr[StatefulContext]](CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+      )
+    parse("testEqual!(a, b)", StatefulParser.statement(_)).get.value is
+      stmt.copy(
+        id = FuncId("testEqual", true),
+        args = Seq[Expr[StatefulContext]](Variable(Ident("a")), Variable(Ident("b")))
+      )
+    parse("testFail!(a == 1)", StatefulParser.statement(_)).get.value is
+      stmt.copy(
+        id = FuncId("testFail", true),
+        args =
+          Seq[Expr[StatefulContext]](Binop(Eq, Variable(Ident("a")), Const(Val.U256(U256.One))))
+      )
+    parse("testFail!(foo())", StatefulParser.statement(_)).get.value is
+      stmt.copy(
+        id = FuncId("testFail", true),
+        args = Seq[Expr[StatefulContext]](CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+      )
+    parse("testError!(foo(), 1)", StatefulParser.statement(_)).get.value is
+      stmt.copy(
+        id = FuncId("testError", true),
+        args = Seq[Expr[StatefulContext]](
+          CallExpr(FuncId("foo", false), Seq.empty, Seq.empty),
+          Const(Val.U256(U256.One))
+        )
+      )
   }
 }
 

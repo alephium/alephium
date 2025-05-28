@@ -18,6 +18,7 @@ package org.alephium.ralph
 
 import java.nio.charset.StandardCharsets
 
+import scala.annotation.nowarn
 import scala.collection.{immutable, mutable}
 
 import akka.util.ByteString
@@ -34,7 +35,8 @@ final case class CompiledContract(
     code: StatefulContract,
     ast: Ast.Contract,
     warnings: AVector[Warning],
-    debugCode: StatefulContract
+    debugCode: StatefulContract,
+    tests: Option[Testing.CompiledUnitTests[StatefulContext]]
 )
 final case class CompiledScript(
     code: StatefulScript,
@@ -156,9 +158,30 @@ object Compiler {
     def useUpdateFields: Boolean
     def inline: Boolean = false
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type]
+    def getReturnType[C <: Ctx](
+        @nowarn ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: State[C]
+    ): Seq[Type] = {
+      val argsType = args.flatMap(_.getType(state))
+      getReturnType(argsType, state)
+    }
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
       args.flatMap(_.genCode(state))
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
+    def genCode[C <: Ctx](
+        @nowarn ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: State[C]
+    ): Seq[Instr[C]] = {
+      val argsType = args.flatMap(_.getType(state))
+      val variadicInstrs = if (isVariadic) {
+        Seq(U256Const(Val.U256.unsafe(state.flattenTypeLength(argsType))))
+      } else {
+        Seq.empty
+      }
+      genCodeForArgs(args, state) ++ variadicInstrs ++ genCode(argsType)
+    }
     def genInlineCode[C <: Ctx](
         args: Seq[Ast.Expr[C]],
         state: Compiler.State[C],
@@ -245,11 +268,11 @@ object Compiler {
         tpe: Type,
         value: Val,
         instrs: Seq[Instr[Ctx]],
-        constantDef: Ast.ConstantDefinition
+        constantDef: Option[Ast.ConstantDefinition]
     ) extends VarInfo {
       def isMutable: Boolean   = false
       def isUnused: Boolean    = false
-      def isGenerated: Boolean = false
+      def isGenerated: Boolean = constantDef.isEmpty
       def isLocal: Boolean     = true
     }
     final case class InlinedArgument[Ctx <: StatelessContext](
@@ -459,7 +482,7 @@ object Compiler {
         mutable.HashMap.empty,
         0,
         funcTable,
-        immutable.Map(script.ident -> ContractInfo(ContractKind.TxScript, funcTable)),
+        immutable.Map(script.ident -> ContractInfo(script, ContractKind.TxScript, funcTable)),
         globalState
       )
     }
@@ -510,6 +533,7 @@ object Compiler {
   }
 
   final case class ContractInfo[Ctx <: StatelessContext](
+      ast: Ast.ContractT[Ctx],
       kind: ContractKind,
       funcs: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
   )
@@ -571,7 +595,8 @@ object Compiler {
       with Scope
       with VariableScoped
       with PhaseLike
-      with Constants[Ctx] {
+      with Constants[Ctx]
+      with Testing.State[Ctx] {
     def typeId: Ast.TypeId
     def selfContractType: Type = Type.Contract(typeId)
     def varTable: mutable.HashMap[VarKey, VarInfo]
@@ -920,7 +945,19 @@ object Compiler {
     }
     // scalastyle:on parameter.number
     // scalastyle:off method.length
-    def addConstant(ident: Ast.Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
+
+    private[ralph] def addTestingConstant(ident: Ast.Ident, value: Val, tpe: Type): Unit = {
+      assume(tpe.toVal == value.tpe)
+      val sname = checkNewVariable(ident)
+      addVarInfo(sname, VarInfo.Constant(ident, tpe, value, Seq(value.toConstInstr), None))
+      ()
+    }
+
+    def addConstant(
+        ident: Ast.Ident,
+        value: Val,
+        constantDef: Option[Ast.ConstantDefinition]
+    ): Unit = {
       val sname = checkNewVariable(ident)
       assume(ident.name == sname)
       val varInfo =
@@ -995,8 +1032,9 @@ object Compiler {
           varTable.get(varKey).orElse(globalState.getConstantOpt(ident)) match {
             case Some(varInfo) => (varKey, varInfo)
             case None =>
+              val varName = if (isInTestContext) name else sname
               throw Error(
-                s"Variable $sname is not defined in the current scope or is used before being defined",
+                s"Variable $varName is not defined in the current scope or is used before being defined",
                 ident.sourceIndex
               )
           }
@@ -1082,9 +1120,9 @@ object Compiler {
       val unusedLocalConstants = mutable.ArrayBuffer.empty[(String, Option[SourceIndex])]
       val unusedFields         = mutable.ArrayBuffer.empty[(String, Option[SourceIndex])]
       unusedVars.foreach {
-        case (varKey, c: VarInfo.Constant[_]) =>
-          if (c.constantDef.definedIn(typeId)) {
-            unusedLocalConstants.addOne((varKey.name, c.constantDef.ident.sourceIndex))
+        case (varKey, VarInfo.Constant(_, _, _, _, Some(constantDef))) =>
+          if (constantDef.definedIn(typeId)) {
+            unusedLocalConstants.addOne((varKey.name, constantDef.ident.sourceIndex))
           }
         case (varKey, varInfo) if !varInfo.isLocal =>
           unusedFields.addOne((varKey.name, varInfo.ident.sourceIndex))
@@ -1102,11 +1140,11 @@ object Compiler {
         : Iterable[(Ast.TypeId, (String, Option[SourceIndex]))] = {
       val used = mutable.ArrayBuffer.empty[(Ast.TypeId, (String, Option[SourceIndex]))]
       varTable.foreach {
-        case (varKey, c: VarInfo.Constant[_]) =>
+        case (varKey, VarInfo.Constant(_, tpe, _, _, Some(constantDef))) =>
           if (accessedVars.contains(ReadVariable(varKey))) {
-            c.constantDef.origin match {
+            constantDef.origin match {
               case Some(originContractId) if originContractId != typeId =>
-                used.addOne((originContractId, (varKey.name, c.tpe.sourceIndex)))
+                used.addOne((originContractId, (varKey.name, tpe.sourceIndex)))
               case _ => ()
             }
           }
@@ -1338,6 +1376,15 @@ object Compiler {
       if (returnType != resolveTypes(rtype)) {
         throw Error(
           s"Invalid return types ${quote(returnType)} for func ${currentScope.name}, expected ${quote(rtype)}",
+          sourceIndex
+        )
+      }
+    }
+
+    def checkInTestContext(funcName: String, sourceIndex: Option[SourceIndex]): Unit = {
+      if (!isInTestContext) {
+        throw Compiler.Error(
+          s"The `$funcName` function can only be used in unit tests",
           sourceIndex
         )
       }
