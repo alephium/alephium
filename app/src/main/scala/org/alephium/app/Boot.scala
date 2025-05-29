@@ -30,7 +30,7 @@ import io.prometheus.client.hotspot.DefaultExports
 
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
-import org.alephium.protocol.model.{Block, NetworkId}
+import org.alephium.protocol.model.Block
 import org.alephium.util.{AVector, Duration, Env}
 
 object Boot extends App with StrictLogging {
@@ -52,12 +52,13 @@ class BootUp extends StrictLogging {
   implicit val apiConfig: ApiConfig   = ApiConfig.load(typesafeConfig, "alephium.api")
   val flowSystem: ActorSystem         = ActorSystem("flow", typesafeConfig)
 
-  if (config.network.networkId == NetworkId.AlephiumMainNet) {
-    logger.error(
-      "This is a testnet release for Danube upgrade, please don't use it for mainnet"
-    )
-    System.exit(-1)
-  }
+  // Enable this for new upgrades
+//  if (config.network.networkId == NetworkId.AlephiumMainNet) {
+//    logger.error(
+//      "This is a testnet release for Danube upgrade, please don't use it for mainnet"
+//    )
+//    System.exit(-1)
+//  }
 
   @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
   implicit val executionContext: ExecutionContext =
