@@ -505,7 +505,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       addresses.toSet.size is 2
       tokens.toSet.size is 2
 
-      assets(0) is (addresses(0), AVector(TokenId.alph -> ALPH.cent(50), tokens(0) -> ALPH.alph(1)))
+      assets(0)._1 is addresses(0)
+      assets(0)._2.toSet is Set(TokenId.alph -> ALPH.cent(50), tokens(0) -> ALPH.alph(1))
       assets(1) is (addresses(0), AVector(tokens(1) -> ALPH.alph(2)))
       assets(2) is (addresses(2), AVector(tokens(0) -> ALPH.alph(3)))
     }
