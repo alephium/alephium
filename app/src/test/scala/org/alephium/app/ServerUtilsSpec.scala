@@ -5783,7 +5783,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  test "transfer"
            |  before Self(0)
            |  after Self{ALPH: 1.1 alph}(1 alph)
-           |  approve{@$fromAddress -> ALPH: 2 alph} {
+           |  approve{@$fromAddress -> ALPH: 1 alph} {
            |    emit Debug(`balance: $${balance}`)
            |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == $result)
            |  }
@@ -6080,6 +6080,59 @@ class ServerUtilsSpec extends AlephiumSpec {
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
             |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected execution failure in test. Expected error code: 1, but got failure: ArithmeticError((U256(9) * U256(9)) % U256(0)).
             |""".stripMargin
+    }
+
+    {
+      val code =
+        s"""
+           |Contract TokenVault() {
+           |    @using(preapprovedAssets = true, assetsInContract = true, checkExternalCaller = false)
+           |    pub fn deposit() -> () {
+           |        transferTokenToSelf!(externalCallerAddress!(), ALPH, 2 alph)
+           |    }
+           |
+           |    test "should increase contract balance on deposit"
+           |    before Self{ALPH: 1 alph}()
+           |    after Self{ALPH: 3 alph}()
+           |    approve{address -> ALPH: 2 alph}
+           |    {
+           |        deposit{callerAddress!() -> ALPH: 2 alph}()
+           |    }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Bank(mut totalDeposits: U256) {
+           |    @using(preapprovedAssets = true, assetsInContract = true, checkExternalCaller = false)
+           |    pub fn deposit(depositor: Address) -> () {
+           |        totalDeposits = totalDeposits + 1 alph
+           |        transferTokenToSelf!(depositor, ALPH, 1 alph)
+           |    }
+           |}
+           |Contract Customer() {
+           |    @using(preapprovedAssets = true, checkExternalCaller = false)
+           |    pub fn makeDeposit(bank: Bank) -> () {
+           |        let depositor = externalCallerAddress!()
+           |        bank.deposit{depositor -> ALPH: 1 alph}(depositor)
+           |    }
+           |    test "customer should be able to make deposit to bank"
+           |    before
+           |        Bank{ALPH: 0 alph}(0)@bank
+           |        Self()
+           |    after
+           |        Bank{ALPH: 1 alph}(1 alph)@bank
+           |        Self()
+           |    approve{address -> ALPH: 1 alph}
+           |    {
+           |        makeDeposit{callerAddress!() -> ALPH: 1 alph}(bank)
+           |    }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
     }
   }
 
