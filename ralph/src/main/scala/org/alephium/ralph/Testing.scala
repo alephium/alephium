@@ -139,7 +139,8 @@ object Testing {
       extends Ast.Positioned {
     private def getApprovedTokens(
         state: Compiler.State[Ctx],
-        asset: Ast.ApproveAsset[Ctx]
+        asset: Ast.ApproveAsset[Ctx],
+        index: Int
     ): (LockupScript.Asset, AVector[(TokenId, U256)]) = {
       val address =
         checkAndGetValue[Ctx, Val.Address](state, asset.address, Val.Address, "address")
@@ -154,7 +155,12 @@ object Testing {
       val tokens = asset.tokenAmounts.map { case (tokenExpr, amountExpr) =>
         getApprovedToken(state, tokenExpr, amountExpr)
       }
-      val amounts = tokens.groupBy(_._1).view.mapValues { amounts =>
+      val tokensWithGasFee = if (index == 0) {
+        tokens :+ (TokenId.alph, nonCoinbaseMinGasPrice * maximalGasPerTx)
+      } else {
+        tokens
+      }
+      val amounts = tokensWithGasFee.groupBy(_._1).view.mapValues { amounts =>
         amounts.foldLeft(Option(U256.Zero))((acc, v) => acc.flatMap(_.add(v._2))) match {
           case Some(amount) => amount
           case None =>
@@ -165,7 +171,10 @@ object Testing {
     }
 
     def compile(state: Compiler.State[Ctx]): ApprovedAssetsValue = {
-      ApprovedAssetsValue(AVector.from(assets.map(getApprovedTokens(state, _))))
+      val approvedAssets = assets.view.zipWithIndex.map { case (asset, index) =>
+        getApprovedTokens(state, asset, index)
+      }
+      ApprovedAssetsValue(AVector.from(approvedAssets))
     }
   }
   final case class ApprovedAssetsValue(

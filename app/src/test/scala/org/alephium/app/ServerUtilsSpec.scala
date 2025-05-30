@@ -5783,7 +5783,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  test "transfer"
            |  before Self(0)
            |  after Self{ALPH: 1.1 alph}(1 alph)
-           |  approve{@$fromAddress -> ALPH: 2 alph} {
+           |  approve{@$fromAddress -> ALPH: 1 alph} {
            |    emit Debug(`balance: $${balance}`)
            |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == $result)
            |  }
