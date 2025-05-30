@@ -22,6 +22,7 @@ import scala.util.Random
 import akka.util.ByteString
 
 import org.alephium.io.IOResult
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockHash => _, _}
@@ -117,14 +118,49 @@ object Testing {
       blockTimeStamp: Option[TimeStamp]
   )
 
+  private def getAssetAddress[Ctx <: StatelessContext](
+      state: Compiler.State[Ctx],
+      address: Ast.Expr[Ctx]
+  ): Val.Address = {
+    address match {
+      case Ast.Variable(id) =>
+        state.getTestingVar(id) match {
+          case Some(Compiler.VarInfo.Constant(_, _, value: Val.Address, _, _)) => value
+          case _ =>
+            val assetAddress = Val.Address(LockupScript.p2pkh(Hash.random))
+            state.addTestingConstant(id, assetAddress, Type.Address)
+            assetAddress
+        }
+      case _ => checkAndGetValue[Ctx, Val.Address](state, address, Val.Address, "address")
+    }
+  }
+
+  private def getTokenId[Ctx <: StatelessContext](
+      state: Compiler.State[Ctx],
+      tokenIdExpr: Ast.Expr[Ctx]
+  ): Val.ByteVec = {
+    tokenIdExpr match {
+      case Ast.Variable(id) =>
+        state.getTestingVar(id) match {
+          case Some(Compiler.VarInfo.Constant(_, _, value: Val.ByteVec, _, _))
+              if value.bytes.length == TokenId.length =>
+            value
+          case _ =>
+            val tokenId = Val.ByteVec(TokenId.random.bytes)
+            state.addTestingConstant(id, Val.ByteVec(tokenId.bytes), Type.ByteVec)
+            tokenId
+        }
+      case _ => checkAndGetValue[Ctx, Val.ByteVec](state, tokenIdExpr, Val.ByteVec, "token id")
+    }
+  }
+
   private def getApprovedToken[Ctx <: StatelessContext](
       state: Compiler.State[Ctx],
       tokenIdExpr: Ast.Expr[Ctx],
       amountExpr: Ast.Expr[Ctx]
   ) = {
-    val tokenId =
-      checkAndGetValue[Ctx, Val.ByteVec](state, tokenIdExpr, Val.ByteVec, "token id")
-    val amount = checkAndGetValue[Ctx, Val.U256](state, amountExpr, Val.U256, "amount")
+    val tokenId = getTokenId(state, tokenIdExpr)
+    val amount  = checkAndGetValue[Ctx, Val.U256](state, amountExpr, Val.U256, "amount")
     TokenId.from(tokenId.bytes) match {
       case Some(token) => (token, amount.v)
       case None =>
@@ -142,8 +178,7 @@ object Testing {
         asset: Ast.ApproveAsset[Ctx],
         index: Int
     ): (LockupScript.Asset, AVector[(TokenId, U256)]) = {
-      val address =
-        checkAndGetValue[Ctx, Val.Address](state, asset.address, Val.Address, "address")
+      val address = getAssetAddress(state, asset.address)
       val assetAddress = address.lockupScript match {
         case address: LockupScript.Asset => address
         case _ =>
