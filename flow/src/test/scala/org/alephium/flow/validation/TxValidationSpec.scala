@@ -1182,9 +1182,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val allPubKeys: AVector[PublicKeyLike] =
       AVector(pubKey0, pubKey1, pubKey2).map(PublicKeyLike.SecP256K1.apply)
 
-    def tx(publicKeyIndexes: AVector[Int]): Transaction = {
-      val lockup   = LockupScript.P2HMPK.unsafe(allPubKeys, 2, GroupIndex.unsafe(0))
-      val unlock   = UnlockScript.P2HMPK(allPubKeys, publicKeyIndexes)
+    def tx(publicKeyIndexes: AVector[Int], pubKeys: AVector[PublicKeyLike]): Transaction = {
+      val lockup   = LockupScript.P2HMPK.unsafe(pubKeys, 2, GroupIndex.unsafe(0))
+      val unlock   = UnlockScript.P2HMPK(pubKeys, publicKeyIndexes)
       val unsigned = prepareOutput(lockup, unlock)
       sign(unsigned, priKey0, priKey1)
     }
@@ -1192,10 +1192,18 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     implicit val validator: (Transaction) => TxValidationResult[Unit] =
       validateTxOnlyForTest(_, blockFlow, None)
 
-    tx(AVector(0, 1, 2)).fail(InvalidP2hmpkHash)
-    tx(AVector(0)).fail(InvalidP2hmpkHash)
-    tx(AVector(0, 2)).fail(InvalidSignature)
-    tx(AVector(0, 1)).pass()
+    tx(AVector(0, 1, 2), allPubKeys).fail(InvalidP2hmpkHash)
+    tx(AVector(0), allPubKeys).fail(InvalidP2hmpkHash)
+    tx(AVector(0, 2), allPubKeys).fail(InvalidSignature)
+    tx(AVector(0, 1), allPubKeys).pass()
+
+    val maxPubKeys = allPubKeys ++ AVector
+      .fill(ALPH.MaxKeysInP2HMPK - 3)(keypairGen.sample.value._2)
+      .map(PublicKeyLike.SecP256K1.apply)
+    tx(AVector(0, 1), maxPubKeys).pass()
+
+    val tooManyPubKeys = maxPubKeys :+ PublicKeyLike.SecP256K1(keypairGen.sample.value._2)
+    tx(AVector(0, 1), tooManyPubKeys).fail(TooManyKeysInMultisig)
   }
 
   it should "validate p2sh" in new Fixture {

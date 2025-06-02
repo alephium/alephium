@@ -5174,6 +5174,16 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MethodSelector(Method.Selector(0)),
       CallExternalBySelector(Method.Selector(0))
     )
+    val danubeInstrs = allInstrs.map(_._1).filter(_.isInstanceOf[DanubeInstr[_]])
+    danubeInstrs is AVector[Instr[_]](
+      VerifySignature,
+      GetSegregatedWebAuthnSignature,
+      DevInstr(TestCheckStart),
+      I256RoundInfinityDiv,
+      U256RoundInfinityDiv,
+      ExternalCallerContractId,
+      ExternalCallerAddress
+    )
   }
 
   trait AllInstrsFixture {

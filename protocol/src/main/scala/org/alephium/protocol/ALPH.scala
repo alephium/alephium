@@ -47,6 +47,7 @@ object ALPH {
   val MaxOutputDataSize: Int = 256
   val MaxScriptSigNum: Int   = 32
   val MaxKeysInP2MPK: Int    = 16
+  val MaxKeysInP2HMPK: Int   = 16
 
   val MaxGhostUncleAge: Int  = 7
   val MaxGhostUncleSize: Int = 2

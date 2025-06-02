@@ -641,6 +641,29 @@ abstract class RestServerSpec(
       )
     }
 
+    lazy val tooManyDummyKeys = AVector.fill(ALPH.MaxKeysInP2HMPK + 1)(
+      addressStringGen(
+        GroupIndex.unsafe(1)
+      ).sample.get._2.toHexString
+    )
+    Post(
+      s"/multisig/address",
+      body = s"""
+                |{
+                |  "keys": [
+                |    ${tooManyDummyKeys.map(k => s""""$k"""").mkString(",")}
+                |  ],
+                |  "multiSigType": "p2hmpk",
+                |  "mrequired": 3
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.BadRequest
+      response.as[ApiError.BadRequest] is ApiError.BadRequest(
+        s"Too many public keys in P2HMPK: ${tooManyDummyKeys.length}, max is ${ALPH.MaxKeysInP2HMPK}"
+      )
+    }
+
     Post(
       s"/multisig/address",
       body = s"""
