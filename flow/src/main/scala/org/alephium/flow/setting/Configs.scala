@@ -99,12 +99,17 @@ object Configs extends StrictLogging {
     }
 
   def parseNetworkId(config: Config): Either[String, NetworkId] = {
-    val keyPath = "alephium.network.network-id"
-    if (!config.hasPath(keyPath)) {
-      Right(NetworkId.AlephiumMainNet)
-    } else {
-      val id = config.getInt(keyPath)
-      NetworkId.from(id).toRight(s"Invalid chain id: $id")
+    sys.env.get("ALEPHIUM_NETWORK_ID") match {
+      case Some(id) =>
+        NetworkId.from(id.toInt).toRight(s"Invalid chain id: $id")
+      case None =>
+        val keyPath = "alephium.network.network-id"
+        if (!config.hasPath(keyPath)) {
+          Right(NetworkId.AlephiumMainNet)
+        } else {
+          val id = config.getInt(keyPath)
+          NetworkId.from(id).toRight(s"Invalid chain id: $id")
+        }
     }
   }
 
