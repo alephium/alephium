@@ -86,7 +86,7 @@ trait LockupScriptGenerators extends Generators {
 
   def p2hmpkLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2HMPK] = {
     for {
-      numKeys   <- Gen.chooseNum(1, ALPH.MaxKeysInP2MPK)
+      numKeys   <- Gen.chooseNum(1, ALPH.MaxKeysInP2HMPK)
       keys      <- Gen.listOfN(numKeys, publicKeyLikeGen()).map(AVector.from)
       threshold <- Gen.choose(1, keys.length)
     } yield LockupScript.P2HMPK.unsafe(keys, threshold, groupIndex)

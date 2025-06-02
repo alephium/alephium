@@ -935,6 +935,8 @@ object TxValidation {
     ): TxValidationResult[GasBox] = {
       if (lock.p2hmpkHash != unlock.calHash()) {
         invalidTx(InvalidP2hmpkHash)
+      } else if (unlock.publicKeys.length > ALPH.MaxKeysInP2HMPK) {
+        invalidTx(TooManyKeysInMultisig)
       } else {
         unlock.publicKeyIndexes.foldE(gasRemaining) { case (gasBox, index) =>
           checkSignature(txEnv, preImage, gasBox, unlock.publicKeys(index))

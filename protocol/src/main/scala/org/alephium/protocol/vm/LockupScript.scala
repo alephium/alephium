@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{Checksum, Hash, PublicKey}
+import org.alephium.protocol.{ALPH, Checksum, Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ContractId, GroupIndex, Hint, ScriptHint}
 import org.alephium.serde._
@@ -279,27 +279,39 @@ object LockupScript {
         m: Int,
         groupIndex: GroupIndex
     ): Either[String, P2HMPK] = {
-      checkThreshold(publicKeys, m) {
-        P2HMPK(calcHash(publicKeys, m), groupIndex.value.toByte)
-      }
+      for {
+        _ <- checkPublicKeysNumber(publicKeys)
+        _ <- checkThreshold(publicKeys, m)
+      } yield P2HMPK(calcHash(publicKeys, m), groupIndex.value.toByte)
     }
 
     def apply(publicKeys: AVector[PublicKeyLike], m: Int)(implicit
         config: GroupConfig
     ): Either[String, P2HMPK] = {
-      checkThreshold(publicKeys, m) {
+      for {
+        _ <- checkPublicKeysNumber(publicKeys)
+        _ <- checkThreshold(publicKeys, m)
+      } yield {
         val hash = calcHash(publicKeys, m)
         P2HMPK(hash, defaultGroup(hash))
       }
     }
 
-    private def checkThreshold(publicKeys: AVector[PublicKeyLike], m: Int)(
-        p2hmpk: => P2HMPK
-    ): Either[String, P2HMPK] = {
+    private def checkThreshold(publicKeys: AVector[PublicKeyLike], m: Int): Either[String, Unit] = {
       if (P2HMPK.validate(publicKeys.length, m)) {
-        Right(p2hmpk)
+        Right(())
       } else {
         Left(validationErrorMsg(publicKeys.length, m))
+      }
+    }
+
+    private def checkPublicKeysNumber(publicKeys: AVector[PublicKeyLike]): Either[String, Unit] = {
+      if (publicKeys.length <= ALPH.MaxKeysInP2HMPK) {
+        Right(())
+      } else {
+        Left(
+          s"Too many public keys in P2HMPK: ${publicKeys.length}, max is ${ALPH.MaxKeysInP2HMPK}"
+        )
       }
     }
 
