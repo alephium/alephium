@@ -977,7 +977,8 @@ abstract class RestServerSpec(
       response.as[NodeInfo] is NodeInfo(
         buildInfo,
         networkConfig.upnp.enabled,
-        networkConfig.externalAddressInferred
+        networkConfig.externalAddressInferred,
+        Some("Hello Alephium !")
       )
     }
   }
@@ -1742,7 +1743,8 @@ trait RestServerFixture
       ALPH.oneAlph,
       utxosLimit,
       maxFormBufferedBytes,
-      enableHttpMetrics = true
+      enableHttpMetrics = true,
+      description = "Hello Alephium !"
     )
 
     (peer, peerConf)
