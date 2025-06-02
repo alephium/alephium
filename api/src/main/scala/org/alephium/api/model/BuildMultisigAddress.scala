@@ -16,13 +16,16 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.Address
+import akka.util.ByteString
+
 import org.alephium.util.AVector
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildMultisigAddress(
-    keys: AVector[PublicKey],
-    mrequired: Int
+    keys: AVector[ByteString],
+    keyTypes: Option[AVector[BuildTxCommon.PublicKeyType]] = None,
+    mrequired: Int,
+    multiSigType: Option[MultiSigType] = Some(MultiSigType.P2MPKH)
 )
 
 final case class BuildMultisigAddressResult(address: Address)

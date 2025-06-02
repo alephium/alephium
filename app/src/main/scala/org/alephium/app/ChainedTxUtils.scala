@@ -102,12 +102,13 @@ trait ChainedTxUtils { self: ServerUtils =>
       )
     } yield {
       val (transferTxs, executeScriptTx, txScriptExecution) = result
-      BuildGrouplessExecuteScriptTxResult(
-        transferTxs.map(BuildSimpleTransferTxResult.from),
-        BuildSimpleExecuteScriptTxResult.from(
-          executeScriptTx,
-          SimulationResult.from(txScriptExecution)
-        )
+      val executeScriptTxResult = BuildSimpleExecuteScriptTxResult.from(
+        executeScriptTx,
+        SimulationResult.from(txScriptExecution)
+      )
+      BuildGrouplessExecuteScriptTxResult.from(
+        executeScriptTxResult,
+        transferTxs.map(BuildSimpleTransferTxResult.from)
       )
     }
   }
@@ -149,9 +150,9 @@ trait ChainedTxUtils { self: ServerUtils =>
       )
     } yield {
       val (transferTxs, deployContractTx, _) = result
-      BuildGrouplessDeployContractTxResult(
-        transferTxs.map(BuildSimpleTransferTxResult.from),
-        BuildSimpleDeployContractTxResult.from(deployContractTx)
+      BuildGrouplessDeployContractTxResult.from(
+        BuildSimpleDeployContractTxResult.from(deployContractTx),
+        transferTxs.map(BuildSimpleTransferTxResult.from)
       )
     }
   }
@@ -314,7 +315,7 @@ trait ChainedTxUtils { self: ServerUtils =>
       }
   }
 
-  private def transferFromFallbackAddress(
+  protected def transferFromFallbackAddress(
       blockFlow: BlockFlow,
       fromLockupPair: (LockupScript.Asset, UnlockScript),
       toLockup: LockupScript.Asset,
@@ -347,7 +348,7 @@ trait ChainedTxUtils { self: ServerUtils =>
       }
   }
 
-  private def calcAlphAmount(
+  protected def calcAlphAmount(
       alphBalance: U256,
       alphNeeded: U256,
       tokenSize: Int,
@@ -390,7 +391,7 @@ trait ChainedTxUtils { self: ServerUtils =>
     } yield unsignedTx
   }
 
-  private def calcTokenAmount(
+  protected def calcTokenAmount(
       tokenBalances: AVector[(TokenId, U256)],
       tokenNeeded: AVector[(TokenId, U256)]
   ): (AVector[(TokenId, U256)], AVector[(TokenId, U256)]) = {
@@ -409,7 +410,7 @@ trait ChainedTxUtils { self: ServerUtils =>
     }
   }
 
-  private def getAvailableBalances(
+  protected def getAvailableBalances(
       utxos: AVector[FlowUtils.AssetOutputInfo]
   ): (U256, AVector[(TokenId, U256)]) = {
     var alphBalance   = U256.Zero
@@ -437,7 +438,7 @@ trait ChainedTxUtils { self: ServerUtils =>
     }
   }
 
-  private def getExtraUtxos(
+  protected def getExtraUtxos(
       lockup: LockupScript.Asset,
       txs: AVector[UnsignedTransaction]
   ): AVector[FlowUtils.AssetOutputInfo] = {

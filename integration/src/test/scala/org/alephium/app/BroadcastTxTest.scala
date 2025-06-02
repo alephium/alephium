@@ -28,7 +28,7 @@ class BroadcastTxTest extends AlephiumActorSpec {
     val clique = bootClique(nbOfNodes = 2)
     clique.start()
 
-    val fromAddressGroup = Address.fromBase58(address).get.groupIndex
+    val fromAddressGroup = Address.fromBase58(address).rightValue.groupIndex
 
     {
       info("intra-group transaction")

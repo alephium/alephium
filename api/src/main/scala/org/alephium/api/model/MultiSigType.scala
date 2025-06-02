@@ -16,22 +16,9 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
+sealed trait MultiSigType extends Product with Serializable
 
-import org.alephium.api.{model => api}
-import org.alephium.protocol.model.GroupIndex
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
-
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildMultisig(
-    fromAddress: api.Address,
-    fromPublicKeys: AVector[ByteString],
-    fromPublicKeyTypes: Option[AVector[BuildTxCommon.PublicKeyType]] = None,
-    fromPublicKeyIndexes: Option[AVector[Int]] = None,
-    destinations: AVector[Destination],
-    gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
-    group: Option[GroupIndex] = None,
-    multiSigType: Option[MultiSigType] = Some(MultiSigType.P2MPKH)
-) extends BuildMultisigCommon
+object MultiSigType {
+  case object P2MPKH extends MultiSigType
+  case object P2HMPK extends MultiSigType
+}

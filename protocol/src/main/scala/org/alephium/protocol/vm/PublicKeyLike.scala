@@ -23,16 +23,13 @@ import org.alephium.crypto.{PublicKey => CryptoPublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.GroupIndex
 import org.alephium.serde._
-import org.alephium.util.Bytes
 
 sealed trait PublicKeyLike extends Product with Serializable {
   def publicKey: CryptoPublicKey
   def rawBytes: ByteString = publicKey.bytes
 
-  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-  def defaultGroup(implicit groupConfig: GroupConfig): GroupIndex = {
-    GroupIndex.unsafe(Bytes.toPosInt(rawBytes.last) % groupConfig.groups)
-  }
+  def defaultGroup(implicit groupConfig: GroupConfig): GroupIndex =
+    LockupScript.Groupless.defaultGroup(rawBytes)
 }
 
 object PublicKeyLike {

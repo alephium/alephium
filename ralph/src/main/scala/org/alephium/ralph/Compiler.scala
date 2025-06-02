@@ -743,6 +743,11 @@ object Compiler {
       getGlobalVariable(ident.name).exists(_.tpe.isMapType)
     }
 
+    @inline private[ralph] def getTestingVar(ident: Ast.Ident): Option[VarInfo] = {
+      val sname = scopedName(ident.name)
+      varTable.get(VarKey(sname, variableScope))
+    }
+
     def addInlinedArgument(ident: Ast.Ident, tpe: Type, instrs: Seq[Instr[Ctx]]): Unit = {
       val sname   = checkNewVariable(ident)
       val varInfo = VarInfo.InlinedArgument(ident, tpe, instrs)

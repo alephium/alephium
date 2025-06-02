@@ -25,7 +25,7 @@ import org.scalatest.EitherValues
 
 import org.alephium.api.{model => api}
 import org.alephium.api.UtilJson._
-import org.alephium.api.model._
+import org.alephium.api.model.{Address => _, _}
 import org.alephium.json.Json._
 import org.alephium.protocol._
 import org.alephium.protocol.model.{AssetOutput => _, Balance => _, ContractOutput => _, _}
@@ -49,7 +49,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   val zeroHash: String = BlockHash.zero.toHexString
   val ghostUncleHash: BlockHash =
     BlockHash.unsafe(Hex.unsafe("bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"))
-  val lockupScript = LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
+  val lockupScript = LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").rightValue
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(
       BlockHash.zero,
@@ -95,7 +95,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   def generateAddress(): Address.Asset = Address.p2pkh(PublicKey.generate)
   def generateContractAddress(): Address.Contract =
-    Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").get)
+    Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").rightValue)
 
   def blockEntryJson(blockEntry: BlockEntry): String = {
     s"""
@@ -893,8 +893,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val targetBlockHash    = BlockHash.generate
 
     val buildSweep = BuildSweepMultisig(
-      fromAddress,
-      fromPublicKeys,
+      api.Address.fromProtocol(fromAddress),
+      fromPublicKeys.map(_.bytes),
+      None,
+      None,
       toAddress,
       Some(maxAttoAlphPerUTXO),
       Some(lockTime),
@@ -1960,8 +1962,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   trait GrouplessModelFixture {
     val fromPublicKey           = PublicKeyLike.SecP256K1(PublicKey.generate)
     val fromLockupScript        = LockupScript.p2pk(fromPublicKey, GroupIndex.unsafe(0))
-    val fromAddressWithGroup    = AddressLike.from(fromLockupScript)
-    val fromAddressWithoutGroup = AddressLike.fromP2PKPublicKey(fromPublicKey)
+    val fromAddressWithGroup    = api.Address.from(fromLockupScript)
+    val fromAddressWithoutGroup = api.Address.from(fromPublicKey)
   }
 
   it should "getLockPair for BuildExecuteScriptTx" in new GrouplessModelFixture {
@@ -2107,5 +2109,31 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       s"""{"type": "Address", "value": "${address.toBase58.dropRight(2)}"}"""
     ) is ValAddress(address)
     write(ValAddress(address)) is s"""{"type":"Address","value":"${address.toBase58}"}"""
+  }
+
+  it should "decode address from base58 string" in {
+    import api.Address._
+    import scala.reflect.ClassTag
+    def pass[T: ClassTag](str: String) = {
+      fromBase58(str).value.lockupScript is a[T]
+    }
+
+    def fail(str: String, error: String) = {
+      fromBase58(str).leftValue.startsWith(error) is true
+    }
+
+    pass[CompleteLockupScript]("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3")
+    pass[CompleteLockupScript]("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa")
+    pass[CompleteLockupScript]("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr")
+    fail("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1", "Invalid address")
+
+    pass[HalfDecodedP2PK]("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L")
+    pass[CompleteLockupScript]("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0")
+    fail("bMEQ1jQgijED5jmCgunSNs5G1W87VX33ueywrpqemY7KVCEaDys", "Invalid p2pk address")
+
+    pass[HalfDecodedP2HMPK]("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU")
+    pass[CompleteLockupScript]("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU:0")
+    fail("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85", "Invalid p2hmpk address")
+    fail("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU1:0", "Invalid groupless address")
   }
 }

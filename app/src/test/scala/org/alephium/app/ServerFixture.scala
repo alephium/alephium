@@ -26,7 +26,14 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.api.ApiModelCodec
-import org.alephium.api.model.{AssetOutput => _, ContractOutput => _, Transaction => _, _}
+import org.alephium.api.model.{
+  Address => _,
+  AssetOutput => _,
+  ContractOutput => _,
+  Transaction => _,
+  _
+}
+import org.alephium.api.model.BuildTxCommon.PublicKeyType
 import org.alephium.crypto.{Blake2b, Byte32}
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
@@ -43,6 +50,7 @@ import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
 import org.alephium.json.Json._
 import org.alephium.protocol._
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.ModelGenerators
@@ -113,6 +121,10 @@ trait ServerFixture
   )
   def dummyBuildTransactionResult(tx: Transaction) =
     BuildSimpleTransferTxResult.from(tx.unsigned)
+  def dummyBuildGrouplessTransactionResult(tx: Transaction) =
+    BuildGrouplessTransferTxResult
+      .from(AVector(BuildSimpleTransferTxResult.from(tx.unsigned)))
+      .rightValue
   def dummySweepAddressBuildTransactionsResult(
       tx: Transaction,
       fromGroup: GroupIndex,
@@ -153,17 +165,36 @@ object ServerFixture {
     )
   }
 
-  def p2mpkhAddress(publicKeys: AVector[String], mrequired: Int): Address.Asset = {
-    Address.Asset(
-      LockupScript
-        .p2mpkh(
-          publicKeys.map { publicKey =>
-            PublicKey.from(Hex.from(publicKey).get).get
-          },
-          mrequired
-        )
-        .get
-    )
+  def p2mpkhAddress(publicKeys: AVector[String], mrequired: Int): String = {
+    Address
+      .Asset(
+        LockupScript
+          .p2mpkh(
+            publicKeys.map { publicKey =>
+              PublicKey.from(Hex.from(publicKey).get).get
+            },
+            mrequired
+          )
+          .get
+      )
+      .toBase58
+  }
+
+  def p2hmpkAddress(
+      publicKeys: AVector[String],
+      publicKeyTypes: AVector[PublicKeyType],
+      mrequired: Int
+  )(implicit groupConfig: GroupConfig): String = {
+    ServerUtils
+      .buildP2HMPKAddress(
+        publicKeys.map(Hex.from(_).get),
+        mrequired,
+        Some(publicKeyTypes)
+      )
+      .toOption
+      .get
+      .address
+      .toBase58
   }
 
   val dummyParentContractId      = ContractId.hash("parent")
@@ -329,7 +360,7 @@ object ServerFixture {
 
     override def sweepAddress(
         targetBlockHashOpt: Option[BlockHash],
-        fromPublicKey: PublicKey,
+        fromLockPair: (LockupScript.Asset, UnlockScript),
         toLockupScript: LockupScript.Asset,
         lockTimeOpt: Option[TimeStamp],
         gasOpt: Option[GasBox],
@@ -443,8 +474,10 @@ object ServerFixture {
         start: Int,
         end: Int
     ): IOResult[(Int, AVector[LogStates])] = {
-      lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
-      lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
+      lazy val address1 =
+        Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").toOption.get
+      lazy val address2 =
+        Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").toOption.get
 
       val eventKeysWithoutEvents: Seq[ContractId] = Seq(
         ContractId.unsafe(

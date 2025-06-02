@@ -32,7 +32,7 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
       request[UTXOs](getUTXOs(addr), clique.masterRestPort)
     }
 
-    val addressGroupIndex = Address.fromBase58(address).get.groupIndex
+    val addressGroupIndex = Address.fromBase58(address).rightValue.groupIndex
 
     val (address2, _, _) = generateAccount(addressGroupIndex)
 
@@ -45,7 +45,7 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     val destAmount = amount
 
     val destinations = AVector(
-      Destination(Address.asset(address2).get, Some(Amount(destAmount)))
+      Destination(Address.asset(address2).rightValue, Some(Amount(destAmount)))
     )
 
     val inputs: AVector[BuildMultiAddressesTransaction.Source] = AVector(
@@ -75,7 +75,7 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
       request[UTXOs](getUTXOs(addr), clique.masterRestPort)
     }
 
-    val addressGroupIndex = Address.fromBase58(address).get.groupIndex
+    val addressGroupIndex = Address.fromBase58(address).rightValue.groupIndex
 
     val (address2, publicKey2, privateKey2) = generateAccount(addressGroupIndex)
     val (address3, publicKey3, privateKey3) = generateAccount(addressGroupIndex)
@@ -115,7 +115,7 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
         message: Option[ByteString] = None
     ) = AVector(
       Destination(
-        Address.asset(destAddress).get,
+        Address.asset(destAddress).rightValue,
         Some(Amount(amount)),
         lockTime = lockTime,
         message = message

@@ -18,6 +18,7 @@ package org.alephium.ralph
 
 import org.alephium.protocol.vm.{StatelessContext, Val}
 import org.alephium.ralph.Compiler.{Error, VarInfo}
+import org.alephium.ralph.error.CompilerError
 
 trait Constants[Ctx <: StatelessContext] {
   def getConstant(ident: Ast.Ident): VarInfo.Constant[Ctx]
@@ -68,6 +69,14 @@ trait Constants[Ctx <: StatelessContext] {
       case Val.U256(value) => value.toBigInt.intValue()
       case _ =>
         throw Compiler.Error("Invalid array size, expected a constant U256 value", expr.sourceIndex)
+    }
+  }
+
+  final private[ralph] def tryCalcConstant(expr: Ast.Expr[Ctx]): Option[Val] = {
+    try {
+      Some(calcConstant(expr))
+    } catch {
+      case _: CompilerError.FormattableError => None
     }
   }
 

@@ -26,7 +26,7 @@ import org.scalatest.Assertion
 
 import org.alephium.api.{model => api}
 import org.alephium.api.{ApiError, Try}
-import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
+import org.alephium.api.model.{Address => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.api.model.BuildDeployContractTx.Code
 import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
 import org.alephium.flow.{FlowFixture, GhostUncleFixture}
@@ -604,7 +604,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildSweepAddressTransactionsRes = serverUtils
         .buildSweepAddressTransactions(
           blockFlow,
-          BuildSweepAddressTransactions(fromPublicKey, sweepAddressDestination)
+          BuildSweepAddressTransactions(fromPublicKey.bytes, None, sweepAddressDestination)
         )
         .rightValue
       val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
@@ -698,7 +698,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildSweepAddressTransactionsRes = serverUtils
         .buildSweepAddressTransactions(
           blockFlow,
-          BuildSweepAddressTransactions(toPublicKey, sweepAddressDestination)
+          BuildSweepAddressTransactions(toPublicKey.bytes, None, sweepAddressDestination)
         )
         .rightValue
       val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
@@ -744,7 +744,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val result0 = serverUtils
       .buildSweepAddressTransactions(
         blockFlow,
-        BuildSweepAddressTransactions(fromPublicKey, Address.p2pkh(toPublicKey), None)
+        BuildSweepAddressTransactions(fromPublicKey.bytes, None, Address.p2pkh(toPublicKey), None)
       )
       .rightValue
     result0.unsignedTxs.length is 1
@@ -753,7 +753,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       .buildSweepAddressTransactions(
         blockFlow,
         BuildSweepAddressTransactions(
-          fromPublicKey,
+          fromPublicKey.bytes,
+          None,
           Address.p2pkh(toPublicKey),
           Some(Amount(U256.One))
         )
@@ -806,14 +807,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       val txs = serverUtils
         .prepareSweepAddressTransaction(
           blockFlow,
-          fromPublicKey,
-          destinations.head.address,
-          None,
-          None,
-          None,
-          nonCoinbaseMinGasPrice,
-          targetBlockHash,
-          None
+          getLockPair(fromPublicKey),
+          BuildSweepAddressTransactions(
+            fromPublicKey.bytes,
+            None,
+            destinations.head.address,
+            targetBlockHash = targetBlockHash
+          )
         )
         .rightValue
       txs.length is 1
@@ -841,19 +841,34 @@ class ServerUtilsSpec extends AlephiumSpec {
     blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 6
 
     val params0 =
-      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = Some(2))
+      BuildSweepAddressTransactions(
+        pubKey.bytes,
+        None,
+        Address.Asset(lockupScript),
+        utxosLimit = Some(2)
+      )
     val result0 = serverUtils.buildSweepAddressTransactions(blockFlow, params0).rightValue
     result0.unsignedTxs.length is 1
     checkInputSize(result0.unsignedTxs.head.unsignedTx, 2)
 
     val params1 =
-      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = None)
+      BuildSweepAddressTransactions(
+        pubKey.bytes,
+        None,
+        Address.Asset(lockupScript),
+        utxosLimit = None
+      )
     val result1 = serverUtils.buildSweepAddressTransactions(blockFlow, params1).rightValue
     result1.unsignedTxs.length is 1
     checkInputSize(result1.unsignedTxs.head.unsignedTx, utxosLimitInApiConfig)
 
     val params2 =
-      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = Some(6))
+      BuildSweepAddressTransactions(
+        pubKey.bytes,
+        None,
+        Address.Asset(lockupScript),
+        utxosLimit = Some(6)
+      )
     val result2 = serverUtils.buildSweepAddressTransactions(blockFlow, params2).rightValue
     result2.unsignedTxs.length is 1
     checkInputSize(result2.unsignedTxs.head.unsignedTx, utxosLimitInApiConfig)
@@ -5608,20 +5623,20 @@ class ServerUtilsSpec extends AlephiumSpec {
       val block = transfer(blockFlow, genesisPrivateKey, publicKey, ALPH.alph(1))
       addAndCheck(blockFlow, block)
     }
-    val lockupScript     = LockupScript.p2pkh(publicKey)
-    val assetAddress     = Address.from(lockupScript)
-    val assetAddressLike = AddressLike.from(lockupScript)
+    val lockupScript = LockupScript.p2pkh(publicKey)
+    val assetAddress = Address.from(lockupScript)
+    val apiAddress   = api.Address.from(lockupScript)
     blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 10
 
     val serverUtils0 = createServerUtils(9)
-    serverUtils0.getBalance(blockFlow, assetAddressLike, true).leftValue.detail is
+    serverUtils0.getBalance(blockFlow, apiAddress, true).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
     serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
 
     val serverUtils1 = createServerUtils(10)
     serverUtils1
-      .getBalance(blockFlow, assetAddressLike, true)
+      .getBalance(blockFlow, apiAddress, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
@@ -5633,7 +5648,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val serverUtils2 = createServerUtils(11)
     serverUtils2
-      .getBalance(blockFlow, assetAddressLike, true)
+      .getBalance(blockFlow, apiAddress, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
@@ -5768,7 +5783,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  test "transfer"
            |  before Self(0)
            |  after Self{ALPH: 1.1 alph}(1 alph)
-           |  approve{@$fromAddress -> ALPH: 2 alph} {
+           |  approve{@$fromAddress -> ALPH: 1 alph} {
            |    emit Debug(`balance: $${balance}`)
            |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == $result)
            |  }
@@ -5937,9 +5952,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       def code(str: String) =
         s"""
            |Contract Foo() {
-           |  pub fn foo0() -> () {
-           |    let v = 1 / 0
-           |    let _ = v
+           |  pub fn foo0(v: U256) -> () {
+           |    let _ = v / 0
            |  }
            |  fn foo1() -> U256 {
            |    return 0
@@ -5950,7 +5964,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      Seq("foo0()", "1 / 0", "1 / foo1()", "foo1() / foo1()").foreach { expr =>
+      Seq("foo0(1)", "1 / foo1()", "foo1() / foo1()").foreach { expr =>
         serverUtils.compileProject(blockFlow, api.Compile.Project(code(expr))).isRight is true
       }
 
@@ -5958,8 +5972,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         .compileProject(blockFlow, api.Compile.Project(code("foo1() / 1")))
         .leftValue
         .detail is
-        s"""|-- error (11:5): Testing error
-            |11 |    testFail!(foo1() / 1)
+        s"""|-- error (10:5): Testing error
+            |10 |    testFail!(foo1() / 1)
             |   |    ^^^^^^^^^^^^^^^^^^^^^
             |   |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: the test code did not throw an exception
             |""".stripMargin
@@ -6066,6 +6080,59 @@ class ServerUtilsSpec extends AlephiumSpec {
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
             |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected execution failure in test. Expected error code: 1, but got failure: ArithmeticError((U256(9) * U256(9)) % U256(0)).
             |""".stripMargin
+    }
+
+    {
+      val code =
+        s"""
+           |Contract TokenVault() {
+           |    @using(preapprovedAssets = true, assetsInContract = true, checkExternalCaller = false)
+           |    pub fn deposit() -> () {
+           |        transferTokenToSelf!(externalCallerAddress!(), ALPH, 2 alph)
+           |    }
+           |
+           |    test "should increase contract balance on deposit"
+           |    before Self{ALPH: 1 alph}()
+           |    after Self{ALPH: 3 alph}()
+           |    approve{address -> ALPH: 2 alph}
+           |    {
+           |        deposit{callerAddress!() -> ALPH: 2 alph}()
+           |    }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Bank(mut totalDeposits: U256) {
+           |    @using(preapprovedAssets = true, assetsInContract = true, checkExternalCaller = false)
+           |    pub fn deposit(depositor: Address) -> () {
+           |        totalDeposits = totalDeposits + 1 alph
+           |        transferTokenToSelf!(depositor, ALPH, 1 alph)
+           |    }
+           |}
+           |Contract Customer() {
+           |    @using(preapprovedAssets = true, checkExternalCaller = false)
+           |    pub fn makeDeposit(bank: Bank) -> () {
+           |        let depositor = externalCallerAddress!()
+           |        bank.deposit{depositor -> ALPH: 1 alph}(depositor)
+           |    }
+           |    test "customer should be able to make deposit to bank"
+           |    before
+           |        Bank{ALPH: 0 alph}(0)@bank
+           |        Self()
+           |    after
+           |        Bank{ALPH: 1 alph}(1 alph)@bank
+           |        Self()
+           |    approve{address -> ALPH: 1 alph}
+           |    {
+           |        makeDeposit{callerAddress!() -> ALPH: 1 alph}(bank)
+           |    }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
     }
   }
 
@@ -6226,7 +6293,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       blockFlow: BlockFlow
   ) = {
     serverUtils
-      .getBalance(blockFlow, AddressLike.from(address.lockupScript), true) isE Balance.from(
+      .getBalance(blockFlow, api.Address.from(address.lockupScript), true) isE Balance.from(
       Amount(amount),
       Amount.Zero,
       None,

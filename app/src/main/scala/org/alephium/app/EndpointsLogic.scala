@@ -30,7 +30,7 @@ import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.metrics.prometheus.PrometheusMetrics.prometheusRegistryCodec
 
 import org.alephium.api.{badRequest, notFound, ApiError, Endpoints, Try}
-import org.alephium.api.model.{TransactionTemplate => _, _}
+import org.alephium.api.model.{Address => _, TransactionTemplate => _, _}
 import org.alephium.app.FutureTry
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo}
@@ -373,7 +373,9 @@ trait EndpointsLogic extends Endpoints {
       serverUtils
         .buildMultisigAddress(
           buildMultisig.keys,
-          buildMultisig.mrequired
+          buildMultisig.mrequired,
+          buildMultisig.keyTypes,
+          buildMultisig.multiSigType
         )
         .left
         .map(ApiError.BadRequest(_))
@@ -420,7 +422,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
+    bt => Right(Some(bt.fromAddress.toProtocol().groupIndex(brokerConfig)))
   )
 
   val buildSweepMultisigLogic = serverLogicRedirect(buildSweepMultisig)(
@@ -434,7 +436,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
+    bt => Right(Some(bt.fromAddress.toProtocol().groupIndex(brokerConfig)))
   )
 
   val buildMultiInputsTransactionLogic = serverLogicRedirect(buildMultiAddressesTransaction)(
@@ -465,7 +467,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bst => Right(Some(LockupScript.p2pkh(bst.fromPublicKey).groupIndex(brokerConfig)))
+    bst => bst.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
   )
 
   val submitTransactionLogic =

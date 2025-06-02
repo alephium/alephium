@@ -62,7 +62,8 @@ object BuiltInFunctions extends App {
         Chain,
         Conversion,
         ByteVec,
-        Cryptography
+        Cryptography,
+        Test
       ).map(_.toString)
       Ordering.by(f => orders.indexOf(f.category))
     }

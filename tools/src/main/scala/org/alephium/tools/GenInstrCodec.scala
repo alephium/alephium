@@ -81,6 +81,7 @@ object GenRustDecoder {
       case "ByteVec"            => "ByteString"
       case "Selector"           => "MethodSelector"
       case s"AVector[${value}]" => s"AVector<${getRustType(value)}>"
+      case "DevInstrBase"       => "Byte"
       case t                    => throw new RuntimeException(s"unknown type $t")
     }
   }
@@ -257,6 +258,7 @@ object GenTsCodec {
       case "ByteVec"          => ("ByteString", "byteStringCodec")
       case "Selector"         => ("number", "intAs4BytesCodec")
       case "AVector[ByteVec]" => ("ByteString[]", "byteStringsCodec")
+      case "DevInstrBase"     => ("number", "byteCodec")
       case t                  => throw new RuntimeException(s"unknown type $t")
     }
   }

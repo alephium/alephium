@@ -22,7 +22,14 @@ import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex}
 
-sealed trait BuildTransferTxResult extends Product with Serializable
+sealed trait BuildTransferTxResult extends Product with Serializable {
+  def unsignedTx: String
+  def gasAmount: GasBox
+  def gasPrice: GasPrice
+  def txId: TransactionId
+  def fromGroup: Int
+  def toGroup: Int
+}
 
 @upickle.implicits.key("BuildSimpleTransferTxResult")
 final case class BuildSimpleTransferTxResult(
@@ -53,8 +60,13 @@ object BuildSimpleTransferTxResult {
 
 @upickle.implicits.key("BuildGrouplessTransferTxResult")
 final case class BuildGrouplessTransferTxResult(
-    transferTxs: AVector[BuildSimpleTransferTxResult],
-    transferTx: BuildSimpleTransferTxResult
+    unsignedTx: String,
+    gasAmount: GasBox,
+    gasPrice: GasPrice,
+    txId: TransactionId,
+    fromGroup: Int,
+    toGroup: Int,
+    transferTxs: AVector[BuildSimpleTransferTxResult]
 ) extends BuildTransferTxResult
 object BuildGrouplessTransferTxResult {
   def from(
@@ -63,6 +75,17 @@ object BuildGrouplessTransferTxResult {
     if (transferTxs.isEmpty) {
       Left(badRequest("transferTxs is empty"))
     } else {
-      Right(BuildGrouplessTransferTxResult(transferTxs.init, transferTxs.last))
+      val transferTx = transferTxs.last
+      Right(
+        BuildGrouplessTransferTxResult(
+          transferTx.unsignedTx,
+          transferTx.gasAmount,
+          transferTx.gasPrice,
+          transferTx.txId,
+          transferTx.fromGroup,
+          transferTx.toGroup,
+          transferTxs.init
+        )
+      )
     }
 }

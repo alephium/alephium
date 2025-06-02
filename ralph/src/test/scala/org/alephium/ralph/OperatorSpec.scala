@@ -72,8 +72,16 @@ class OperatorSpec
   }
 
   it should "test / (I256)" in new I256Fixture {
-    val operator: Operator = ArithOperator.Div
-    test(Seq(3, 4), 0)
+    val operator: Operator = ArithOperator.RoundDownDiv
+    test(Seq(5, 3), 1)
+    test(Seq(-5, 3), -2)
+    operator.calc(Seq(Val.I256(I256.MinValue), -1)) is Left("I256 overflow")
+  }
+
+  it should "test \\ (I256)" in new I256Fixture {
+    val operator: Operator = ArithOperator.RoundUpDiv
+    test(Seq(5, 3), 2)
+    test(Seq(-5, 3), -1)
     operator.calc(Seq(Val.I256(I256.MinValue), -1)) is Left("I256 overflow")
   }
 
@@ -108,8 +116,14 @@ class OperatorSpec
   }
 
   it should "test / (U256)" in new U256Fixture {
-    val operator: Operator = ArithOperator.Div
-    test(Seq(3, 4), 0)
+    val operator: Operator = ArithOperator.RoundDownDiv
+    test(Seq(5, 3), 1)
+    operator.calc(Seq(Val.U256(U256.MinValue), 0)) is Left("U256 overflow")
+  }
+
+  it should "test \\ (U256)" in new U256Fixture {
+    val operator: Operator = ArithOperator.RoundUpDiv
+    test(Seq(5, 3), 2)
     operator.calc(Seq(Val.U256(U256.MinValue), 0)) is Left("U256 overflow")
   }
 

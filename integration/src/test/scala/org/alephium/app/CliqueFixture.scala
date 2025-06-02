@@ -141,7 +141,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       privateKey: String,
       restPort: Int
   ): SubmitTxResult = eventually {
-    val destinations = AVector(Destination(Address.asset(toAddress).get, Some(Amount(amount))))
+    val destinations = AVector(Destination(Address.asset(toAddress).rightValue, Some(Amount(amount))))
     transfer(fromPubKey, destinations, privateKey, restPort)
   }
 
@@ -628,7 +628,15 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       case result: BuildSimpleTransferTxResult =>
         AVector(signAndSubmitFunc(result))
       case result: BuildGrouplessTransferTxResult =>
-        (result.transferTxs :+ result.transferTx).map(signAndSubmitFunc)
+        val transferTx = BuildSimpleTransferTxResult(
+          result.unsignedTx,
+          result.gasAmount,
+          result.gasPrice,
+          result.txId,
+          result.fromGroup,
+          result.toGroup
+        )
+        (result.transferTxs :+ transferTx).map(signAndSubmitFunc)
     }
   }
 
@@ -862,7 +870,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         submitTxWithPort(result.unsignedTx, result.txId, restPort)
       case result: BuildGrouplessExecuteScriptTxResult =>
         result.transferTxs.foreach(tx => submitTxWithPort(tx.unsignedTx, tx.txId, restPort))
-        submitTxWithPort(result.executeScriptTx.unsignedTx, result.executeScriptTx.txId, restPort)
+        submitTxWithPort(result.unsignedTx, result.txId, restPort)
     }
     buildResult
   }

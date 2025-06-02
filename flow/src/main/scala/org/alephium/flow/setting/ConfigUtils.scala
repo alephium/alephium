@@ -59,22 +59,10 @@ object ConfigUtils {
   }
 
   private def parseAddress(rawAddress: String): Either[ConfigException, Address.Asset] = {
-    Address.fromBase58(rawAddress) match {
-      case Some(address: Address.Asset) => Right(address)
-      case Some(_: Address.Contract) =>
-        Left(
-          new ConfigException.BadValue(
-            "address",
-            s"Unexpected contract address for miner: $rawAddress"
-          )
-        )
-      case None =>
-        Left(
-          new ConfigException.BadValue(
-            "address",
-            s"Invalid base58 encoding: $rawAddress"
-          )
-        )
+    Address.asset(rawAddress) match {
+      case Right(address) => Right(address)
+      case Left(error) =>
+        Left(new ConfigException.BadValue("address", error))
     }
   }
 

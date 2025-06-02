@@ -29,6 +29,7 @@ import scala.util.Try
 
 import sttp.model.StatusCode
 
+import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
 import org.alephium.api.model.{
   Amount,
@@ -41,7 +42,7 @@ import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, AddressLike, GroupIndex, TransactionId}
+import org.alephium.protocol.model.{Address, GroupIndex, TransactionId}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{discard, AVector, Duration, FutureCollection, Service, TimeStamp}
 import org.alephium.wallet.Constants
@@ -586,7 +587,7 @@ object WalletService {
         address: Address.Asset
     ): Future[Either[WalletError, (Address.Asset, Amount, Amount)]] = {
       blockFlowClient
-        .fetchBalance(AddressLike.from(address.lockupScript))
+        .fetchBalance(api.Address.fromProtocol(address))
         .map(
           _.map { case (amount, lockedAmount) =>
             (address, amount, lockedAmount)

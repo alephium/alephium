@@ -21,6 +21,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import sttp.tapir.EndpointIO.Example
 
+import org.alephium.api.{model => api}
 import org.alephium.api.model._
 import org.alephium.protocol._
 import org.alephium.protocol.model
@@ -44,7 +45,7 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val networkId = NetworkId.AlephiumMainNet
   private val lockupScript =
-    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
+    LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").toOption.get
   private val publicKey = PublicKey
     .from(Hex.unsafe("d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"))
     .get
@@ -563,13 +564,15 @@ trait EndpointsExamples extends ErrorExamples {
     List(
       defaultExample(
         BuildSweepAddressTransactions(
-          publicKey,
+          publicKey.bytes,
+          None,
           address
         )
       ),
       moreSettingsExample(
         BuildSweepAddressTransactions(
-          publicKey,
+          publicKey.bytes,
+          None,
           address,
           Some(Amount(ALPH.oneAlph)),
           Some(ts),
@@ -640,35 +643,39 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildMultisigAddressExample: List[Example[BuildMultisigAddress]] =
     simpleExample(
       BuildMultisigAddress(
-        AVector(publicKey, publicKey),
-        1
+        AVector(publicKey.bytes, publicKey.bytes),
+        Some(AVector(BuildTxCommon.Default, BuildTxCommon.Default)),
+        1,
+        Some(MultiSigType.P2MPKH)
       )
     )
 
   implicit val buildMultisigAddressResultExample: List[Example[BuildMultisigAddressResult]] =
-    simpleExample(
-      BuildMultisigAddressResult(
-        address
-      )
-    )
+    simpleExample(BuildMultisigAddressResult(api.Address.from(lockupScript)))
 
   implicit val buildMultisigTransactionExamples: List[Example[BuildMultisig]] = List(
     defaultExample(
       BuildMultisig(
-        address,
-        AVector(publicKey),
+        api.Address.fromProtocol(address),
+        AVector(publicKey.bytes),
+        None,
+        None,
         defaultDestinations,
+        None,
         None,
         None
       )
     ),
     moreSettingsExample(
       BuildMultisig(
-        address,
-        AVector(publicKey),
+        api.Address.fromProtocol(address),
+        AVector(publicKey.bytes),
+        None,
+        None,
         moreSettingsDestinations,
         Some(model.minimalGas),
-        Some(model.nonCoinbaseMinGasPrice)
+        Some(model.nonCoinbaseMinGasPrice),
+        None
       )
     )
   )
@@ -676,8 +683,10 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildSweepMultisigTransactionExamples: List[Example[BuildSweepMultisig]] = List(
     defaultExample(
       BuildSweepMultisig(
-        address,
-        AVector(publicKey),
+        api.Address.fromProtocol(address),
+        AVector(publicKey.bytes),
+        None,
+        None,
         address,
         None,
         None,
@@ -689,8 +698,10 @@ trait EndpointsExamples extends ErrorExamples {
     ),
     moreSettingsExample(
       BuildSweepMultisig(
-        address,
-        AVector(publicKey),
+        api.Address.fromProtocol(address),
+        AVector(publicKey.bytes),
+        None,
+        None,
         address,
         Some(Amount(ALPH.oneAlph)),
         Some(ts),
@@ -1179,6 +1190,12 @@ trait EndpointsExamples extends ErrorExamples {
   val buildGrouplessTransferTxResultExamples: List[Example[BuildGrouplessTransferTxResult]] =
     simpleExample(
       BuildGrouplessTransferTxResult(
+        unsignedTx = hexString2,
+        model.minimalGas,
+        model.nonCoinbaseMinGasPrice,
+        txId2,
+        fromGroup = 1,
+        toGroup = 3,
         transferTxs = AVector(
           BuildSimpleTransferTxResult(
             unsignedTx = hexString,
@@ -1188,14 +1205,6 @@ trait EndpointsExamples extends ErrorExamples {
             fromGroup = 2,
             toGroup = 1
           )
-        ),
-        transferTx = BuildSimpleTransferTxResult(
-          unsignedTx = hexString2,
-          model.minimalGas,
-          model.nonCoinbaseMinGasPrice,
-          txId2,
-          fromGroup = 1,
-          toGroup = 3
         )
       )
     )
@@ -1213,6 +1222,12 @@ trait EndpointsExamples extends ErrorExamples {
     ),
     moreSettingsExample(
       BuildGrouplessTransferTxResult(
+        unsignedTx = hexString2,
+        model.minimalGas,
+        model.nonCoinbaseMinGasPrice,
+        txId2,
+        fromGroup = 1,
+        toGroup = 3,
         transferTxs = AVector(
           BuildSimpleTransferTxResult(
             unsignedTx = hexString,
@@ -1222,14 +1237,6 @@ trait EndpointsExamples extends ErrorExamples {
             fromGroup = 2,
             toGroup = 1
           )
-        ),
-        transferTx = BuildSimpleTransferTxResult(
-          unsignedTx = hexString2,
-          model.minimalGas,
-          model.nonCoinbaseMinGasPrice,
-          txId2,
-          fromGroup = 1,
-          toGroup = 3
         )
       )
     )
@@ -1238,18 +1245,8 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildGrouplessExecuteScriptTxResultExamples
       : List[Example[BuildGrouplessExecuteScriptTxResult]] =
     simpleExample(
-      BuildGrouplessExecuteScriptTxResult(
-        transferTxs = AVector(
-          BuildSimpleTransferTxResult(
-            unsignedTx = hexString,
-            model.minimalGas,
-            model.nonCoinbaseMinGasPrice,
-            txId,
-            fromGroup = 2,
-            toGroup = 1
-          )
-        ),
-        executeScriptTx = BuildSimpleExecuteScriptTxResult(
+      BuildGrouplessExecuteScriptTxResult.from(
+        BuildSimpleExecuteScriptTxResult(
           fromGroup = 2,
           toGroup = 2,
           unsignedTx = hexString,
@@ -1257,14 +1254,7 @@ trait EndpointsExamples extends ErrorExamples {
           model.nonCoinbaseMinGasPrice,
           txId = txId,
           simulationResult
-        )
-      )
-    )
-
-  implicit val buildGrouplessDeployContractTxResultExamples
-      : List[Example[BuildGrouplessDeployContractTxResult]] =
-    simpleExample(
-      BuildGrouplessDeployContractTxResult(
+        ),
         transferTxs = AVector(
           BuildSimpleTransferTxResult(
             unsignedTx = hexString,
@@ -1274,8 +1264,15 @@ trait EndpointsExamples extends ErrorExamples {
             fromGroup = 2,
             toGroup = 1
           )
-        ),
-        deployContractTx = BuildSimpleDeployContractTxResult(
+        )
+      )
+    )
+
+  implicit val buildGrouplessDeployContractTxResultExamples
+      : List[Example[BuildGrouplessDeployContractTxResult]] =
+    simpleExample(
+      BuildGrouplessDeployContractTxResult.from(
+        BuildSimpleDeployContractTxResult(
           fromGroup = 2,
           toGroup = 2,
           unsignedTx = hexString,
@@ -1283,6 +1280,16 @@ trait EndpointsExamples extends ErrorExamples {
           model.nonCoinbaseMinGasPrice,
           txId = txId,
           contractAddress = Address.contract(contractId)
+        ),
+        transferTxs = AVector(
+          BuildSimpleTransferTxResult(
+            unsignedTx = hexString,
+            model.minimalGas,
+            model.nonCoinbaseMinGasPrice,
+            txId,
+            fromGroup = 2,
+            toGroup = 1
+          )
         )
       )
     )

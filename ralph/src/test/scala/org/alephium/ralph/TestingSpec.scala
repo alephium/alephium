@@ -380,8 +380,10 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       test.settings.isEmpty is true
       val assets = test.assets.value.assets
       assets.length is 2
-      assets(0) is LockupScript.asset(address0).value -> AVector(TokenId.alph -> ALPH.alph(1))
-      assets(1)._1 is LockupScript.asset(address1).value
+      assets(0) is LockupScript.asset(address0).rightValue -> AVector(
+        TokenId.alph -> ALPH.cent(150)
+      )
+      assets(1)._1 is LockupScript.asset(address1).rightValue
       assets(1)._2.toSet is Set(TokenId.alph -> ALPH.alph(2), tokenId -> ALPH.alph(1))
     }
 
@@ -477,6 +479,36 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       barContract.typeId is Ast.TypeId("Bar")
       fooContract.immFields is AVector[(String, Val)](("a", Val.U256(20)), ("b", Val.U256(10)))
       barContract.mutFields.isEmpty is true
+    }
+
+    {
+      info("Generate address and token id")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo"
+           |  approve {address0 -> token0: 1 alph; address0 -> token1: 2 alph; address1 -> token0: 3 alph} {
+           |    testEqual!(foo(), 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      val tests     = Compiler.compileContractFull(code).rightValue.tests.value.tests
+      val assets    = tests.head.assets.value.assets
+      val addresses = assets.map(_._1)
+      val tokens    = assets.flatMap(_._2).map(_._1).filter(_ != TokenId.alph)
+
+      assets.length is 3
+      addresses.toSet.size is 2
+      tokens.toSet.size is 2
+
+      assets(0)._1 is addresses(0)
+      assets(0)._2.toSet is Set(TokenId.alph -> ALPH.cent(50), tokens(0) -> ALPH.alph(1))
+      assets(1) is (addresses(0), AVector(tokens(1) -> ALPH.alph(2)))
+      assets(2) is (addresses(2), AVector(tokens(0) -> ALPH.alph(3)))
     }
   }
 
