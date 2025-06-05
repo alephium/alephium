@@ -601,7 +601,7 @@ abstract class RestServerSpec(
                 |  "default",
                 |  "default"
                 |],
-                |  "multiSigType": "p2hmpk",
+                |  "multiSigType": "P2HMPK",
                 |  "mrequired": 1
                 |}
         """.stripMargin
@@ -630,7 +630,7 @@ abstract class RestServerSpec(
                 |  "default",
                 |  "default"
                 |],
-                |  "multiSigType": "p2hmpk",
+                |  "multiSigType": "P2HMPK",
                 |  "mrequired": 3
                 |}
         """.stripMargin
@@ -653,7 +653,7 @@ abstract class RestServerSpec(
                 |  "keys": [
                 |    ${tooManyDummyKeys.map(k => s""""$k"""").mkString(",")}
                 |  ],
-                |  "multiSigType": "p2hmpk",
+                |  "multiSigType": "P2HMPK",
                 |  "mrequired": 3
                 |}
         """.stripMargin
@@ -675,7 +675,7 @@ abstract class RestServerSpec(
                 |  "keyTypes": [
                 |  "default"
                 |],
-                |  "multiSigType": "p2hmpk",
+                |  "multiSigType": "P2HMPK",
                 |  "mrequired": 1
                 |}
         """.stripMargin
@@ -754,7 +754,7 @@ abstract class RestServerSpec(
                   |    }
                   |  ],
                   |  "group": 0,
-                  |  "multiSigType": "p2hmpk"
+                  |  "multiSigType": "P2HMPK"
                   |}
         """.stripMargin
       ) check { response =>
@@ -779,7 +779,7 @@ abstract class RestServerSpec(
                   |  ],
                   |  "group": 0,
                   |  "fromPublicKeyIndexes": [0],
-                  |  "multiSigType": "p2hmpk"
+                  |  "multiSigType": "P2HMPK"
                   |}
         """.stripMargin
       ) check { response =>
