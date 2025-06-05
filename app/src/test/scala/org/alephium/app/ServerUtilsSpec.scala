@@ -34,6 +34,7 @@ import org.alephium.flow.core.{maxForkDepth, AMMContract, BlockFlow, ExtraUtxosI
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
+import org.alephium.io.IOError
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
@@ -5005,6 +5006,39 @@ class ServerUtilsSpec extends AlephiumSpec {
     val txOutputRef    = block1.nonCoinbase.head.unsigned.inputs(0).outputRef
     val coinbaseOutput = block0.coinbase.unsigned.fixedOutputs(0)
     blockFlow.getTxOutput(txOutputRef, block1.hash) isE Some(coinbaseOutput)
+  }
+
+  it should "return correct tx output when original tx exists in forked blocks and the spending tx's block height is lower" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.node.indexes.tx-output-ref-index", "true")
+    )
+
+    val chainIndex00                  = ChainIndex.unsafe(0, 0)
+    val chainIndex01                  = ChainIndex.unsafe(0, 1)
+    val (toPrivateKey0, toPublicKey0) = chainIndex00.to.generateKey
+    val (_, toPublicKey1)             = chainIndex01.to.generateKey
+
+    val block00_1 = mineFromMemPool(blockFlow, chainIndex00)
+    addAndCheck(blockFlow, block00_1)
+
+    val block00_2 = mineFromMemPool(blockFlow, chainIndex00)
+    addAndCheck(blockFlow, block00_2)
+
+    val block00_31 = transfer(blockFlow, genesisKeys(0)._1, toPublicKey0, ALPH.alph(2))
+    val block00_32 = transfer(blockFlow, genesisKeys(0)._1, toPublicKey0, ALPH.alph(2))
+    addAndCheck(blockFlow, block00_31, block00_32)
+
+    val heightHashes00_3 = blockFlow.getHashes(chainIndex00, 3).rightValue
+    heightHashes00_3.toSet is Set(block00_31.hash, block00_32.hash)
+
+    val block01_1 = transfer(blockFlow, toPrivateKey0, toPublicKey1, ALPH.alph(1))
+    addAndCheck(blockFlow, block01_1)
+
+    val heightHashes01_1 = blockFlow.getHashes(chainIndex01, 1).rightValue
+    heightHashes01_1.toSet is Set(block01_1.hash)
+
+    val txOutputRef = block01_1.nonCoinbase.head.unsigned.inputs(0).outputRef
+    blockFlow.getTxOutput(txOutputRef, block01_1.hash).leftValue is a[IOError.KeyNotFound]
   }
 
   it should "return error if the BuildTransaction.ExecuteScript is invalid" in new Fixture {
