@@ -650,19 +650,21 @@ trait BlockGenerators extends TxGenerators {
       chainIndex: ChainIndex,
       length: Int,
       initialHash: BlockHash,
-      initialTs: TimeStamp
-  ): Gen[AVector[Block]] =
+      initialTs0: TimeStamp
+  ): Gen[AVector[Block]] = {
+    val initialTs = TimeStamp.unsafe(math.max(initialTs0.millis, ALPH.LaunchTimestamp.millis))
     Gen.listOfN(length, blockGen(chainIndex)).map { blocks =>
       blocks.zipWithIndex.foldLeft(AVector.empty[Block]) { case (acc, (block, index)) =>
-        val prevHash      = if (acc.isEmpty) initialHash else acc.last.hash
-        val currentHeader = block.header
-        val deps          = BlockDeps.build(AVector.fill(groupConfig.depsNum)(prevHash))
-        val newTs         = initialTs.plusUnsafe(Duration.ofSecondsUnsafe(index.toLong + 1))
-        val newHeader     = currentHeader.copy(blockDeps = deps, timestamp = newTs)
-        val newBlock      = block.copy(header = newHeader)
+        val prevHash     = if (acc.isEmpty) initialHash else acc.last.hash
+        val deps         = BlockDeps.build(AVector.fill(groupConfig.depsNum)(prevHash)).deps
+        val depStateHash = block.header.depStateHash
+        val newTs        = initialTs.plusUnsafe(Duration.ofSecondsUnsafe(index.toLong + 1))
+        val txs          = block.transactions.init
+        val newBlock     = gen(chainIndex, deps, depStateHash, newTs, txs, AVector.empty)
         acc :+ newBlock
       }
     }
+  }
 }
 
 trait ModelGenerators extends BlockGenerators
