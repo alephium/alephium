@@ -1196,14 +1196,16 @@ trait EndpointsExamples extends ErrorExamples {
         txId2,
         fromGroup = 1,
         toGroup = 3,
-        transferTxs = AVector(
-          BuildSimpleTransferTxResult(
-            unsignedTx = hexString,
-            model.minimalGas,
-            model.nonCoinbaseMinGasPrice,
-            txId,
-            fromGroup = 2,
-            toGroup = 1
+        fundingTxs = Some(
+          AVector(
+            BuildSimpleTransferTxResult(
+              unsignedTx = hexString,
+              model.minimalGas,
+              model.nonCoinbaseMinGasPrice,
+              txId,
+              fromGroup = 2,
+              toGroup = 1
+            )
           )
         )
       )
@@ -1228,14 +1230,16 @@ trait EndpointsExamples extends ErrorExamples {
         txId2,
         fromGroup = 1,
         toGroup = 3,
-        transferTxs = AVector(
-          BuildSimpleTransferTxResult(
-            unsignedTx = hexString,
-            model.minimalGas,
-            model.nonCoinbaseMinGasPrice,
-            txId,
-            fromGroup = 2,
-            toGroup = 1
+        fundingTxs = Some(
+          AVector(
+            BuildSimpleTransferTxResult(
+              unsignedTx = hexString,
+              model.minimalGas,
+              model.nonCoinbaseMinGasPrice,
+              txId,
+              fromGroup = 2,
+              toGroup = 1
+            )
           )
         )
       )
@@ -1255,7 +1259,7 @@ trait EndpointsExamples extends ErrorExamples {
           txId = txId,
           simulationResult
         ),
-        transferTxs = AVector(
+        fundingTxs = AVector(
           BuildSimpleTransferTxResult(
             unsignedTx = hexString,
             model.minimalGas,
@@ -1281,7 +1285,7 @@ trait EndpointsExamples extends ErrorExamples {
           txId = txId,
           contractAddress = Address.contract(contractId)
         ),
-        transferTxs = AVector(
+        fundingTxs = AVector(
           BuildSimpleTransferTxResult(
             unsignedTx = hexString,
             model.minimalGas,

@@ -9090,7 +9090,7 @@
                       }
                     ]
                   },
-                  "transferTxs": [
+                  "fundingTxs": [
                     {
                       "type": "BuildSimpleTransferTxResult",
                       "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
@@ -9825,7 +9825,7 @@
                   "gasPrice": "100000000000",
                   "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                   "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq",
-                  "transferTxs": [
+                  "fundingTxs": [
                     {
                       "type": "BuildSimpleTransferTxResult",
                       "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
@@ -14415,8 +14415,7 @@
           "gasAmount",
           "gasPrice",
           "txId",
-          "contractAddress",
-          "transferTxs"
+          "contractAddress"
         ],
         "properties": {
           "fromGroup": {
@@ -14446,7 +14445,7 @@
             "type": "string",
             "format": "address"
           },
-          "transferTxs": {
+          "fundingTxs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
@@ -14464,8 +14463,7 @@
           "gasAmount",
           "gasPrice",
           "txId",
-          "simulationResult",
-          "transferTxs"
+          "simulationResult"
         ],
         "properties": {
           "fromGroup": {
@@ -14494,7 +14492,7 @@
           "simulationResult": {
             "$ref": "#/components/schemas/SimulationResult"
           },
-          "transferTxs": {
+          "fundingTxs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
@@ -14511,8 +14509,7 @@
           "gasPrice",
           "txId",
           "fromGroup",
-          "toGroup",
-          "transferTxs"
+          "toGroup"
         ],
         "properties": {
           "unsignedTx": {
@@ -14538,7 +14535,7 @@
             "type": "integer",
             "format": "int32"
           },
-          "transferTxs": {
+          "fundingTxs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
@@ -14638,7 +14635,11 @@
             "format": "group-index"
           },
           "multiSigType": {
-            "$ref": "#/components/schemas/MultiSigType"
+            "type": "string",
+            "enum": [
+              "P2HMPK",
+              "P2MPKH"
+            ]
           }
         }
       },
@@ -14669,7 +14670,11 @@
             "format": "int32"
           },
           "multiSigType": {
-            "$ref": "#/components/schemas/MultiSigType"
+            "type": "string",
+            "enum": [
+              "P2HMPK",
+              "P2MPKH"
+            ]
           }
         }
       },
@@ -14948,7 +14953,11 @@
             "format": "group-index"
           },
           "multiSigType": {
-            "$ref": "#/components/schemas/MultiSigType"
+            "type": "string",
+            "enum": [
+              "P2HMPK",
+              "P2MPKH"
+            ]
           }
         }
       },
@@ -16341,24 +16350,6 @@
           }
         }
       },
-      "MultiSigType": {
-        "title": "MultiSigType",
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/P2HMPK"
-          },
-          {
-            "$ref": "#/components/schemas/P2MPKH"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type",
-          "mapping": {
-            "P2HMPK": "#/components/schemas/P2HMPK",
-            "P2MPKH": "#/components/schemas/P2MPKH"
-          }
-        }
-      },
       "MultipleCallContract": {
         "title": "MultipleCallContract",
         "type": "object",
@@ -16484,30 +16475,6 @@
           "key": {
             "type": "string",
             "format": "32-byte-hash"
-          }
-        }
-      },
-      "P2HMPK": {
-        "title": "P2HMPK",
-        "type": "object",
-        "required": [
-          "type"
-        ],
-        "properties": {
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "P2MPKH": {
-        "title": "P2MPKH",
-        "type": "object",
-        "required": [
-          "type"
-        ],
-        "properties": {
-          "type": {
-            "type": "string"
           }
         }
       },

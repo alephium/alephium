@@ -220,7 +220,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     }
 
     def getAllUnsignedTxs(result: BuildGrouplessTransferTxResult) = {
-      val txs = result.transferTxs.map(_.unsignedTx) :+ result.unsignedTx
+      val txs = result.fundingTxs.getOrElse(AVector.empty).map(_.unsignedTx) :+ result.unsignedTx
       txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
     }
 
@@ -726,7 +726,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         .buildExecuteScriptTx(blockFlow, query)
         .rightValue
         .asInstanceOf[BuildGrouplessExecuteScriptTxResult]
-      val txs = result.transferTxs.map(_.unsignedTx) :+ result.unsignedTx
+      val txs = result.fundingTxs.getOrElse(AVector.empty).map(_.unsignedTx) :+ result.unsignedTx
       txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
     }
 
@@ -831,7 +831,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         .buildDeployContractTx(blockFlow, query)
         .rightValue
         .asInstanceOf[BuildGrouplessDeployContractTxResult]
-      val txs         = result.transferTxs.map(_.unsignedTx) :+ result.unsignedTx
+      val txs = result.fundingTxs.getOrElse(AVector.empty).map(_.unsignedTx) :+ result.unsignedTx
       val unsignedTxs = txs.map(tx => deserialize[UnsignedTransaction](Hex.unsafe(tx)).rightValue)
       (unsignedTxs, result.contractAddress.contractId)
     }
@@ -1096,7 +1096,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
           .rightValue
           .rightValue
 
-        result.transferTxs.length is 1
+        result.fundingTxs.value.length is 1
         verifyBalance(toAddress, result.unsignedTx, alphAmount, tokenAmount)
       }
 

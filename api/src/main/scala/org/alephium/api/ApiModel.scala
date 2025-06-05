@@ -336,12 +336,12 @@ trait ApiModelCodec {
 
   implicit val multiSigTypeRW: RW[MultiSigType] = readwriter[String].bimap(
     {
-      case MultiSigType.P2MPKH => "p2mpkh"
-      case MultiSigType.P2HMPK => "p2hmpk"
+      case MultiSigType.P2MPKH => "P2MPKH"
+      case MultiSigType.P2HMPK => "P2HMPK"
     },
     {
-      case "p2mpkh" => MultiSigType.P2MPKH
-      case "p2hmpk" => MultiSigType.P2HMPK
+      case "P2MPKH" => MultiSigType.P2MPKH
+      case "P2HMPK" => MultiSigType.P2HMPK
       case other    => throw Abort(s"Invalid multi-sig type: $other")
     }
   )

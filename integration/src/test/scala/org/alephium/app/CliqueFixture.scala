@@ -636,7 +636,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
           result.fromGroup,
           result.toGroup
         )
-        (result.transferTxs :+ transferTx).map(signAndSubmitFunc)
+        (result.fundingTxs.getOrElse(AVector.empty) :+ transferTx).map(signAndSubmitFunc)
     }
   }
 
@@ -869,7 +869,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       case result: BuildSimpleExecuteScriptTxResult =>
         submitTxWithPort(result.unsignedTx, result.txId, restPort)
       case result: BuildGrouplessExecuteScriptTxResult =>
-        result.transferTxs.foreach(tx => submitTxWithPort(tx.unsignedTx, tx.txId, restPort))
+        result.fundingTxs.foreach(_.foreach(tx => submitTxWithPort(tx.unsignedTx, tx.txId, restPort)))
         submitTxWithPort(result.unsignedTx, result.txId, restPort)
     }
     buildResult

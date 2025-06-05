@@ -107,6 +107,14 @@ trait TapirSchemasLike {
     Schema.derived
   implicit val buildDeployContractTxResultSchema: Schema[BuildDeployContractTxResult] =
     Schema.derived
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  implicit val multisigTypeSchema: Schema[MultiSigType] =
+    Schema
+      .string[MultiSigType]
+      .validate(
+        Validator.enumeration(List(MultiSigType.P2HMPK, MultiSigType.P2MPKH), v => Some(v.toString))
+      )
 }
 
 object TapirSchemas extends TapirSchemasLike
