@@ -34,7 +34,6 @@ import org.alephium.flow.core.{maxForkDepth, AMMContract, BlockFlow, ExtraUtxosI
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.TxScriptExeFailed
-import org.alephium.io.IOError
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
@@ -5031,7 +5030,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     heightHashes01_1.toSet is Set(block01_1.hash)
 
     val txOutputRef = block01_1.nonCoinbase.head.unsigned.inputs(0).outputRef
-    blockFlow.getTxOutput(txOutputRef, block01_1.hash).leftValue is a[IOError.KeyNotFound]
+    val output      = block00_31.nonCoinbase.head.unsigned.fixedOutputs(0)
+    blockFlow.getTxOutput(txOutputRef, block01_1.hash) isE Some(output)
   }
 
   it should "return error if the BuildTransaction.ExecuteScript is invalid" in new Fixture {
