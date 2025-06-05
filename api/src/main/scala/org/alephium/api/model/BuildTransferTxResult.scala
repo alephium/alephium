@@ -66,7 +66,7 @@ final case class BuildGrouplessTransferTxResult(
     txId: TransactionId,
     fromGroup: Int,
     toGroup: Int,
-    transferTxs: AVector[BuildSimpleTransferTxResult]
+    fundingTxs: Option[AVector[BuildSimpleTransferTxResult]]
 ) extends BuildTransferTxResult
 object BuildGrouplessTransferTxResult {
   def from(
@@ -76,6 +76,7 @@ object BuildGrouplessTransferTxResult {
       Left(badRequest("transferTxs is empty"))
     } else {
       val transferTx = transferTxs.last
+      val fundingTxs = transferTxs.init
       Right(
         BuildGrouplessTransferTxResult(
           transferTx.unsignedTx,
@@ -84,7 +85,7 @@ object BuildGrouplessTransferTxResult {
           transferTx.txId,
           transferTx.fromGroup,
           transferTx.toGroup,
-          transferTxs.init
+          Option.when(fundingTxs.nonEmpty)(fundingTxs)
         )
       )
     }

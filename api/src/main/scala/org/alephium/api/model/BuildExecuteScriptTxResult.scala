@@ -85,13 +85,13 @@ final case class BuildGrouplessExecuteScriptTxResult(
     gasPrice: GasPrice,
     txId: TransactionId,
     simulationResult: SimulationResult,
-    transferTxs: AVector[BuildSimpleTransferTxResult]
+    fundingTxs: Option[AVector[BuildSimpleTransferTxResult]]
 ) extends BuildExecuteScriptTxResult
 
 object BuildGrouplessExecuteScriptTxResult {
   def from(
       executeScriptTx: BuildSimpleExecuteScriptTxResult,
-      transferTxs: AVector[BuildSimpleTransferTxResult]
+      fundingTxs: AVector[BuildSimpleTransferTxResult]
   ): BuildGrouplessExecuteScriptTxResult = {
     BuildGrouplessExecuteScriptTxResult(
       executeScriptTx.fromGroup,
@@ -101,7 +101,7 @@ object BuildGrouplessExecuteScriptTxResult {
       executeScriptTx.gasPrice,
       executeScriptTx.txId,
       executeScriptTx.simulationResult,
-      transferTxs
+      Option.when(fundingTxs.nonEmpty)(fundingTxs)
     )
   }
 }

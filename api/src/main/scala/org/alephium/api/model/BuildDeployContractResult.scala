@@ -73,13 +73,13 @@ final case class BuildGrouplessDeployContractTxResult(
     gasPrice: GasPrice,
     txId: TransactionId,
     contractAddress: Address.Contract,
-    transferTxs: AVector[BuildSimpleTransferTxResult]
+    fundingTxs: Option[AVector[BuildSimpleTransferTxResult]]
 ) extends BuildDeployContractTxResult
 
 object BuildGrouplessDeployContractTxResult {
   def from(
       deployContractTx: BuildSimpleDeployContractTxResult,
-      transferTxs: AVector[BuildSimpleTransferTxResult]
+      fundingTxs: AVector[BuildSimpleTransferTxResult]
   ): BuildGrouplessDeployContractTxResult = {
     BuildGrouplessDeployContractTxResult(
       deployContractTx.fromGroup,
@@ -89,7 +89,7 @@ object BuildGrouplessDeployContractTxResult {
       deployContractTx.gasPrice,
       deployContractTx.txId,
       deployContractTx.contractAddress,
-      transferTxs
+      Option.when(fundingTxs.nonEmpty)(fundingTxs)
     )
   }
 }
