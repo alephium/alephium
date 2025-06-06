@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.model.{BlockHash, ContractId, TxOutput, TxOutputRef}
+import org.alephium.protocol.model.{BlockHash, ChainIndex, ContractId, TxOutput, TxOutputRef}
 import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStateId
 import org.alephium.util.AVector
@@ -147,13 +147,28 @@ trait NodeIndexesUtils { Self: FlowUtils =>
       spentBlockHash: BlockHash,
       locators: AVector[TxOutputLocator]
   ): IOResult[TxOutputLocator] = {
-    val headerChain = blockFlow.getHeaderChain(spentBlockHash)
-
     locators
-      .findE(locator => headerChain.isBefore(locator.blockHash, spentBlockHash))
+      .findE(locator => isBefore(blockFlow, locator.blockHash, spentBlockHash))
       .flatMap {
         case Some(locator) => Right(locator)
         case None          => Left(IOError.keyNotFound("Cannot find the input info for the TX"))
       }
+  }
+
+  private[core] def isBefore(
+      blockFlow: BlockFlow,
+      previous: BlockHash,
+      current: BlockHash
+  ): IOResult[Boolean] = {
+    val previousChainIndex = ChainIndex.from(previous)
+    val currentChainIndex  = ChainIndex.from(current)
+
+    val chain = blockFlow.getHeaderChain(currentChainIndex)
+    if (currentChainIndex == previousChainIndex) {
+      chain.isBefore(previous, current)
+    } else {
+      val groupDeps = getOutTipsUnsafe(current, previousChainIndex.from)
+      chain.isBefore(previous, groupDeps(previousChainIndex.to.value))
+    }
   }
 }
