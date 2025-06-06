@@ -324,6 +324,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def isBefore(hash1: BlockHash, hash2: BlockHash): IOResult[Boolean] = {
+    assume(ChainIndex.from(hash1) == ChainIndex.from(hash2))
     for {
       height1 <- getHeight(hash1)
       height2 <- getHeight(hash2)
