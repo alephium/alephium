@@ -282,14 +282,16 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       oldHeight: Int
   ): IOResult[AVector[BlockHash]] = {
     assume(oldHeight >= ALPH.GenesisHeight)
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def iter(
+    @tailrec def iter(
         acc: AVector[BlockHash],
         currentHash: BlockHash,
         currentHeight: Int
     ): IOResult[AVector[BlockHash]] = {
       if (currentHeight > oldHeight) {
-        getParentHash(currentHash).flatMap(iter(acc :+ currentHash, _, currentHeight - 1))
+        getParentHash(currentHash) match {
+          case Right(parentHash) => iter(acc :+ currentHash, parentHash, currentHeight - 1)
+          case Left(error)       => Left(error)
+        }
       } else if (currentHeight == oldHeight && currentHash == oldHash) {
         Right(acc)
       } else {
