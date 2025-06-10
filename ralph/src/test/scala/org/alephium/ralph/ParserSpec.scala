@@ -315,6 +315,17 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           IndexSelector[StatefulContext](Const(Val.U256(U256.Zero)))
         )
       )
+    parse("(a)", StatefulParser.expr(_)).get.value is ParenExpr[StatefulContext](
+      Variable(Ident("a"))
+    )
+    parse("(a, b)", StatefulParser.expr(_)).get.value is TupleLiteral[StatefulContext](
+      Seq(Variable(Ident("a")), Variable(Ident("b")))
+    )
+    parse("(a, b)._0", StatefulParser.expr(_)).get.value is
+      LoadDataBySelectors[StatefulContext](
+        TupleLiteral(Seq(Variable(Ident("a")), Variable(Ident("b")))),
+        Seq(IdentSelector(Ident("_0")))
+      )
   }
 
   it should "parse string literals" in {

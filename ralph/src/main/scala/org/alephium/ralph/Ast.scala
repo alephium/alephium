@@ -848,6 +848,19 @@ object Ast {
     }
   }
 
+  final case class TupleLiteral[Ctx <: StatelessContext](exprs: Seq[Expr[Ctx]]) extends Expr[Ctx] {
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      val types = exprs.flatMap(_.getType(state))
+      Seq(state.resolveType(Type.Tuple(types)))
+    }
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
+      exprs.flatMap(_.genCode(state))
+    override def reset(): Unit = {
+      exprs.foreach(_.reset())
+      super.reset()
+    }
+  }
+
   trait IfBranch[Ctx <: StatelessContext] extends Positioned {
     def condition: Expr[Ctx]
     def checkCondition(state: Compiler.State[Ctx]): Unit = {

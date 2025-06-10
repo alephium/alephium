@@ -10234,10 +10234,18 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
            |    return (1, false)
            |  }
            |  pub fn foo2() -> () {
-           |    let tuple = foo0()
-           |    assert!(tuple._0 == 0 && tuple._1, 0)
+           |    let tuple0 = foo0()
+           |    assert!(tuple0._0 == 0 && tuple0._1, 0)
            |    let (a, b) = foo1()
            |    assert!(a == 1 && !b, 0)
+           |
+           |    let mut tuple1 = (2, false)
+           |    assert!(tuple1._0 == 2 && !tuple1._1, 0)
+           |    tuple1 = foo0()
+           |    assert!(tuple1._0 == 0 && tuple1._1, 0)
+           |    tuple1._0 = a
+           |    tuple1._1 = b
+           |    assert!(tuple1._0 == 1 && !tuple1._1, 0)
            |  }
            |}
            |""".stripMargin
