@@ -10192,15 +10192,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
 
     {
       info("Invalid tuple field assignment")
-      val code =
+      def code(stmt: String) =
         s"""
            |Contract Foo(mut a: (U256, I256)) {
            |  pub fn foo(value: I256) -> () {
-           |    $$a._0 = value$$
+           |    $stmt
            |  }
            |}
            |""".stripMargin
-      testContractError(code, s"""Cannot assign "I256" to "U256"""")
+      testContractError(code(s"$$a._0 = value$$"), s"""Cannot assign "I256" to "U256"""")
+      testContractError(
+        code(s"$$a._0 += (value, value)$$"),
+        s"""Cannot assign "Tuple(I256,I256)" to "U256""""
+      )
     }
 
     {
