@@ -339,8 +339,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       // Lexer.primTpes currently can't have source index as they are case objects
       Lexer.typeId.map(id =>
         Lexer.primTpes.getOrElse(id.name, contractTypeCtor(id).atSourceIndex(id.sourceIndex))
-      ) |
-        arrayType(parseType(contractTypeCtor))
+      ) | arrayType(parseType(contractTypeCtor)) | tupleType(parseType(contractTypeCtor))
     )
   }
 
@@ -353,6 +352,13 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
   }
+
+  def tupleType[Unknown: P](baseType: => P[Type]): P[Type] = {
+    P(Index ~ "(" ~ baseType.rep(1, ",") ~ ")" ~ Index).map { case (from, types, to) =>
+      if (types.length == 1) types(0) else Type.Tuple(types).atSourceIndex(from, to, fileURI)
+    }
+  }
+
   def argument[Unknown: P](
       allowMutable: Boolean
   )(contractTypeCtor: Ast.TypeId => Type.NamedType): P[Ast.Argument] =

@@ -1382,7 +1382,12 @@ object Ast {
     def getArgNames(): AVector[String]          = AVector.from(args.view.map(_.ident.name))
     def getArgTypeSignatures(): AVector[String] = AVector.from(args.view.map(_.tpe.signature))
     def getArgMutability(): AVector[Boolean]    = AVector.from(args.view.map(_.isMutable))
-    def getReturnSignatures(): AVector[String]  = AVector.from(rtypes.view.map(_.signature))
+    def getReturnSignatures(): AVector[String] = {
+      rtypes match {
+        case Seq(t: Type.Tuple) => AVector.from(t.types.map(_.signature))
+        case _                  => AVector.from(rtypes.map(_.signature))
+      }
+    }
 
     def hasDirectCheckExternalCaller(): Boolean = {
       !useCheckExternalCaller || // check external caller manually disabled

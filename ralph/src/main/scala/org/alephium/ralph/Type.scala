@@ -26,10 +26,8 @@ sealed trait Type extends Ast.Positioned {
   def signature: String = toVal.toString
 
   def isPrimitive: Boolean = this match {
-    case _: Type.FixedSizeArray | _: Type.Struct | _: Type.NamedType | _: Type.Contract |
-        _: Type.Map =>
-      false
-    case _ => true
+    case Type.Bool | Type.I256 | Type.U256 | Type.ByteVec | Type.Address => true
+    case _                                                               => false
   }
 
   def isArrayType: Boolean = this match {
@@ -105,6 +103,11 @@ object Type {
     def toVal: Val.Type            = Val.Map(key.toVal, value.toVal)
     override def toString: String  = s"Map[$key,$value]"
     override def signature: String = s"Map[${key.signature},${value.signature}]"
+  }
+
+  final case class Tuple(types: Seq[Type]) extends Type {
+    def toVal: Val.Type            = ???
+    override def signature: String = s"(${types.map(_.signature).mkString(",")})"
   }
 
   final case class Contract(id: Ast.TypeId) extends Type {
