@@ -40,6 +40,11 @@ sealed trait Type extends Ast.Positioned {
     case _              => false
   }
 
+  def isTupleType: Boolean = this match {
+    case _: Type.Tuple => true
+    case _             => false
+  }
+
   def isMapType: Boolean = this match {
     case _: Type.Map => true
     case _           => false
@@ -107,6 +112,7 @@ object Type {
 
   final case class Tuple(types: Seq[Type]) extends Type {
     def toVal: Val.Type            = ???
+    override def toString: String  = s"Tuple$signature"
     override def signature: String = s"(${types.map(_.signature).mkString(",")})"
   }
 

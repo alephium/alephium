@@ -303,12 +303,20 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.StructDestruction(id, vars, expr).atSourceIndex(sourceIndex)
     }
 
+  def tupleFieldSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(
+    "." ~ Index ~ "_" ~ CharIn("0-9").rep(1).! ~~ Index
+  ).map { case (from, index, to) =>
+    val selector = Ast.Ident(s"_$index").atSourceIndex(from, to, fileURI)
+    Ast.IdentSelector(selector).atSourceIndex(selector.sourceIndex)
+  }
   def identSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(
     "." ~ Index ~ Lexer.ident ~ Index
   ).map { case (from, ident, to) =>
     Ast.IdentSelector(ident).atSourceIndex(from, to, fileURI)
   }
-  def dataSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(identSelector | indexSelector)
+  def dataSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(
+    identSelector | indexSelector | tupleFieldSelector
+  )
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
     PP(Lexer.ident ~ dataSelector.rep(0)) { case (ident, selectors) =>
