@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.model.{BlockHash, ChainIndex, ContractId, TxOutput, TxOutputRef}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStateId
 import org.alephium.util.AVector
@@ -86,7 +86,10 @@ trait NodeIndexesUtils { Self: FlowUtils =>
     subContractIndexStorage.flatMap(_.subContractIndexCounterState.getOpt(parentContractId))
   }
 
-  def getTxOutput(outputRef: TxOutputRef, spentBlockHash: BlockHash): IOResult[Option[TxOutput]] = {
+  def getTxOutput(
+      outputRef: TxOutputRef,
+      spentBlockHash: BlockHash
+  ): IOResult[Option[(TransactionId, TxOutput)]] = {
     getTxOutput(outputRef, spentBlockHash, maxForkDepth)
   }
 
@@ -94,15 +97,17 @@ trait NodeIndexesUtils { Self: FlowUtils =>
       outputRef: TxOutputRef,
       spentBlockHash: BlockHash,
       maxForkDepth: Int
-  ): IOResult[Option[TxOutput]] = {
+  ): IOResult[Option[(TransactionId, TxOutput)]] = {
     for {
       resultOpt <- getTxIdTxOutputLocatorsFromOutputRef(outputRef)
       txOutputOpt <- resultOpt match {
-        case Some(TxIdTxOutputLocators(_, txOutputLocators)) =>
+        case Some(TxIdTxOutputLocators(txId, txOutputLocators)) =>
           for {
             locator <- getOutputLocator(blockFlow, spentBlockHash, txOutputLocators, maxForkDepth)
             block   <- blockFlow.getBlock(locator.blockHash)
-          } yield Some(block.getTransaction(locator.txIndex).getOutput(locator.txOutputIndex))
+          } yield Some(
+            (txId, block.getTransaction(locator.txIndex).getOutput(locator.txOutputIndex))
+          )
         case None =>
           Right(None)
       }

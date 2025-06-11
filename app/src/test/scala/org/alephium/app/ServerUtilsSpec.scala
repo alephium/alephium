@@ -13,7 +13,6 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
-
 package org.alephium.app
 
 import java.net.InetSocketAddress
@@ -4880,12 +4879,19 @@ class ServerUtilsSpec extends AlephiumSpec {
     def main4: Block
     def fork3: Block
 
+    // scalastyle:off method.length
     def verifyForkedChain(): Assertion = {
       main2.nonCoinbase.length is 1
       main2.nonCoinbase.head.inputsLength is 1
       val testKeyTxOutputRef = main2.nonCoinbase.head.unsigned.inputs(0).outputRef
-      val testKeyTxOutput    = main0.nonCoinbase.head.unsigned.fixedOutputs(0)
-      blockFlow.getTxOutput(testKeyTxOutputRef, main2.hash, maxForkDepth) isE Some(testKeyTxOutput)
+      val testKeyTx          = main0.nonCoinbase.head.unsigned
+      val testKeyTxOutput    = testKeyTx.fixedOutputs(0)
+      blockFlow.getTxOutput(testKeyTxOutputRef, main2.hash, maxForkDepth) isE Some(
+        (
+          testKeyTx.id,
+          testKeyTxOutput
+        )
+      )
 
       // Same tx in both main3 and fork2
       main3.nonCoinbase.head.id is fork2.nonCoinbase.head.id
@@ -4907,10 +4913,24 @@ class ServerUtilsSpec extends AlephiumSpec {
         lockupScript = LockupScript.p2c(contractId),
         tokens = AVector((TokenId.from(contractId), ALPH.alph(15)))
       )
-      blockFlow.getTxOutput(contractOutputRef, main4.hash, 0) isE Some(contractOutputMain3)
-      blockFlow.getTxOutput(contractOutputRef, main4.hash, 1) isE Some(contractOutputMain3)
+
+      blockFlow.getTxOutput(contractOutputRef, main4.hash, 0) isE Some(
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputMain3
+        )
+      )
+      blockFlow.getTxOutput(contractOutputRef, main4.hash, 1) isE Some(
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputMain3
+        )
+      )
       blockFlow.getTxOutput(contractOutputRef, main4.hash, maxForkDepth) isE Some(
-        contractOutputMain3
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputMain3
+        )
       )
 
       val contractOutputFork2 = ModelContractOutput(
@@ -4918,10 +4938,23 @@ class ServerUtilsSpec extends AlephiumSpec {
         lockupScript = LockupScript.p2c(contractId),
         tokens = AVector((TokenId.from(contractId), ALPH.alph(19)))
       )
-      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 0) isE Some(contractOutputMain3)
-      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 1) isE Some(contractOutputFork2)
+      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 0) isE Some(
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputMain3
+        )
+      )
+      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 1) isE Some(
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputFork2
+        )
+      )
       blockFlow.getTxOutput(contractOutputRef, fork3.hash, maxForkDepth) isE Some(
-        contractOutputFork2
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputFork2
+        )
       )
     }
   }
@@ -5003,8 +5036,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     block1.nonCoinbase.length is 1
     block1.nonCoinbase.head.inputsLength is 1
     val txOutputRef    = block1.nonCoinbase.head.unsigned.inputs(0).outputRef
-    val coinbaseOutput = block0.coinbase.unsigned.fixedOutputs(0)
-    blockFlow.getTxOutput(txOutputRef, block1.hash) isE Some(coinbaseOutput)
+    val coinbaseTx     = block0.coinbase.unsigned
+    val coinbaseOutput = coinbaseTx.fixedOutputs(0)
+    blockFlow.getTxOutput(txOutputRef, block1.hash) isE Some((coinbaseTx.id, coinbaseOutput))
   }
 
   it should "return correct tx output when original tx exists in forked blocks and the spending tx's block height is lower" in new Fixture {
@@ -5037,8 +5071,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     heightHashes01_1.toSet is Set(block01_1.hash)
 
     val txOutputRef = block01_1.nonCoinbase.head.unsigned.inputs(0).outputRef
-    val output      = block00_31.nonCoinbase.head.unsigned.fixedOutputs(0)
-    blockFlow.getTxOutput(txOutputRef, block01_1.hash) isE Some(output)
+    val outputTx    = block00_31.nonCoinbase.head.unsigned
+    val output      = outputTx.fixedOutputs(0)
+    blockFlow.getTxOutput(txOutputRef, block01_1.hash) isE Some((outputTx.id, output))
   }
 
   it should "return error if the BuildTransaction.ExecuteScript is invalid" in new Fixture {
@@ -5251,8 +5286,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val transaction = block1.nonCoinbase.head
     val richInput = {
       transaction.unsigned.inputs.length is 1
-      val input = transaction.unsigned.inputs.head
-      RichInput.from(input, outputToBeSpent.asInstanceOf[model.AssetOutput])
+      val input   = transaction.unsigned.inputs.head
+      val txIdRef = serverUtils.getTxIdFromOutputRef(blockFlow, input.outputRef).rightValue
+      RichInput.from(input, outputToBeSpent.asInstanceOf[model.AssetOutput], txIdRef)
     }
     val richTransaction = RichTransaction.from(transaction, AVector(richInput), AVector.empty)
 
@@ -5325,13 +5361,15 @@ class ServerUtilsSpec extends AlephiumSpec {
     val scriptTransaction = scriptBlock.nonCoinbase.head
     val richAssetInput = {
       scriptTransaction.unsigned.inputs.length is 1
-      val input = scriptTransaction.unsigned.inputs.head
-      RichInput.from(input, assetOutputToBeSpent.asInstanceOf[model.AssetOutput])
+      val input   = scriptTransaction.unsigned.inputs.head
+      val txIdRef = serverUtils.getTxIdFromOutputRef(blockFlow, input.outputRef).rightValue
+      RichInput.from(input, assetOutputToBeSpent.asInstanceOf[model.AssetOutput], txIdRef)
     }
     val richContractInput = {
       scriptTransaction.contractInputs.length is 1
-      val input = scriptTransaction.contractInputs.head
-      RichInput.from(input, contractOutputToBeSpent.asInstanceOf[model.ContractOutput])
+      val input   = scriptTransaction.contractInputs.head
+      val txIdRef = serverUtils.getTxIdFromOutputRef(blockFlow, input).rightValue
+      RichInput.from(input, contractOutputToBeSpent.asInstanceOf[model.ContractOutput], txIdRef)
     }
     val richTransaction =
       RichTransaction.from(scriptTransaction, AVector(richAssetInput), AVector(richContractInput))

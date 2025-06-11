@@ -632,8 +632,14 @@ class ServerUtils(implicit
       for {
         txOutputOpt <- wrapResult(blockFlow.getTxOutput(contractOutputRef, spentBlockHash))
         richInput <- txOutputOpt match {
-          case Some(txOutput) =>
-            Right(RichInput.from(contractOutputRef, txOutput.asInstanceOf[ProtocolContractOutput]))
+          case Some((txId, txOutput)) =>
+            Right(
+              RichInput.from(
+                contractOutputRef,
+                txOutput.asInstanceOf[ProtocolContractOutput],
+                txId
+              )
+            )
           case None =>
             Left(notFound(s"Transaction output for contract output reference ${contractOutputRef}"))
         }
@@ -651,8 +657,8 @@ class ServerUtils(implicit
       for {
         txOutputOpt <- wrapResult(blockFlow.getTxOutput(assetInput.outputRef, spentBlockHash))
         richInput <- txOutputOpt match {
-          case Some(txOutput) =>
-            Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput]))
+          case Some((txId, txOutput)) =>
+            Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput], txId))
           case None =>
             Left(notFound(s"Transaction output for asset output reference ${assetInput.outputRef}"))
         }
