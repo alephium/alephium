@@ -18,11 +18,14 @@ package org.alephium.api.model
 
 import java.net.InetSocketAddress
 
+
+
 final case class NodeInfo(
     buildInfo: NodeInfo.BuildInfo,
     upnp: Boolean,
-    externalAddress: Option[InetSocketAddress]
-)
+    externalAddress: Option[InetSocketAddress],
+    description: Option[String]
+) 
 
 object NodeInfo {
   final case class BuildInfo(
