@@ -6206,6 +6206,35 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
       serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
     }
+
+    {
+      def code(times: Int) =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false, updateFields = true)
+           |  pub fn foo(num: U256) -> () {
+           |    for (let mut i = 0; i < num; i += 1) {
+           |      map.insert!(i, i)
+           |    }
+           |  }
+           |
+           |  test "foo"
+           |  approve{address -> ALPH: 1 alph} {
+           |    foo($times)
+           |  }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(1))).isRight is true
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(2))).isRight is true
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(3))).isRight is true
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(4)))
+        .leftValue
+        .detail
+        .contains("Insufficient funds to cover the minimum amount") is true
+    }
   }
 
   it should "test auto fund" in {

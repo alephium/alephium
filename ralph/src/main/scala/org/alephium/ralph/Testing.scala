@@ -712,7 +712,63 @@ object Testing {
     }
   }
 
-  // scalastyle:off method.length
+  // scalastyle:off method.length parameter.number
+  def tryRunTest(
+      createWorldState: GroupIndex => IOResult[WorldState.Staging],
+      sourceCode: String,
+      allContracts: Map[String, CompiledContract],
+      testingContract: CompiledContract,
+      allTests: CompiledUnitTests[StatefulContext],
+      test: CompiledUnitTest[StatefulContext]
+  )(implicit
+      consensusConfigs: ConsensusConfigs,
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      groupConfig: GroupConfig
+  ): Either[String, Unit] = {
+    for {
+      groupIndex <- test.getGroupIndex
+      worldState <- from(createWorldState(groupIndex))
+      blockHash      = test.settings.flatMap(_.blockHash).getOrElse(BlockHash.random)
+      blockTimeStamp = test.settings.flatMap(_.blockTimeStamp).getOrElse(TimeStamp.now())
+      txId           = TransactionId.random
+      createFunc = () =>
+        createContracts(worldState, allContracts, testingContract, test, blockHash, txId)
+      runFunc = (extraDustAmount: U256) => {
+        val blockEnv    = BlockEnv.mockup(groupIndex, blockHash, blockTimeStamp)
+        val inputAssets = test.getInputAssets()
+        val txEnv       = ContractRunner.createTxEnv(txId, inputAssets, extraDustAmount)
+        val context     = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
+        ContractRunner.run(
+          context,
+          test.selfContract.contractId,
+          None,
+          inputAssets,
+          testingContract.debugCode.methodsLength,
+          AVector.empty,
+          test.method,
+          nonCoinbaseMinGasPrice * maximalGasPerTx
+        )
+      }
+      _ <- ContractRunner.retryOnInsufficientFundsError(
+        worldState,
+        createFunc,
+        runFunc,
+        ContractRunner.MaxRetryTimes,
+        U256.Zero
+      ) match {
+        case Right(_) => Right(())
+        case Left(Left(error)) =>
+          Left(s"IO error occurred when running test `${test.name}`: $error")
+        case Left(Right(error)) =>
+          val debugMessages = extractDebugMessage(worldState, test)
+          Left(getUnitTestError(sourceCode, allTests, test.name, error, debugMessages))
+      }
+      _ <- checkStateAfterTesting(worldState, sourceCode, test)
+    } yield ()
+  }
+  // scalastyle:on method.length parameter.number
+
   def run(
       createWorldState: GroupIndex => IOResult[WorldState.Staging],
       sourceCode: String,
@@ -727,51 +783,13 @@ object Testing {
     contracts.foreachE { testingContract =>
       testingContract.tests match {
         case Some(tests) =>
-          tests.tests.foreachE { test =>
-            for {
-              groupIndex <- test.getGroupIndex
-              worldState <- from(createWorldState(groupIndex))
-              blockHash      = test.settings.flatMap(_.blockHash).getOrElse(BlockHash.random)
-              blockTimeStamp = test.settings.flatMap(_.blockTimeStamp).getOrElse(TimeStamp.now())
-              txId           = TransactionId.random
-              _ <- createContracts(
-                worldState,
-                contractMap,
-                testingContract,
-                test,
-                blockHash,
-                txId
-              )
-              blockEnv    = BlockEnv.mockup(groupIndex, blockHash, blockTimeStamp)
-              testGasFee  = nonCoinbaseMinGasPrice * maximalGasPerTx
-              inputAssets = test.getInputAssets()
-              txEnv       = TxEnv.mockup(txId, inputAssets)
-              context     = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
-              _ <- ContractRunner.run(
-                context,
-                test.selfContract.contractId,
-                None,
-                inputAssets,
-                testingContract.debugCode.methodsLength,
-                AVector.empty,
-                test.method,
-                testGasFee
-              ) match {
-                case Right(_) => Right(())
-                case Left(Left(error)) =>
-                  Left(s"IO error occurred when running test `${test.name}`: $error")
-                case Left(Right(error)) =>
-                  val debugMessages = extractDebugMessage(worldState, test)
-                  Left(getUnitTestError(sourceCode, tests, test.name, error, debugMessages))
-              }
-              _ <- checkStateAfterTesting(worldState, sourceCode, test)
-            } yield ()
+          tests.tests.foreachE {
+            tryRunTest(createWorldState, sourceCode, contractMap, testingContract, tests, _)
           }
         case None => Right(())
       }
     }
   }
-  // scalastyle:off method.length
 
   private def createContracts(
       worldState: WorldState.Staging,
@@ -780,7 +798,7 @@ object Testing {
       test: Testing.CompiledUnitTest[StatefulContext],
       blockHash: BlockHash,
       txId: TransactionId
-  ) = {
+  ): IOResult[Unit] = {
     test.before.foreachE { c =>
       val contractCode = if (c.typeId == testingContract.ast.ident) {
         val code = testingContract.debugCode
@@ -803,8 +821,6 @@ object Testing {
           blockHash,
           txId
         )
-        .left
-        .map(err => s"IO error occurred when creating contract: $err")
     }
   }
 
