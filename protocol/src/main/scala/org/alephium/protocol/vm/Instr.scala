@@ -3220,22 +3220,26 @@ final case class DEBUG(stringParts: AVector[Val.ByteVec])
 object DEBUG extends StatelessInstrCompanion1[AVector[Val.ByteVec]]
 
 sealed trait DevInstrBase
-case object TestCheckStart extends DevInstrBase
-case object TestErrorStart extends DevInstrBase
-case object TestCheckEnd   extends DevInstrBase
-case object TestEqual      extends DevInstrBase
-case object RandomU256     extends DevInstrBase
-case object RandomI256     extends DevInstrBase
+case object TestCheckStart        extends DevInstrBase
+case object TestErrorStart        extends DevInstrBase
+case object TestCheckEnd          extends DevInstrBase
+case object TestEqual             extends DevInstrBase
+case object RandomU256            extends DevInstrBase
+case object RandomI256            extends DevInstrBase
+case object RandomContractAddress extends DevInstrBase
+case object RandomAssetAddress    extends DevInstrBase
 object DevInstrBase {
   implicit val serde: Serde[DevInstrBase] = new Serde[DevInstrBase] {
     override def serialize(input: DevInstrBase): ByteString = {
       input match {
-        case TestCheckStart => ByteString(0)
-        case TestErrorStart => ByteString(1)
-        case TestCheckEnd   => ByteString(2)
-        case TestEqual      => ByteString(3)
-        case RandomU256     => ByteString(4)
-        case RandomI256     => ByteString(5)
+        case TestCheckStart        => ByteString(0)
+        case TestErrorStart        => ByteString(1)
+        case TestCheckEnd          => ByteString(2)
+        case TestEqual             => ByteString(3)
+        case RandomU256            => ByteString(4)
+        case RandomI256            => ByteString(5)
+        case RandomContractAddress => ByteString(6)
+        case RandomAssetAddress    => ByteString(7)
       }
     }
 
@@ -3247,6 +3251,8 @@ object DevInstrBase {
         case Staging(3, content) => Right(Staging(TestEqual, content))
         case Staging(4, content) => Right(Staging(RandomU256, content))
         case Staging(5, content) => Right(Staging(RandomI256, content))
+        case Staging(6, content) => Right(Staging(RandomContractAddress, content))
+        case Staging(7, content) => Right(Staging(RandomAssetAddress, content))
         case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid dev instr prefix $n"))
       }
     }
@@ -3318,6 +3324,10 @@ final case class DevInstr(instr: DevInstrBase)
           } yield ()
         case RandomU256 => frame.pushOpStack(Val.U256(util.UnsecureRandom.nextU256()))
         case RandomI256 => frame.pushOpStack(Val.I256(util.UnsecureRandom.nextI256()))
+        case RandomContractAddress =>
+          frame.pushOpStack(Val.Address(LockupScript.p2c(ContractId.random)))
+        case RandomAssetAddress =>
+          frame.pushOpStack(Val.Address(LockupScript.p2pkh(PublicKey.generate)))
       }
     }
   }

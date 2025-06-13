@@ -6235,6 +6235,26 @@ class ServerUtilsSpec extends AlephiumSpec {
         .detail
         .contains("Insufficient funds to cover the minimum amount") is true
     }
+
+    {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |
+           |  test "random address" {
+           |    let address0 = randomContractAddress!()
+           |    testCheck!(!isAssetAddress!(address0))
+           |    testCheck!(isContractAddress!(address0))
+           |
+           |    let address1 = randomAssetAddress!()
+           |    testCheck!(isAssetAddress!(address1))
+           |    testCheck!(!isContractAddress!(address1))
+           |  }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+    }
   }
 
   it should "test auto fund" in {
