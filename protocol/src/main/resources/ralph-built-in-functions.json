@@ -1162,5 +1162,21 @@
     "doc": "Generates a random I256 value",
     "params": [],
     "returns": "@returns a randomly generated I256 value for testing purposes"
+  },
+  {
+    "name": "randomContractAddress",
+    "category": "Test",
+    "signature": "fn randomContractAddress!() -> Address",
+    "doc": "Generates a random Address value",
+    "params": [],
+    "returns": "@returns a randomly generated Address value for testing purposes"
+  },
+  {
+    "name": "randomAssetAddress",
+    "category": "Test",
+    "signature": "fn randomAssetAddress!() -> Address",
+    "doc": "Generates a random Address value",
+    "params": [],
+    "returns": "@returns a randomly generated Address value for testing purposes"
   }
 ]
