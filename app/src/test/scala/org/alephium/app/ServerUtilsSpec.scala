@@ -6257,6 +6257,29 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "test 111" in new Fixture {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn f0() -> U256 {
+         |    return f1()
+         |  }
+         |
+         |  fn f1() -> U256 {
+         |    assert!(false, 0)
+         |    return 0
+         |  }
+         |
+         |  test "f0" {
+         |    testError!(f0(), 0)
+         |    testFail!(f0())
+         |  }
+         |}
+         |""".stripMargin
+    val serverUtils = new ServerUtils
+    serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+  }
+
   it should "test auto fund" in {
     new Fixture {
       info("success if the dust amount is not specified")
