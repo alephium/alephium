@@ -428,7 +428,7 @@ object Testing {
       address.foreach(
         state.addTestingConstant(_, Val.ByteVec(contractId.bytes), Type.Contract(typeId))
       )
-      CreateContractValue(typeId, tokenAmounts, immFields, mutFields, contractId)
+      CreateContractValue(typeId, tokenAmounts, AVector.empty, mutFields ++ immFields, contractId)
     }
 
     def compileAfterContract(
@@ -454,7 +454,7 @@ object Testing {
             throw Compiler.Error(s"Expect a contract id in after def", sourceIndex)
           }
       }
-      CreateContractValue(typeId, tokenAmounts, immFields, mutFields, contractId)
+      CreateContractValue(typeId, tokenAmounts, AVector.empty, mutFields ++ immFields, contractId)
     }
   }
   final case class CreateContractValue(
@@ -492,7 +492,13 @@ object Testing {
         }
         val (immFields, mutFields) = getContractFields(contract, values)
         val selfContract =
-          CreateContractValue(state.typeId, AVector.empty, immFields, mutFields, ContractId.random)
+          CreateContractValue(
+            state.typeId,
+            AVector.empty,
+            AVector.empty,
+            mutFields ++ immFields,
+            ContractId.random
+          )
         AVector.from(dependencies.map(_.compileBeforeContract(state, origin))) :+ selfContract
       } else {
         AVector.from(dependencies ++ selfContracts).map(_.compileBeforeContract(state, origin))
@@ -561,8 +567,6 @@ object Testing {
     lazy val name: String = origin.map(typeId => s"${typeId.name}:$testName").getOrElse(testName)
 
     def compile(state: Compiler.State[Ctx]): AVector[CompiledUnitTest[Ctx]] = {
-      state.setGenDebugCode()
-
       val settingsValue = settings.map(_.compile(state))
       AVector.from(tests).mapWithIndex { case (test, index) =>
         test.compile(state, settingsValue, name, index, origin.getOrElse(state.typeId))
@@ -652,6 +656,7 @@ object Testing {
   }
 
   final case class CompiledUnitTests[Ctx <: StatelessContext](
+      contractCode: StatefulContract,
       tests: AVector[CompiledUnitTest[Ctx]],
       sourceIndexes: Map[Int, Option[SourceIndex]]
   ) {
@@ -679,10 +684,12 @@ object Testing {
 
   trait State[Ctx <: StatelessContext] { _: Compiler.State[Ctx] =>
     private var _isInTestContext: Boolean                                 = false
+    private var _isCompilingUnitTest: Boolean                             = false
     private val testCheckCalls: mutable.HashMap[Int, Option[SourceIndex]] = mutable.HashMap.empty
 
-    def isInTestContext: Boolean = _isInTestContext
-    private def withinTestContext[T](func: => T): T = {
+    def isInTestContext: Boolean     = _isInTestContext
+    def isCompilingUnitTest: Boolean = isInTestContext && _isCompilingUnitTest
+    def withinTestContext[T](func: => T): T = {
       _isInTestContext = true
       val result = func
       _isInTestContext = false
@@ -701,14 +708,29 @@ object Testing {
       errorCode
     }
 
-    def genUnitTestCode(unitTestDefs: Seq[UnitTestDef[Ctx]]): CompiledUnitTests[Ctx] = {
+    def genUnitTestCode(
+        unitTestDefs: Seq[UnitTestDef[Ctx]]
+    ): (AVector[CompiledUnitTest[Ctx]], Map[Int, Option[SourceIndex]]) = {
+      assume(isInTestContext)
+      _isCompilingUnitTest = true
       Ast.UniqueDef.checkDuplicates(unitTestDefs, "tests")
-      withinTestContext {
-        val tests      = AVector.from(unitTestDefs.flatMap(_.compile(this)))
-        val errorCodes = testCheckCalls.toMap
-        testCheckCalls.clear()
-        CompiledUnitTests(tests, errorCodes)
-      }
+      val tests      = AVector.from(unitTestDefs.flatMap(_.compile(this)))
+      val errorCodes = testCheckCalls.toMap
+      testCheckCalls.clear()
+      _isCompilingUnitTest = false
+      (tests, errorCodes)
+    }
+  }
+
+  def genUnitTestCode(
+      contract: Ast.Contract,
+      state: Compiler.State[StatefulContext]
+  ): CompiledUnitTests[StatefulContext] = {
+    state.withinTestContext {
+      state.setGenDebugCode()
+      val contractCode        = contract.genCode(state)
+      val (tests, errorCodes) = state.genUnitTestCode(contract.unitTests)
+      CompiledUnitTests(contractCode, tests, errorCodes)
     }
   }
 
@@ -791,6 +813,10 @@ object Testing {
     }
   }
 
+  private def getContractCode(contract: CompiledContract): StatefulContract = {
+    contract.tests.map(_.contractCode).getOrElse(contract.debugCode)
+  }
+
   private def createContracts(
       worldState: WorldState.Staging,
       allContracts: Map[String, CompiledContract],
@@ -801,10 +827,10 @@ object Testing {
   ): IOResult[Unit] = {
     test.before.foreachE { c =>
       val contractCode = if (c.typeId == testingContract.ast.ident) {
-        val code = testingContract.debugCode
+        val code = getContractCode(testingContract)
         code.copy(methods = code.methods :+ test.method)
       } else {
-        allContracts(c.typeId.name).debugCode
+        getContractCode(allContracts(c.typeId.name))
       }
       val attoAlphAmount =
         c.tokens.find(_._1 == TokenId.alph).map(_._2).getOrElse(minimalAlphInContract)

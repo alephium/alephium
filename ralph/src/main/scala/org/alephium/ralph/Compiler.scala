@@ -1225,7 +1225,7 @@ object Compiler {
 
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[Ctx]]]
 
-    def genStoreCode(offset: VarOffset[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
+    def genStoreCode(offset: VarOffset[Ctx], isLocal: Boolean, isMutable: Boolean): Seq[Instr[Ctx]]
 
     def resolveType(ident: Ast.Ident): Type = resolveType(getVariable(ident).tpe)
 
@@ -1450,7 +1450,8 @@ object Compiler {
 
     def genStoreCode(
         offset: VarOffset[StatelessContext],
-        isLocal: Boolean
+        isLocal: Boolean,
+        isMutable: Boolean
     ): Seq[Instr[StatelessContext]] =
       genVarIndexCode(offset, isLocal, StoreLocal.apply, StoreLocalByIndex)
 
@@ -1499,6 +1500,10 @@ object Compiler {
       globalState: Ast.GlobalState[StatefulContext]
   )(implicit val compilerOptions: CompilerOptions)
       extends State[StatefulContext] {
+    lazy val mutFieldLength = contractTable(typeId).ast.fields
+      .flatMap(f => globalState.flattenTypeMutability(f.tpe, f.isMutable))
+      .count(identity)
+
     def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatefulContext] = {
       BuiltIn.statefulFuncs
         .getOrElse(
@@ -1526,6 +1531,18 @@ object Compiler {
       }
     }
 
+    private def tryCalcOffset(
+        offset: VarOffset[StatefulContext],
+        isLocal: Boolean,
+        isMutable: Boolean
+    ): VarOffset[StatefulContext] = {
+      if (isInTestContext && !isLocal && !isMutable) {
+        offset.add(ConstantVarOffset[StatefulContext](mutFieldLength))
+      } else {
+        offset
+      }
+    }
+
     def genLoadCode(
         ident: Ast.Ident,
         isTemplate: Boolean,
@@ -1538,22 +1555,39 @@ object Compiler {
         genLoadTemplateRef(ident, tpe, offset)
       } else {
         genVarIndexCode(
-          offset,
+          tryCalcOffset(offset, isLocal, isMutable),
           isLocal,
           LoadLocal.apply,
-          if (isMutable) LoadMutField.apply else LoadImmField.apply,
+          if (isMutable || isInTestContext) LoadMutField.apply else LoadImmField.apply,
           LoadLocalByIndex,
-          if (isMutable) LoadMutFieldByIndex else LoadImmFieldByIndex
+          if (isMutable || isInTestContext) LoadMutFieldByIndex else LoadImmFieldByIndex
         )
+      }
+    }
+
+    private def genStoreField(v: VarInfo.Field): Seq[Instr[StatefulContext]] = {
+      if (isInTestContext && !v.isMutable) {
+        Seq(StoreMutField((v.index + mutFieldLength).toByte))
+      } else {
+        Seq(StoreMutField(v.index))
+      }
+    }
+
+    private def genLoadImmField(fieldIndex: Byte): Seq[Instr[StatefulContext]] = {
+      if (isInTestContext) {
+        Seq(LoadMutField((fieldIndex + mutFieldLength).toByte))
+      } else {
+        Seq(LoadImmField(fieldIndex))
       }
     }
 
     def genStoreCode(
         offset: VarOffset[StatefulContext],
-        isLocal: Boolean
+        isLocal: Boolean,
+        isMutable: Boolean
     ): Seq[Instr[StatefulContext]] = {
       genVarIndexCode(
-        offset,
+        tryCalcOffset(offset, isLocal, isMutable),
         isLocal,
         StoreLocal.apply,
         StoreMutField.apply,
@@ -1572,7 +1606,7 @@ object Compiler {
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
       getVariable(ident) match {
         case v: VarInfo.Field =>
-          if (v.isMutable) Seq(LoadMutField(v.index)) else Seq(LoadImmField(v.index))
+          if (v.isMutable) Seq(LoadMutField(v.index)) else genLoadImmField(v.index)
         case v: VarInfo.Local => Seq(LoadLocal(v.index))
         case v: VarInfo.Template =>
           Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
@@ -1586,7 +1620,7 @@ object Compiler {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[StatefulContext]]] = {
       getVariable(ident) match {
-        case v: VarInfo.Field => Seq(Seq(StoreMutField(v.index)))
+        case v: VarInfo.Field => Seq(genStoreField(v))
         case v: VarInfo.Local => Seq(Seq(StoreLocal(v.index)))
         case _: VarInfo.Template =>
           throw Error(s"Unexpected template variable: ${ident.name}", ident.sourceIndex)

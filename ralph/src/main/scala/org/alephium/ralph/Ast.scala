@@ -1543,6 +1543,9 @@ object Ast {
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
     def genLoad(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
     def genInit(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
+    final def skipCheckMutable(state: Compiler.State[Ctx], varInfo: Compiler.VarInfo): Boolean = {
+      state.isInTestContext && !varInfo.isLocal
+    }
   }
   final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
       extends AssignmentTarget[Ctx] {
@@ -1557,14 +1560,16 @@ object Ast {
           throw Compiler.Error(s"Cannot assign to map variable ${ident.name}.", sourceIndex)
         case _ =>
       }
-      if (!variable.isMutable) {
-        throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
-      }
-      if (!state.isTypeMutable(getType(state))) {
-        throw Compiler.Error(
-          s"Cannot assign to variable ${ident.name}. Assignment only works when all of the (nested) fields are mutable.",
-          sourceIndex
-        )
+      if (!skipCheckMutable(state, variable)) {
+        if (!variable.isMutable) {
+          throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
+        }
+        if (!state.isTypeMutable(getType(state))) {
+          throw Compiler.Error(
+            s"Cannot assign to variable ${ident.name}. Assignment only works when all of the (nested) fields are mutable.",
+            sourceIndex
+          )
+        }
       }
     }
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
@@ -1673,10 +1678,12 @@ object Ast {
     }
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit = {
       val variable = state.getVariable(ident)
-      if (!variable.isMutable) {
-        throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
+      if (!skipCheckMutable(state, variable)) {
+        if (!variable.isMutable) {
+          throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
+        }
+        checkMutable(state, state.resolveType(variable.tpe), selectors, ident, None, sourceIndex)
       }
-      checkMutable(state, state.resolveType(variable.tpe), selectors, ident, None, sourceIndex)
     }
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
@@ -2741,12 +2748,6 @@ object Ast {
       StatefulContract(fieldsLength, genMethods(state))
     }
 
-    def genUnitTestCode(
-        state: Compiler.State[StatefulContext]
-    ): Testing.CompiledUnitTests[StatefulContext] = {
-      state.genUnitTestCode(unitTests)
-    }
-
     // the state must have been updated in the check pass
     def buildCheckExternalCallerTable(
         state: Compiler.State[StatefulContext]
@@ -3125,7 +3126,7 @@ object Ast {
           contract,
           state.getWarnings,
           inlinedDebugCode,
-          Option.unless(compilerOptions.skipTests)(contract.genUnitTestCode(state))
+          Option.unless(compilerOptions.skipTests)(Testing.genUnitTestCode(contract, state))
         ) -> index
       }
       (warnings, compiled)

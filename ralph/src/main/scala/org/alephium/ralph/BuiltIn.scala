@@ -368,7 +368,7 @@ object BuiltIn {
         inputType: Seq[Type],
         state: Compiler.State[C]
     ): Seq[Type] = {
-      if (state.isInTestContext) {
+      if (state.isCompilingUnitTest) {
         throw Compiler.Error("Please use `testCheck!` instead of `assert!` in unit tests", None)
       }
       val argsType = Seq[Type](Type.Bool, Type.U256)
