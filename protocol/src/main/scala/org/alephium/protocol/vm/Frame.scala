@@ -218,9 +218,13 @@ abstract class Frame[Ctx <: StatelessContext] {
     Return.runWith(this).map(_ => None)
 
   private def checkExeResult(result: ExeResult[Option[Frame[Ctx]]]) = {
-    result match {
-      case Right(_)    => result
-      case Left(error) => handleError(error)
+    if (ctx.testEnvOpt.isDefined) {
+      result match {
+        case Right(_)    => result
+        case Left(error) => handleError(error)
+      }
+    } else {
+      result
     }
   }
 

@@ -6257,7 +6257,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "test 111" in new Fixture {
+  it should "handle test error properly" in new Fixture {
     val code =
       s"""
          |Contract Foo() {
