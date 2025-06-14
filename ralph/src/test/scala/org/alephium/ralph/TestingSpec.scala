@@ -17,7 +17,7 @@
 package org.alephium.ralph
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.{BlockHash, ContractId, ContractOutput, TokenId}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockHash => _, _}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.util._
@@ -855,6 +855,88 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
         LoadMutField(1),
         Pop
       )
+    }
+  }
+
+  it should "generate correct test code for encodeFields" in new Fixture {
+    def runSimpleTest(contract: CompiledContract): Unit = {
+      implicit val logConfig = LogConfig.allEnabled()
+      val worldState         = cachedWorldState.staging()
+      val blockHash          = BlockHash.random
+      val txId               = TransactionId.random
+      val tests              = contract.tests.value
+      tests.tests.foreach { test =>
+        worldState.rollback()
+        Testing.createContracts(
+          worldState,
+          Map(contract.ast.name -> contract),
+          contract,
+          test,
+          blockHash,
+          txId
+        ) isE ()
+        val blockEnv = BlockEnv.mockup(GroupIndex.unsafe(0), blockHash, TimeStamp.now())
+        val txEnv    = ContractRunner.createTxEnv(txId, AVector.empty, U256.Zero)
+        val context  = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
+        ContractRunner
+          .run(
+            context,
+            test.selfContract.contractId,
+            None,
+            AVector.empty,
+            tests.contractCode.methodsLength,
+            AVector.empty,
+            test.method,
+            nonCoinbaseMinGasPrice * maximalGasPerTx
+          )
+          .isRight is true
+      }
+    }
+
+    {
+      info("No stdId field")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |  test "foo" {
+           |    let (immFields, mutFields) = Bar.encodeFields!(0, 1)
+           |    testEqual!(immFields, #00)
+           |    testEqual!(mutFields, #0202010200)
+           |  }
+           |}
+           |Contract Bar(@unused num0: U256, @unused mut num1: U256) {
+           |  pub fn bar() -> () {}
+           |}
+           |""".stripMargin
+
+      val contract = compileContractFull(code).rightValue
+      runSimpleTest(contract)
+    }
+
+    {
+      info("Has stdId field")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |  test "foo" {
+           |    let (immFields, mutFields) = Bar.encodeFields!(0, 1)
+           |    testEqual!(immFields, #00)
+           |    testEqual!(mutFields, #03020102000306414c50481234)
+           |  }
+           |}
+           |Contract Bar(@unused num0: U256, @unused mut num1: U256) implements BarBase {
+           |  pub fn bar() -> () {}
+           |}
+           |@std(id = #1234)
+           |Interface BarBase {
+           |  pub fn bar() -> ()
+           |}
+           |""".stripMargin
+
+      val contract = compileContractFull(code).rightValue
+      runSimpleTest(contract)
     }
   }
 }

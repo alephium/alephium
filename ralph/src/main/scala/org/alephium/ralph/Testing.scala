@@ -817,7 +817,7 @@ object Testing {
     contract.tests.map(_.contractCode).getOrElse(contract.debugCode)
   }
 
-  private def createContracts(
+  private[ralph] def createContracts(
       worldState: WorldState.Staging,
       allContracts: Map[String, CompiledContract],
       testingContract: CompiledContract,
