@@ -1239,6 +1239,8 @@ object Compiler {
       tpe match {
         case t: Type.FixedSizeArray =>
           Type.FixedSizeArray(resolveType(t.baseType), Left(calcArraySize(t)))
+        case t: Type.Tuple =>
+          globalState.resolveType(Type.Tuple(t.types.map(resolveType)))
         case _ => globalState.resolveType(tpe)
       }
     }

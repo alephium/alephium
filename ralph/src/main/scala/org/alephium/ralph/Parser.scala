@@ -190,9 +190,9 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.StructCtor(typeId, fields)
     }
 
-  def parenExpr[Unknown: P]: P[Ast.ParenExpr[Ctx]] =
-    PP("(" ~ expr ~ ")") { case (ex) =>
-      Ast.ParenExpr.apply[Ctx](ex)
+  def tupleLiteralExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
+    PP("(" ~ expr.rep(1, ",") ~ ")") { exprs =>
+      if (exprs.length == 1) Ast.ParenExpr(exprs(0)) else Ast.TupleLiteral(exprs)
     }
 
   private def ifElseExprBody[Unknown: P]: P[(Seq[Ast.Statement[Ctx]], Ast.Expr[Ctx])] =
@@ -303,12 +303,20 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.StructDestruction(id, vars, expr).atSourceIndex(sourceIndex)
     }
 
+  def tupleFieldSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(
+    "." ~ Index ~ "_" ~ CharIn("0-9").rep(1).! ~~ Index
+  ).map { case (from, index, to) =>
+    val selector = Ast.Ident(s"_$index").atSourceIndex(from, to, fileURI)
+    Ast.IdentSelector(selector).atSourceIndex(selector.sourceIndex)
+  }
   def identSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(
     "." ~ Index ~ Lexer.ident ~ Index
   ).map { case (from, ident, to) =>
     Ast.IdentSelector(ident).atSourceIndex(from, to, fileURI)
   }
-  def dataSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(identSelector | indexSelector)
+  def dataSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(
+    identSelector | indexSelector | tupleFieldSelector
+  )
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
     PP(Lexer.ident ~ dataSelector.rep(0)) { case (ident, selectors) =>
@@ -339,8 +347,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       // Lexer.primTpes currently can't have source index as they are case objects
       Lexer.typeId.map(id =>
         Lexer.primTpes.getOrElse(id.name, contractTypeCtor(id).atSourceIndex(id.sourceIndex))
-      ) |
-        arrayType(parseType(contractTypeCtor))
+      ) | arrayType(parseType(contractTypeCtor)) | tupleType(parseType(contractTypeCtor))
     )
   }
 
@@ -353,6 +360,13 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
   }
+
+  def tupleType[Unknown: P](baseType: => P[Type]): P[Type] = {
+    P(Index ~ "(" ~ baseType.rep(1, ",") ~ ")" ~ Index).map { case (from, types, to) =>
+      if (types.length == 1) types(0) else Type.Tuple(types).atSourceIndex(from, to, fileURI)
+    }
+  }
+
   def argument[Unknown: P](
       allowMutable: Boolean
   )(contractTypeCtor: Ast.TypeId => Type.NamedType): P[Ast.Argument] =
@@ -955,11 +969,11 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
       const | stringLiteral | alphTokenId | loadData | callExpr | contractConv |
-        structCtor | variable | parenExpr | arrayExpr | rawIfElseExpr
+        structCtor | variable | tupleLiteralExpr | arrayExpr | rawIfElseExpr
     )
 
   private def loadDataBase[Unknown: P] = P(
-    (callExpr | structCtor | variableIdOnly | parenExpr | arrayExpr) ~ dataSelector.rep(1)
+    (callExpr | structCtor | variableIdOnly | tupleLiteralExpr | arrayExpr) ~ dataSelector.rep(1)
   )
   def loadData[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     loadDataBase.map { case (base, selectors) =>
@@ -1002,7 +1016,7 @@ class StatefulParser(val fileURI: Option[java.net.URI])
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
       const | stringLiteral | alphTokenId | mapContains | contractCallOrLoadData | callExpr | contractConv |
-        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | rawIfElseExpr
+        enumFieldSelector | structCtor | variable | tupleLiteralExpr | arrayExpr | rawIfElseExpr
     )
 
   def mapKeyType[Unknown: P]: P[Type] = {
@@ -1044,7 +1058,7 @@ class StatefulParser(val fileURI: Option[java.net.URI])
     })
 
   private def contractCallOrLoadDataBase[Unknown: P] = P(
-    (callExpr | contractConv | structCtor | variableIdOnly | parenExpr | arrayExpr)
+    (callExpr | contractConv | structCtor | variableIdOnly | tupleLiteralExpr | arrayExpr)
       ~ (("." ~ callAbs) | dataSelector).rep(1)
   )
 
