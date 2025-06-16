@@ -1386,9 +1386,12 @@ class StatefulParser(val fileURI: Option[java.net.URI])
 
 trait TestingParser { self: StatefulParser =>
   private def settingDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] =
-    PP(Lexer.ident ~ "=" ~ expr) { case (ident, expr) => Testing.SettingDef(ident.name, expr) }
+    P(Lexer.ident ~ "=" ~ expr).map { case (ident, expr) =>
+      val sourceIndex = SourceIndex(ident.sourceIndex, expr.sourceIndex)
+      Testing.SettingDef(ident.name, expr).atSourceIndex(sourceIndex)
+    }
   private def settingsDef[Unknown: P]: P[Testing.SettingsDef[StatefulContext]] =
-    PP("with" ~ "Settings" ~ "(" ~ settingDef.rep(0, ",") ~ ")")(Testing.SettingsDef.apply)
+    PP("with" ~ settingDef.rep(0, ","))(Testing.SettingsDef.apply)
 
   private def contractAssets[Unknown: P] = P("{" ~ amountList ~ "}")
   private def contractCtor[Unknown: P]   = P("(" ~ expr.rep(0, ",") ~ ")")
@@ -1404,7 +1407,7 @@ trait TestingParser { self: StatefulParser =>
   private def contractDefs[Unknown: P](
       key: String
   ): P[Testing.CreateContractDefs[StatefulContext]] =
-    PP(key ~ createContractDef.rep)(Testing.CreateContractDefs.apply)
+    PP(key ~ createContractDef.rep(0, ","))(Testing.CreateContractDefs.apply)
   private def singleTestDef[Unknown: P]: P[Testing.SingleTestDef[StatefulContext]] =
     PP(
       contractDefs("before").? ~ contractDefs("after").? ~
