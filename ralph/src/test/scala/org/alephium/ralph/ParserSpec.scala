@@ -2923,7 +2923,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val withSettings =
       s"""
          |test "foo"
-         |with Settings(group = GroupIndex)
+         |with group = GroupIndex, blockTimeStamp = 0
          |before Self(10) {
          |  assert!(foo() == 10, 0)
          |}
@@ -2931,7 +2931,14 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse(withSettings, StatefulParser.unitTestDef(_)).get.value is
       Testing.UnitTestDef[StatefulContext](
         "foo",
-        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+        Some(
+          Testing.SettingsDef(
+            Seq(
+              Testing.SettingDef("group", Variable(Ident("GroupIndex"))),
+              Testing.SettingDef("blockTimeStamp", Const(Val.U256(U256.Zero)))
+            )
+          )
+        ),
         Seq(
           Testing.SingleTestDef(
             Testing.CreateContractDefs(
@@ -2954,7 +2961,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val withAfter =
       s"""
          |test "foo"
-         |with Settings(group = GroupIndex)
+         |with group = GroupIndex
          |before Self(10)
          |after Self(11) {
          |  assert!(foo() == 10, 0)
@@ -2995,7 +3002,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val withAssets =
       s"""
          |test "foo"
-         |with Settings(group = GroupIndex)
+         |with group = GroupIndex
          |before Self(10)
          |approve{ From -> ALPH: 1 }
          |{
@@ -3037,11 +3044,8 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val withMultipleContracts =
       s"""
          |test "foo"
-         |with Settings(group = GroupIndex)
-         |before
-         |  Self(10)
-         |  Bar(20)@address1
-         |  Bar(30)@address2
+         |with group = GroupIndex
+         |before Self(10), Bar(20)@address1, Bar(30)@address2
          |{
          |  assert!(foo() == 10, 0)
          |}
@@ -3084,7 +3088,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     val withMultipleTests =
       s"""
          |test "foo"
-         |with Settings(group = GroupIndex)
+         |with group = GroupIndex
          |before Self(10) {
          |  assert!(foo() == 10, 0)
          |}
