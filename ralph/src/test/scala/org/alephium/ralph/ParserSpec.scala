@@ -326,6 +326,9 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         TupleLiteral(Seq(Variable(Ident("a")), Variable(Ident("b")))),
         Seq(IdentSelector(Ident("_0")))
       )
+    parse("._11", StatefulParser.tupleFieldSelector(_)).get.value is IdentSelector[StatefulContext](
+      Ident("_11")
+    )
   }
 
   it should "parse string literals" in {
