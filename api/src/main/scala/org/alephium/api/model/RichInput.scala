@@ -19,7 +19,7 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Address, AssetOutput, ContractOutput, TxInput, TxOutputRef}
+import org.alephium.protocol.model._
 import org.alephium.serde.serialize
 import org.alephium.util.AVector
 
@@ -29,6 +29,7 @@ sealed trait RichInput {
   def attoAlphAmount: Amount
   def address: Address
   def tokens: AVector[Token]
+  def outputRefTxId: TransactionId
 }
 
 @upickle.implicits.key("AssetInput")
@@ -38,7 +39,8 @@ final case class RichAssetInput(
     unlockScript: ByteString,
     attoAlphAmount: Amount,
     address: Address.Asset,
-    tokens: AVector[Token]
+    tokens: AVector[Token],
+    outputRefTxId: TransactionId
 ) extends RichInput
 
 @upickle.implicits.key("ContractInput")
@@ -47,28 +49,39 @@ final case class RichContractInput(
     key: Hash,
     attoAlphAmount: Amount,
     address: Address.Contract,
-    tokens: AVector[Token]
+    tokens: AVector[Token],
+    outputRefTxId: TransactionId
 ) extends RichInput
 
 object RichInput {
-  def from(assetInput: TxInput, txOutput: AssetOutput): RichAssetInput = {
+  def from(
+      assetInput: TxInput,
+      txOutput: AssetOutput,
+      outputRefTxId: TransactionId
+  ): RichAssetInput = {
     RichAssetInput(
       hint = assetInput.outputRef.hint.value,
       key = assetInput.outputRef.key.value,
       unlockScript = serialize(assetInput.unlockScript),
       attoAlphAmount = Amount(txOutput.amount),
       address = Address.Asset(txOutput.lockupScript),
-      tokens = txOutput.tokens.map(Token.tupled.apply)
+      tokens = txOutput.tokens.map(Token.tupled.apply),
+      outputRefTxId = outputRefTxId
     )
   }
 
-  def from(contractOutputRef: TxOutputRef, txOutput: ContractOutput): RichContractInput = {
+  def from(
+      contractOutputRef: TxOutputRef,
+      txOutput: ContractOutput,
+      outputRefTxId: TransactionId
+  ): RichContractInput = {
     RichContractInput(
       hint = contractOutputRef.hint.value,
       key = contractOutputRef.key.value,
       attoAlphAmount = Amount(txOutput.amount),
       address = Address.Contract(txOutput.lockupScript),
-      tokens = txOutput.tokens.map(Token.tupled.apply)
+      tokens = txOutput.tokens.map(Token.tupled.apply),
+      outputRefTxId = outputRefTxId
     )
   }
 }
