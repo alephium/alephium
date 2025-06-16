@@ -540,9 +540,10 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   trait ForkedFixture extends Fixture {
-    val chain  = buildBlockChain()
-    val chain0 = chainGenOf(2, genesis).sample.get
-    val chain1 = chainGenOf(2, genesis).sample.get
+    val chain      = buildBlockChain()
+    val chainIndex = genesis.chainIndex
+    val chain0     = chainGenOf(chainIndex, 2, genesis).sample.get
+    val chain1     = chainGenOf(chainIndex, 2, genesis).sample.get
     addBlocks(chain, chain0)
     addBlocks(chain, chain1)
   }
@@ -568,7 +569,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.isBefore(block.hash, chain0.last.hash) isE false
     }
 
-    val chain2 = chainGenOf(2, chain0.last).sample.get
+    val chain2 = chainGenOf(chainIndex, 2, chain0.last).sample.get
     addBlocks(chain, chain2)
     chain2.foreach { block =>
       chain.isBefore(genesis.hash, block.hash) isE true
