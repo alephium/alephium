@@ -1544,7 +1544,7 @@ object Ast {
     def genLoad(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
     def genInit(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
     final def skipCheckMutable(state: Compiler.State[Ctx], varInfo: Compiler.VarInfo): Boolean = {
-      state.isInTestContext && !varInfo.isLocal
+      state.allowUpdateImmFields && !varInfo.isLocal
     }
   }
   final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)

@@ -93,6 +93,10 @@ object Testing {
       }
     }
 
+    private def getUpdateImmFields(state: Compiler.State[Ctx]): Option[Boolean] = {
+      getSetting[Val.Bool](state, Val.Bool, "updateImmFields").map(_.v)
+    }
+
     def compile(state: Compiler.State[Ctx]): SettingsValue = {
       Ast.UniqueDef.checkDuplicates(defs, "test settings")
       defs.find(d => !SettingsDef.keys.contains(d.name)).foreach { invalidDef =>
@@ -105,17 +109,19 @@ object Testing {
       SettingsValue(
         getGroup(state).getOrElse(0),
         getBlockHash(state),
-        getBlockTimeStamp(state)
+        getBlockTimeStamp(state),
+        getUpdateImmFields(state).getOrElse(false)
       )
     }
   }
   object SettingsDef {
-    val keys: Seq[String] = Seq("group", "blockHash", "blockTimeStamp")
+    val keys: Seq[String] = Seq("group", "blockHash", "blockTimeStamp", "updateImmFields")
   }
   final case class SettingsValue(
       group: Int,
       blockHash: Option[BlockHash],
-      blockTimeStamp: Option[TimeStamp]
+      blockTimeStamp: Option[TimeStamp],
+      updateImmFields: Boolean
   )
 
   private def getAssetAddress[Ctx <: StatelessContext](
@@ -567,9 +573,18 @@ object Testing {
     lazy val name: String = origin.map(typeId => s"${typeId.name}:$testName").getOrElse(testName)
 
     def compile(state: Compiler.State[Ctx]): AVector[CompiledUnitTest[Ctx]] = {
-      val settingsValue = settings.map(_.compile(state))
-      AVector.from(tests).mapWithIndex { case (test, index) =>
-        test.compile(state, settingsValue, name, index, origin.getOrElse(state.typeId))
+      val settingsValue        = settings.map(_.compile(state))
+      val allowUpdateImmFields = settingsValue.exists(_.updateImmFields)
+      state.withUpdateImmFields(allowUpdateImmFields) {
+        AVector.from(tests).mapWithIndex { case (test, index) =>
+          test.compile(
+            state,
+            settingsValue,
+            name,
+            index,
+            origin.getOrElse(state.typeId)
+          )
+        }
       }
     }
   }
@@ -685,10 +700,20 @@ object Testing {
   trait State[Ctx <: StatelessContext] { _: Compiler.State[Ctx] =>
     private var _isInTestContext: Boolean                                 = false
     private var _isCompilingUnitTest: Boolean                             = false
+    private var _allowUpdateImmFields: Boolean                            = false
     private val testCheckCalls: mutable.HashMap[Int, Option[SourceIndex]] = mutable.HashMap.empty
 
-    def isInTestContext: Boolean     = _isInTestContext
-    def isCompilingUnitTest: Boolean = isInTestContext && _isCompilingUnitTest
+    def isInTestContext: Boolean      = _isInTestContext
+    def isCompilingUnitTest: Boolean  = isInTestContext && _isCompilingUnitTest
+    def allowUpdateImmFields: Boolean = isInTestContext && _allowUpdateImmFields
+
+    def withUpdateImmFields[T](allow: Boolean)(func: => T): T = {
+      _allowUpdateImmFields = allow
+      val result = func
+      _allowUpdateImmFields = false
+      result
+    }
+
     def withinTestContext[T](func: => T): T = {
       _isInTestContext = true
       val result = func

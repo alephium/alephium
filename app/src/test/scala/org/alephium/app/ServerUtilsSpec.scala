@@ -6254,7 +6254,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |    checkCaller!(callerAddress!() == parent, 0)
            |    amount += 1
            |  }
-           |  test "foo" {
+           |  test "foo" with updateImmFields = true {
            |    testEqual!(amount, 0)
            |    parent = randomContractAddress!()
            |    testError!(foo(), 0)

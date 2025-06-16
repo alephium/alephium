@@ -344,15 +344,19 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
 
       val blockHash = BlockHash.generate
       val now       = TimeStamp.now()
-      checkSettings("", Testing.SettingsValue(0, None, None))
-      checkSettings("group = 0", Testing.SettingsValue(0, None, None))
+      checkSettings("", Testing.SettingsValue(0, None, None, false))
+      checkSettings("group = 0", Testing.SettingsValue(0, None, None, false))
       checkSettings(
         s"group = 1, blockHash = #${blockHash.toHexString}",
-        Testing.SettingsValue(1, Some(blockHash), None)
+        Testing.SettingsValue(1, Some(blockHash), None, false)
       )
       checkSettings(
         s"group = 1, blockHash = #${blockHash.toHexString}, blockTimeStamp = ${now.millis}",
-        Testing.SettingsValue(1, Some(blockHash), Some(now))
+        Testing.SettingsValue(1, Some(blockHash), Some(now), false)
+      )
+      checkSettings(
+        s"group = 1, blockHash = #${blockHash.toHexString}, blockTimeStamp = ${now.millis}, updateImmFields = true",
+        Testing.SettingsValue(1, Some(blockHash), Some(now), true)
       )
       testContractError(
         code(s"group = 0, $$group = 1$$"),
@@ -360,7 +364,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       )
       testContractError(
         code(s"$$invalidKey = 0$$"),
-        "Invalid setting key invalidKey, it must be one of [group, blockHash, blockTimeStamp]"
+        "Invalid setting key invalidKey, it must be one of [group, blockHash, blockTimeStamp, updateImmFields]"
       )
     }
 
@@ -790,7 +794,43 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     )
   }
 
-  it should "support update immutable fields in unit tests" in new Fixture {
+  trait UnitTestFixture extends Fixture {
+    def runSimpleTest(contract: CompiledContract): Unit = {
+      implicit val logConfig = LogConfig.allEnabled()
+      val worldState         = cachedWorldState.staging()
+      val blockHash          = BlockHash.random
+      val txId               = TransactionId.random
+      val tests              = contract.tests.value
+      tests.tests.foreach { test =>
+        worldState.rollback()
+        Testing.createContracts(
+          worldState,
+          Map(contract.ast.name -> contract),
+          contract,
+          test,
+          blockHash,
+          txId
+        ) isE ()
+        val blockEnv = BlockEnv.mockup(GroupIndex.unsafe(0), blockHash, TimeStamp.now())
+        val txEnv    = ContractRunner.createTxEnv(txId, AVector.empty, U256.Zero)
+        val context  = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
+        ContractRunner
+          .run(
+            context,
+            test.selfContract.contractId,
+            None,
+            AVector.empty,
+            tests.contractCode.methodsLength,
+            AVector.empty,
+            test.method,
+            nonCoinbaseMinGasPrice * maximalGasPerTx
+          )
+          .isRight is true
+      }
+    }
+  }
+
+  it should "support update immutable fields in unit tests" in new UnitTestFixture {
     {
       info("Update immutable fields in non-test code")
       val code =
@@ -807,6 +847,28 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
 
     {
       info("Update immutable fields in test code")
+      def code(settings: String) =
+        s"""
+           |Contract Foo(v: U256) {
+           |  pub fn foo() -> U256 { return v }
+           |  test "foo0" with updateImmFields = true {
+           |    v = 0
+           |  }
+           |  test "foo1" $settings {
+           |    $$v = 0$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(""), "Cannot assign to immutable variable v.")
+      testContractError(
+        code("with updateImmFields = false"),
+        "Cannot assign to immutable variable v."
+      )
+      compileContract(replace(code("with updateImmFields = true"))).isRight is true
+    }
+
+    {
+      info("Generate correct code")
       val code =
         s"""
            |struct Bar {
@@ -815,7 +877,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |}
            |Contract Foo(@unused num0: U256, @unused mut num1: U256, bar: Bar) {
            |  pub fn foo() -> () {}
-           |  test "foo" {
+           |  test "foo" with updateImmFields = true {
            |    num0 = 1
            |    bar.a[0] = 2
            |    bar.a[1] = 3
@@ -853,43 +915,54 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
         Pop
       )
     }
+
+    {
+      info("Load correct fields in tests")
+      val code =
+        s"""
+           |Contract Foo(num0: U256, mut num1: U256) {
+           |  pub fn update() -> () {
+           |    num1 += 1
+           |  }
+           |  pub fn getNum0() -> U256 {
+           |    return num0
+           |  }
+           |  pub fn getNum1() -> U256 {
+           |    return num1
+           |  }
+           |
+           |  test "foo0" {
+           |    testEqual!(num0, 0)
+           |    testEqual!(getNum0(), 0)
+           |
+           |    testEqual!(num1, 0)
+           |    testEqual!(getNum1(), 0)
+           |    update()
+           |    testEqual!(num1, 1)
+           |    testEqual!(getNum1(), 1)
+           |  }
+           |
+           |  test "foo1" with updateImmFields = true {
+           |    testEqual!(num0, 0)
+           |    testEqual!(getNum0(), 0)
+           |    num0 += 1
+           |    testEqual!(num0, 1)
+           |    testEqual!(getNum0(), 1)
+           |
+           |    testEqual!(num1, 0)
+           |    testEqual!(getNum1(), 0)
+           |    update()
+           |    testEqual!(num1, 1)
+           |    testEqual!(getNum1(), 1)
+           |  }
+           |}
+           |""".stripMargin
+      val contract = compileContractFull(code).rightValue
+      runSimpleTest(contract)
+    }
   }
 
-  it should "generate correct test code for encodeFields" in new Fixture {
-    def runSimpleTest(contract: CompiledContract): Unit = {
-      implicit val logConfig = LogConfig.allEnabled()
-      val worldState         = cachedWorldState.staging()
-      val blockHash          = BlockHash.random
-      val txId               = TransactionId.random
-      val tests              = contract.tests.value
-      tests.tests.foreach { test =>
-        worldState.rollback()
-        Testing.createContracts(
-          worldState,
-          Map(contract.ast.name -> contract),
-          contract,
-          test,
-          blockHash,
-          txId
-        ) isE ()
-        val blockEnv = BlockEnv.mockup(GroupIndex.unsafe(0), blockHash, TimeStamp.now())
-        val txEnv    = ContractRunner.createTxEnv(txId, AVector.empty, U256.Zero)
-        val context  = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
-        ContractRunner
-          .run(
-            context,
-            test.selfContract.contractId,
-            None,
-            AVector.empty,
-            tests.contractCode.methodsLength,
-            AVector.empty,
-            test.method,
-            nonCoinbaseMinGasPrice * maximalGasPerTx
-          )
-          .isRight is true
-      }
-    }
-
+  it should "generate correct test code for encodeFields" in new UnitTestFixture {
     {
       info("No stdId field")
       val code =
