@@ -315,6 +315,20 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
           IndexSelector[StatefulContext](Const(Val.U256(U256.Zero)))
         )
       )
+    parse("(a)", StatefulParser.expr(_)).get.value is ParenExpr[StatefulContext](
+      Variable(Ident("a"))
+    )
+    parse("(a, b)", StatefulParser.expr(_)).get.value is TupleLiteral[StatefulContext](
+      Seq(Variable(Ident("a")), Variable(Ident("b")))
+    )
+    parse("(a, b)._0", StatefulParser.expr(_)).get.value is
+      LoadDataBySelectors[StatefulContext](
+        TupleLiteral(Seq(Variable(Ident("a")), Variable(Ident("b")))),
+        Seq(IdentSelector(Ident("_0")))
+      )
+    parse("._11", StatefulParser.tupleFieldSelector(_)).get.value is IdentSelector[StatefulContext](
+      Ident("_11")
+    )
   }
 
   it should "parse string literals" in {
@@ -833,11 +847,11 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
     parse("@using(x = true, y = false)", StatefulParser.annotation(_)).isSuccess is true
   }
 
-  it should "parse functions" in {
-    def parseFunc(code: String) = {
-      fastparse.parse(code, StatelessParser.func(_))
-    }
+  def parseFunc(code: String) = {
+    fastparse.parse(code, StatelessParser.func(_))
+  }
 
+  it should "parse functions" in {
     {
       val parsed =
         parseFunc("fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }").get.value
@@ -849,7 +863,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parsed.useRoutePattern is false
       parsed.inline is false
       parsed.args.size is 2
-      parsed.rtypes is Seq(Type.U256, Type.U256)
+      parsed.rtypes is Seq(Type.Tuple(Seq(Type.U256, Type.U256)))
     }
 
     {
@@ -868,14 +882,14 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parsed.useUpdateFields is false
       parsed.inline is false
       parsed.args.size is 2
-      parsed.rtypes is Seq(Type.U256, Type.U256)
+      parsed.rtypes is Seq(Type.Tuple(Seq(Type.U256, Type.U256)))
       parsed.signature is FuncSignature(
         FuncId("add", false),
         true,
         true,
         false,
         Seq((Type.U256, false), (Type.U256, true)),
-        Seq(Type.U256, Type.U256)
+        Seq(Type.Tuple(Seq(Type.U256, Type.U256)))
       )
     }
 
@@ -1028,6 +1042,31 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       val error3 = intercept[Compiler.Error](parseFunc(duplicateAnnotations.replace("$", "")))
       error3.message is "There are duplicate annotations: inline"
       error3.position is duplicateAnnotations.indexOf("$")
+    }
+  }
+
+  it should "parse tuple types" in {
+    {
+      val parsed =
+        parseFunc("fn add(v: (U256, U256)) -> (U256, U256) { return v }").get.value
+      parsed.args.size is 1
+      parsed.args.head.tpe is Type.Tuple(Seq(Type.U256, Type.U256))
+      parsed.getArgTypeSignatures() is AVector("(U256,U256)")
+      parsed.rtypes is Seq(Type.Tuple(Seq(Type.U256, Type.U256)))
+      parsed.getReturnSignatures() is AVector("U256", "U256")
+    }
+
+    {
+      val parsed =
+        parseFunc(
+          "fn add(a: (U256, U256), b: I256) -> ((U256, U256), I256) { return (a, b) }"
+        ).get.value
+      parsed.args.size is 2
+      parsed.args.head.tpe is Type.Tuple(Seq(Type.U256, Type.U256))
+      parsed.args.last.tpe is Type.I256
+      parsed.getArgTypeSignatures() is AVector("(U256,U256)", "I256")
+      parsed.rtypes is Seq(Type.Tuple(Seq(Type.Tuple(Seq(Type.U256, Type.U256)), Type.I256)))
+      parsed.getReturnSignatures() is AVector("(U256,U256)", "I256")
     }
   }
 
@@ -2409,7 +2448,9 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       parsed.funcs.length is 1
       parsed.funcs.head.name is "main"
       parsed.funcs.head.usePreapprovedAssets is false
-      parsed.funcs.head.rtypes is Seq(Type.FixedSizeArray(Type.U256, Left(2)), Type.Bool)
+      parsed.funcs.head.rtypes is Seq(
+        Type.Tuple(Seq(Type.FixedSizeArray(Type.U256, Left(2)), Type.Bool))
+      )
     }
 
     {
