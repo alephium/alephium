@@ -233,8 +233,10 @@ object UtxoSelectionAlgo extends StrictLogging {
             } else {
               Left(s"Execution error when emulating tx script or contract: $error")
             }
-          case Left(error) =>
+          case Left(Right(error)) =>
             Left(s"Execution error when emulating tx script or contract: $error")
+          case Left(Left(error)) =>
+            Left(s"IO error when emulating tx script or contract: $error")
         }
       } yield result
     }
