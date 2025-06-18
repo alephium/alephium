@@ -195,8 +195,13 @@ abstract class Parser[Ctx <: StatelessContext] {
       if (exprs.length == 1) Ast.ParenExpr(exprs(0)) else Ast.TupleLiteral(exprs)
     }
 
-  private def ifElseExprBody[Unknown: P]: P[(Seq[Ast.Statement[Ctx]], Ast.Expr[Ctx])] =
-    P("{" ~ statement.rep(0) ~ expr ~ "}" | expr.map(expr => (Seq.empty[Ast.Statement[Ctx]], expr)))
+  private def ifElseExprBody[Unknown: P]: P[(Seq[Ast.Statement[Ctx]], Ast.Expr[Ctx])] = {
+    P(
+      P("{" ~ expr ~ "}").map(expr => (Seq.empty[Ast.Statement[Ctx]], expr)) |
+        "{" ~ statement.rep(1) ~ expr ~ "}" |
+        expr.map(expr => (Seq.empty[Ast.Statement[Ctx]], expr))
+    )
+  }
   def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
     P(Lexer.token(Keyword.`if`) ~ expr ~ ifElseExprBody).map {
       case (ifIndex, condition, (statements, expr)) =>
