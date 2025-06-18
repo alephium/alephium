@@ -368,7 +368,7 @@ object BuiltIn {
         inputType: Seq[Type],
         state: Compiler.State[C]
     ): Seq[Type] = {
-      if (state.isCompilingUnitTest) {
+      if (state.isInTestContext) {
         throw Compiler.Error("Please use `testCheck!` instead of `assert!` in unit tests", None)
       }
       val argsType = Seq[Type](Type.Bool, Type.U256)
@@ -2342,6 +2342,7 @@ object BuiltIn {
 
   // scalastyle:off method.length
   def encodeFields[Ctx <: StatelessContext](
+      typeId: Ast.TypeId,
       stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
       fields: Seq[Ast.Argument],
       globalState: Ast.GlobalState[Ctx]
@@ -2395,7 +2396,7 @@ object BuiltIn {
           args: Seq[Ast.Expr[C]],
           state: Compiler.State[C]
       ): Seq[Instr[C]] = {
-        if (state.isInTestContext) {
+        if (state.allowUpdateImmFields && state.typeId == typeId) {
           genTestCodeForArgs(args, state)
         } else {
           genProdCodeForArgs(args, state)

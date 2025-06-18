@@ -52,6 +52,7 @@ import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOut
 import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.protocol.vm.nodeindexes.TxIdTxOutputLocators
+import org.alephium.ralph
 import org.alephium.ralph.{CompiledContract, Compiler, Testing}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
@@ -1685,7 +1686,7 @@ class ServerUtils(implicit
         if (compilerOptions.skipTests) {
           Right(())
         } else {
-          runTests(blockFlow, query.code, result._1)
+          runTests(blockFlow, query.code, result._1, compilerOptions)
         }
     } yield {
       CompileProjectResult.from(result._1, result._2, result._3, result._4)
@@ -1695,13 +1696,15 @@ class ServerUtils(implicit
   private def runTests(
       blockFlow: BlockFlow,
       sourceCode: String,
-      contracts: AVector[CompiledContract]
+      contracts: AVector[CompiledContract],
+      compilerOptions: ralph.CompilerOptions
   ): Try[Unit] = {
     Testing
       .run(
         groupIndex => blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()),
         sourceCode,
-        contracts
+        contracts,
+        compilerOptions
       )
       .left
       .map(failed)

@@ -2624,7 +2624,7 @@ object Ast {
         globalState: GlobalState[StatefulContext]
     ): Seq[Compiler.ContractFunc[StatefulContext]] = {
       val stdInterfaceIdOpt = if (hasStdIdField) stdInterfaceId else None
-      Seq(BuiltIn.encodeFields(stdInterfaceIdOpt, fields, globalState))
+      Seq(BuiltIn.encodeFields(ident, stdInterfaceIdOpt, fields, globalState))
     }
 
     private def checkFuncs(): Unit = {

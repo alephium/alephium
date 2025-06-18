@@ -1536,7 +1536,7 @@ object Compiler {
         isLocal: Boolean,
         isMutable: Boolean
     ): VarOffset[StatefulContext] = {
-      if (isInTestContext && !isLocal && !isMutable) {
+      if (allowUpdateImmFields && !isLocal && !isMutable) {
         offset.add(ConstantVarOffset[StatefulContext](mutFieldLength))
       } else {
         offset
@@ -1558,15 +1558,15 @@ object Compiler {
           tryCalcOffset(offset, isLocal, isMutable),
           isLocal,
           LoadLocal.apply,
-          if (isMutable || isInTestContext) LoadMutField.apply else LoadImmField.apply,
+          if (isMutable || allowUpdateImmFields) LoadMutField.apply else LoadImmField.apply,
           LoadLocalByIndex,
-          if (isMutable || isInTestContext) LoadMutFieldByIndex else LoadImmFieldByIndex
+          if (isMutable || allowUpdateImmFields) LoadMutFieldByIndex else LoadImmFieldByIndex
         )
       }
     }
 
     private def genStoreField(v: VarInfo.Field): Seq[Instr[StatefulContext]] = {
-      if (isInTestContext && !v.isMutable) {
+      if (allowUpdateImmFields && !v.isMutable) {
         Seq(StoreMutField((v.index + mutFieldLength).toByte))
       } else {
         Seq(StoreMutField(v.index))
@@ -1574,7 +1574,7 @@ object Compiler {
     }
 
     private def genLoadImmField(fieldIndex: Byte): Seq[Instr[StatefulContext]] = {
-      if (isInTestContext) {
+      if (allowUpdateImmFields) {
         Seq(LoadMutField((fieldIndex + mutFieldLength).toByte))
       } else {
         Seq(LoadImmField(fieldIndex))

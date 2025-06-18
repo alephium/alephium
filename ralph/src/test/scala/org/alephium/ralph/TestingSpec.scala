@@ -45,11 +45,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
-      contract.immFields.isEmpty is true
-      contract.mutFields is AVector[(String, Val)](
-        ("v1", Val.U256(U256.Zero)),
-        ("v0", Val.U256(U256.Zero))
-      )
+      contract.immFields is AVector[(String, Val)](("v0", Val.U256(U256.Zero)))
+      contract.mutFields is AVector[(String, Val)](("v1", Val.U256(U256.Zero)))
     }
 
     {
@@ -72,20 +69,16 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |""".stripMargin
       val test0     = compileContractFull(code(true)).rightValue.tests.value.tests.head
       val contract0 = test0.before.head
-      contract0.immFields.isEmpty is true
-      contract0.mutFields is AVector[(String, Val)](
-        ("v1", Val.U256(U256.Zero)),
+      contract0.immFields is AVector[(String, Val)](
         ("v0", Val.U256(U256.Zero)),
         (Ast.stdArg.ident.name, Val.ByteVec(Ast.StdInterfaceIdPrefix ++ Hex.unsafe("1234")))
       )
+      contract0.mutFields is AVector[(String, Val)](("v1", Val.U256(U256.Zero)))
 
       val test1     = compileContractFull(code(false)).rightValue.tests.value.tests.head
       val contract1 = test1.before.head
-      contract1.immFields.isEmpty is true
-      contract1.mutFields is AVector[(String, Val)](
-        ("v1", Val.U256(U256.Zero)),
-        ("v0", Val.U256(U256.Zero))
-      )
+      contract1.immFields is AVector[(String, Val)](("v0", Val.U256(U256.Zero)))
+      contract1.mutFields is AVector[(String, Val)](("v1", Val.U256(U256.Zero)))
     }
 
     {
@@ -97,13 +90,14 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    v1 = v1 + 1
            |    return v0 + v1
            |  }
-           |  test "foo" before Self(0, 1) {
+           |  test "foo"
+           |  with updateImmFields = true
+           |  before Self(0, 1) {
            |    testCheck!(foo() == 1)
            |  }
            |}
            |""".stripMargin
       val test = compileContractFull(code).rightValue.tests.value.tests.head
-      test.settings.isEmpty is true
       test.before.length is 1
       val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
@@ -135,8 +129,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
-      contract.immFields.isEmpty is true
-      contract.mutFields is AVector[(String, Val)](("v", Val.U256(U256.Zero)))
+      contract.immFields is AVector[(String, Val)](("v", Val.U256(U256.Zero)))
+      contract.mutFields.isEmpty is true
     }
 
     {
@@ -158,8 +152,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens is AVector(TokenId.alph -> ALPH.alph(1))
-      contract.immFields.isEmpty is true
-      contract.mutFields is AVector[(String, Val)](("v", Val.U256(U256.Zero)))
+      contract.immFields is AVector[(String, Val)](("v", Val.U256(U256.Zero)))
+      contract.mutFields.isEmpty is true
     }
 
     {
@@ -189,14 +183,15 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
-      contract.immFields.isEmpty is true
-      contract.mutFields is AVector[(String, Val)](
-        ("bars[0].a", Val.U256(U256.Zero)),
-        ("bars[1].a", Val.U256(U256.One)),
+      contract.immFields is AVector[(String, Val)](
         ("bars[0].b", Val.False),
         ("bars[1].b", Val.True),
         ("bar1.a", Val.U256(U256.Two)),
         ("bar1.b", Val.False)
+      )
+      contract.mutFields is AVector[(String, Val)](
+        ("bars[0].a", Val.U256(U256.Zero)),
+        ("bars[1].a", Val.U256(U256.One))
       )
     }
 
@@ -226,21 +221,21 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       test.before.length is 3
 
       val bar0 = test.before(0)
-      bar0.immFields.isEmpty is true
-      bar0.mutFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(10))))
+      bar0.immFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(10))))
+      bar0.mutFields.isEmpty is true
 
       val bar1 = test.before(1)
-      bar1.immFields.isEmpty is true
-      bar1.mutFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(20))))
+      bar1.immFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(20))))
+      bar1.mutFields.isEmpty is true
 
       val contract = test.before(2)
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
-      contract.immFields.isEmpty is true
-      contract.mutFields is AVector[(String, Val)](
+      contract.immFields is AVector[(String, Val)](
         ("bar0", Val.ByteVec(bar0.contractId.bytes)),
         ("bar1", Val.ByteVec(bar1.contractId.bytes))
       )
+      contract.mutFields.isEmpty is true
     }
 
     {
@@ -268,12 +263,12 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       contracts.length is 2
       val bar = contracts.head
       bar.typeId is Ast.TypeId("Bar")
-      bar.immFields.isEmpty is true
-      bar.mutFields is AVector[(String, Val)](("v", Val.U256(U256.Zero)))
+      bar.immFields is AVector[(String, Val)](("v", Val.U256(U256.Zero)))
+      bar.mutFields.isEmpty is true
       val foo = contracts.last
       foo.typeId is Ast.TypeId("Foo")
-      foo.immFields.isEmpty is true
-      foo.mutFields is AVector[(String, Val)](("bar", Val.ByteVec(bar.contractId.bytes)))
+      foo.immFields is AVector[(String, Val)](("bar", Val.ByteVec(bar.contractId.bytes)))
+      foo.mutFields.isEmpty is true
     }
 
     {
@@ -439,15 +434,16 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       val tests       = compileContractFull(code).rightValue.tests.value
       val barContract = tests.tests.head.before.head
       barContract.typeId is Ast.TypeId("Bar")
-      barContract.immFields.isEmpty is true
-      barContract.mutFields is AVector[(String, Val)](
-        ("foos[0].a", Val.U256(0)),
-        ("foos[1].a", Val.U256(0)),
-        ("b", Val.U256(20)),
+      barContract.immFields is AVector[(String, Val)](
         ("foos[0].b", Val.U256(0)),
         ("foos[1].b", Val.U256(0)),
         ("baz", Val.ByteVec(ContractId.zero.bytes)),
         ("a", Val.U256(10))
+      )
+      barContract.mutFields is AVector[(String, Val)](
+        ("foos[0].a", Val.U256(0)),
+        ("foos[1].a", Val.U256(0)),
+        ("b", Val.U256(20))
       )
     }
 
@@ -480,19 +476,18 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       fooTests.length is 1
       val fooContract = fooTests.head.before.head
       fooContract.typeId is Ast.TypeId("Foo")
-      fooContract.immFields.isEmpty is true
-      fooContract.mutFields is AVector[(String, Val)](
-        ("c", Val.False),
+      fooContract.immFields is AVector[(String, Val)](
         ("a", Val.U256(20)),
         ("b", Val.U256(10))
       )
+      fooContract.mutFields is AVector[(String, Val)](("c", Val.False))
 
       val barTests = contracts(1).tests.value.tests
       barTests.length is 1
       val barContract = barTests.head.before.head
       barContract.typeId is Ast.TypeId("Bar")
-      barContract.immFields.isEmpty is true
-      barContract.mutFields is AVector[(String, Val)](("a", Val.U256(20)), ("b", Val.U256(10)))
+      barContract.immFields is AVector[(String, Val)](("a", Val.U256(20)), ("b", Val.U256(10)))
+      barContract.mutFields.isEmpty is true
     }
 
     {
@@ -633,17 +628,18 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
          |""".stripMargin
 
     val contractState = compileContractFull(code).rightValue.tests.value.tests.head.after.head
-    val immFields     = AVector.empty[Val]
-    val mutFields = AVector[Val](
-      Val.U256(U256.Two),
-      Val.U256(U256.Two),
-      Val.U256(U256.unsafe(4)),
+    val immFields = AVector[Val](
       Val.U256(U256.Zero),
       Val.U256(U256.One),
       Val.U256(U256.Zero),
       Val.U256(U256.One),
       Val.U256(U256.Two),
       Val.U256(U256.unsafe(3))
+    )
+    val mutFields = AVector[Val](
+      Val.U256(U256.Two),
+      Val.U256(U256.Two),
+      Val.U256(U256.unsafe(4))
     )
     val contractOutput = ContractOutput(
       ALPH.oneAlph,
@@ -652,13 +648,22 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
     )
     Testing.checkContractState(contractState, immFields, mutFields, contractOutput) isE ()
 
+    val invalidImmFields = Seq(
+      (0, Val.U256(U256.One), "invalid field bars[0].a[0], expected U256(0), have: U256(1)"),
+      (3, Val.U256(U256.Zero), "invalid field bars[1].a[1], expected U256(1), have: U256(0)"),
+      (4, Val.U256(U256.Zero), "invalid field bar.a[0], expected U256(2), have: U256(0)")
+    )
+    invalidImmFields.foreach { case (index, value, error) =>
+      val fields = immFields.replace(index, value)
+      Testing
+        .checkContractState(contractState, fields, mutFields, contractOutput)
+        .leftValue is error
+    }
+
     val invalidMutFields = Seq(
       (0, Val.U256(U256.One), "invalid field bars[0].b, expected U256(2), have: U256(1)"),
       (1, Val.U256(U256.Zero), "invalid field bars[1].b, expected U256(2), have: U256(0)"),
-      (2, Val.U256(U256.Zero), "invalid field bar.b, expected U256(4), have: U256(0)"),
-      (3, Val.U256(U256.One), "invalid field bars[0].a[0], expected U256(0), have: U256(1)"),
-      (6, Val.U256(U256.Zero), "invalid field bars[1].a[1], expected U256(1), have: U256(0)"),
-      (7, Val.U256(U256.Zero), "invalid field bar.a[0], expected U256(2), have: U256(0)")
+      (2, Val.U256(U256.Zero), "invalid field bar.b, expected U256(4), have: U256(0)")
     )
     invalidMutFields.foreach { case (index, value, error) =>
       val fields = mutFields.replace(index, value)
@@ -712,8 +717,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
          |}
          |""".stripMargin
     val test = compileContractFull(code).rightValue.tests.get.tests.head
-    test.selfContract.immFields.isEmpty is true
-    test.selfContract.mutFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(2))))
+    test.selfContract.immFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(2))))
+    test.selfContract.mutFields.isEmpty is true
   }
 
   it should "test using random func" in {
@@ -795,38 +800,22 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
   }
 
   trait UnitTestFixture extends Fixture {
-    def runSimpleTest(contract: CompiledContract): Unit = {
+    def runSimpleTest(sourceCode: String): Unit = {
       implicit val logConfig = LogConfig.allEnabled()
-      val worldState         = cachedWorldState.staging()
-      val blockHash          = BlockHash.random
-      val txId               = TransactionId.random
-      val tests              = contract.tests.value
-      tests.tests.foreach { test =>
-        worldState.rollback()
-        Testing.createContracts(
-          worldState,
-          Map(contract.ast.name -> contract),
-          contract,
-          test,
-          blockHash,
-          txId
-        ) isE ()
-        val blockEnv = BlockEnv.mockup(GroupIndex.unsafe(0), blockHash, TimeStamp.now())
-        val txEnv    = ContractRunner.createTxEnv(txId, AVector.empty, U256.Zero)
-        val context  = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
-        ContractRunner
-          .run(
-            context,
-            test.selfContract.contractId,
-            None,
-            AVector.empty,
-            tests.contractCode.methodsLength,
-            AVector.empty,
-            test.method,
-            nonCoinbaseMinGasPrice * maximalGasPerTx
-          )
-          .isRight is true
-      }
+      val contracts          = Compiler.compileProject(sourceCode).rightValue._1
+      Testing
+        .run(
+          (_: GroupIndex) => {
+            val worldState = cachedWorldState.staging()
+            worldState.rollback()
+            Right(worldState)
+          },
+          sourceCode,
+          contracts,
+          CompilerOptions.Default
+        )
+        .isRight is true
+      ()
     }
   }
 
@@ -957,8 +946,8 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  }
            |}
            |""".stripMargin
-      val contract = compileContractFull(code).rightValue
-      runSimpleTest(contract)
+
+      runSimpleTest(code)
     }
   }
 
@@ -967,46 +956,48 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       info("No stdId field")
       val code =
         s"""
-           |Contract Foo() {
+           |Contract Foo(@unused num0: U256, @unused mut num1: U256) {
            |  pub fn foo() -> () {}
-           |  test "foo" {
-           |    let (immFields, mutFields) = Bar.encodeFields!(0, 1)
+           |  test "foo0" {
+           |    let (immFields, mutFields) = Foo.encodeFields!(0, 1)
+           |    testEqual!(immFields, #010200)
+           |    testEqual!(mutFields, #010201)
+           |  }
+           |  test "foo1" with updateImmFields = true {
+           |    let (immFields, mutFields) = Foo.encodeFields!(0, 1)
            |    testEqual!(immFields, #00)
            |    testEqual!(mutFields, #0202010200)
            |  }
            |}
-           |Contract Bar(@unused num0: U256, @unused mut num1: U256) {
-           |  pub fn bar() -> () {}
-           |}
            |""".stripMargin
 
-      val contract = compileContractFull(code).rightValue
-      runSimpleTest(contract)
+      runSimpleTest(code)
     }
 
     {
       info("Has stdId field")
       val code =
         s"""
-           |Contract Foo() {
+           |Contract Foo(@unused num0: U256, @unused mut num1: U256) implements FooBase {
            |  pub fn foo() -> () {}
-           |  test "foo" {
-           |    let (immFields, mutFields) = Bar.encodeFields!(0, 1)
+           |  test "foo0" {
+           |    let (immFields, mutFields) = Foo.encodeFields!(0, 1)
+           |    testEqual!(immFields, #0202000306414c50481234)
+           |    testEqual!(mutFields, #010201)
+           |  }
+           |  test "foo1" with updateImmFields = true {
+           |    let (immFields, mutFields) = Foo.encodeFields!(0, 1)
            |    testEqual!(immFields, #00)
            |    testEqual!(mutFields, #03020102000306414c50481234)
            |  }
            |}
-           |Contract Bar(@unused num0: U256, @unused mut num1: U256) implements BarBase {
-           |  pub fn bar() -> () {}
-           |}
            |@std(id = #1234)
-           |Interface BarBase {
-           |  pub fn bar() -> ()
+           |Interface FooBase {
+           |  pub fn foo() -> ()
            |}
            |""".stripMargin
 
-      val contract = compileContractFull(code).rightValue
-      runSimpleTest(contract)
+      runSimpleTest(code)
     }
   }
 }

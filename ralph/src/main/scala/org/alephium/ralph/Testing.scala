@@ -281,14 +281,24 @@ object Testing {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  private def getContractFields(contract: Ast.Contract, fields: Seq[(String, Val, Boolean)]) = {
+  private def getContractFields(
+      contract: Ast.Contract,
+      fields: Seq[(String, Val, Boolean)],
+      allowUpdateImmFields: Boolean
+  ) = {
     val allFields = if (contract.hasStdIdField) {
       fields :+ (Ast.stdArg.ident.name, contract.stdInterfaceId.get, Ast.stdArg.isMutable)
     } else {
       fields
     }
     val (immFields, mutFields) = allFields.view.partition(!_._3)
-    (AVector.from(immFields.map(f => (f._1, f._2))), AVector.from(mutFields.map(f => (f._1, f._2))))
+    val immutableFields        = AVector.from(immFields.map(f => (f._1, f._2)))
+    val mutableFields          = AVector.from(mutFields.map(f => (f._1, f._2)))
+    if (allowUpdateImmFields) {
+      (AVector.empty[(String, Val)], mutableFields ++ immutableFields)
+    } else {
+      (immutableFields, mutableFields)
+    }
   }
 
   final case class CreateContractDef[Ctx <: StatelessContext](
@@ -365,7 +375,8 @@ object Testing {
     private def getFields(
         state: Compiler.State[Ctx],
         origin: Ast.Contract,
-        self: Ast.Contract
+        self: Ast.Contract,
+        allowUpdateImmFields: Boolean
     ): (AVector[(String, Val)], AVector[(String, Val)]) = {
       if (origin.fields.length != fields.length) {
         throw Compiler.Error(s"Invalid contract field size", sourceIndex)
@@ -386,20 +397,24 @@ object Testing {
           genDefaultValue(state, argument.ident.name, fieldType, argument.isMutable)
         }
       }
-      getContractFields(self, values)
+      getContractFields(self, values, allowUpdateImmFields)
     }
 
-    private def getTypeIdAndFields(state: Compiler.State[Ctx], origin: Ast.TypeId) = {
+    private def getTypeIdAndFields(
+        state: Compiler.State[Ctx],
+        origin: Ast.TypeId,
+        allowUpdateImmFields: Boolean
+    ) = {
       if (isSelfType) {
         val selfTypeId   = state.typeId
         val selfContract = getContract(state, selfTypeId)
         val originContract =
           if (selfTypeId == origin) selfContract else getAbstractContract(state, origin)
-        val fields = getFields(state, originContract, selfContract)
+        val fields = getFields(state, originContract, selfContract, allowUpdateImmFields)
         (selfTypeId, fields._1, fields._2)
       } else {
         val contract = getContract(state, typeId)
-        val fields   = getFields(state, contract, contract)
+        val fields   = getFields(state, contract, contract, allowUpdateImmFields)
         (typeId, fields._1, fields._2)
       }
     }
@@ -426,24 +441,26 @@ object Testing {
 
     def compileBeforeContract(
         state: Compiler.State[Ctx],
-        origin: Ast.TypeId
+        origin: Ast.TypeId,
+        allowUpdateImmFields: Boolean
     ): CreateContractValue = {
       val tokenAmounts                   = getTokenAmount(state)
-      val (typeId, immFields, mutFields) = getTypeIdAndFields(state, origin)
+      val (typeId, immFields, mutFields) = getTypeIdAndFields(state, origin, allowUpdateImmFields)
       val contractId                     = ContractId.random
       address.foreach(
         state.addTestingConstant(_, Val.ByteVec(contractId.bytes), Type.Contract(typeId))
       )
-      CreateContractValue(typeId, tokenAmounts, AVector.empty, mutFields ++ immFields, contractId)
+      CreateContractValue(typeId, tokenAmounts, immFields, mutFields, contractId)
     }
 
     def compileAfterContract(
         state: Compiler.State[Ctx],
         origin: Ast.TypeId,
-        selfContractId: ContractId
+        selfContractId: ContractId,
+        allowUpdateImmFields: Boolean
     ): CreateContractValue = {
       val tokenAmounts                   = getTokenAmount(state)
-      val (typeId, immFields, mutFields) = getTypeIdAndFields(state, origin)
+      val (typeId, immFields, mutFields) = getTypeIdAndFields(state, origin, allowUpdateImmFields)
       val contractId = address match {
         case Some(ident) =>
           val contractId = state.getConstantValue(ident) match {
@@ -460,7 +477,7 @@ object Testing {
             throw Compiler.Error(s"Expect a contract id in after def", sourceIndex)
           }
       }
-      CreateContractValue(typeId, tokenAmounts, AVector.empty, mutFields ++ immFields, contractId)
+      CreateContractValue(typeId, tokenAmounts, immFields, mutFields, contractId)
     }
   }
   final case class CreateContractValue(
@@ -485,7 +502,8 @@ object Testing {
   ) extends Ast.Positioned {
     private def getBeforeContracts(
         state: Compiler.State[Ctx],
-        origin: Ast.TypeId
+        origin: Ast.TypeId,
+        allowUpdateImmFields: Boolean
     ): AVector[CreateContractValue] = {
       val (selfContracts, dependencies) = before.defs.partition(_.isSelfType)
       if (selfContracts.length > 1) {
@@ -496,25 +514,24 @@ object Testing {
         val values = contract.fields.flatMap { argument =>
           genDefaultValue(state, argument.ident.name, argument.tpe, argument.isMutable)
         }
-        val (immFields, mutFields) = getContractFields(contract, values)
+        val (immFields, mutFields) = getContractFields(contract, values, allowUpdateImmFields)
         val selfContract =
-          CreateContractValue(
-            state.typeId,
-            AVector.empty,
-            AVector.empty,
-            mutFields ++ immFields,
-            ContractId.random
-          )
-        AVector.from(dependencies.map(_.compileBeforeContract(state, origin))) :+ selfContract
+          CreateContractValue(state.typeId, AVector.empty, immFields, mutFields, ContractId.random)
+        AVector.from(
+          dependencies.map(_.compileBeforeContract(state, origin, allowUpdateImmFields))
+        ) :+ selfContract
       } else {
-        AVector.from(dependencies ++ selfContracts).map(_.compileBeforeContract(state, origin))
+        AVector
+          .from(dependencies ++ selfContracts)
+          .map(_.compileBeforeContract(state, origin, allowUpdateImmFields))
       }
     }
 
     private def getAfterContracts(
         selfContractId: ContractId,
         state: Compiler.State[Ctx],
-        origin: Ast.TypeId
+        origin: Ast.TypeId,
+        allowUpdateImmFields: Boolean
     ): AVector[CreateContractValue] = {
       val (selfContracts, dependencies) = after.defs.partition(_.isSelfType)
       if (selfContracts.length > 1) {
@@ -522,7 +539,7 @@ object Testing {
       }
       AVector
         .from(dependencies ++ selfContracts)
-        .map(_.compileAfterContract(state, origin, selfContractId))
+        .map(_.compileAfterContract(state, origin, selfContractId, allowUpdateImmFields))
     }
 
     def compile(
@@ -530,14 +547,16 @@ object Testing {
         settings: Option[SettingsValue],
         name: String,
         index: Int,
-        origin: Ast.TypeId
+        origin: Ast.TypeId,
+        allowUpdateImmFields: Boolean
     ): CompiledUnitTest[Ctx] = {
       val scopeId = Ast.FuncId(s"$name:$index", false)
       state.setFuncScope(scopeId)
       state.withScope(this) {
-        val beforeContracts = getBeforeContracts(state, origin)
-        val afterContracts  = getAfterContracts(beforeContracts.last.contractId, state, origin)
-        val compiledAssets  = assets.map(_.compile(state))
+        val beforeContracts = getBeforeContracts(state, origin, allowUpdateImmFields)
+        val afterContracts =
+          getAfterContracts(beforeContracts.last.contractId, state, origin, allowUpdateImmFields)
+        val compiledAssets = assets.map(_.compile(state))
         body.foreach(_.check(state))
         val method = Method[Ctx](
           isPublic = true,
@@ -582,7 +601,8 @@ object Testing {
             settingsValue,
             name,
             index,
-            origin.getOrElse(state.typeId)
+            origin.getOrElse(state.typeId),
+            allowUpdateImmFields
           )
         }
       }
@@ -599,6 +619,8 @@ object Testing {
       method: Method[Ctx]
   ) {
     lazy val selfContract: CreateContractValue = before.last
+
+    def isUpdateImmFields: Boolean = settings.exists(_.updateImmFields)
 
     def getGroupIndex(implicit groupConfig: GroupConfig): Either[String, GroupIndex] = {
       val group = settings.map(_.group).getOrElse(0)
@@ -671,10 +693,11 @@ object Testing {
   }
 
   final case class CompiledUnitTests[Ctx <: StatelessContext](
-      contractCode: StatefulContract,
       tests: AVector[CompiledUnitTest[Ctx]],
       sourceIndexes: Map[Int, Option[SourceIndex]]
   ) {
+    def isUpdateImmFields: Boolean = tests.exists(_.isUpdateImmFields)
+
     def getError(
         testName: String,
         sourcePosIndex: Option[Int],
@@ -699,13 +722,11 @@ object Testing {
 
   trait State[Ctx <: StatelessContext] { _: Compiler.State[Ctx] =>
     private var _isInTestContext: Boolean                                 = false
-    private var _isCompilingUnitTest: Boolean                             = false
     private var _allowUpdateImmFields: Boolean                            = false
     private val testCheckCalls: mutable.HashMap[Int, Option[SourceIndex]] = mutable.HashMap.empty
 
     def isInTestContext: Boolean      = _isInTestContext
-    def isCompilingUnitTest: Boolean  = isInTestContext && _isCompilingUnitTest
-    def allowUpdateImmFields: Boolean = isInTestContext && _allowUpdateImmFields
+    def allowUpdateImmFields: Boolean = _allowUpdateImmFields
 
     def withUpdateImmFields[T](allow: Boolean)(func: => T): T = {
       _allowUpdateImmFields = allow
@@ -714,7 +735,7 @@ object Testing {
       result
     }
 
-    def withinTestContext[T](func: => T): T = {
+    private def withinTestContext[T](func: => T): T = {
       _isInTestContext = true
       val result = func
       _isInTestContext = false
@@ -733,17 +754,14 @@ object Testing {
       errorCode
     }
 
-    def genUnitTestCode(
-        unitTestDefs: Seq[UnitTestDef[Ctx]]
-    ): (AVector[CompiledUnitTest[Ctx]], Map[Int, Option[SourceIndex]]) = {
-      assume(isInTestContext)
-      _isCompilingUnitTest = true
+    def genUnitTestCode(unitTestDefs: Seq[UnitTestDef[Ctx]]): CompiledUnitTests[Ctx] = {
       Ast.UniqueDef.checkDuplicates(unitTestDefs, "tests")
-      val tests      = AVector.from(unitTestDefs.flatMap(_.compile(this)))
-      val errorCodes = testCheckCalls.toMap
-      testCheckCalls.clear()
-      _isCompilingUnitTest = false
-      (tests, errorCodes)
+      withinTestContext {
+        val tests      = AVector.from(unitTestDefs.flatMap(_.compile(this)))
+        val errorCodes = testCheckCalls.toMap
+        testCheckCalls.clear()
+        CompiledUnitTests(tests, errorCodes)
+      }
     }
   }
 
@@ -751,20 +769,16 @@ object Testing {
       contract: Ast.Contract,
       state: Compiler.State[StatefulContext]
   ): CompiledUnitTests[StatefulContext] = {
-    state.withinTestContext {
-      state.setGenDebugCode()
-      val contractCode        = contract.genCode(state)
-      val (tests, errorCodes) = state.genUnitTestCode(contract.unitTests)
-      CompiledUnitTests(contractCode, tests, errorCodes)
-    }
+    state.genUnitTestCode(contract.unitTests)
   }
 
   // scalastyle:off method.length parameter.number
   def tryRunTest(
       createWorldState: GroupIndex => IOResult[WorldState.Staging],
       sourceCode: String,
-      allContracts: Map[String, CompiledContract],
-      testingContract: CompiledContract,
+      contractCodes: Map[Ast.TypeId, StatefulContract],
+      testingContractCode: StatefulContract,
+      testingContractAst: Ast.Contract,
       allTests: CompiledUnitTests[StatefulContext],
       test: CompiledUnitTest[StatefulContext]
   )(implicit
@@ -780,7 +794,15 @@ object Testing {
       blockTimeStamp = test.settings.flatMap(_.blockTimeStamp).getOrElse(TimeStamp.now())
       txId           = TransactionId.random
       createFunc = () =>
-        createContracts(worldState, allContracts, testingContract, test, blockHash, txId)
+        createContracts(
+          worldState,
+          contractCodes,
+          testingContractCode,
+          testingContractAst,
+          test,
+          blockHash,
+          txId
+        )
       runFunc = (extraDustAmount: U256) => {
         val blockEnv    = BlockEnv.mockup(groupIndex, blockHash, blockTimeStamp)
         val inputAssets = test.getInputAssets()
@@ -791,7 +813,7 @@ object Testing {
           test.selfContract.contractId,
           None,
           inputAssets,
-          testingContract.debugCode.methodsLength,
+          testingContractCode.methodsLength,
           AVector.empty,
           test.method,
           nonCoinbaseMinGasPrice * maximalGasPerTx
@@ -819,43 +841,125 @@ object Testing {
   def run(
       createWorldState: GroupIndex => IOResult[WorldState.Staging],
       sourceCode: String,
-      contracts: AVector[CompiledContract]
+      contracts: AVector[CompiledContract],
+      options: CompilerOptions
   )(implicit
       consensusConfigs: ConsensusConfigs,
       networkConfig: NetworkConfig,
       logConfig: LogConfig,
       groupConfig: GroupConfig
   ): Either[String, Unit] = {
-    val contractMap = contracts.map(c => (c.ast.ident.name, c)).iterator.toMap
+    val contractCodes = contracts.map(c => (c.ast.ident, c.debugCode)).iterator.toMap
+    for {
+      _ <- runTestsWithoutUpdateImmFields(createWorldState, sourceCode, contracts, contractCodes)
+      _ <- runTestsWithUpdateImmFields(
+        createWorldState,
+        sourceCode,
+        contracts,
+        contractCodes,
+        options
+      )
+    } yield ()
+  }
+
+  private def runTestsWithoutUpdateImmFields(
+      createWorldState: GroupIndex => IOResult[WorldState.Staging],
+      sourceCode: String,
+      contracts: AVector[CompiledContract],
+      contractCodes: Map[Ast.TypeId, StatefulContract]
+  )(implicit
+      consensusConfigs: ConsensusConfigs,
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      groupConfig: GroupConfig
+  ): Either[String, Unit] = {
     contracts.foreachE { testingContract =>
       testingContract.tests match {
         case Some(tests) =>
-          tests.tests.foreachE {
-            tryRunTest(createWorldState, sourceCode, contractMap, testingContract, tests, _)
+          tests.tests.foreachE { test =>
+            if (!test.isUpdateImmFields) {
+              tryRunTest(
+                createWorldState,
+                sourceCode,
+                contractCodes,
+                testingContract.debugCode,
+                testingContract.ast,
+                tests,
+                test
+              )
+            } else {
+              Right(())
+            }
           }
         case None => Right(())
       }
     }
   }
 
-  private def getContractCode(contract: CompiledContract): StatefulContract = {
-    contract.tests.map(_.contractCode).getOrElse(contract.debugCode)
+  // scalastyle:off parameter.number
+  private def runTestsWithUpdateImmFields(
+      createWorldState: GroupIndex => IOResult[WorldState.Staging],
+      sourceCode: String,
+      contracts: AVector[CompiledContract],
+      contractCodes: Map[Ast.TypeId, StatefulContract],
+      options: CompilerOptions
+  )(implicit
+      consensusConfigs: ConsensusConfigs,
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      groupConfig: GroupConfig
+  ): Either[String, Unit] = {
+    val filtered = contracts.filter(_.tests.exists(_.isUpdateImmFields))
+    if (filtered.nonEmpty) {
+      for {
+        multiContracts <- Compiler.compileMultiContract(sourceCode).left.map(_.format(sourceCode))
+        _ <- filtered.foreachE { contract =>
+          val index = multiContracts.contracts.indexWhere(_.ident == contract.ast.ident)
+          val state = Compiler.State.buildFor(multiContracts, index)(options)
+          contract.ast.check(state)
+          state.setGenDebugCode()
+          val contractCode = state.withUpdateImmFields(allow = true)(contract.ast.genCode(state))
+          contract.tests match {
+            case Some(tests) =>
+              tests.tests.foreachE { test =>
+                if (test.isUpdateImmFields) {
+                  tryRunTest(
+                    createWorldState,
+                    sourceCode,
+                    contractCodes,
+                    contractCode,
+                    contract.ast,
+                    tests,
+                    test
+                  )
+                } else {
+                  Right(())
+                }
+              }
+            case None => Right(())
+          }
+        }
+      } yield ()
+    } else {
+      Right(())
+    }
   }
+  // scalastyle:on parameter.number
 
   private[ralph] def createContracts(
       worldState: WorldState.Staging,
-      allContracts: Map[String, CompiledContract],
-      testingContract: CompiledContract,
+      contractCodes: Map[Ast.TypeId, StatefulContract],
+      testingContractCode: StatefulContract,
+      testingContractAst: Ast.Contract,
       test: Testing.CompiledUnitTest[StatefulContext],
       blockHash: BlockHash,
       txId: TransactionId
   ): IOResult[Unit] = {
     test.before.foreachE { c =>
-      val contractCode = if (c.typeId == testingContract.ast.ident) {
-        val code = getContractCode(testingContract)
-        code.copy(methods = code.methods :+ test.method)
+      val contractCode = if (c.typeId == testingContractAst.ident) {
+        testingContractCode.copy(methods = testingContractCode.methods :+ test.method)
       } else {
-        getContractCode(allContracts(c.typeId.name))
+        contractCodes(c.typeId)
       }
       val attoAlphAmount =
         c.tokens.find(_._1 == TokenId.alph).map(_._2).getOrElse(minimalAlphInContract)
