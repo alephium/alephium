@@ -3041,7 +3041,7 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         )
       )
 
-    val withMultipleContracts =
+    val withMultipleContracts0 =
       s"""
          |test "foo"
          |with group = GroupIndex
@@ -3050,40 +3050,55 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
          |  assert!(foo() == 10, 0)
          |}
          |""".stripMargin
-    parse(withMultipleContracts, StatefulParser.unitTestDef(_)).get.value is
-      Testing.UnitTestDef[StatefulContext](
-        "foo",
-        Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
-        Seq(
-          Testing.SingleTestDef(
-            Testing.CreateContractDefs(
-              Seq(
-                Testing.CreateContractDef(
-                  TypeId("Self"),
-                  Seq.empty,
-                  Seq(Const(Val.U256(U256.unsafe(10)))),
-                  None
-                ),
-                Testing.CreateContractDef(
-                  TypeId("Bar"),
-                  Seq.empty,
-                  Seq(Const(Val.U256(U256.unsafe(20)))),
-                  Some(Ident("address1"))
-                ),
-                Testing.CreateContractDef(
-                  TypeId("Bar"),
-                  Seq.empty,
-                  Seq(Const(Val.U256(U256.unsafe(30)))),
-                  Some(Ident("address2"))
-                )
+
+    val ast = Testing.UnitTestDef[StatefulContext](
+      "foo",
+      Some(Testing.SettingsDef(Seq(Testing.SettingDef("group", Variable(Ident("GroupIndex")))))),
+      Seq(
+        Testing.SingleTestDef(
+          Testing.CreateContractDefs(
+            Seq(
+              Testing.CreateContractDef(
+                TypeId("Self"),
+                Seq.empty,
+                Seq(Const(Val.U256(U256.unsafe(10)))),
+                None
+              ),
+              Testing.CreateContractDef(
+                TypeId("Bar"),
+                Seq.empty,
+                Seq(Const(Val.U256(U256.unsafe(20)))),
+                Some(Ident("address1"))
+              ),
+              Testing.CreateContractDef(
+                TypeId("Bar"),
+                Seq.empty,
+                Seq(Const(Val.U256(U256.unsafe(30)))),
+                Some(Ident("address2"))
               )
-            ),
-            Testing.CreateContractDefs.empty,
-            None,
-            statements
-          )
+            )
+          ),
+          Testing.CreateContractDefs.empty,
+          None,
+          statements
         )
       )
+    )
+    parse(withMultipleContracts0, StatefulParser.unitTestDef(_)).get.value is ast
+
+    val withMultipleContracts1 =
+      s"""
+         |test "foo"
+         |with group = GroupIndex
+         |before
+         |  Self(10)
+         |  Bar(20)@address1
+         |  Bar(30)@address2
+         |{
+         |  assert!(foo() == 10, 0)
+         |}
+         |""".stripMargin
+    parse(withMultipleContracts1, StatefulParser.unitTestDef(_)).get.value is ast
 
     val withMultipleTests =
       s"""

@@ -1407,7 +1407,7 @@ trait TestingParser { self: StatefulParser =>
   private def contractDefs[Unknown: P](
       key: String
   ): P[Testing.CreateContractDefs[StatefulContext]] =
-    PP(key ~ createContractDef.rep(0, ","))(Testing.CreateContractDefs.apply)
+    PP(key ~ P(createContractDef ~ ",".?).rep)(Testing.CreateContractDefs.apply)
   private def singleTestDef[Unknown: P]: P[Testing.SingleTestDef[StatefulContext]] =
     PP(
       contractDefs("before").? ~ contractDefs("after").? ~
