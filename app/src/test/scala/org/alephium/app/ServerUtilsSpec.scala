@@ -1572,17 +1572,16 @@ class ServerUtilsSpec extends AlephiumSpec {
     outputs(2).additionalDataOpt.isDefined is true
   }
 
-  trait ContractFixture extends Fixture {
+  trait ContractFixtureBase extends Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", 4),
       ("alephium.broker.broker-num", 1),
       ("alephium.node.indexes.tx-output-ref-index", "true")
     )
-    setHardForkSince(HardFork.Rhone)
 
-    val chainIndex                        = ChainIndex.unsafe(0, 0)
-    val lockupScript                      = getGenesisLockupScript(chainIndex)
-    implicit val serverUtils: ServerUtils = new ServerUtils()
+    lazy val chainIndex                        = ChainIndex.unsafe(0, 0)
+    lazy val lockupScript                      = getGenesisLockupScript(chainIndex)
+    implicit lazy val serverUtils: ServerUtils = new ServerUtils()
 
     def executeScript(
         script: vm.StatefulScript,
@@ -1668,6 +1667,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       val contractId = ContractId.from(block.transactions.head.id, 0, chainIndex.from)
       (block, contractId)
     }
+  }
+
+  trait ContractFixture extends ContractFixtureBase {
+    setHardForkSince(HardFork.Rhone)
   }
 
   trait CallContractFixture extends ContractFixture {
@@ -1986,7 +1989,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "returns error if the number of contract calls exceeds the maximum limit" in new CallContractFixture {
-    override val serverUtils = new ServerUtils() {
+    override lazy val serverUtils = new ServerUtils() {
       override val maxCallsInMultipleCall = 3
     }
     val groupIndex = chainIndex.from.value
@@ -6208,7 +6211,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "test auto fund" in {
+  it should "support auto fund in test-contract endpoint" in {
     new Fixture {
       info("success if the dust amount is not specified")
       setHardForkSince(HardFork.Danube)
@@ -6307,6 +6310,94 @@ class ServerUtilsSpec extends AlephiumSpec {
           .detail
           .contains(errorString) is true
       }
+    }
+  }
+
+  trait AutoFundFixture extends ContractFixtureBase {
+    setHardForkSince(HardFork.Danube)
+    val contract =
+      s"""
+         |Contract AutoFundTest() {
+         |  mapping[U256, U256] map
+         |
+         |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+         |  pub fn insert(num: U256) -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+         |    for (let mut i = 0; i < num; i += 1) {
+         |      map.insert!(i, i)
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    val contractId = createContract(contract, AVector.empty, AVector.empty)._2
+
+    val (privKey, pubKey) = chainIndex.from.generateKey
+    val fromAddress       = Address.p2pkh(pubKey)
+    def script(num: Int) =
+      s"""
+         |TxScript Main {
+         |  let autoFundTest = AutoFundTest(#${contractId.toHexString})
+         |  autoFundTest.insert{@${fromAddress.toBase58} -> ALPH: 1 alph}($num)
+         |}
+         |$contract
+         |""".stripMargin
+
+    val (genesisPrivKey, genesisPubKey, _) = genesisKeys(chainIndex.from.value)
+    val destinations = AVector.fill(30)(Destination(fromAddress, Some(Amount(ALPH.cent(10)))))
+    val buildTxQuery = BuildTransferTx(genesisPubKey.bytes, None, destinations)
+    val unsignedTx = serverUtils
+      .buildTransferUnsignedTransaction(blockFlow, buildTxQuery, ExtraUtxosInfo.empty)
+      .rightValue
+    val signedTx = Transaction.from(unsignedTx, genesisPrivKey)
+    addAndCheck(blockFlow, mineWithTxs(blockFlow, chainIndex, AVector(signedTx)))
+    getAlphBalance(blockFlow, fromAddress.lockupScript) is ALPH.alph(3)
+
+    def submitTx(unsignedTx: String): Unit = {
+      val unsigned   = deserialize[UnsignedTransaction](Hex.unsafe(unsignedTx)).rightValue
+      val txTemplate = TransactionTemplate.from(unsigned, privKey)
+      blockFlow.getGrandPool().add(chainIndex, AVector(txTemplate), TimeStamp.now())
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      block.nonCoinbase.head.id is unsigned.id
+      ()
+    }
+  }
+
+  it should "support auto fund in build-script-tx endpoint" in {
+    new AutoFundFixture {
+      info("success if the dust amount is not specified")
+      val code = Compiler.compileTxScript(script(nextInt(0, 3))).rightValue
+      val query = BuildExecuteScriptTx(
+        pubKey.bytes,
+        None,
+        serialize(code),
+        attoAlphAmount = Some(Amount(ALPH.oneAlph))
+      )
+      val result = serverUtils.buildExecuteScriptTx(blockFlow, query).rightValue.unsignedTx
+      submitTx(result)
+    }
+
+    new AutoFundFixture {
+      info("fail if the dust amount is not enough")
+      val code = Compiler.compileTxScript(script(nextInt(7, 9))).rightValue
+      val query0 = BuildExecuteScriptTx(
+        pubKey.bytes,
+        None,
+        serialize(code),
+        attoAlphAmount = Some(Amount(ALPH.oneAlph)),
+        dustAmount = Some(Amount(ALPH.cent(10)))
+      )
+      serverUtils
+        .buildExecuteScriptTx(blockFlow, query0)
+        .leftValue
+        .detail
+        .contains(
+          "Insufficient funds to cover the minimum amount"
+        ) is true
+
+      val query1 = query0.copy(dustAmount = Some(Amount(ALPH.cent(40))))
+      val result = serverUtils.buildExecuteScriptTx(blockFlow, query1).rightValue.unsignedTx
+      submitTx(result)
     }
   }
 

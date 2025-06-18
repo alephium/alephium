@@ -281,9 +281,11 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
       val frame           = createFrame(Some(initialState))
       val txCaller        = frame.ctx.getUniqueTxInputAddress().rightValue.lockupScript
       val txCallerBalance = createRemainingBalanceState(txCaller, ALPH.oneAlph)
+      frame.ctx.totalAutoFundDustAmount is U256.Zero
 
       frame.ctx.setTxCallerBalance(txCallerBalance)
       frame.getInitialBalancesForNewContract() isE MutBalancesPerLockup.alph(minimalAlphInContract)
+      frame.ctx.totalAutoFundDustAmount is minimalAlphInContract.subUnsafe(ALPH.oneNanoAlph)
 
       val txCallerRemainingAlph = txCallerBalance.remaining.all.head._2.attoAlphAmount
       txCallerRemainingAlph is ALPH.oneAlph
@@ -299,9 +301,11 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
       val frame           = createFrame(Some(initialState))
       val txCaller        = frame.ctx.getUniqueTxInputAddress().rightValue.lockupScript
       val txCallerBalance = createApprovedBalanceState(txCaller, ALPH.oneAlph)
+      frame.ctx.totalAutoFundDustAmount is U256.Zero
 
       frame.ctx.setTxCallerBalance(txCallerBalance)
       frame.getInitialBalancesForNewContract() isE MutBalancesPerLockup.alph(minimalAlphInContract)
+      frame.ctx.totalAutoFundDustAmount is minimalAlphInContract.subUnsafe(ALPH.oneNanoAlph)
 
       val txCallerRemainingAlph = txCallerBalance.approved.all.head._2.attoAlphAmount
       txCallerRemainingAlph is ALPH.oneAlph

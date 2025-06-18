@@ -24,6 +24,7 @@ import org.alephium.flow.gasestimation._
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
+import org.alephium.protocol.vm.InsufficientFundsForUTXODustAmount
 import org.alephium.util._
 
 /*
@@ -35,6 +36,8 @@ import org.alephium.util._
  */
 // scalastyle:off parameter.number
 object UtxoSelectionAlgo extends StrictLogging {
+  val maxAutoFundRetries: Int = 3
+
   trait AssetOrder {
     def byAlph: Ordering[Asset]
     def byToken(id: TokenId): Ordering[Asset]
@@ -76,7 +79,7 @@ object UtxoSelectionAlgo extends StrictLogging {
   }
 
   type Asset = FlowUtils.AssetOutputInfo
-  final case class Selected(assets: AVector[Asset], gas: GasBox)
+  final case class Selected(assets: AVector[Asset], gas: GasBox, autoFundDustAmount: U256)
   final case class SelectedSoFar(alph: U256, selected: AVector[Asset], rest: AVector[Asset])
   final case class ProvidedGas(
       gasOpt: Option[GasBox],
@@ -143,6 +146,7 @@ object UtxoSelectionAlgo extends StrictLogging {
       providedGas: ProvidedGas,
       assetOrder: AssetOrder
   ) {
+    // scalastyle:off method.length
     def select(
         amounts: AssetAmounts,
         lockupScript: LockupScript,
@@ -160,24 +164,28 @@ object UtxoSelectionAlgo extends StrictLogging {
           SelectionWithoutGasEstimation(assetOrder)
             .select(amountsWithGas, utxos)
             .map { selectedSoFar =>
-              Selected(selectedSoFar.selected, gas)
+              Selected(selectedSoFar.selected, gas, U256.Zero)
             }
 
         case None =>
           for {
-            inputWithAssets <- selectTxInputWithAssetsForGasEstimation(amounts, unlockScript, utxos)
-            scriptGas <- txScriptOpt match {
-              case None =>
-                Right(GasBox.zero)
+            scriptGasAndExtraDustAmount <- txScriptOpt match {
+              case None => Right((GasBox.zero, U256.Zero))
               case Some(txScript) =>
-                GasEstimation.estimate(inputWithAssets, txScript, txScriptEmulator).map {
-                  scriptGas =>
-                    providedGas.gasEstimationMultiplier.map(_ * scriptGas).getOrElse(scriptGas)
-                }
+                estimate(
+                  amounts,
+                  unlockScript,
+                  utxos,
+                  txScript,
+                  txScriptEmulator,
+                  maxAutoFundRetries
+                )
             }
-            scriptGasFee = gasPrice * scriptGas
+            (scriptGas, extraDustAmount) = scriptGasAndExtraDustAmount
+            scriptGasFee                 = gasPrice * scriptGas
             totalAttoAlphAmount <- scriptGasFee
               .add(amounts.alph)
+              .flatMap(_.add(extraDustAmount))
               .toRight("ALPH balance overflow with estimated script gas")
             amountsWithScriptGas = AssetAmounts(totalAttoAlphAmount, amounts.tokens)
             utxosWithGas <- selectUtxos(
@@ -190,9 +198,45 @@ object UtxoSelectionAlgo extends StrictLogging {
               assetScriptGasEstimator
             )
           } yield {
-            Selected(utxosWithGas._1, utxosWithGas._2.addUnsafe(scriptGas))
+            Selected(utxosWithGas._1, utxosWithGas._2.addUnsafe(scriptGas), extraDustAmount)
           }
       }
+    }
+    // scalastyle:off method.length
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    private def estimate(
+        amounts: AssetAmounts,
+        unlockScript: UnlockScript,
+        utxos: AVector[Asset],
+        txScript: StatefulScript,
+        txScriptEmulator: TxScriptEmulator,
+        retryTimes: Int
+    )(implicit networkConfig: NetworkConfig): Either[String, (GasBox, U256)] = {
+      for {
+        inputWithAssets <- selectTxInputWithAssetsForGasEstimation(amounts, unlockScript, utxos)
+        _ <- if (inputWithAssets.isEmpty) Left("Insufficient funds for gas") else Right(())
+        result <- txScriptEmulator.emulateRaw(
+          inputWithAssets,
+          AVector.empty,
+          txScript
+        ) match {
+          case Right(result) =>
+            val gasUsed = result.gasUsed
+            val scriptGas =
+              providedGas.gasEstimationMultiplier.map(_ * gasUsed).getOrElse(gasUsed)
+            Right((scriptGas, result.value.autoFundDustAmount))
+          case Left(Right(error: InsufficientFundsForUTXODustAmount)) =>
+            if (retryTimes > 0) {
+              val newAmounts = amounts.copy(alph = amounts.alph.addUnsafe(error.required))
+              estimate(newAmounts, unlockScript, utxos, txScript, txScriptEmulator, retryTimes - 1)
+            } else {
+              Left(s"Execution error when emulating tx script or contract: $error")
+            }
+          case Left(error) =>
+            Left(s"Execution error when emulating tx script or contract: $error")
+        }
+      } yield result
     }
 
     private def selectUtxos(
