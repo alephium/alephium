@@ -6206,6 +6206,78 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
       serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
     }
+
+    {
+      def code(times: Int) =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false, updateFields = true)
+           |  pub fn foo(num: U256) -> () {
+           |    for (let mut i = 0; i < num; i += 1) {
+           |      map.insert!(i, i)
+           |    }
+           |  }
+           |
+           |  test "foo"
+           |  approve{address -> ALPH: 1 alph} {
+           |    foo($times)
+           |  }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(1))).isRight is true
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(2))).isRight is true
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code(3))).isRight is true
+      serverUtils
+        .compileProject(blockFlow, api.Compile.Project(code(4)))
+        .leftValue
+        .detail
+        .contains("Insufficient funds to cover the minimum amount") is true
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |
+           |  test "random address" {
+           |    let address0 = randomContractAddress!()
+           |    testCheck!(!isAssetAddress!(address0))
+           |    testCheck!(isContractAddress!(address0))
+           |
+           |    let address1 = randomAssetAddress!()
+           |    testCheck!(isAssetAddress!(address1))
+           |    testCheck!(!isContractAddress!(address1))
+           |  }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+    }
+  }
+
+  it should "handle test error properly" in new Fixture {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn f0() -> U256 {
+         |    return f1()
+         |  }
+         |
+         |  fn f1() -> U256 {
+         |    assert!(false, 0)
+         |    return 0
+         |  }
+         |
+         |  test "f0" {
+         |    testError!(f0(), 0)
+         |    testFail!(f0())
+         |  }
+         |}
+         |""".stripMargin
+    val serverUtils = new ServerUtils
+    serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
   }
 
   it should "test auto fund" in {

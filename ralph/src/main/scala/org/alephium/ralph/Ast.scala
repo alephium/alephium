@@ -2438,7 +2438,7 @@ object Ast {
             case _                    => false
           }
           var table = Compiler.SimpleFunc
-            .from(funcs, isInterface)
+            .from(orderedFuncs, isInterface)
             .map(f => f.funcDef.id -> f)
             .toMap[FuncId, Compiler.ContractFunc[Ctx]]
           builtInFuncs.foreach(func =>

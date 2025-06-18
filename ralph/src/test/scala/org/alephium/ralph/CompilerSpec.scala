@@ -10078,6 +10078,32 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
     testTxScriptError(code(s"${I256.MinValue}i \\ -1i"), s"I256 overflow: `${I256.MinValue} \\ -1`")
   }
 
+  it should "generate correct debug code" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  @inline fn f1() -> () {}
+         |  @inline fn f2() -> () {}
+         |  pub fn f3() -> () {
+         |    f2()
+         |    f1()
+         |  }
+         |}
+         |""".stripMargin
+
+    val contracts = Compiler.compileMultiContract(code).rightValue
+    val state     = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
+    val contract  = contracts.contracts.head.asInstanceOf[Ast.Contract]
+    contract.check(state)
+    state.setGenDebugCode()
+    val result = contract.genCode(state)
+    result.methods.head.instrs is AVector[Instr[StatefulContext]](
+      MethodSelector(Method.Selector(1410741771)),
+      CallLocal(2),
+      CallLocal(1)
+    )
+  }
+
   it should "compile tuple" in new Fixture {
     {
       info("Test tuple type")
