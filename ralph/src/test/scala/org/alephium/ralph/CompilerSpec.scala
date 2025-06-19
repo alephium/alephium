@@ -3184,6 +3184,43 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
       testContractError(code, "Cannot assign to immutable variable x.")
     }
 
+    {
+      info("Contract call inside if-else block")
+      val code =
+        s"""
+           |Contract Foo(array: [Bar; 2]) {
+           |  pub fn foo(v: U256) -> U256 {
+           |    return if v == 1 {
+           |      array[0].bar()
+           |    } else {
+           |      array[1].bar()
+           |    }
+           |  }
+           |}
+           |Contract Bar(v: U256) {
+           |  pub fn bar() -> U256 { return v }
+           |}
+           |""".stripMargin
+      compileContract(code).isRight is true
+    }
+
+    {
+      info("Load array element inside if-else block")
+      val code =
+        s"""
+           |Contract Foo(array: [U256; 2]) {
+           |  pub fn foo(v: U256) -> U256 {
+           |    return if v == 1 {
+           |      array[0]
+           |    } else {
+           |      array[1]
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      compileContract(code).isRight is true
+    }
+
     new Fixture {
       val code =
         s"""
