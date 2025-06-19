@@ -5784,7 +5784,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |    return blockTimeStamp!()
            |  }
            |  test "foo"
-           |  with Settings(blockTimeStamp = ${now.millis})
+           |  with blockTimeStamp = ${now.millis}
            |  before Self(0) {
            |    testCheck!(foo() == ${blockTimeStamp.millis})
            |  }
@@ -5811,10 +5811,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |    return bar0.value() + bar1.value()
            |  }
            |  test "add"
-           |  before
-           |    Bar(10)@addr0
-           |    Bar(20)@addr1
-           |    Self(addr0, addr1)
+           |  before Bar(10)@addr0, Bar(20)@addr1, Self(addr0, addr1)
            |  {
            |    testCheck!(add() == $result)
            |  }
@@ -5831,10 +5828,10 @@ class ServerUtilsSpec extends AlephiumSpec {
         .compileProject(blockFlow, api.Compile.Project(code(20)))
         .leftValue
         .detail is
-        s"""|-- error (12:5): Testing error
-            |12 |    testCheck!(add() == 20)
-            |   |    ^^^^^^^^^^^^^^^^^^^^^^^
-            |   |    Test failed: Foo:add, detail: VM execution error: Assertion Failed: left(U256(30)) is not equal to right(U256(20))
+        s"""|-- error (9:5): Testing error
+            |9 |    testCheck!(add() == 20)
+            |  |    ^^^^^^^^^^^^^^^^^^^^^^^
+            |  |    Test failed: Foo:add, detail: VM execution error: Assertion Failed: left(U256(30)) is not equal to right(U256(20))
             |""".stripMargin
     }
 
@@ -5977,12 +5974,8 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |
            |  test "foo"
-           |  before
-           |    Bar{ALPH: 10 alph}(0)@barId
-           |    Self(barId)
-           |  after
-           |    Bar{ALPH: 9 alph}(1)@barId
-           |    Self{ALPH: 1.1 alph}(barId)
+           |  before Bar{ALPH: 10 alph}(0)@barId, Self(barId)
+           |  after Bar{ALPH: 9 alph}(1)@barId, Self{ALPH: 1.1 alph}(barId)
            |  {
            |    foo()
            |  }
@@ -6192,12 +6185,8 @@ class ServerUtilsSpec extends AlephiumSpec {
            |        bank.deposit{depositor -> ALPH: 1 alph}(depositor)
            |    }
            |    test "customer should be able to make deposit to bank"
-           |    before
-           |        Bank{ALPH: 0 alph}(0)@bank
-           |        Self()
-           |    after
-           |        Bank{ALPH: 1 alph}(1 alph)@bank
-           |        Self()
+           |    before Bank{ALPH: 0 alph}(0)@bank, Self()
+           |    after Bank{ALPH: 1 alph}(1 alph)@bank, Self()
            |    approve{address -> ALPH: 1 alph}
            |    {
            |        makeDeposit{callerAddress!() -> ALPH: 1 alph}(bank)
