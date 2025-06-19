@@ -21,6 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import scala.reflect.ClassTag
 
+import org.alephium.io.IOError
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model._
@@ -657,23 +658,25 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
   }
 
   it should "handle error properly" in new FrameFixture {
-    val error  = AssertionFailedWithErrorCode(None, 0)
-    val frame0 = genStatelessFrame()
-    frame0.handleError(error).leftValue isE error
+    val error   = AssertionFailedWithErrorCode(None, 0)
+    val ioError = IOErrorUpdateState(IOError.keyNotFound("key"))
+    val frame0  = genStatelessFrame()
+    frame0.handleError(Left(ioError)).leftValue.leftValue is ioError
+    frame0.handleError(Right(error)).leftValue isE error
     frame0.ctx.initTestEnv(error.errorCode, None, frame0)
-    frame0.handleError(error).leftValue isE InvalidTestCheckInstr
+    frame0.handleError(Right(error)).leftValue isE InvalidTestCheckInstr
 
     val method = baseMethod[StatelessContext](2).copy(instrs =
       AVector[Instr[StatelessContext]](DevInstr(TestCheckStart), DevInstr(TestCheckEnd))
     )
     val frame1 = genStatelessFrame(method)
     frame1.ctx.initTestEnv(error.errorCode, None, frame1)
-    frame1.handleError(error) isE None
+    frame1.handleError(Right(error)) isE None
     frame1.ctx.testEnvOpt.isEmpty is true
 
     val frame2 = genStatelessFrame()
     frame2.ctx.initTestEnv(error.errorCode, None, frame1)
-    frame2.handleError(error) isE None
+    frame2.handleError(Right(error)) isE None
     frame2.ctx.testEnvOpt.isDefined is true
     frame2.ctx.testEnvOpt.value.exeFailure.value is error
   }

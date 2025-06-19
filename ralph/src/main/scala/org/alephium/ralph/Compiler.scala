@@ -410,12 +410,7 @@ object Compiler {
           }
         }
       } else {
-        var funcIndex = 0
-        funcs.map { func =>
-          val simpleFunc = from(func, funcIndex.toByte)
-          if (!func.inline) funcIndex += 1
-          simpleFunc
-        }
+        funcs.view.zipWithIndex.map { case (func, index) => from(func, index.toByte) }.toSeq
       }
     }
   }
