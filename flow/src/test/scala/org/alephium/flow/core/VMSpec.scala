@@ -7387,7 +7387,6 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     def verifySingleTarget(op: String, initValue: String) = {
-      val valueType = getValueType(initValue)
       verify(
         s"""
            |Contract TestContract() {
@@ -7396,8 +7395,8 @@ class VMSpec extends AlephiumSpec with Generators {
            |    x $op getValues()
            |  }
            |
-           |  fn getValues() -> ($valueType, $valueType) {
-           |    return $initValue, $initValue
+           |  fn getValues() -> () {
+           |    return
            |  }
            |}
            |""".stripMargin
@@ -7570,7 +7569,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |""".stripMargin
       )
       .leftValue
-      .message is """Invalid array index type "List(U256, ByteVec)", expected "U256""""
+      .message is """Invalid array index type "Tuple(U256,ByteVec)", expected "U256""""
 
     Compiler
       .compileContractFull(
@@ -7608,7 +7607,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |""".stripMargin
       )
       .leftValue
-      .message is """Invalid map key type "List(U256, ByteVec)", expected "ByteVec""""
+      .message is """Invalid map key type "Tuple(U256,ByteVec)", expected "ByteVec""""
 
     Compiler
       .compileContractFull(
@@ -8541,6 +8540,112 @@ class VMSpec extends AlephiumSpec with Generators {
          |$contract
          |""".stripMargin
     testSimpleScript(script)
+  }
+
+  it should "test tuple" in new ContractFixture {
+    {
+      info("Tuple as a contract field")
+      val contract =
+        s"""
+           |struct Bar {mut a: U256, b: (U256, U256)}
+           |struct Foo {a: U256, mut b: (U256, U256), c: Bar, mut d: [(U256, U256); 2]}
+           |Contract C(@unused mut value: (Foo, U256)) {
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+
+      val compiledContract = Compiler.compileContract(contract).rightValue
+      val contractBytecode = Hex.toHexString(serialize(compiledContract))
+      val fields = "(Foo{a: 0, b: (1, 2), c: Bar{a: 3, b: (4, 5)}, d: [(6, 7), (8, 9)]}, 10)"
+
+      val script =
+        s"""
+           |TxScript Deploy() {
+           |  let (encodedImmFields, encodedMutFields) = C.encodeFields!($fields)
+           |  createContract!(#$contractBytecode, encodedImmFields, encodedMutFields)
+           |}
+           |$contract
+           |""".stripMargin
+
+      deployAndCheckContractState(
+        script,
+        AVector.from(Seq(0, 3, 4, 5)).map(v => Val.U256(U256.unsafe(v))),
+        AVector.from(Seq(1, 2, 6, 7, 8, 9, 10)).map(v => Val.U256(U256.unsafe(v)))
+      )
+    }
+
+    {
+      info("Tuple as map value")
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, (U256, Bool)] map
+           |
+           |  pub fn foo() -> () {
+           |    assert!(!map.contains!(0), 0)
+           |    map.insert!(0, (1, false))
+           |    assert!(map.contains!(0), 0)
+           |    let tuple0 = map[0]
+           |    assert!(tuple0._0 == 1 && !tuple0._1, 0)
+           |
+           |    map[0]._0 = 2
+           |    map[0]._1 = true
+           |    let tuple1 = map[0]
+           |    assert!(tuple1._0 == 2 && tuple1._1, 0)
+           |
+           |    map[0] = (3, false)
+           |    let mut tuple2 = map[0]
+           |    assert!(tuple2._0 == 3 && !tuple2._1, 0)
+           |    tuple2 = (4, true)
+           |    assert!(tuple2._0 == 4 && tuple2._1, 0)
+           |    tuple2._0 = 5
+           |    tuple2._1 = false
+           |    assert!(tuple2._0 == 5 && !tuple2._1, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      val foo = createContract(contract)._1
+      val script =
+        s"""
+           |TxScript Main {
+           |  let foo = Foo(#${foo.toHexString})
+           |  foo.foo()
+           |}
+           |$contract
+           |""".stripMargin
+      callTxScript(script)
+    }
+
+    {
+      info("Encode tuple values")
+      val contract =
+        s"""
+           |struct Bar { a: (U256, U256), b: [(U256, Bool); 2] }
+           |Contract Foo() {
+           |  pub fn foo(value: (U256, (U256, U256), Bool), bar: Bar) -> ByteVec {
+           |    return encodeToByteVec!(value) ++ encodeToByteVec!(bar)
+           |  }
+           |}
+           |""".stripMargin
+
+      val foo     = createContract(contract)._1
+      val args    = "(0, (1, 2), false), Bar{ a: (3, 4), b: [(5, false), (6, true)] }"
+      val values0 = AVector[Val](Val.U256(0), Val.U256(1), Val.U256(2), Val.False)
+      val values1 =
+        AVector[Val](Val.U256(3), Val.U256(4), Val.U256(5), Val.False, Val.U256(6), Val.True)
+      val encoded = Hex.toHexString(serialize(values0) ++ serialize(values1))
+      val script =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  let foo = Foo(#${foo.toHexString})
+           |  assert!(foo.foo($args) == #$encoded, 0)
+           |}
+           |$contract
+           |""".stripMargin
+      testSimpleScript(script)
+    }
   }
 
   private def getEvents(

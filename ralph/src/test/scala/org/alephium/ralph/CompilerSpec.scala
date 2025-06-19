@@ -5863,7 +5863,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
       )
       testContractError(
         code("f1(address)"),
-        "Invalid args type List(Address, U256), expected List(U256)"
+        "Invalid args type List(Tuple(Address,U256)), expected List(U256)"
       )
       testContractError(code("address, 1, 1"), "Invalid args length, expected 2, got 3")
     }
@@ -10102,5 +10102,248 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
       CallLocal(2),
       CallLocal(1)
     )
+  }
+
+  it should "compile tuple" in new Fixture {
+    {
+      info("Test tuple type")
+      val code =
+        s"""
+           |const Size = 2
+           |struct Bar {
+           |  mut a: (Bool, [U256; Size], (U256, I256)),
+           |  b: U256,
+           |  mut c: [(U256, I256); Size]
+           |}
+           |Contract Foo(mut bar: Bar) {
+           |  pub fn getA() -> (Bool, [U256; Size], (U256, I256)) {
+           |    return bar.a
+           |  }
+           |  pub fn getC() -> [(U256, I256); Size] {
+           |    return bar.c
+           |  }
+           |  pub fn getA0() -> Bool {
+           |    return bar.a._0
+           |  }
+           |  pub fn getA1() -> [U256; Size] {
+           |    return bar.a._1
+           |  }
+           |  pub fn getA2() -> (U256, I256) {
+           |    return bar.a._2
+           |  }
+           |  pub fn getC0() -> U256 {
+           |    return bar.c[0]._0
+           |  }
+           |  pub fn getC1() -> I256 {
+           |    return bar.c[1]._1
+           |  }
+           |  pub fn setA(newA: (Bool, [U256; Size], (U256, I256))) -> () {
+           |    bar.a = newA
+           |  }
+           |  pub fn setA2(value: (U256, I256)) -> () {
+           |    bar.a._2 = value
+           |  }
+           |  pub fn setC(value: (U256, I256), index: U256) -> () {
+           |    bar.c[index] = value
+           |  }
+           |  pub fn setC0(value: U256, index: U256) -> () {
+           |    bar.c[index]._0 = value
+           |  }
+           |  pub fn setC1(value: I256, index: U256) -> () {
+           |    bar.c[index]._1 = value
+           |  }
+           |}
+           |""".stripMargin
+
+      compileContract(code).isRight is true
+    }
+
+    {
+      info("Invalid return tuple type")
+      val code =
+        s"""
+           |Contract Foo(a: (U256, I256)) {
+           |  pub fn foo() -> (U256, U256) {
+           |    $$return a$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        s"""Invalid return types "List(Tuple(U256,I256))" for func foo, expected "List(Tuple(U256,U256))""""
+      )
+    }
+
+    {
+      info("Invalid tuple field type")
+      val code =
+        s"""
+           |Contract Foo(a: (U256, I256)) {
+           |  pub fn foo() -> I256 {
+           |    $$return a._0$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        s"""Invalid return types "List(U256)" for func foo, expected "List(I256)""""
+      )
+    }
+
+    {
+      info("Invalid tuple field index")
+      val code =
+        s"""
+           |Contract Foo(a: (U256, I256)) {
+           |  pub fn foo() -> I256 {
+           |    return a.$$_2$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Field _2 does not exist in tuple Tuple(U256,I256)")
+    }
+
+    {
+      info("Invalid tuple assignment")
+      val code =
+        s"""
+           |Contract Foo(mut a: (U256, I256)) {
+           |  pub fn foo(value: (U256, U256)) -> () {
+           |    $$a = value$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, s"""Cannot assign "Tuple(U256,U256)" to "Tuple(U256,I256)"""")
+    }
+
+    {
+      info("Invalid tuple field assignment")
+      def code(stmt: String) =
+        s"""
+           |Contract Foo(mut a: (U256, I256)) {
+           |  pub fn foo(value: I256) -> () {
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(s"$$a._0 = value$$"), s"""Cannot assign "I256" to "U256"""")
+      testContractError(
+        code(s"$$a._0 += (value, value)$$"),
+        s"""Cannot assign "Tuple(I256,I256)" to "U256""""
+      )
+    }
+
+    {
+      info("Assign to immutable tuple field")
+      def code(stmt: String) =
+        s"""
+           |struct Bar { a: U256, mut b: U256 }
+           |Contract Foo(mut value: (U256, Bar)) {
+           |  pub fn foo() -> () {
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+      compileContract(code("value._0 = 1")).isRight is true
+      compileContract(code("value._1.b = 1")).isRight is true
+      testContractError(
+        code(s"$$value._1.a = 1$$"),
+        "Cannot assign to immutable field a in struct Bar."
+      )
+    }
+
+    {
+      info("Local tuple variables")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo0() -> (U256, Bool) {
+           |    return 0, true
+           |  }
+           |  pub fn foo1() -> (U256, Bool) {
+           |    return (1, false)
+           |  }
+           |  pub fn foo2() -> () {
+           |    let tuple0 = foo0()
+           |    assert!(tuple0._0 == 0 && tuple0._1, 0)
+           |    let (a, b) = foo1()
+           |    assert!(a == 1 && !b, 0)
+           |
+           |    let mut tuple1 = (2, false)
+           |    assert!(tuple1._0 == 2 && !tuple1._1, 0)
+           |    tuple1 = foo0()
+           |    assert!(tuple1._0 == 0 && tuple1._1, 0)
+           |    tuple1._0 = a
+           |    tuple1._1 = b
+           |    assert!(tuple1._0 == 1 && !tuple1._1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code, methodIndex = 2)
+    }
+
+    {
+      info("Defining variables from a tuple")
+      def code(stmt0: String, stmt1: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> (U256, U256, U256) {
+           |    return 0, 1, 2
+           |  }
+           |  pub fn bar() -> U256 {
+           |    $stmt0
+           |    $stmt1
+           |  }
+           |}
+           |""".stripMargin
+      compileContract(code("let (_, _, _) = foo()", "return 0")).isRight is true
+      compileContract(code("let (a, _, _) = foo()", "return a")).isRight is true
+      compileContract(code("let (a, b, _) = foo()", "return a + b")).isRight is true
+      compileContract(code("let (a, _, c) = foo()", "return a + c")).isRight is true
+      compileContract(code("let a = foo()", "return a._0")).isRight is true
+      testContractError(
+        code(s"$$let (a, b) = foo()$$", "return a + b"),
+        "Invalid variable declaration, expected 3 variables, got 2 variables"
+      )
+    }
+
+    {
+      info("Tuple type as map value")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, (U256, Bool)] map
+           |
+           |  pub fn insert(key: U256, value: (U256, Bool)) -> () {
+           |    map.insert!(key, value)
+           |  }
+           |  pub fn update0(key: U256, amount: U256, flag: Bool) -> () {
+           |    map[key]._0 = amount
+           |    map[key]._1 = flag
+           |  }
+           |  pub fn update1(key: U256, value: (U256, Bool)) -> () {
+           |    map[key] = value
+           |  }
+           |  pub fn remove(key: U256) -> () {
+           |    map.remove!(key)
+           |  }
+           |}
+           |""".stripMargin
+      compileContract(code).isRight is true
+    }
+
+    {
+      info("Encode tuple values")
+      val code =
+        s"""
+           |struct Bar { a: (U256, U256), b: [(U256, I256); 2] }
+           |Contract Foo(value: (U256, (U256, U256), Bool), bar: Bar) {
+           |  pub fn foo() -> ByteVec {
+           |    return encodeToByteVec!(value) ++ encodeToByteVec!(bar)
+           |  }
+           |}
+           |""".stripMargin
+      compileContract(code).isRight is true
+    }
   }
 }
