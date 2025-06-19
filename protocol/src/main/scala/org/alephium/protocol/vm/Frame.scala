@@ -190,22 +190,24 @@ abstract class Frame[Ctx <: StatelessContext] {
     if (pc < pcMax) {
       val instr = method.instrs(pc)
       (instr.code: @switch) match {
-        case 0   => callLocal(instr.asInstanceOf[CallLocal].index)
-        case 1   => callExternal(instr.asInstanceOf[CallExternal].index)
-        case 2   => runReturn()
-        case -44 => callExternalBySelector(instr.asInstanceOf[CallExternalBySelector].selector)
-        case _   =>
+        case 0 => checkExeResult(callLocal(instr.asInstanceOf[CallLocal].index))
+        case 1 => checkExeResult(callExternal(instr.asInstanceOf[CallExternal].index))
+        case 2 => checkExeResult(runReturn())
+        case -44 =>
+          checkExeResult(
+            callExternalBySelector(instr.asInstanceOf[CallExternalBySelector].selector)
+          )
+        case _ =>
           // No flatMap for tailrec
           instr.runWith(this) match {
             case Right(_) =>
               advancePC()
               execute()
-            case Left(Left(ioError))     => Left(Left(ioError))
-            case Left(Right(exeFailure)) => handleError(exeFailure)
+            case Left(error) => handleError(error)
           }
       }
     } else if (pc == pcMax) {
-      runReturn()
+      checkExeResult(runReturn())
     } else {
       failed(PcOverflow)
     }
@@ -215,21 +217,38 @@ abstract class Frame[Ctx <: StatelessContext] {
   protected def runReturn(): ExeResult[Option[Frame[Ctx]]] =
     Return.runWith(this).map(_ => None)
 
-  private[vm] def handleError(exeFailure: ExeFailure): ExeResult[Option[Frame[Ctx]]] = {
-    ctx.testEnvOpt match {
-      case None => failed(exeFailure)
-      case Some(testEnv) =>
-        ctx.setTestError(exeFailure)
-        if (testEnv.testFrame == this) {
-          val testEndIndex = method.instrs.view.indexOf(DevInstr(TestCheckEnd), pc)
-          if (testEndIndex == -1) {
-            failed(InvalidTestCheckInstr)
-          } else {
-            pc = testEndIndex
-            execute()
-          }
-        } else {
-          Right(None)
+  private def checkExeResult(result: ExeResult[Option[Frame[Ctx]]]) = {
+    if (ctx.testEnvOpt.isDefined) {
+      result match {
+        case Right(_)    => result
+        case Left(error) => handleError(error)
+      }
+    } else {
+      result
+    }
+  }
+
+  private[vm] def handleError(
+      exeError: Either[IOFailure, ExeFailure]
+  ): ExeResult[Option[Frame[Ctx]]] = {
+    exeError match {
+      case Left(ioError) => Left(Left(ioError))
+      case Right(exeFailure) =>
+        ctx.testEnvOpt match {
+          case None => failed(exeFailure)
+          case Some(testEnv) =>
+            ctx.setTestError(exeFailure)
+            if (testEnv.testFrame == this) {
+              val testEndIndex = method.instrs.view.indexOf(DevInstr(TestCheckEnd), pc)
+              if (testEndIndex == -1) {
+                failed(InvalidTestCheckInstr)
+              } else {
+                pc = testEndIndex
+                execute()
+              }
+            } else {
+              Right(None)
+            }
         }
     }
   }

@@ -1418,6 +1418,10 @@ object BuiltIn {
     randomFunc("randomU256", Type.U256, "U256", DevInstr(RandomU256))
   val randomI256: BuiltIn[StatelessContext] =
     randomFunc("randomI256", Type.I256, "I256", DevInstr(RandomI256))
+  val randomContractAddress: BuiltIn[StatelessContext] =
+    randomFunc("randomContractAddress", Type.Address, "Address", DevInstr(RandomContractAddress))
+  val randomAssetAddress: BuiltIn[StatelessContext] =
+    randomFunc("randomAssetAddress", Type.Address, "Address", DevInstr(RandomAssetAddress))
 
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
@@ -1488,7 +1492,9 @@ object BuiltIn {
     testFail,
     testError,
     randomU256,
-    randomI256
+    randomI256,
+    randomContractAddress,
+    randomAssetAddress
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap

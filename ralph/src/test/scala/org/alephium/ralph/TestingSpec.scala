@@ -199,10 +199,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    return bar0.value() + bar1.value()
            |  }
            |  test "add"
-           |  before
-           |    Bar(10)@addr0
-           |    Bar(20)@addr1
-           |    Self(addr0, addr1)
+           |  before Bar(10)@addr0, Bar(20)@addr1, Self(addr0, addr1)
            |  {
            |    testCheck!(add() == 30)
            |  }
@@ -244,7 +241,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |  pub fn foo() -> U256 {
            |    return bar.bar()
            |  }
-           |  test "foo" before Bar(0)@addr Self(addr) {
+           |  test "foo" before Bar(0)@addr, Self(addr) {
            |    testCheck!(foo() == 0)
            |  }
            |}
@@ -323,7 +320,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    return v0 + v1
            |  }
            |  test "foo"
-           |  with Settings($settings)
+           |  with $settings
            |  before Self(0, 1) {
            |    testCheck!(foo() == 1)
            |  }
@@ -580,7 +577,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
          |Contract Foo(bar: Bar) {
          |  pub fn foo() -> () { bar.bar() }
          |  test "foo"
-         |  before Bar(0)@barId Self(barId)
+         |  before Bar(0)@barId, Self(barId)
          |  after $stat {
          |    foo()
          |  }

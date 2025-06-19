@@ -195,8 +195,13 @@ abstract class Parser[Ctx <: StatelessContext] {
       if (exprs.length == 1) Ast.ParenExpr(exprs(0)) else Ast.TupleLiteral(exprs)
     }
 
-  private def ifElseExprBody[Unknown: P]: P[(Seq[Ast.Statement[Ctx]], Ast.Expr[Ctx])] =
-    P("{" ~ statement.rep(0) ~ expr ~ "}" | expr.map(expr => (Seq.empty[Ast.Statement[Ctx]], expr)))
+  private def ifElseExprBody[Unknown: P]: P[(Seq[Ast.Statement[Ctx]], Ast.Expr[Ctx])] = {
+    P(
+      P("{" ~ expr ~ "}").map(expr => (Seq.empty[Ast.Statement[Ctx]], expr)) |
+        "{" ~ statement.rep(1) ~ expr ~ "}" |
+        expr.map(expr => (Seq.empty[Ast.Statement[Ctx]], expr))
+    )
+  }
   def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
     P(Lexer.token(Keyword.`if`) ~ expr ~ ifElseExprBody).map {
       case (ifIndex, condition, (statements, expr)) =>
@@ -1400,9 +1405,12 @@ class StatefulParser(val fileURI: Option[java.net.URI])
 
 trait TestingParser { self: StatefulParser =>
   private def settingDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] =
-    PP(Lexer.ident ~ "=" ~ expr) { case (ident, expr) => Testing.SettingDef(ident.name, expr) }
+    P(Lexer.ident ~ "=" ~ expr).map { case (ident, expr) =>
+      val sourceIndex = SourceIndex(ident.sourceIndex, expr.sourceIndex)
+      Testing.SettingDef(ident.name, expr).atSourceIndex(sourceIndex)
+    }
   private def settingsDef[Unknown: P]: P[Testing.SettingsDef[StatefulContext]] =
-    PP("with" ~ "Settings" ~ "(" ~ settingDef.rep(0, ",") ~ ")")(Testing.SettingsDef.apply)
+    PP("with" ~ settingDef.rep(0, ","))(Testing.SettingsDef.apply)
 
   private def contractAssets[Unknown: P] = P("{" ~ amountList ~ "}")
   private def contractCtor[Unknown: P]   = P("(" ~ expr.rep(0, ",") ~ ")")
@@ -1418,7 +1426,7 @@ trait TestingParser { self: StatefulParser =>
   private def contractDefs[Unknown: P](
       key: String
   ): P[Testing.CreateContractDefs[StatefulContext]] =
-    PP(key ~ createContractDef.rep)(Testing.CreateContractDefs.apply)
+    PP(key ~ P(createContractDef ~ ",".?).rep)(Testing.CreateContractDefs.apply)
   private def singleTestDef[Unknown: P]: P[Testing.SingleTestDef[StatefulContext]] =
     PP(
       contractDefs("before").? ~ contractDefs("after").? ~

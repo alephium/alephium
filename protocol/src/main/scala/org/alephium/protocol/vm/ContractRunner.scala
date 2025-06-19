@@ -22,6 +22,8 @@ import org.alephium.protocol.vm.nodeindexes._
 import org.alephium.util.{AVector, U256}
 
 object ContractRunner {
+  val MaxRetryTimes: Int = 3
+
   def createContractUnsafe(
       worldState: WorldState.Staging,
       contractId: ContractId,
@@ -94,6 +96,53 @@ object ContractRunner {
         BytesConst(Val.ByteVec(contractId.bytes)),
         CallExternal(methodIndex.toByte)
       )
+  }
+
+  def createTxEnv(
+      txId: TransactionId,
+      inputAssets: AVector[AssetOutput],
+      dustAmount: U256
+  ): TxEnv = {
+    val allInputs = if (inputAssets.isEmpty || dustAmount.isZero) {
+      inputAssets
+    } else {
+      val dustInput = inputAssets.head.copy(amount = dustAmount, tokens = AVector.empty)
+      inputAssets :+ dustInput
+    }
+    TxEnv.mockup(txId, allInputs)
+  }
+
+  private def wrapResult[T](result: IOResult[T]): ExeResult[T] = {
+    result match {
+      case Right(result) => Right(result)
+      case Left(ioError) => ioFailed(IOErrorUpdateState(ioError))
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def retryOnInsufficientFundsError(
+      worldState: WorldState.Staging,
+      createContracts: () => IOResult[Unit],
+      runFunc: U256 => ExeResult[(AVector[Val], StatefulVM.TxScriptExecution)],
+      retryTimes: Int,
+      extraDustAmount: U256
+  ): ExeResult[(AVector[Val], StatefulVM.TxScriptExecution)] = {
+    for {
+      _ <- wrapResult(createContracts())
+      result <- runFunc(extraDustAmount) match {
+        case Left(Right(error: InsufficientFundsForUTXODustAmount)) if retryTimes > 0 =>
+          // clear the cache from world state
+          worldState.rollback()
+          retryOnInsufficientFundsError(
+            worldState,
+            createContracts,
+            runFunc,
+            retryTimes - 1,
+            extraDustAmount.addUnsafe(error.required)
+          )
+        case result => result
+      }
+    } yield result
   }
 
   // scalastyle:off method.length parameter.number

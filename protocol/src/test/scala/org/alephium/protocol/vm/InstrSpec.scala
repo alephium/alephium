@@ -4835,6 +4835,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     serialize[DevInstrBase](TestEqual) is Hex.unsafe("03")
     serialize[DevInstrBase](RandomU256) is Hex.unsafe("04")
     serialize[DevInstrBase](RandomI256) is Hex.unsafe("05")
+    serialize[DevInstrBase](RandomContractAddress) is Hex.unsafe("06")
+    serialize[DevInstrBase](RandomAssetAddress) is Hex.unsafe("07")
 
     deserialize[DevInstrBase](Hex.unsafe("00")).rightValue is TestCheckStart
     deserialize[DevInstrBase](Hex.unsafe("01")).rightValue is TestErrorStart
@@ -4842,8 +4844,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     deserialize[DevInstrBase](Hex.unsafe("03")).rightValue is TestEqual
     deserialize[DevInstrBase](Hex.unsafe("04")).rightValue is RandomU256
     deserialize[DevInstrBase](Hex.unsafe("05")).rightValue is RandomI256
-    deserialize[DevInstrBase](Hex.unsafe("06")).leftValue is SerdeError.WrongFormat(
-      "Invalid dev instr prefix 6"
+    deserialize[DevInstrBase](Hex.unsafe("06")).rightValue is RandomContractAddress
+    deserialize[DevInstrBase](Hex.unsafe("07")).rightValue is RandomAssetAddress
+    deserialize[DevInstrBase](Hex.unsafe("08")).leftValue is SerdeError.WrongFormat(
+      "Invalid dev instr prefix 8"
     )
   }
 
@@ -4956,6 +4960,26 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     DevInstr(RandomI256).runWith(frame) isE ()
     frame.opStack.size is 1
     frame.opStack.top.value is a[Val.I256]
+  }
+
+  it should "DevInstr(RandomContractAddress)" in new DevInstrFixture {
+    fail(DevInstr(RandomContractAddress))
+
+    frame.opStack.isEmpty is true
+    DevInstr(RandomContractAddress).runWith(frame) isE ()
+    frame.opStack.size is 1
+    frame.opStack.top.value is a[Val.Address]
+    frame.opStack.top.value.asInstanceOf[Val.Address].lockupScript.isAssetType is false
+  }
+
+  it should "DevInstr(RandomAssetAddress)" in new DevInstrFixture {
+    fail(DevInstr(RandomAssetAddress))
+
+    frame.opStack.isEmpty is true
+    DevInstr(RandomAssetAddress).runWith(frame) isE ()
+    frame.opStack.size is 1
+    frame.opStack.top.value is a[Val.Address]
+    frame.opStack.top.value.asInstanceOf[Val.Address].lockupScript.isAssetType is true
   }
 
   it should "test gas amount" in new FrameFixture {
