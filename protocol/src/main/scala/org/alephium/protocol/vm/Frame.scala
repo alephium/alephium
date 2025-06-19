@@ -327,19 +327,10 @@ final case class StatefulFrame(
     }
   }
 
-  @tailrec
   def getCallAddress(): ExeResult[Val.Address] = {
     obj.contractIdOpt match {
       case Some(contractId) => // frame for contract method
-        if (method.useRoutePattern) {
-          // Can't use flatMap here due to tailrec
-          getCallerFrame() match {
-            case Right(callerFrame) => callerFrame.getCallAddress()
-            case Left(e)            => Left(e)
-          }
-        } else {
-          Right(Val.Address(LockupScript.p2c(contractId)))
-        }
+        Right(Val.Address(LockupScript.p2c(contractId)))
       case None => // frame for script
         ctx.getUniqueTxInputAddress()
     }
