@@ -41,7 +41,8 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
+import org.alephium.serde.serialize
+import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
 class TxUtilsSpec extends AlephiumSpec {
@@ -2732,6 +2733,7 @@ class TxUtilsSpec extends AlephiumSpec {
           fromUnlockScript,
           inputs,
           approvedAlph,
+          U256.Zero,
           AVector.from(approvedTokens),
           minimalGas,
           nonCoinbaseMinGasPrice
@@ -3028,6 +3030,67 @@ class TxUtilsSpec extends AlephiumSpec {
     def sign(unsignedTx: UnsignedTransaction): Transaction = signWithWebAuthn(unsignedTx, priKey)._2
 
     testTransfer()
+  }
+
+  it should "support auto-funding when selecting utxos" in new FlowFixture {
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val bytecode    = Compiler.compileContract(contract).rightValue
+    val bytecodeHex = Hex.toHexString(serialize(bytecode))
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val genesisKey = genesisKeys(chainIndex.from.value)._1
+    val publicKey  = chainIndex.from.generateKey._2
+    (0 until 20).foreach { _ =>
+      val block = transfer(blockFlow, genesisKey, publicKey, ALPH.cent(10))
+      addAndCheck(blockFlow, block)
+    }
+
+    val lockupScript = LockupScript.p2pkh(publicKey)
+    val unlockScript = UnlockScript.p2pkh(publicKey)
+    val utxos = blockFlow.getUsableUtxos(LockupScript.p2pkh(publicKey), Int.MaxValue).rightValue
+
+    val script =
+      s"""
+         |@using(preapprovedAssets = true)
+         |TxScript Main {
+         |  for (let mut i = 0; i < 10; i += 1) {
+         |    let _ = createContract!(#$bytecodeHex, #00, #00)
+         |  }
+         |}
+         |""".stripMargin
+    val scriptCode = Compiler.compileTxScript(script).rightValue
+
+    def selectUtxos(amount: UnsignedTransaction.TotalAmountNeeded) = {
+      blockFlow.selectUtxos(
+        lockupScript,
+        unlockScript,
+        utxos,
+        amount,
+        None,
+        Some(scriptCode),
+        None,
+        nonCoinbaseMinGasPrice
+      )
+    }
+
+    (0 until 5).foreach { num =>
+      val alphAmount   = ALPH.cent(10 * num.toLong)
+      val amountNeeded = UnsignedTransaction.TotalAmountNeeded(alphAmount, AVector.empty, 0)
+      selectUtxos(amountNeeded).leftValue.contains(
+        "Insufficient funds to cover the minimum amount"
+      ) is true
+    }
+
+    (5 until 10).foreach { num =>
+      val alphAmount   = ALPH.cent(10 * num.toLong)
+      val amountNeeded = UnsignedTransaction.TotalAmountNeeded(alphAmount, AVector.empty, 0)
+      selectUtxos(amountNeeded).rightValue.autoFundDustAmount is minimalAlphInContract.mulUnsafe(10)
+    }
   }
 
   private def input(

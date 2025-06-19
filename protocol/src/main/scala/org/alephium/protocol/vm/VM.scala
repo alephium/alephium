@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, OptionF}
+import org.alephium.util.{AVector, OptionF, U256}
 
 sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
@@ -475,7 +475,8 @@ object StatefulVM {
       gasBox: GasBox,
       contractInputs: AVector[ContractOutputRef],
       contractPrevOutputs: AVector[ContractOutput],
-      generatedOutputs: AVector[TxOutput]
+      generatedOutputs: AVector[TxOutput],
+      autoFundDustAmount: U256
   )
 
   // scalastyle:off parameter.number
@@ -539,7 +540,8 @@ object StatefulVM {
       context.gasRemaining,
       AVector.from(context.contractInputs.view.map(_._1)),
       AVector.from(context.contractInputs.view.map(_._2)),
-      AVector.from(context.generatedOutputs)
+      AVector.from(context.generatedOutputs),
+      context.totalAutoFundDustAmount
     )
   }
 
@@ -577,7 +579,8 @@ object StatefulVM {
         context.gasRemaining,
         AVector.from(context.contractInputs.view.map(_._1)),
         AVector.from(context.contractInputs.view.map(_._2)),
-        AVector.from(context.generatedOutputs)
+        AVector.from(context.generatedOutputs),
+        context.totalAutoFundDustAmount
       )
     }
   }

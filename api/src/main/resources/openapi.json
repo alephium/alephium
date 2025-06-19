@@ -14394,6 +14394,10 @@
           "gasEstimationMultiplier": {
             "type": "number",
             "format": "double"
+          },
+          "dustAmount": {
+            "type": "string",
+            "format": "uint256"
           }
         }
       },

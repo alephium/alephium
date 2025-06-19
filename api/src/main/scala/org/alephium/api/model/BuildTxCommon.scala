@@ -225,6 +225,7 @@ object BuildTxCommon {
   object ScriptTxAmounts {
     def from(
         approvedAlph: U256,
+        extraDustAmount: U256,
         tokens: AVector[(TokenId, U256)]
     ): Either[String, ScriptTxAmounts] = {
       val estimatedTxOutputsLength = tokens.length + 1
@@ -233,6 +234,7 @@ object BuildTxCommon {
         dustUtxoAmount.mulUnsafe(U256.unsafe(estimatedTxOutputsLength * 2))
       approvedAlph
         .add(estimatedTotalDustAmount)
+        .flatMap(_.add(extraDustAmount))
         .map { estimatedAlph =>
           ScriptTxAmounts(approvedAlph, estimatedAlph, tokens)
         }
@@ -245,11 +247,16 @@ object BuildTxCommon {
     def attoAlphAmount: Option[Amount]
     def tokens: Option[AVector[Token]]
     def gasEstimationMultiplier: Option[Double]
+    def dustAmount: Option[Amount]
 
     def getAmounts: Either[String, ScriptTxAmounts] = {
       BuildTxCommon.getAlphAndTokenAmounts(attoAlphAmount, tokens).flatMap {
         case (alphAmount, tokens) =>
-          ScriptTxAmounts.from(alphAmount.getOrElse(U256.Zero), tokens)
+          ScriptTxAmounts.from(
+            alphAmount.getOrElse(U256.Zero),
+            dustAmount.map(_.value).getOrElse(U256.Zero),
+            tokens
+          )
       }
     }
 
@@ -293,7 +300,7 @@ object BuildTxCommon {
         approvedAlph <- contractDeposit
           .add(issueTokenTo.map(_ => dustUtxoAmount).getOrElse(U256.Zero))
           .toRight("ALPH amount overflow")
-        result <- ScriptTxAmounts.from(approvedAlph, amounts._2)
+        result <- ScriptTxAmounts.from(approvedAlph, U256.Zero, amounts._2)
       } yield (contractDeposit, result)
     }
   }

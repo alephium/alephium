@@ -36,6 +36,8 @@ object Ast {
   private[ralph] val stdArg: Argument =
     Argument(Ident("__stdInterfaceId"), Type.ByteVec, isMutable = false, isUnused = true)
 
+  val TuplePrefix = "Tuple"
+
   trait Positioned extends Product with Serializable {
     var sourceIndex: Option[SourceIndex] = None
 
@@ -846,6 +848,19 @@ object Ast {
     }
   }
 
+  final case class TupleLiteral[Ctx <: StatelessContext](exprs: Seq[Expr[Ctx]]) extends Expr[Ctx] {
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      val types = exprs.flatMap(_.getType(state))
+      Seq(state.resolveType(Type.Tuple(types)))
+    }
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
+      exprs.flatMap(_.genCode(state))
+    override def reset(): Unit = {
+      exprs.foreach(_.reset())
+      super.reset()
+    }
+  }
+
   trait IfBranch[Ctx <: StatelessContext] extends Positioned {
     def condition: Expr[Ctx]
     def checkCondition(state: Compiler.State[Ctx]): Unit = {
@@ -972,6 +987,9 @@ object Ast {
   final case class Struct(id: TypeId, fields: Seq[StructField]) extends GlobalDefinition {
     lazy val tpe: Type.Struct = Type.Struct(id)
 
+    def isTupleType: Boolean = id.name.startsWith(s"$TuplePrefix(")
+    def getErrorType: String = if (isTupleType) "tuple" else "struct"
+
     def name: String = id.name
 
     def getFieldNames(): AVector[String]          = AVector.from(fields.view.map(_.ident.name))
@@ -983,7 +1001,7 @@ object Ast {
         .find(_.ident == selector)
         .getOrElse(
           throw Compiler.Error(
-            s"Field ${selector.name} does not exist in struct ${id.name}",
+            s"Field ${selector.name} does not exist in $getErrorType ${id.name}",
             selector.sourceIndex
           )
         )
@@ -1218,14 +1236,35 @@ object Ast {
       vars: Seq[VarDeclaration],
       value: Expr[Ctx]
   ) extends Statement[Ctx] {
-    override def check(state: Compiler.State[Ctx]): Unit = {
-      val types = value.getType(state)
-      if (types.length != vars.length) {
+    private def checkAndGetTypes(state: Compiler.State[Ctx]): Seq[Type] = {
+      val (types, isValidDef) = value.getType(state) match {
+        case types @ Seq(Type.Struct(id)) =>
+          val struct = state.getStruct(id)
+          if (struct.isTupleType) {
+            if (vars.length == 1) {
+              (Seq(struct.tpe), true)
+            } else {
+              (
+                struct.fields.map(f => state.resolveType(f.tpe)),
+                vars.length == struct.fields.length
+              )
+            }
+          } else {
+            (types, vars.length == types.length)
+          }
+        case types => (types, vars.length == types.length)
+      }
+      if (!isValidDef) {
         throw Compiler.Error(
           s"Invalid variable declaration, expected ${types.length} variables, got ${vars.length} variables",
           sourceIndex
         )
       }
+      types
+    }
+
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      val types = checkAndGetTypes(state)
       vars.zip(types).foreach {
         case (NamedVar(isMutable, ident), tpe) =>
           if (tpe.isMapType) {
@@ -1238,7 +1277,8 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val storeCodes = vars.zip(value.getType(state)).flatMap {
+      val types = checkAndGetTypes(state)
+      val storeCodes = vars.zip(types).flatMap {
         case (NamedVar(_, ident), _) => state.genStoreCode(ident)
         case (_: AnonymousVar, tpe) =>
           Seq(Seq.fill(state.flattenTypeLength(Seq(tpe)))(Pop))
@@ -1382,7 +1422,12 @@ object Ast {
     def getArgNames(): AVector[String]          = AVector.from(args.view.map(_.ident.name))
     def getArgTypeSignatures(): AVector[String] = AVector.from(args.view.map(_.tpe.signature))
     def getArgMutability(): AVector[Boolean]    = AVector.from(args.view.map(_.isMutable))
-    def getReturnSignatures(): AVector[String]  = AVector.from(rtypes.view.map(_.signature))
+    def getReturnSignatures(): AVector[String] = {
+      rtypes match {
+        case Seq(t: Type.Tuple) => AVector.from(t.types.map(_.signature))
+        case _                  => AVector.from(rtypes.map(_.signature))
+      }
+    }
 
     def hasDirectCheckExternalCaller(): Boolean = {
       !useCheckExternalCaller || // check external caller manually disabled
@@ -1874,7 +1919,10 @@ object Ast {
       rhs: Expr[Ctx]
   ) extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
-      val leftTypes  = targets.map(_.getType(state))
+      val leftTypes = targets.map(_.getType(state)) match {
+        case Seq(tpe) => Seq(tpe)
+        case types    => Seq(state.resolveType(Type.Tuple(types)))
+      }
       val rightTypes = rhs.getType(state)
       if (leftTypes != rightTypes) {
         throw Compiler.Error(
@@ -2120,7 +2168,12 @@ object Ast {
   final case class ReturnStmt[Ctx <: StatelessContext](exprs: Seq[Expr[Ctx]])
       extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
-      state.checkReturn(exprs.flatMap(_.getType(state)), sourceIndex)
+      val returnType = exprs match {
+        case Seq(expr)          => expr.getType(state)
+        case _ if exprs.isEmpty => Seq.empty
+        case _ => Seq(state.resolveType(Type.Tuple(exprs.flatMap(_.getType(state)))))
+      }
+      state.checkReturn(returnType, sourceIndex)
     }
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       exprs.flatMap(_.genCode(state)) :+ Return
@@ -2217,7 +2270,7 @@ object Ast {
               id.sourceIndex
             )
           }
-          structs.find(_.id == id) match {
+          tryGetStruct(id) match {
             case Some(struct) =>
               struct.fields.map(f => getFlattenSize(f.tpe, accessedTypes :+ id)).sum
             case None => 1
@@ -2225,6 +2278,7 @@ object Ast {
         case t: Type.FixedSizeArray =>
           calcArraySize(t) * flattenSize(t.baseType, accessedTypes)
         case Type.Struct(id) => flattenSize(Type.NamedType(id), accessedTypes)
+        case t: Type.Tuple   => flattenSize(resolveType(t), accessedTypes)
         case _               => 1
       }
     }
@@ -2244,7 +2298,7 @@ object Ast {
     private def _resolveType(tpe: Type): Type = {
       tpe match {
         case t: Type.NamedType =>
-          structs.find(_.id == t.id) match {
+          tryGetStruct(t.id) match {
             case Some(struct) => struct.tpe
             case None         => Type.Contract(t.id)
           }
@@ -2252,13 +2306,30 @@ object Ast {
           Type.FixedSizeArray(resolveType(t.baseType), Left(calcArraySize(t)))
         case Type.Map(key, value) =>
           Type.Map(resolveType(key), resolveType(value))
-        case _ => tpe
+        case t: Type.Tuple => resolveTupleType(t)
+        case _             => tpe
+      }
+    }
+
+    private val tuples = mutable.HashMap.empty[Type.Tuple, Ast.Struct]
+
+    private def resolveTupleType(tuple: Type.Tuple): Type.Struct = {
+      tuples.get(tuple) match {
+        case Some(struct) => struct.tpe
+        case None =>
+          val fields = tuple.types.view.zipWithIndex.map { case (tpe, index) =>
+            Ast.StructField(Ast.Ident(s"_$index"), isMutable = true, resolveType(tpe))
+          }
+          val name   = s"$TuplePrefix(${fields.map(_.tpe.signature).mkString(",")})"
+          val struct = Ast.Struct(Ast.TypeId(name), fields.toSeq)
+          tuples.addOne(tuple -> struct)
+          struct.tpe
       }
     }
 
     @inline def resolveType(tpe: Type): Type = {
       tpe match {
-        case _: Type.NamedType | _: Type.FixedSizeArray | _: Type.Map =>
+        case _: Type.NamedType | _: Type.FixedSizeArray | _: Type.Map | _: Type.Tuple =>
           typeCache.get(tpe) match {
             case Some(tpe) => tpe
             case None =>
@@ -2272,8 +2343,9 @@ object Ast {
 
     @inline def resolveTypes(types: Seq[Type]): Seq[Type] = types.map(resolveType)
 
-    def flattenTypeLength(types: Seq[Type]): Int = {
-      types.foldLeft(0) { case (acc, tpe) =>
+    def flattenTypeLength(resolvedTypes: Seq[Type]): Int = {
+      resolvedTypes.foldLeft(0) { case (acc, tpe) =>
+        assume(!tpe.isTupleType)
         tpe match {
           case _: Type.FixedSizeArray | _: Type.NamedType | _: Type.Struct =>
             acc + getFlattenSize(tpe, Seq.empty)
@@ -2294,8 +2366,12 @@ object Ast {
       }
     }
 
+    def tryGetStruct(typeId: Ast.TypeId): Option[Ast.Struct] = {
+      structs.find(_.id == typeId).orElse(tuples.values.find(_.id == typeId))
+    }
+
     def getStruct(typeId: Ast.TypeId): Ast.Struct = {
-      structs.find(_.id == typeId) match {
+      tryGetStruct(typeId) match {
         case Some(struct) => struct
         case None =>
           throw Compiler.Error(s"Struct ${quote(typeId.name)} does not exist", typeId.sourceIndex)
