@@ -504,3 +504,4 @@ final case class IOErrorLoadContract(error: IOError)           extends IOFailure
 final case class IOErrorMigrateContract(error: IOError)        extends IOFailure
 final case class IOErrorWriteLog(error: IOError)               extends IOFailure
 final case class IOErrorCreateSubContractIndex(error: IOError) extends IOFailure
+final case class IOErrorOther(error: IOError)                  extends IOFailure

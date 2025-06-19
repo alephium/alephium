@@ -1269,6 +1269,7 @@ class ServerUtils(implicit
           fromUnlockScript,
           inputs,
           amounts.approvedAlph,
+          selectedUtxos.autoFundDustAmount,
           amounts.tokens,
           gas.getOrElse(selectedUtxos.gas),
           gasPrice.getOrElse(nonCoinbaseMinGasPrice)
@@ -1308,7 +1309,10 @@ class ServerUtils(implicit
         val alphAmount = res.assets.fold(U256.Zero)(_ addUnsafe _.output.amount)
         val gasFee     = gasPrice.getOrElse(nonCoinbaseMinGasPrice) * res.gas
 
-        val remainingAmount = alphAmount.subUnsafe(gasFee).subUnsafe(amounts.approvedAlph)
+        val remainingAmount = alphAmount
+          .subUnsafe(gasFee)
+          .subUnsafe(amounts.approvedAlph)
+          .subUnsafe(res.autoFundDustAmount)
         if (remainingAmount < dustUtxoAmount) {
           tryBuildSelectedUtxos(
             blockFlow,
@@ -1320,7 +1324,7 @@ class ServerUtils(implicit
             gasPrice,
             None,
             utxos
-          )
+          ).map(_.copy(autoFundDustAmount = res.autoFundDustAmount))
         } else {
           Right(res)
         }
