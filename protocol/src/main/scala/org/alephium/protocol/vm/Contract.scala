@@ -623,13 +623,13 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
     if (mutFields.isDefinedAt(index)) {
       Right(mutFields(index))
     } else {
-      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), immFields.length))
+      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), mutFields.length))
     }
   }
 
   def setMutField(index: Int, v: Val): ExeResult[Unit] = {
     if (!mutFields.isDefinedAt(index)) {
-      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), immFields.length))
+      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), mutFields.length))
     } else if (mutFields(index).tpe != v.tpe) {
       failed(InvalidMutFieldType)
     } else {

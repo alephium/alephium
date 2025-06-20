@@ -288,7 +288,7 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
         subRef(state, selector).genStoreCode(state).reverse.flatten
       case _ =>
         val offset = calcDataOffset(state, selector)
-        state.genStoreCode(offset, isLocal)
+        state.genStoreCode(offset, isLocal, isMutable)
     }
   }
 
@@ -462,7 +462,8 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
         Seq(
           state.genStoreCode(
             offset.add(VarOffset.calcArrayElementOffset(state, index, tpe)),
-            isLocal
+            isLocal,
+            isMutable
           )
         )
     }
@@ -611,12 +612,12 @@ final case class FieldArrayRef[Ctx <: StatelessContext](
             ConstInstr.u256(Val.U256(U256.unsafe(idx))),
             U256Add
           )
-          state.genStoreCode(VariableVarOffset(calcOffsetCode), isLocal)
+          state.genStoreCode(VariableVarOffset(calcOffsetCode), isLocal, isMutable)
         }
         storeCodes :+ codes
       case DataRefOffset(_, ConstantVarOffset(value)) =>
         (0 until flattenSize) map { idx =>
-          state.genStoreCode(ConstantVarOffset(value + idx), isLocal)
+          state.genStoreCode(ConstantVarOffset(value + idx), isLocal, isMutable)
         }
       case _ => throw Compiler.Error("Invalid variable offset", ident.sourceIndex) // dead branch
     }
@@ -698,12 +699,12 @@ final case class LocalArrayRef[Ctx <: StatelessContext](
             ConstInstr.u256(Val.U256(U256.unsafe(idx))),
             U256Add
           )
-          state.genStoreCode(VariableVarOffset(calcOffsetCode), isLocal)
+          state.genStoreCode(VariableVarOffset(calcOffsetCode), isLocal, isMutable)
         }
         storeCodes :+ codes
       case LocalRefOffset(ConstantVarOffset(value)) =>
         (0 until flattenSize) map { idx =>
-          state.genStoreCode(ConstantVarOffset(value + idx), isLocal)
+          state.genStoreCode(ConstantVarOffset(value + idx), isLocal, isMutable)
         }
     }
   }

@@ -17,11 +17,12 @@
 package org.alephium.ralph
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.{BlockHash, ContractId, ContractOutput, TokenId}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockHash => _, _}
 import org.alephium.ralph.error.CompilerError
 import org.alephium.util._
 
+// scalastyle:off file.size.limit
 class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixture {
   it should "compile unit tests" in {
     {
@@ -89,19 +90,23 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |    v1 = v1 + 1
            |    return v0 + v1
            |  }
-           |  test "foo" before Self(0, 1) {
+           |  test "foo"
+           |  with updateImmFields = true
+           |  before Self(0, 1) {
            |    testCheck!(foo() == 1)
            |  }
            |}
            |""".stripMargin
       val test = compileContractFull(code).rightValue.tests.value.tests.head
-      test.settings.isEmpty is true
       test.before.length is 1
       val contract = test.before.head
       contract.typeId is Ast.TypeId("Foo")
       contract.tokens.isEmpty is true
-      contract.immFields is AVector[(String, Val)](("v0", Val.U256(U256.Zero)))
-      contract.mutFields is AVector[(String, Val)](("v1", Val.U256(U256.One)))
+      contract.immFields.isEmpty is true
+      contract.mutFields is AVector[(String, Val)](
+        ("v1", Val.U256(U256.One)),
+        ("v0", Val.U256(U256.Zero))
+      )
     }
 
     {
@@ -334,15 +339,19 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
 
       val blockHash = BlockHash.generate
       val now       = TimeStamp.now()
-      checkSettings("", Testing.SettingsValue(0, None, None))
-      checkSettings("group = 0", Testing.SettingsValue(0, None, None))
+      checkSettings("", Testing.SettingsValue(0, None, None, false))
+      checkSettings("group = 0", Testing.SettingsValue(0, None, None, false))
       checkSettings(
         s"group = 1, blockHash = #${blockHash.toHexString}",
-        Testing.SettingsValue(1, Some(blockHash), None)
+        Testing.SettingsValue(1, Some(blockHash), None, false)
       )
       checkSettings(
         s"group = 1, blockHash = #${blockHash.toHexString}, blockTimeStamp = ${now.millis}",
-        Testing.SettingsValue(1, Some(blockHash), Some(now))
+        Testing.SettingsValue(1, Some(blockHash), Some(now), false)
+      )
+      checkSettings(
+        s"group = 1, blockHash = #${blockHash.toHexString}, blockTimeStamp = ${now.millis}, updateImmFields = true",
+        Testing.SettingsValue(1, Some(blockHash), Some(now), true)
       )
       testContractError(
         code(s"group = 0, $$group = 1$$"),
@@ -350,7 +359,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       )
       testContractError(
         code(s"$$invalidKey = 0$$"),
-        "Invalid setting key invalidKey, it must be one of [group, blockHash, blockTimeStamp]"
+        "Invalid setting key invalidKey, it must be one of [group, blockHash, blockTimeStamp, updateImmFields]"
       )
     }
 
@@ -467,14 +476,17 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       fooTests.length is 1
       val fooContract = fooTests.head.before.head
       fooContract.typeId is Ast.TypeId("Foo")
-      fooContract.immFields is AVector[(String, Val)](("a", Val.U256(20)), ("b", Val.U256(10)))
+      fooContract.immFields is AVector[(String, Val)](
+        ("a", Val.U256(20)),
+        ("b", Val.U256(10))
+      )
       fooContract.mutFields is AVector[(String, Val)](("c", Val.False))
 
       val barTests = contracts(1).tests.value.tests
       barTests.length is 1
       val barContract = barTests.head.before.head
       barContract.typeId is Ast.TypeId("Bar")
-      fooContract.immFields is AVector[(String, Val)](("a", Val.U256(20)), ("b", Val.U256(10)))
+      barContract.immFields is AVector[(String, Val)](("a", Val.U256(20)), ("b", Val.U256(10)))
       barContract.mutFields.isEmpty is true
     }
 
@@ -624,7 +636,11 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       Val.U256(U256.Two),
       Val.U256(U256.unsafe(3))
     )
-    val mutFields = AVector[Val](Val.U256(U256.Two), Val.U256(U256.Two), Val.U256(U256.unsafe(4)))
+    val mutFields = AVector[Val](
+      Val.U256(U256.Two),
+      Val.U256(U256.Two),
+      Val.U256(U256.unsafe(4))
+    )
     val contractOutput = ContractOutput(
       ALPH.oneAlph,
       LockupScript.p2c(contractState.contractId),
@@ -702,6 +718,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
          |""".stripMargin
     val test = compileContractFull(code).rightValue.tests.get.tests.head
     test.selfContract.immFields is AVector[(String, Val)](("v", Val.U256(U256.unsafe(2))))
+    test.selfContract.mutFields.isEmpty is true
   }
 
   it should "test using random func" in {
@@ -780,5 +797,207 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       code(s"$$testError!(foo(), 0i)$$"),
       "Invalid args type List(U256, I256) for builtin func testError"
     )
+  }
+
+  trait UnitTestFixture extends Fixture {
+    def runSimpleTest(sourceCode: String): Unit = {
+      implicit val logConfig = LogConfig.allEnabled()
+      val contracts          = Compiler.compileProject(sourceCode).rightValue._1
+      Testing
+        .run(
+          (_: GroupIndex) => {
+            val worldState = cachedWorldState.staging()
+            worldState.rollback()
+            Right(worldState)
+          },
+          sourceCode,
+          contracts,
+          CompilerOptions.Default
+        )
+        .isRight is true
+      ()
+    }
+  }
+
+  it should "support update immutable fields in unit tests" in new UnitTestFixture {
+    {
+      info("Update immutable fields in non-test code")
+      val code =
+        s"""
+           |Contract Foo(v: U256) {
+           |  @using(updateFields = true, checkExternalCaller = false)
+           |  pub fn foo() -> () {
+           |    $$v = v + 1$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Cannot assign to immutable variable v.")
+    }
+
+    {
+      info("Update immutable fields in test code")
+      def code(settings: String) =
+        s"""
+           |Contract Foo(v: U256) {
+           |  pub fn foo() -> U256 { return v }
+           |  test "foo0" with updateImmFields = true {
+           |    v = 0
+           |  }
+           |  test "foo1" $settings {
+           |    $$v = 0$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(""), "Cannot assign to immutable variable v.")
+      testContractError(
+        code("with updateImmFields = false"),
+        "Cannot assign to immutable variable v."
+      )
+      compileContract(replace(code("with updateImmFields = true"))).isRight is true
+    }
+
+    {
+      info("Generate correct code")
+      val code =
+        s"""
+           |struct Bar {
+           |  a: [U256; 2],
+           |  b: U256
+           |}
+           |Contract Foo(@unused num0: U256, @unused mut num1: U256, bar: Bar) {
+           |  pub fn foo() -> () {}
+           |  test "foo" with updateImmFields = true {
+           |    num0 = 1
+           |    bar.a[0] = 2
+           |    bar.a[1] = 3
+           |    bar.b = 4
+           |    num1 = 5
+           |    let _ = num1
+           |    let _ = bar.b
+           |    let _ = bar.a[1]
+           |    let _ = bar.a[0]
+           |    let _ = num0
+           |  }
+           |}
+           |""".stripMargin
+      val test = compileContractFull(code).rightValue.tests.value.tests.head.method
+      test.instrs is AVector[Instr[StatefulContext]](
+        U256Const1,
+        StoreMutField(1),
+        U256Const2,
+        StoreMutField(2),
+        U256Const3,
+        StoreMutField(3),
+        U256Const4,
+        StoreMutField(4),
+        U256Const5,
+        StoreMutField(0),
+        LoadMutField(0),
+        Pop,
+        LoadMutField(4),
+        Pop,
+        LoadMutField(3),
+        Pop,
+        LoadMutField(2),
+        Pop,
+        LoadMutField(1),
+        Pop
+      )
+    }
+
+    {
+      info("Load correct fields in tests")
+      val code =
+        s"""
+           |Contract Foo(num0: U256, mut num1: U256) {
+           |  pub fn update() -> () {
+           |    num1 += 1
+           |  }
+           |  pub fn getNum0() -> U256 {
+           |    return num0
+           |  }
+           |  pub fn getNum1() -> U256 {
+           |    return num1
+           |  }
+           |
+           |  test "foo0" {
+           |    testEqual!(num0, 0)
+           |    testEqual!(getNum0(), 0)
+           |
+           |    testEqual!(num1, 0)
+           |    testEqual!(getNum1(), 0)
+           |    update()
+           |    testEqual!(num1, 1)
+           |    testEqual!(getNum1(), 1)
+           |  }
+           |
+           |  test "foo1" with updateImmFields = true {
+           |    testEqual!(num0, 0)
+           |    testEqual!(getNum0(), 0)
+           |    num0 += 1
+           |    testEqual!(num0, 1)
+           |    testEqual!(getNum0(), 1)
+           |
+           |    testEqual!(num1, 0)
+           |    testEqual!(getNum1(), 0)
+           |    update()
+           |    testEqual!(num1, 1)
+           |    testEqual!(getNum1(), 1)
+           |  }
+           |}
+           |""".stripMargin
+
+      runSimpleTest(code)
+    }
+  }
+
+  it should "generate correct test code for encodeFields" in new UnitTestFixture {
+    {
+      info("No stdId field")
+      val code =
+        s"""
+           |Contract Foo(@unused num0: U256, @unused mut num1: U256) {
+           |  pub fn foo() -> () {}
+           |  test "foo0" {
+           |    let (immFields, mutFields) = Foo.encodeFields!(0, 1)
+           |    testEqual!(immFields, #010200)
+           |    testEqual!(mutFields, #010201)
+           |  }
+           |  test "foo1" with updateImmFields = true {
+           |    let (immFields, mutFields) = Foo.encodeFields!(0, 1)
+           |    testEqual!(immFields, #00)
+           |    testEqual!(mutFields, #0202010200)
+           |  }
+           |}
+           |""".stripMargin
+
+      runSimpleTest(code)
+    }
+
+    {
+      info("Has stdId field")
+      val code =
+        s"""
+           |Contract Foo(@unused num0: U256, @unused mut num1: U256) implements FooBase {
+           |  pub fn foo() -> () {}
+           |  test "foo0" {
+           |    let (immFields, mutFields) = Foo.encodeFields!(0, 1)
+           |    testEqual!(immFields, #0202000306414c50481234)
+           |    testEqual!(mutFields, #010201)
+           |  }
+           |  test "foo1" with updateImmFields = true {
+           |    let (immFields, mutFields) = Foo.encodeFields!(0, 1)
+           |    testEqual!(immFields, #00)
+           |    testEqual!(mutFields, #03020102000306414c50481234)
+           |  }
+           |}
+           |@std(id = #1234)
+           |Interface FooBase {
+           |  pub fn foo() -> ()
+           |}
+           |""".stripMargin
+
+      runSimpleTest(code)
+    }
   }
 }

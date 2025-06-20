@@ -6247,6 +6247,30 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
       serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
     }
+
+    {
+      val code =
+        s"""
+           |Contract Foo(parent: Address, mut amount: U256) {
+           |  @using(updateFields = true)
+           |  pub fn foo() -> () {
+           |    checkCaller!(callerAddress!() == parent, 0)
+           |    amount += 1
+           |  }
+           |  test "foo" with updateImmFields = true {
+           |    testEqual!(amount, 0)
+           |    parent = randomContractAddress!()
+           |    testError!(foo(), 0)
+           |    testEqual!(amount, 0)
+           |
+           |    parent = selfAddress!()
+           |    foo()
+           |    testEqual!(amount, 1)
+           |  }
+           |}
+           |""".stripMargin
+      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+    }
   }
 
   it should "handle test error properly" in new Fixture {
