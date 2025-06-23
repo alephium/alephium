@@ -563,7 +563,6 @@ object Testing {
           usePreapprovedAssets = assets.isDefined,
           useContractAssets = false,
           usePayToContractOnly = false,
-          useRoutePattern = false,
           argsLength = 0,
           localsLength = state.getLocalVarSize(scopeId),
           returnLength = 0,

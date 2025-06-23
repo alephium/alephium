@@ -146,7 +146,6 @@ case object InvalidMethod                    extends ExeFailure
 case object InvalidMethodModifierBeforeLeman extends ExeFailure
 case object InvalidMethodModifierBeforeRhone extends ExeFailure
 case object InvalidMethodModifierSinceRhone  extends ExeFailure
-case object InvalidMethodModifierPreDanube   extends ExeFailure
 
 final case class InvalidMethodIndex(index: Int, methodLength: Int) extends ExeFailure {
   override def toString: String = s"Invalid method index $index, method length: $methodLength"
