@@ -1177,6 +1177,7 @@ class FlowUtilsSpec extends AlephiumSpec {
         unlockScript,
         utxos.map(info => (info.ref, info.output)),
         ALPH.cent(1),
+        U256.Zero,
         AVector.empty,
         minimalGas,
         nonCoinbaseMinGasPrice
@@ -1193,6 +1194,7 @@ class FlowUtilsSpec extends AlephiumSpec {
           (ref, unsignedTx0.fixedOutputs(index))
         },
         ALPH.cent(1),
+        U256.Zero,
         AVector.empty,
         minimalGas,
         nonCoinbaseMinGasPrice

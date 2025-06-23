@@ -30,13 +30,35 @@ final case class TxScriptEmulationResult(gasUsed: GasBox, value: TxScriptExecuti
 
 trait TxScriptEmulator {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  def emulateRaw(
+      inputWithAssets: AVector[TxInputWithAsset],
+      fixedOutputs: AVector[AssetOutput],
+      script: StatefulScript,
+      gasAmountOpt: Option[GasBox] = None,
+      gasPriceOpt: Option[GasPrice] = None
+  ): ExeResult[TxScriptEmulationResult]
+
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def emulate(
       inputWithAssets: AVector[TxInputWithAsset],
       fixedOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasAmountOpt: Option[GasBox] = None,
       gasPriceOpt: Option[GasPrice] = None
-  ): Either[String, TxScriptEmulationResult]
+  ): Either[String, TxScriptEmulationResult] = {
+    emulateRaw(
+      inputWithAssets,
+      fixedOutputs,
+      script,
+      gasAmountOpt,
+      gasPriceOpt
+    ).left.map {
+      case Right(error) =>
+        s"Execution error when emulating tx script or contract: $error"
+      case Left(error) =>
+        s"IO error when emulating tx script or contract: $error"
+    }
+  }
 }
 
 object TxScriptEmulator {
@@ -50,13 +72,13 @@ object TxScriptEmulator {
       logConfig: LogConfig
   ) extends TxScriptEmulator {
 
-    def emulate(
+    def emulateRaw(
         inputWithAssets: AVector[TxInputWithAsset],
         fixedOutputs: AVector[AssetOutput],
         script: StatefulScript,
         gasAmountOpt: Option[GasBox],
         gasPriceOpt: Option[GasPrice]
-    ): Either[String, TxScriptEmulationResult] = {
+    ): ExeResult[TxScriptEmulationResult] = {
       assume(inputWithAssets.nonEmpty)
       val groupIndex      = inputWithAssets.head.input.fromGroup
       val chainIndex      = ChainIndex(groupIndex, groupIndex)
@@ -66,7 +88,7 @@ object TxScriptEmulator {
           blockEnv: BlockEnv,
           groupView: BlockFlowGroupView[WorldState.Cached],
           preOutputs: AVector[AssetOutput]
-      ): Either[String, TxScriptExecution] = {
+      ): ExeResult[TxScriptExecution] = {
         val gasAmount = gasAmountOpt.getOrElse(minimalGas)
         val gasPrice  = gasPriceOpt.getOrElse(nonCoinbaseMinGasPrice)
         val txTemplate = TransactionTemplate(
@@ -81,30 +103,25 @@ object TxScriptEmulator {
           scriptSignatures = AVector.fill(16)(Byte64.from(Signature.generate))
         )
 
-        val result =
-          VM.checkCodeSize(maximalGasPerTx, script.bytes, blockEnv.getHardFork()).flatMap {
-            remainingGas =>
-              StatefulVM.runTxScriptMockup(
-                groupView.worldState.staging(),
-                blockEnv,
-                txTemplate,
-                preOutputs,
-                script.mockup(),
-                remainingGas
-              )
-          }
-
-        result.left.map {
-          case Right(error) =>
-            s"Execution error when emulating tx script or contract: $error"
-          case Left(error) =>
-            s"IO error when emulating tx script or contract: $error"
+        VM.checkCodeSize(maximalGasPerTx, script.bytes, blockEnv.getHardFork()).flatMap {
+          remainingGas =>
+            StatefulVM.runTxScriptMockup(
+              groupView.worldState.staging(),
+              blockEnv,
+              txTemplate,
+              preOutputs,
+              script.mockup(),
+              remainingGas
+            )
         }
       }
 
       for {
-        blockEnv  <- flow.getDryrunBlockEnv(chainIndex).left.map(_.toString())
-        groupView <- flow.getMutableGroupViewIncludePool(chainIndex.from).left.map(_.toString())
+        blockEnv <- flow.getDryrunBlockEnv(chainIndex).left.flatMap(e => ioFailed(IOErrorOther(e)))
+        groupView <- flow
+          .getMutableGroupViewIncludePool(chainIndex.from)
+          .left
+          .flatMap(e => ioFailed(IOErrorOther(e)))
         preOutputs = inputWithAssets.map(_.asset.output)
         result <- runScript(blockEnv, groupView, preOutputs)
       } yield TxScriptEmulationResult(
@@ -113,16 +130,15 @@ object TxScriptEmulator {
       )
     }
   }
-  // scalastyle:on method.length
 
   object Mock extends TxScriptEmulator {
-    def emulate(
+    def emulateRaw(
         inputWithAssets: AVector[TxInputWithAsset],
         fixedOutputs: AVector[AssetOutput],
         script: StatefulScript,
         gasAmountOpt: Option[GasBox],
         gasFeeOpt: Option[GasPrice]
-    ): Either[String, TxScriptEmulationResult] = {
+    ): ExeResult[TxScriptEmulationResult] = {
       Right(
         TxScriptEmulationResult(
           defaultGasPerInput,
@@ -130,7 +146,8 @@ object TxScriptEmulator {
             defaultGasPerInput,
             AVector.empty,
             AVector.empty,
-            AVector.empty
+            AVector.empty,
+            U256.Zero
           )
         )
       )
@@ -138,13 +155,13 @@ object TxScriptEmulator {
   }
 
   object NotImplemented extends TxScriptEmulator {
-    def emulate(
+    def emulateRaw(
         inputWithAssets: AVector[TxInputWithAsset],
         fixedOutputs: AVector[AssetOutput],
         script: StatefulScript,
         gasAmountOpt: Option[GasBox],
         gasFeeOpt: Option[GasPrice]
-    ): Either[String, TxScriptEmulationResult] = {
+    ): ExeResult[TxScriptEmulationResult] = {
       throw new NotImplementedError("TxScriptEmulator not implemented")
     }
   }
