@@ -22,7 +22,11 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: sbt
-      - name: Setup SBT
+      - name: Setup SBT on Windows
+        if: runner.os == 'Windows'
+        run: choco install sbt -y
+      - name: Setup SBT on Linux/Mac
+        if: runner.os != 'Windows'
         uses: sbt/setup-sbt@v1
       - run: sbt test
         shell: bash
