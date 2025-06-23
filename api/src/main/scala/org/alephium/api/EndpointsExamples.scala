@@ -206,7 +206,8 @@ trait EndpointsExamples extends ErrorExamples {
           unlockScript = unlockupScriptBytes,
           attoAlphAmount = Amount(ALPH.oneAlph),
           address = Address.Asset(lockupScript),
-          tokens
+          tokens,
+          outputRefTxId = txId
         )
       ),
       fixedOutputs = AVector(outputAsset)

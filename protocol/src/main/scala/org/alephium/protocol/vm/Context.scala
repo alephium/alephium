@@ -387,6 +387,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def logConfig: LogConfig
 
   var txCallerBalance: Option[MutBalanceState] = None
+  var totalAutoFundDustAmount: U256            = U256.Zero
 
   def setTxCallerBalance(callerBalance: MutBalanceState): Unit = {
     this.txCallerBalance = Some(callerBalance)
@@ -871,7 +872,12 @@ trait StatefulContext extends StatelessContext with ContractPool {
     )
 
     if (remainingAfterApproved == U256.Zero) {
-      okay
+      totalAutoFundDustAmount.add(alphToCover) match {
+        case Some(amount) =>
+          totalAutoFundDustAmount = amount
+          okay
+        case None => failed(BalanceOverflow)
+      }
     } else {
       failed(InsufficientFundsForUTXODustAmount(remainingAfterApproved))
     }

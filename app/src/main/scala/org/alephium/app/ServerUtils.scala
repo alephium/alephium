@@ -44,7 +44,7 @@ import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.mempool.MemPool._
-import org.alephium.io.IOError
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{vm, ALPH, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.{Balance => _, ContractOutput => ProtocolContractOutput, _}
@@ -52,6 +52,7 @@ import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOut
 import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.protocol.vm.nodeindexes.TxIdTxOutputLocators
+import org.alephium.ralph
 import org.alephium.ralph.{CompiledContract, Compiler, Testing}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
@@ -632,8 +633,14 @@ class ServerUtils(implicit
       for {
         txOutputOpt <- wrapResult(blockFlow.getTxOutput(contractOutputRef, spentBlockHash))
         richInput <- txOutputOpt match {
-          case Some(txOutput) =>
-            Right(RichInput.from(contractOutputRef, txOutput.asInstanceOf[ProtocolContractOutput]))
+          case Some((txId, txOutput)) =>
+            Right(
+              RichInput.from(
+                contractOutputRef,
+                txOutput.asInstanceOf[ProtocolContractOutput],
+                txId
+              )
+            )
           case None =>
             Left(notFound(s"Transaction output for contract output reference ${contractOutputRef}"))
         }
@@ -651,8 +658,8 @@ class ServerUtils(implicit
       for {
         txOutputOpt <- wrapResult(blockFlow.getTxOutput(assetInput.outputRef, spentBlockHash))
         richInput <- txOutputOpt match {
-          case Some(txOutput) =>
-            Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput]))
+          case Some((txId, txOutput)) =>
+            Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput], txId))
           case None =>
             Left(notFound(s"Transaction output for asset output reference ${assetInput.outputRef}"))
         }
@@ -1263,6 +1270,7 @@ class ServerUtils(implicit
           fromUnlockScript,
           inputs,
           amounts.approvedAlph,
+          selectedUtxos.autoFundDustAmount,
           amounts.tokens,
           gas.getOrElse(selectedUtxos.gas),
           gasPrice.getOrElse(nonCoinbaseMinGasPrice)
@@ -1302,7 +1310,10 @@ class ServerUtils(implicit
         val alphAmount = res.assets.fold(U256.Zero)(_ addUnsafe _.output.amount)
         val gasFee     = gasPrice.getOrElse(nonCoinbaseMinGasPrice) * res.gas
 
-        val remainingAmount = alphAmount.subUnsafe(gasFee).subUnsafe(amounts.approvedAlph)
+        val remainingAmount = alphAmount
+          .subUnsafe(gasFee)
+          .subUnsafe(amounts.approvedAlph)
+          .subUnsafe(res.autoFundDustAmount)
         if (remainingAmount < dustUtxoAmount) {
           tryBuildSelectedUtxos(
             blockFlow,
@@ -1314,7 +1325,7 @@ class ServerUtils(implicit
             gasPrice,
             None,
             utxos
-          )
+          ).map(_.copy(autoFundDustAmount = res.autoFundDustAmount))
         } else {
           Right(res)
         }
@@ -1679,7 +1690,7 @@ class ServerUtils(implicit
         if (compilerOptions.skipTests) {
           Right(())
         } else {
-          runTests(blockFlow, query.code, result._1)
+          runTests(blockFlow, query.code, result._1, compilerOptions)
         }
     } yield {
       CompileProjectResult.from(result._1, result._2, result._3, result._4)
@@ -1689,13 +1700,15 @@ class ServerUtils(implicit
   private def runTests(
       blockFlow: BlockFlow,
       sourceCode: String,
-      contracts: AVector[CompiledContract]
+      contracts: AVector[CompiledContract],
+      compilerOptions: ralph.CompilerOptions
   ): Try[Unit] = {
     Testing
       .run(
         groupIndex => blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()),
         sourceCode,
-        contracts
+        contracts,
+        compilerOptions
       )
       .left
       .map(failed)
@@ -1896,7 +1909,8 @@ class ServerUtils(implicit
       args = params.args.getOrElse(AVector.empty)
       _           <- checkArgs(args, method)
       inputAssets <- inputAssetsWithGasFee(params.inputAssets.getOrElse(AVector.empty))
-      txEnv = TxEnv.mockup(txId, inputAssets.map(_.toAssetOutput))
+      prevOutputs = inputAssets.map(_.toAssetOutput)
+      txEnv       = TxEnv.mockup(txId, prevOutputs)
       result <- fromExeResult(
         worldState,
         executeContractMethod(
@@ -1907,7 +1921,7 @@ class ServerUtils(implicit
           txEnv,
           blockHash,
           TimeStamp.now(),
-          inputAssets,
+          prevOutputs,
           params.methodIndex,
           args,
           method
@@ -1963,25 +1977,10 @@ class ServerUtils(implicit
     }
   }
 
-  private def inputAssetsWithDustAmount(
-      inputAssets: AVector[TestInputAsset],
-      dustAmount: U256
-  ): AVector[TestInputAsset] = {
-    if (inputAssets.isEmpty || dustAmount.isZero) {
-      inputAssets
-    } else {
-      val address   = inputAssets.head.address
-      val dustInput = TestInputAsset(address, AssetState(dustAmount, None))
-      inputAssets :+ dustInput
-    }
-  }
-
   def runTestContract(
       blockFlow: BlockFlow,
       testContract: TestContract.Complete
   ): Try[TestContractResult] = {
-    val dustAmountProvided = testContract.dustAmount.value.nonZero
-    val maxRetryTimes      = if (!dustAmountProvided) 3 else 0
     for {
       groupIndex <- testContract.groupIndex
       method     <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
@@ -1991,69 +1990,70 @@ class ServerUtils(implicit
         testContract,
         groupIndex,
         method,
-        maxRetryTimes,
-        dustAmountProvided
+        testContract.dustAmount.value.nonZero
       )
     } yield result
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def tryRunTestContract(
       blockFlow: BlockFlow,
       testContract: TestContract.Complete,
       groupIndex: GroupIndex,
       method: Method[StatefulContext],
-      retryTimes: Int,
       dustAmountProvided: Boolean
   ): Try[TestContractResult] = {
-    val contractId = testContract.contractId
-    val txId       = testContract.txId
-    val blockHash  = testContract.blockHash
+    val contractId      = testContract.contractId
+    val txId            = testContract.txId
+    val blockHash       = testContract.blockHash
+    var totalDustAmount = testContract.dustAmount.value
     for {
-      worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
-      _ <- testContract.existingContracts.foreachE(createContract(worldState, _, blockHash, txId))
-      _ <- createContract(worldState, contractId, testContract)
+      worldState  <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
       inputAssets <- inputAssetsWithGasFee(testContract.inputAssets)
-      allInputs = inputAssetsWithDustAmount(inputAssets, testContract.dustAmount.value)
-      txEnv     = TxEnv.mockup(txId, allInputs.map(_.toAssetOutput))
-      result <- executeContractMethod(
+      prevOutputs = inputAssets.map(_.toAssetOutput)
+      createContracts = () => {
+        for {
+          _ <- testContract.existingContracts.foreachE(
+            createContract(worldState, _, blockHash, txId)
+          )
+          _ <- createContract(worldState, contractId, testContract)
+        } yield ()
+      }
+      runFunc = (extraDustAmount: U256) => {
+        totalDustAmount = extraDustAmount
+        executeContractMethod(
+          worldState,
+          groupIndex,
+          contractId,
+          testContract.callerContractIdOpt,
+          ContractRunner.createTxEnv(txId, prevOutputs, extraDustAmount),
+          blockHash,
+          testContract.blockTimeStamp,
+          prevOutputs,
+          testContract.testMethodIndex,
+          testContract.testArgs,
+          method
+        )
+      }
+      result <- ContractRunner.retryOnInsufficientFundsError(
         worldState,
-        groupIndex,
-        contractId,
-        testContract.callerContractIdOpt,
-        txEnv,
-        blockHash,
-        testContract.blockTimeStamp,
-        inputAssets,
-        testContract.testMethodIndex,
-        testContract.testArgs,
-        method
+        createContracts,
+        runFunc,
+        if (dustAmountProvided) 0 else ContractRunner.MaxRetryTimes,
+        testContract.dustAmount.value
       ) match {
         case Right(result) =>
-          fromRunTestContractResult(txEnv, worldState, testContract, result._1, result._2)
+          fromRunTestContractResult(worldState, testContract, result._1, result._2)
         case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
         case Left(Right(error: InsufficientFundsForUTXODustAmount)) =>
-          if (retryTimes > 0) {
-            val newDustAmount = Amount(testContract.dustAmount.value.addUnsafe(error.required))
-            tryRunTestContract(
-              blockFlow,
-              testContract.copy(dustAmount = newDustAmount),
-              groupIndex,
-              method,
-              retryTimes - 1,
-              dustAmountProvided
-            )
+          if (!dustAmountProvided) {
+            val dustAmount = ALPH.prettifyAmount(totalDustAmount)
+            val required   = ALPH.prettifyAmount(error.required)
+            val errorString =
+              s"Test failed due to insufficient funds to cover the dust amount. We tried increasing the dust amount to $dustAmount, " +
+                s"but at least $required is still required. Please figure out the exact dust amount needed and specify it using the dustAmount parameter."
+            fromErrorString(worldState, errorString)
           } else {
-            if (!dustAmountProvided) {
-              val dustAmount = ALPH.prettifyAmount(testContract.dustAmount.value)
-              val required   = ALPH.prettifyAmount(error.required)
-              val errorString =
-                s"Test failed due to insufficient funds to cover the dust amount. We tried increasing the dust amount to $dustAmount, " +
-                  s"but at least $required is still required. Please figure out the exact dust amount needed and specify it using the dustAmount parameter."
-              fromErrorString(worldState, errorString)
-            } else {
-              fromExeFailure(worldState, error)
-            }
+            fromExeFailure(worldState, error)
           }
         case Left(Right(exeFailure)) => fromExeFailure(worldState, exeFailure)
       }
@@ -2061,7 +2061,6 @@ class ServerUtils(implicit
   }
 
   private def fromRunTestContractResult(
-      txEnv: TxEnv,
       worldState: WorldState.Staging,
       testContract: TestContract.Complete,
       executionOutputs: AVector[vm.Val],
@@ -2073,7 +2072,7 @@ class ServerUtils(implicit
       postState   <- fetchContractsState(worldState, testContract, contractIds._1, contractIds._2)
       eventsSplit <- extractDebugMessages(events)
     } yield {
-      val gasUsed = txEnv.gasAmount.subUnsafe(executionResult.gasBox)
+      val gasUsed = maximalGasPerTx.subUnsafe(executionResult.gasBox)
       TestContractResult(
         address = Address.contract(testContract.contractId),
         codeHash = postState._2,
@@ -2208,7 +2207,7 @@ class ServerUtils(implicit
       txEnv: TxEnv,
       blockHash: BlockHash,
       blockTimeStamp: TimeStamp,
-      inputAssets: AVector[TestInputAsset],
+      inputAssets: AVector[AssetOutput],
       methodIndex: Int,
       args: AVector[Val],
       method: Method[StatefulContext]
@@ -2219,7 +2218,7 @@ class ServerUtils(implicit
       context,
       contractId,
       callerContractIdOpt,
-      inputAssets.map(_.toAssetOutput),
+      inputAssets,
       methodIndex,
       toVmVal(args),
       method,
@@ -2274,7 +2273,7 @@ class ServerUtils(implicit
       existingContract: ContractState,
       blockHash: BlockHash,
       txId: TransactionId
-  ): Try[Unit] = {
+  ): IOResult[Unit] = {
     createContract(
       worldState,
       existingContract.id,
@@ -2291,7 +2290,7 @@ class ServerUtils(implicit
       worldState: WorldState.Staging,
       contractId: ContractId,
       testContract: TestContract.Complete
-  ): Try[Unit] = {
+  ): IOResult[Unit] = {
     createContract(
       worldState,
       contractId,
@@ -2313,19 +2312,17 @@ class ServerUtils(implicit
       asset: AssetState,
       blockHash: BlockHash,
       txId: TransactionId
-  ): Try[Unit] = {
+  ): IOResult[Unit] = {
     val output = asset.toContractOutput(contractId)
-    wrapResult(
-      ContractRunner.createContractUnsafe(
-        worldState,
-        contractId,
-        code,
-        initialImmState,
-        initialMutState,
-        output,
-        blockHash,
-        txId
-      )
+    ContractRunner.createContractUnsafe(
+      worldState,
+      contractId,
+      code,
+      initialImmState,
+      initialMutState,
+      output,
+      blockHash,
+      txId
     )
   }
 }

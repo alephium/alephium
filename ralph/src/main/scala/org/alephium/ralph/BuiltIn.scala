@@ -1418,6 +1418,10 @@ object BuiltIn {
     randomFunc("randomU256", Type.U256, "U256", DevInstr(RandomU256))
   val randomI256: BuiltIn[StatelessContext] =
     randomFunc("randomI256", Type.I256, "I256", DevInstr(RandomI256))
+  val randomContractAddress: BuiltIn[StatelessContext] =
+    randomFunc("randomContractAddress", Type.Address, "Address", DevInstr(RandomContractAddress))
+  val randomAssetAddress: BuiltIn[StatelessContext] =
+    randomFunc("randomAssetAddress", Type.Address, "Address", DevInstr(RandomAssetAddress))
 
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
@@ -1488,7 +1492,9 @@ object BuiltIn {
     testFail,
     testError,
     randomU256,
-    randomI256
+    randomI256,
+    randomContractAddress,
+    randomAssetAddress
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap
@@ -2334,7 +2340,9 @@ object BuiltIn {
     }
   }
 
+  // scalastyle:off method.length
   def encodeFields[Ctx <: StatelessContext](
+      typeId: Ast.TypeId,
       stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
       fields: Seq[Ast.Argument],
       globalState: Ast.GlobalState[Ctx]
@@ -2348,7 +2356,7 @@ object BuiltIn {
       val argsType: Seq[Type]   = globalState.resolveTypes(fields.map(_.tpe))
       val returnType: Seq[Type] = Seq(Type.ByteVec, Type.ByteVec)
 
-      override def genCodeForArgs[C <: Ctx](
+      private def genProdCodeForArgs[C <: Ctx](
           args: Seq[Ast.Expr[C]],
           state: Compiler.State[C]
       ): Seq[Instr[C]] = {
@@ -2364,7 +2372,39 @@ object BuiltIn {
         immFieldInstrs ++ mutFieldInstrs
       }
 
+      private def genTestCodeForArgs[C <: Ctx](
+          args: Seq[Ast.Expr[C]],
+          state: Compiler.State[C]
+      ): Seq[Instr[C]] = {
+        val (immFields, mutFields) = state.genFieldsInitCodes(fieldsMutability, args)
+        val fields                 = mutFields ++ immFields
+        val (allMutFields, mutFieldsLength) = stdInterfaceIdOpt match {
+          case Some(id) =>
+            (fields :+ BytesConst(Val.ByteVec(id.bytes)), fieldsMutability.length + 1)
+          case _ => (fields, fieldsMutability.length)
+        }
+        val immFieldInstrs =
+          Seq[Instr[Ctx]](BytesConst(Val.ByteVec(ByteString(0)))) // encode(AVector.empty)
+        val mutFieldInstrs = allMutFields ++ Seq[Instr[Ctx]](
+          U256Const(Val.U256.unsafe(mutFieldsLength)),
+          Encode
+        )
+        immFieldInstrs ++ mutFieldInstrs
+      }
+
+      override def genCodeForArgs[C <: Ctx](
+          args: Seq[Ast.Expr[C]],
+          state: Compiler.State[C]
+      ): Seq[Instr[C]] = {
+        if (state.allowUpdateImmFields && state.typeId == typeId) {
+          genTestCodeForArgs(args, state)
+        } else {
+          genProdCodeForArgs(args, state)
+        }
+      }
+
       def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq.empty
     }
   }
+  // scalastyle:on method.length
 }

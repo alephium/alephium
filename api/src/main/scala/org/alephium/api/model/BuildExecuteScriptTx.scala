@@ -35,7 +35,8 @@ final case class BuildExecuteScriptTx(
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None,
     group: Option[GroupIndex] = None,
-    gasEstimationMultiplier: Option[Double] = None
+    gasEstimationMultiplier: Option[Double] = None,
+    dustAmount: Option[Amount] = None
 ) extends BuildTxCommon.ExecuteScriptTx
     with BuildTxCommon.FromPublicKey {
   def check(): Either[String, Unit] = {

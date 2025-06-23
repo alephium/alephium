@@ -161,6 +161,7 @@ object UnsignedTransaction {
       fromUnlockScript: UnlockScript,
       inputs: AVector[(AssetOutputRef, AssetOutput)],
       approvedAttoAlphAmount: U256,
+      extraDustAmount: U256,
       approvedTokens: AVector[(TokenId, U256)],
       gasAmount: GasBox,
       gasPrice: GasPrice
@@ -174,7 +175,7 @@ object UnsignedTransaction {
         fromLockupScript,
         inputs,
         approvedAsOutput,
-        gasFee
+        gasFee.addUnsafe(extraDustAmount)
       )
     } yield {
       UnsignedTransaction(

@@ -190,13 +190,18 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.StructCtor(typeId, fields)
     }
 
-  def parenExpr[Unknown: P]: P[Ast.ParenExpr[Ctx]] =
-    PP("(" ~ expr ~ ")") { case (ex) =>
-      Ast.ParenExpr.apply[Ctx](ex)
+  def tupleLiteralExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
+    PP("(" ~ expr.rep(1, ",") ~ ")") { exprs =>
+      if (exprs.length == 1) Ast.ParenExpr(exprs(0)) else Ast.TupleLiteral(exprs)
     }
 
-  private def ifElseExprBody[Unknown: P]: P[(Seq[Ast.Statement[Ctx]], Ast.Expr[Ctx])] =
-    P("{" ~ statement.rep(0) ~ expr ~ "}" | expr.map(expr => (Seq.empty[Ast.Statement[Ctx]], expr)))
+  private def ifElseExprBody[Unknown: P]: P[(Seq[Ast.Statement[Ctx]], Ast.Expr[Ctx])] = {
+    P(
+      P("{" ~ expr ~ "}").map(expr => (Seq.empty[Ast.Statement[Ctx]], expr)) |
+        "{" ~ statement.rep(1) ~ expr ~ "}" |
+        expr.map(expr => (Seq.empty[Ast.Statement[Ctx]], expr))
+    )
+  }
   def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
     P(Lexer.token(Keyword.`if`) ~ expr ~ ifElseExprBody).map {
       case (ifIndex, condition, (statements, expr)) =>
@@ -303,12 +308,20 @@ abstract class Parser[Ctx <: StatelessContext] {
       Ast.StructDestruction(id, vars, expr).atSourceIndex(sourceIndex)
     }
 
+  def tupleFieldSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(
+    "." ~ Index ~ "_" ~ CharIn("0-9").rep(1).! ~~ Index
+  ).map { case (from, index, to) =>
+    val selector = Ast.Ident(s"_$index").atSourceIndex(from, to, fileURI)
+    Ast.IdentSelector(selector).atSourceIndex(selector.sourceIndex)
+  }
   def identSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(
     "." ~ Index ~ Lexer.ident ~ Index
   ).map { case (from, ident, to) =>
     Ast.IdentSelector(ident).atSourceIndex(from, to, fileURI)
   }
-  def dataSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(identSelector | indexSelector)
+  def dataSelector[Unknown: P]: P[Ast.DataSelector[Ctx]] = P(
+    identSelector | indexSelector | tupleFieldSelector
+  )
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
     PP(Lexer.ident ~ dataSelector.rep(0)) { case (ident, selectors) =>
@@ -339,8 +352,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       // Lexer.primTpes currently can't have source index as they are case objects
       Lexer.typeId.map(id =>
         Lexer.primTpes.getOrElse(id.name, contractTypeCtor(id).atSourceIndex(id.sourceIndex))
-      ) |
-        arrayType(parseType(contractTypeCtor))
+      ) | arrayType(parseType(contractTypeCtor)) | tupleType(parseType(contractTypeCtor))
     )
   }
 
@@ -353,6 +365,13 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
   }
+
+  def tupleType[Unknown: P](baseType: => P[Type]): P[Type] = {
+    P(Index ~ "(" ~ baseType.rep(1, ",") ~ ")" ~ Index).map { case (from, types, to) =>
+      if (types.length == 1) types(0) else Type.Tuple(types).atSourceIndex(from, to, fileURI)
+    }
+  }
+
   def argument[Unknown: P](
       allowMutable: Boolean
   )(contractTypeCtor: Ast.TypeId => Type.NamedType): P[Ast.Argument] =
@@ -955,11 +974,11 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
       const | stringLiteral | alphTokenId | loadData | callExpr | contractConv |
-        structCtor | variable | parenExpr | arrayExpr | rawIfElseExpr
+        structCtor | variable | tupleLiteralExpr | arrayExpr | rawIfElseExpr
     )
 
   private def loadDataBase[Unknown: P] = P(
-    (callExpr | structCtor | variableIdOnly | parenExpr | arrayExpr) ~ dataSelector.rep(1)
+    (callExpr | structCtor | variableIdOnly | tupleLiteralExpr | arrayExpr) ~ dataSelector.rep(1)
   )
   def loadData[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     loadDataBase.map { case (base, selectors) =>
@@ -1002,7 +1021,7 @@ class StatefulParser(val fileURI: Option[java.net.URI])
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
       const | stringLiteral | alphTokenId | mapContains | contractCallOrLoadData | callExpr | contractConv |
-        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | rawIfElseExpr
+        enumFieldSelector | structCtor | variable | tupleLiteralExpr | arrayExpr | rawIfElseExpr
     )
 
   def mapKeyType[Unknown: P]: P[Type] = {
@@ -1044,7 +1063,7 @@ class StatefulParser(val fileURI: Option[java.net.URI])
     })
 
   private def contractCallOrLoadDataBase[Unknown: P] = P(
-    (callExpr | contractConv | structCtor | variableIdOnly | parenExpr | arrayExpr)
+    (callExpr | contractConv | structCtor | variableIdOnly | tupleLiteralExpr | arrayExpr)
       ~ (("." ~ callAbs) | dataSelector).rep(1)
   )
 
@@ -1386,9 +1405,12 @@ class StatefulParser(val fileURI: Option[java.net.URI])
 
 trait TestingParser { self: StatefulParser =>
   private def settingDef[Unknown: P]: P[Testing.SettingDef[StatefulContext]] =
-    PP(Lexer.ident ~ "=" ~ expr) { case (ident, expr) => Testing.SettingDef(ident.name, expr) }
+    P(Lexer.ident ~ "=" ~ expr).map { case (ident, expr) =>
+      val sourceIndex = SourceIndex(ident.sourceIndex, expr.sourceIndex)
+      Testing.SettingDef(ident.name, expr).atSourceIndex(sourceIndex)
+    }
   private def settingsDef[Unknown: P]: P[Testing.SettingsDef[StatefulContext]] =
-    PP("with" ~ "Settings" ~ "(" ~ settingDef.rep(0, ",") ~ ")")(Testing.SettingsDef.apply)
+    PP("with" ~ settingDef.rep(0, ","))(Testing.SettingsDef.apply)
 
   private def contractAssets[Unknown: P] = P("{" ~ amountList ~ "}")
   private def contractCtor[Unknown: P]   = P("(" ~ expr.rep(0, ",") ~ ")")
@@ -1404,7 +1426,7 @@ trait TestingParser { self: StatefulParser =>
   private def contractDefs[Unknown: P](
       key: String
   ): P[Testing.CreateContractDefs[StatefulContext]] =
-    PP(key ~ createContractDef.rep)(Testing.CreateContractDefs.apply)
+    PP(key ~ P(createContractDef ~ ",".?).rep)(Testing.CreateContractDefs.apply)
   private def singleTestDef[Unknown: P]: P[Testing.SingleTestDef[StatefulContext]] =
     PP(
       contractDefs("before").? ~ contractDefs("after").? ~
