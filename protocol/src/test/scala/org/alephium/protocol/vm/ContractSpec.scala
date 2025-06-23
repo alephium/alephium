@@ -168,59 +168,37 @@ class ContractSpec extends AlephiumSpec {
     val statefulOldMethod1  = OldMethod[StatefulContext](true, false, 3, 4, 5, AVector.empty)
 
     val statelessMethod0 =
-      Method[StatelessContext](true, true, true, false, false, 3, 4, 5, AVector.empty)
+      Method[StatelessContext](true, true, true, false, 3, 4, 5, AVector.empty)
     val statelessMethod1 =
-      Method[StatelessContext](true, false, false, false, false, 3, 4, 5, AVector.empty)
+      Method[StatelessContext](true, false, false, false, 3, 4, 5, AVector.empty)
     val statelessMethod2 =
-      Method[StatelessContext](true, true, false, false, false, 3, 4, 5, AVector.empty)
+      Method[StatelessContext](true, true, false, false, 3, 4, 5, AVector.empty)
     val statelessMethod3 =
-      Method[StatelessContext](true, false, true, false, false, 3, 4, 5, AVector.empty)
+      Method[StatelessContext](true, false, true, false, 3, 4, 5, AVector.empty)
     val statelessMethod4 =
-      Method[StatelessContext](true, true, true, true, false, 3, 4, 5, AVector.empty)
+      Method[StatelessContext](true, true, true, true, 3, 4, 5, AVector.empty)
     val statelessMethod5 =
-      Method[StatelessContext](true, false, false, true, false, 3, 4, 5, AVector.empty)
+      Method[StatelessContext](true, false, false, true, 3, 4, 5, AVector.empty)
     val statelessMethod6 =
-      Method[StatelessContext](true, true, false, true, false, 3, 4, 5, AVector.empty)
+      Method[StatelessContext](true, true, false, true, 3, 4, 5, AVector.empty)
     val statelessMethod7 =
-      Method[StatelessContext](true, false, true, true, false, 3, 4, 5, AVector.empty)
+      Method[StatelessContext](true, false, true, true, 3, 4, 5, AVector.empty)
     val statefulMethod0 =
-      Method[StatefulContext](true, true, true, false, false, 3, 4, 5, AVector.empty)
+      Method[StatefulContext](true, true, true, false, 3, 4, 5, AVector.empty)
     val statefulMethod1 =
-      Method[StatefulContext](true, false, false, false, false, 3, 4, 5, AVector.empty)
+      Method[StatefulContext](true, false, false, false, 3, 4, 5, AVector.empty)
     val statefulMethod2 =
-      Method[StatefulContext](true, true, false, false, false, 3, 4, 5, AVector.empty)
+      Method[StatefulContext](true, true, false, false, 3, 4, 5, AVector.empty)
     val statefulMethod3 =
-      Method[StatefulContext](true, false, true, false, false, 3, 4, 5, AVector.empty)
+      Method[StatefulContext](true, false, true, false, 3, 4, 5, AVector.empty)
     val statefulMethod4 =
-      Method[StatefulContext](true, true, true, true, false, 3, 4, 5, AVector.empty)
+      Method[StatefulContext](true, true, true, true, 3, 4, 5, AVector.empty)
     val statefulMethod5 =
-      Method[StatefulContext](true, false, false, true, false, 3, 4, 5, AVector.empty)
+      Method[StatefulContext](true, false, false, true, 3, 4, 5, AVector.empty)
     val statefulMethod6 =
-      Method[StatefulContext](true, true, false, true, false, 3, 4, 5, AVector.empty)
+      Method[StatefulContext](true, true, false, true, 3, 4, 5, AVector.empty)
     val statefulMethod7 =
-      Method[StatefulContext](true, false, true, true, false, 3, 4, 5, AVector.empty)
-
-    // Methods with useRoutePattern=true
-    val statelessMethodR0 =
-      Method[StatelessContext](true, true, true, false, true, 3, 4, 5, AVector.empty)
-    val statelessMethodR1 =
-      Method[StatelessContext](true, false, false, false, true, 3, 4, 5, AVector.empty)
-    val statelessMethodR2 =
-      Method[StatelessContext](true, true, false, false, true, 3, 4, 5, AVector.empty)
-    val statelessMethodR3 =
-      Method[StatelessContext](true, false, true, false, true, 3, 4, 5, AVector.empty)
-    val statelessMethodR4 =
-      Method[StatelessContext](true, true, true, true, true, 3, 4, 5, AVector.empty)
-    val statefulMethodR0 =
-      Method[StatefulContext](true, true, true, false, true, 3, 4, 5, AVector.empty)
-    val statefulMethodR1 =
-      Method[StatefulContext](true, false, false, false, true, 3, 4, 5, AVector.empty)
-    val statefulMethodR2 =
-      Method[StatefulContext](true, true, false, false, true, 3, 4, 5, AVector.empty)
-    val statefulMethodR3 =
-      Method[StatefulContext](true, false, true, false, true, 3, 4, 5, AVector.empty)
-    val statefulMethodR4 =
-      Method[StatefulContext](true, true, true, true, true, 3, 4, 5, AVector.empty)
+      Method[StatefulContext](true, false, true, true, 3, 4, 5, AVector.empty)
   }
 
   it should "serialize method examples" in new MethodsFixture {
@@ -247,39 +225,12 @@ class ContractSpec extends AlephiumSpec {
     serialize(statefulMethod7) is hex"010603040500"
   }
 
-  it should "serialize methods with useRoutePattern" in new MethodsFixture {
-    // Methods without useRoutePattern
-    serialize(statelessMethod0) is hex"010103040500"
-    serialize(statelessMethod1) is hex"010003040500"
-    serialize(statelessMethod2) is hex"010303040500"
-    serialize(statelessMethod3) is hex"010203040500"
-
-    // Methods with useRoutePattern
-    serialize(statelessMethodR0) is hex"010903040500"
-    serialize(statelessMethodR1) is hex"010803040500"
-    serialize(statelessMethodR2) is hex"010b03040500"
-    serialize(statelessMethodR3) is hex"010a03040500"
-
-    // Check combined flags
-    serialize(
-      statelessMethodR4
-    ) is hex"010d03040500" // usePayToContractOnly + useRoutePattern + first2bits
-
-    // Stateful methods
-    serialize(statefulMethodR0) is hex"010903040500"
-    serialize(statefulMethodR1) is hex"010803040500"
-    serialize(statefulMethodR2) is hex"010b03040500"
-    serialize(statefulMethodR3) is hex"010a03040500"
-    serialize(statefulMethodR4) is hex"010d03040500"
-  }
-
   it should "serde methods" in {
     for {
       isPublic             <- Seq(true, false)
       usePreapprovedAssets <- Seq(true, false)
       useContractAssetss   <- Seq(true, false)
       usePayToContractOnly <- Seq(true, false)
-      useRoutePattern      <- Seq(true, false)
     } {
       val statelessMethods =
         Method[StatelessContext](
@@ -287,7 +238,6 @@ class ContractSpec extends AlephiumSpec {
           usePreapprovedAssets,
           useContractAssetss,
           usePayToContractOnly,
-          useRoutePattern,
           3,
           4,
           5,
@@ -301,7 +251,6 @@ class ContractSpec extends AlephiumSpec {
           usePreapprovedAssets,
           useContractAssetss,
           usePayToContractOnly,
-          useRoutePattern,
           3,
           4,
           5,
@@ -370,46 +319,6 @@ class ContractSpec extends AlephiumSpec {
       .foreach(_.checkAssetsModifier(lemanContext).leftValue isE InvalidMethodModifierBeforeRhone)
   }
 
-  it should "validate useRoutePattern on pre-Danube and Danube forks" in new ContractFixture {
-    val preDanubeContext = genStatefulContext(None)(NetworkConfigFixture.Genesis)
-    val danubeContext    = genStatefulContext(None)(NetworkConfigFixture.Danube)
-
-    // Test methods with useRoutePattern enabled
-    val methodsWithRoutePattern = Seq(
-      statelessMethodR0,
-      statelessMethodR1,
-      statelessMethodR2,
-      statelessMethodR3,
-      statelessMethodR4
-    ).map(method => StatelessScript.unsafe(AVector(method)))
-
-    // Check that all methods with useRoutePattern=true are rejected on pre-Danube
-    methodsWithRoutePattern.foreach { contract =>
-      contract.checkAssetsModifier(preDanubeContext).leftValue isE InvalidMethodModifierPreDanube
-    }
-
-    // Check that all methods with useRoutePattern=true are accepted on Danube
-    methodsWithRoutePattern.foreach { contract =>
-      // Some methods might still be rejected due to other modifiers
-      if (contract.methods.head.useContractAssets && contract.methods.head.usePayToContractOnly) {
-        contract.checkAssetsModifier(danubeContext).leftValue isE InvalidMethodModifierSinceRhone
-      } else {
-        contract.checkAssetsModifier(danubeContext) isE ()
-      }
-    }
-
-    // Individual method tests
-    statelessMethodR0.checkModifierPreDanube().leftValue isE InvalidMethodModifierPreDanube
-    statelessMethodR1.checkModifierPreDanube().leftValue isE InvalidMethodModifierPreDanube
-    statelessMethodR2.checkModifierPreDanube().leftValue isE InvalidMethodModifierPreDanube
-    statelessMethodR3.checkModifierPreDanube().leftValue isE InvalidMethodModifierPreDanube
-    statelessMethodR4.checkModifierPreDanube().leftValue isE InvalidMethodModifierPreDanube
-
-    // Method without useRoutePattern should be fine
-    statelessMethod0.checkModifierPreDanube() isE ()
-    statelessMethod1.checkModifierPreDanube() isE ()
-  }
-
   it should "serde Method.Selector" in {
     def test(index: Int, encoded: ByteString) = {
       val selector = Method.Selector(index)
@@ -432,7 +341,6 @@ class ContractSpec extends AlephiumSpec {
           usePreapprovedAssets = Random.nextBoolean(),
           useContractAssets = Random.nextBoolean(),
           usePayToContractOnly = false,
-          useRoutePattern = Random.nextBoolean(),
           argsLength = Random.nextInt(3),
           localsLength = Random.nextInt(3),
           returnLength = Random.nextInt(3),

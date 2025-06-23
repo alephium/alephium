@@ -6803,7 +6803,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
         useAssetsInContract = Ast.NotUseContractAssets,
         usePayToContractOnly = false,
         useCheckExternalCaller = false,
-        useRoutePattern = false,
         useUpdateFields = false,
         useMethodIndex = methodIndex,
         inline = false,
