@@ -152,7 +152,7 @@ class RestServer(
 
   override def subServices: ArraySeq[Service] = ArraySeq(node, endpointSender)
 
-  private val vertx  = Vertx.vertx()
+  val vertx          = Vertx.vertx()
   private val router = Router.router(vertx)
   vertx
     .fileSystem()
