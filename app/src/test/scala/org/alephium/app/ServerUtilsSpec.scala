@@ -6486,6 +6486,36 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "return events from canonical chain" in new Fixture {
+    val chainIndex         = ChainIndex.unsafe(0, 0)
+    val canonicalBlockHash = randomBlockHash(chainIndex)
+    def contractAddress    = Address.contract(ContractId.random)
+
+    def isCanonical(hash: BlockHash) = Right(hash == canonicalBlockHash)
+    def events(num: Int, blockHash: BlockHash) = {
+      AVector.tabulate(num)(ContractEventByTxId(blockHash, contractAddress, _, AVector.empty))
+    }
+
+    // If empty, return directly
+    val emptyEvents = AVector.empty[ContractEventByTxId]
+    ServerUtils.eventsFromCanonicalChain(emptyEvents, isCanonical) isE emptyEvents
+
+    // If only one block hash, return directly
+    val blockHash = randomBlockHash(chainIndex)
+    forAll(Gen.choose(0, 10)) { num =>
+      val allEvents = events(num, blockHash)
+      ServerUtils.eventsFromCanonicalChain(allEvents, isCanonical) isE allEvents
+    }
+
+    // If not all block hashes are the same, check canonical block hash
+    forAll(Gen.choose(1, 10), Gen.choose(0, 10)) { (num1, num2) =>
+      val canonicalEvents    = events(num1, canonicalBlockHash)
+      val nonCanonicalEvents = events(num2, randomBlockHash(chainIndex))
+      val allEvents          = canonicalEvents ++ nonCanonicalEvents
+      ServerUtils.eventsFromCanonicalChain(allEvents, isCanonical) isE canonicalEvents
+    }
+  }
+
   @scala.annotation.tailrec
   private def randomBlockHash(
       chainIndex: ChainIndex

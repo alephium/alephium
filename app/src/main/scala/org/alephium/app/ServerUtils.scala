@@ -18,6 +18,7 @@ package org.alephium.app
 
 import java.math.BigInteger
 
+import scala.collection.mutable
 import scala.concurrent._
 
 import akka.util.ByteString
@@ -849,10 +850,17 @@ class ServerUtils(implicit
       txId: TransactionId
   ): Try[ContractEventsByTxId] = {
     wrapResult(
-      blockFlow.getEventsByHash(Byte32.unsafe(txId.bytes)).map { logs =>
-        val events = logs.map(p => ContractEventByTxId.from(p._1, p._2, p._3))
-        ContractEventsByTxId(events)
-      }
+      for {
+        events <- blockFlow.getEventsByHash(Byte32.unsafe(txId.bytes)).map { logs =>
+          logs.map(p => ContractEventByTxId.from(p._1, p._2, p._3))
+        }
+        filteredEvents <- eventsFromCanonicalChain(
+          events,
+          (blockHash: BlockHash) => {
+            blockFlow.getHeaderChain(blockHash).isCanonical(blockHash)
+          }
+        )
+      } yield ContractEventsByTxId(filteredEvents)
     )
   }
 
@@ -2492,6 +2500,40 @@ object ServerUtils {
           case None => Left(s"Invalid m-of-n multisig")
         }
       }
+    }
+  }
+
+  def eventsFromCanonicalChain(
+      events: AVector[ContractEventByTxId],
+      isCanonical: (BlockHash) => IOResult[Boolean]
+  ): IOResult[AVector[ContractEventByTxId]] = {
+    if (events.isEmpty || events.mapToArray(_.blockHash).distinct.length == 1) {
+      // If empty or only one blockhash, return directly
+      Right(events)
+    } else {
+      var canonicalBlockHash: Option[BlockHash] = None
+      val nonCanonicalBlockHashes               = mutable.Set.empty[BlockHash]
+      val result                                = mutable.ArrayBuffer.empty[ContractEventByTxId]
+
+      events
+        .foreachE { event =>
+          if (canonicalBlockHash.exists(_ == event.blockHash)) {
+            result.addOne(event)
+            Right(())
+          } else if (nonCanonicalBlockHashes.contains(event.blockHash)) {
+            Right(())
+          } else {
+            isCanonical(event.blockHash).map { isCanonical =>
+              if (isCanonical) {
+                canonicalBlockHash = Some(event.blockHash)
+                result.addOne(event)
+              } else {
+                nonCanonicalBlockHashes.addOne(event.blockHash)
+              }
+            }
+          }
+        }
+        .map { _ => AVector.from(result) }
     }
   }
 }
