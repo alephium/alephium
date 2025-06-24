@@ -24,6 +24,11 @@ import scala.util.Random
 // 2. `checkUpgrade` function in `ReleaseVersion.scala`.
 // 3. Enable `checkInactiveInstructions` in `Instr.scala`.
 // 4. `sanityCheck` function in `AlephiumConfig.scala`.
+//
+// Checklist for setting up upgrade activation:
+// 1. Update activation timestamps in config files.
+// 2. `sanityCheck` function in `AlephiumConfig.scala`.
+// 3. Update checks in `ReleaseVersion.scala`.
 sealed class HardFork(val version: Int) extends Ordered[HardFork] {
   def compare(that: HardFork): Int = this.version.compareTo(that.version)
 
