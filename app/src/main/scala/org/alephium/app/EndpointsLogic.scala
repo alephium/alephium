@@ -18,6 +18,7 @@ package org.alephium.app
 
 import java.io.{StringWriter, Writer}
 import java.net.InetAddress
+import java.util.concurrent.Callable
 
 import scala.concurrent._
 
@@ -55,6 +56,7 @@ trait EndpointsLogic extends Endpoints {
   def miner: ActorRefT[Miner.Command]
   def blocksExporter: BlocksExporter
   def endpointSender: EndpointSender
+  def vertx: io.vertx.core.Vertx
 
   private lazy val blockFlow: BlockFlow                        = node.blockFlow
   private lazy val txHandler: ActorRefT[TxHandler.Command]     = node.allHandlers.txHandler
@@ -170,7 +172,9 @@ trait EndpointsLogic extends Endpoints {
   }
 
   val getRichBlocksAndEventsLogic = serverLogic(getRichBlocksAndEvents) { timeInterval =>
-    Future.successful(serverUtils.getRichBlocksAndEvents(blockFlow, timeInterval))
+    executeBlocking(() => {
+      serverUtils.getRichBlocksAndEvents(blockFlow, timeInterval)
+    })
   }
 
   val getBlockLogic = serverLogic(getBlock) { hash =>
@@ -981,6 +985,24 @@ trait EndpointsLogic extends Endpoints {
       case (_, None) =>
         Left(ApiError.BadRequest("`group` parameter is required with multiple brokers"))
     }
+  }
+
+  private def executeBlocking[T](blockingCodeHandler: Callable[T]): Future[T] = {
+    val promise = Promise[T]()
+    vertx.executeBlocking(
+      blockingCodeHandler,
+      false,
+      new io.vertx.core.Handler[io.vertx.core.AsyncResult[T]] {
+        override def handle(ar: io.vertx.core.AsyncResult[T]): Unit = {
+          if (ar.succeeded()) {
+            promise.success(ar.result())
+          } else {
+            promise.failure(ar.cause())
+          }
+        }
+      }
+    )
+    promise.future
   }
 }
 
