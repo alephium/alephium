@@ -129,7 +129,7 @@ class ReleaseVersionSpec extends AlephiumSpec {
       ReleaseVersion.fromClientId("scala-alephium/v3.14.3/Linux") is None
       ReleaseVersion.fromClientId("scala-alephium/v3.14.4/Linux") is None
       ReleaseVersion.fromClientId("scala-alephium/v3.15.0/Linux") is None
-      ReleaseVersion.fromClientId("scala-alephium/v4.0.0/Linux") is None
+      ReleaseVersion.fromClientId("scala-alephium/v4.0.0/Linux") is Some(ReleaseVersion(4, 0, 0))
     }
   }
 }
