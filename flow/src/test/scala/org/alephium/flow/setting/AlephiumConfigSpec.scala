@@ -113,6 +113,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     initialHashRate is HashRate.unsafe(new BigInteger("2199027449856"))
     config.network.networkId is NetworkId.AlephiumMainNet
     config.network.rhoneHardForkTimestamp is TimeStamp.unsafe(1718186400000L)
+    config.network.danubeHardForkTimestamp is TimeStamp.unsafe(1752573600000L)
   }
 
   it should "load danube config" in {
