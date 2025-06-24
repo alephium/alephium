@@ -43,8 +43,7 @@ final case class ReleaseVersion(major: Int, minor: Int, patch: Int)
     networkConfig.getHardFork(TimeStamp.now()) match {
       case HardFork.Danube =>
         if (networkConfig.networkId == NetworkId.AlephiumMainNet) {
-          // TODO: Update this once we release the version for the Danube upgrade
-          false
+          this >= ReleaseVersion(4, 0, 0)
         } else if (networkConfig.networkId == NetworkId.AlephiumTestNet) {
           this >= ReleaseVersion(3, 14, 3)
         } else {

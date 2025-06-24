@@ -485,9 +485,7 @@ object AlephiumConfig {
       throw new IllegalArgumentException("Invalid timestamp for rhone hard fork")
     }
 
-    if (
-      isMainNet && config.network.danubeHardForkTimestamp != TimeStamp.unsafe(9000000000000000000L)
-    ) {
+    if (isMainNet && config.network.danubeHardForkTimestamp != TimeStamp.unsafe(1752573600000L)) {
       throw new IllegalArgumentException("Invalid timestamp for danube hard fork")
     }
 
