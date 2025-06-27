@@ -32,7 +32,7 @@ import org.alephium.flow.{FlowFixture, GhostUncleFixture}
 import org.alephium.flow.core.{maxForkDepth, AMMContract, BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.flow.validation.{InvalidAlphBalance, TxScriptExeFailed}
+import org.alephium.flow.validation.TxScriptExeFailed
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
@@ -6532,7 +6532,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     val submitTx  = SubmitTransaction(result.unsignedTx, signature)
     val tx        = serverUtils.createTxTemplate(submitTx).rightValue
     val validator = blockFlow.templateValidator.nonCoinbaseValidation
-    validator.validateMempoolTxTemplate(tx, blockFlow).leftValue isE InvalidAlphBalance
+
+    validator.validateMempoolTxTemplate(tx, blockFlow) isE ()
   }
 
   @scala.annotation.tailrec
