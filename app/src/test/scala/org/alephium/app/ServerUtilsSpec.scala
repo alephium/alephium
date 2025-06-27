@@ -32,7 +32,7 @@ import org.alephium.flow.{FlowFixture, GhostUncleFixture}
 import org.alephium.flow.core.{maxForkDepth, AMMContract, BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.flow.validation.TxScriptExeFailed
+import org.alephium.flow.validation.{InvalidAlphBalance, TxScriptExeFailed}
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
@@ -6484,6 +6484,55 @@ class ServerUtilsSpec extends AlephiumSpec {
       val result = serverUtils.buildExecuteScriptTx(blockFlow, query1).rightValue.unsignedTx
       submitTx(result)
     }
+  }
+
+  it should "create right tx when preapprovedAssets annotation is not on" in new ContractFixture {
+    val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val tokenFaucetCode =
+      s"""
+         |Contract TokenFaucet() {
+         |  @using(assetsInContract = true)
+         |  pub fn withDrawAlph(caller: Address) -> () {
+         |    transferTokenFromSelf!(caller, ALPH, 10 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val tokenFaucetId = createContract(
+      tokenFaucetCode,
+      initialAttoAlphAmount = ALPH.alph(1000),
+      tokenIssuanceInfo = None
+    )._1
+
+    val withdrawCode =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let tokenFaucet = TokenFaucet(#${tokenFaucetId.toHexString})
+         |    tokenFaucet.withDrawAlph(callerAddress!())
+         |  }
+         |}
+         |$tokenFaucetCode
+         |""".stripMargin
+
+    val scriptBytecode = serialize(Compiler.compileTxScript(withdrawCode).rightValue)
+    val result = serverUtils
+      .buildExecuteScriptTx(
+        blockFlow,
+        BuildExecuteScriptTx(
+          fromPublicKey = genesisPublicKey.bytes,
+          bytecode = scriptBytecode,
+          attoAlphAmount = Some(Amount(ALPH.alph(10)))
+        )
+      )
+      .rightValue
+      .asInstanceOf[BuildSimpleExecuteScriptTxResult]
+
+    val signature = SecP256K1.sign(result.txId.bytes, genesisPrivateKey)
+    val submitTx  = SubmitTransaction(result.unsignedTx, signature)
+    val tx        = serverUtils.createTxTemplate(submitTx).rightValue
+    val validator = blockFlow.templateValidator.nonCoinbaseValidation
+    validator.validateMempoolTxTemplate(tx, blockFlow).leftValue isE InvalidAlphBalance
   }
 
   @scala.annotation.tailrec
