@@ -2717,7 +2717,17 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   trait BuildScriptTxFixture extends UnsignedTransactionFixture {
-    val script        = StatefulScript.unsafe(AVector.empty)
+    val method = Method[StatefulContext](
+      isPublic = true,
+      usePreapprovedAssets = true,
+      useContractAssets = false,
+      usePayToContractOnly = false,
+      argsLength = 0,
+      localsLength = 0,
+      returnLength = 0,
+      instrs = AVector(Return)
+    )
+    val script        = StatefulScript.unsafe(AVector(method))
     val defaultGasFee = nonCoinbaseMinGasPrice * minimalGas
     val tokenId       = TokenId.generate
 
