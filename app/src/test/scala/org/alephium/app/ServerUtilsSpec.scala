@@ -5117,6 +5117,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "build execute script tx with group derived from contract in TxScript" in new ContractFixture {
+    setHardForkSince(HardFork.Danube)
     val (_, fromPublicKey) = SecP256R1.generatePriPub()
     val publicKeyLike      = PublicKeyLike.SecP256R1(fromPublicKey)
 
