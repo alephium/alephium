@@ -896,6 +896,7 @@ object Testing {
   }
 
   // scalastyle:off parameter.number
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def runTestsWithUpdateImmFields(
       createWorldState: GroupIndex => IOResult[WorldState.Staging],
       sourceCode: String,
@@ -912,13 +913,14 @@ object Testing {
     if (filtered.nonEmpty) {
       for {
         multiContracts <- Compiler.compileMultiContract(sourceCode).left.map(_.format(sourceCode))
-        _ <- filtered.foreachE { contract =>
-          val index = multiContracts.contracts.indexWhere(_.ident == contract.ast.ident)
-          val state = Compiler.State.buildFor(multiContracts, index)(options)
-          contract.ast.check(state)
+        _ <- filtered.foreachE { c =>
+          val index    = multiContracts.contracts.indexWhere(_.ident == c.ast.ident)
+          val state    = Compiler.State.buildFor(multiContracts, index)(options)
+          val contract = multiContracts.contracts(index).asInstanceOf[Ast.Contract]
+          contract.check(state)
           state.setGenDebugCode()
-          val contractCode = state.withUpdateImmFields(allow = true)(contract.ast.genCode(state))
-          contract.tests match {
+          val contractCode = state.withUpdateImmFields(allow = true)(contract.genCode(state))
+          c.tests match {
             case Some(tests) =>
               tests.tests.foreachE { test =>
                 if (test.isUpdateImmFields) {
@@ -927,7 +929,7 @@ object Testing {
                     sourceCode,
                     contractCodes,
                     contractCode,
-                    contract.ast,
+                    contract,
                     tests,
                     test
                   )

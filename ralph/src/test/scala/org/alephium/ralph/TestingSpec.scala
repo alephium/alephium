@@ -949,6 +949,36 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
 
       runSimpleTest(code)
     }
+
+    {
+      info("Call external contract")
+      val code =
+        s"""
+           |Abstract Contract FooBase(bar: Bar) {
+           |  pub fn foo() -> (U256, U256) {
+           |    let (v0, v1) = bar.bar()
+           |    return (v0, v1)
+           |  }
+           |}
+           |Contract Foo(bar: Bar) extends FooBase(bar) {
+           |  test "foo"
+           |  with updateImmFields = true
+           |  before Bar()@bar0, Bar()@bar1, Self(bar0) {
+           |    bar = bar1
+           |    let values = foo()
+           |    testEqual!(values._0, 0)
+           |    testEqual!(values._1, 1)
+           |  }
+           |}
+           |Contract Bar() {
+           |  pub fn bar() -> (U256, U256) {
+           |    return (0, 1)
+           |  }
+           |}
+           |""".stripMargin
+
+      runSimpleTest(code)
+    }
   }
 
   it should "generate correct test code for encodeFields" in new UnitTestFixture {
