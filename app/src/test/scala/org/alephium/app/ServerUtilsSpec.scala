@@ -5116,7 +5116,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Invalid gas estimation multiplier precision, maximum allowed precision is 2"
   }
 
-  it should "build execute script tx with group drived from contract in TxScript" in new ContractFixture {
+  it should "build execute script tx with group derived from contract in TxScript" in new ContractFixture {
     val (_, fromPublicKey) = SecP256R1.generatePriPub()
     val publicKeyLike      = PublicKeyLike.SecP256R1(fromPublicKey)
 
