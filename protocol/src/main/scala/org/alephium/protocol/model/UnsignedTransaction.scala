@@ -166,9 +166,13 @@ object UnsignedTransaction {
       gasAmount: GasBox,
       gasPrice: GasPrice
   )(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
-    val approved =
-      TxOutputInfo(fromLockupScript, approvedAttoAlphAmount, approvedTokens, None, None)
-    val approvedAsOutput = buildOutputs(approved)
+    val approvedAsOutput = if (script.entryMethod.usePreapprovedAssets) {
+      val approved =
+        TxOutputInfo(fromLockupScript, approvedAttoAlphAmount, approvedTokens, None, None)
+      buildOutputs(approved)
+    } else {
+      AVector.empty[AssetOutput]
+    }
     for {
       gasFee <- preCheckBuildTx(inputs, gasAmount, gasPrice)
       fixedOutputs <- calculateChangeOutputs(
