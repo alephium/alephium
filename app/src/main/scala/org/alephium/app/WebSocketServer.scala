@@ -90,6 +90,8 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   protected def stopSelfOnce(): Future[Unit] = {
     for {
       _ <- wsBindingPromise.future.flatMap(_.close().asScala)
+      _ <- server.close().asScala
+      _ <- vertx.close().asScala
     } yield {
       logger.info(s"ws unbound")
       ()

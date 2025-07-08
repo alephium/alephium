@@ -2354,7 +2354,7 @@ object BuiltIn {
     new ContractBuiltIn[Ctx] {
       val name: String          = "encodeFields"
       val argsType: Seq[Type]   = globalState.resolveTypes(fields.map(_.tpe))
-      val returnType: Seq[Type] = Seq(Type.ByteVec, Type.ByteVec)
+      val returnType: Seq[Type] = Seq(Type.Tuple(Seq(Type.ByteVec, Type.ByteVec)))
 
       private def genProdCodeForArgs[C <: Ctx](
           args: Seq[Ast.Expr[C]],

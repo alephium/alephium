@@ -4833,7 +4833,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
     test(
       "Bar.encodeFields!()",
       AVector(
-        "The return values of the function \"Bar.encodeFields\" are not used. Please add `let (_, _) = ` before the function call to explicitly ignore its return value."
+        "The return values of the function \"Bar.encodeFields\" are not used. Please add `let _ = ` before the function call to explicitly ignore its return value."
       )
     )
   }
