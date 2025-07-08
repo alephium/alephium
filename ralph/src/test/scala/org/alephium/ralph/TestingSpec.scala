@@ -339,19 +339,23 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
 
       val blockHash = BlockHash.generate
       val now       = TimeStamp.now()
-      checkSettings("", Testing.SettingsValue(0, None, None, false))
-      checkSettings("group = 0", Testing.SettingsValue(0, None, None, false))
+      checkSettings("", Testing.SettingsValue(0, None, None, false, None))
+      checkSettings("group = 0", Testing.SettingsValue(0, None, None, false, None))
+      checkSettings(
+        "group = 0, dustAmount = 1 alph",
+        Testing.SettingsValue(0, None, None, false, Some(ALPH.oneAlph))
+      )
       checkSettings(
         s"group = 1, blockHash = #${blockHash.toHexString}",
-        Testing.SettingsValue(1, Some(blockHash), None, false)
+        Testing.SettingsValue(1, Some(blockHash), None, false, None)
       )
       checkSettings(
         s"group = 1, blockHash = #${blockHash.toHexString}, blockTimeStamp = ${now.millis}",
-        Testing.SettingsValue(1, Some(blockHash), Some(now), false)
+        Testing.SettingsValue(1, Some(blockHash), Some(now), false, None)
       )
       checkSettings(
         s"group = 1, blockHash = #${blockHash.toHexString}, blockTimeStamp = ${now.millis}, updateImmFields = true",
-        Testing.SettingsValue(1, Some(blockHash), Some(now), true)
+        Testing.SettingsValue(1, Some(blockHash), Some(now), true, None)
       )
       testContractError(
         code(s"group = 0, $$group = 1$$"),
@@ -359,7 +363,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
       )
       testContractError(
         code(s"$$invalidKey = 0$$"),
-        "Invalid setting key invalidKey, it must be one of [group, blockHash, blockTimeStamp, updateImmFields]"
+        "Invalid setting key invalidKey, it must be one of [group, blockHash, blockTimeStamp, updateImmFields, dustAmount]"
       )
     }
 
@@ -800,7 +804,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
   }
 
   trait UnitTestFixture extends Fixture {
-    def runSimpleTest(sourceCode: String): Unit = {
+    private def runSimpleTest(sourceCode: String) = {
       implicit val logConfig = LogConfig.allEnabled()
       val contracts          = Compiler.compileProject(sourceCode).rightValue._1
       Testing
@@ -814,7 +818,15 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
           contracts,
           CompilerOptions.Default
         )
-        .isRight is true
+    }
+
+    def testPass(sourceCode: String): Unit = {
+      runSimpleTest(sourceCode).isRight is true
+      ()
+    }
+
+    def testFail(sourceCode: String): Unit = {
+      runSimpleTest(sourceCode).isLeft is true
       ()
     }
   }
@@ -947,7 +959,37 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |}
            |""".stripMargin
 
-      runSimpleTest(code)
+      testPass(code)
+    }
+
+    {
+      info("Call external contract")
+      val code =
+        s"""
+           |Abstract Contract FooBase(bar: Bar) {
+           |  pub fn foo() -> (U256, U256) {
+           |    let (v0, v1) = bar.bar()
+           |    return (v0, v1)
+           |  }
+           |}
+           |Contract Foo(bar: Bar) extends FooBase(bar) {
+           |  test "foo"
+           |  with updateImmFields = true
+           |  before Bar()@bar0, Bar()@bar1, Self(bar0) {
+           |    bar = bar1
+           |    let values = foo()
+           |    testEqual!(values._0, 0)
+           |    testEqual!(values._1, 1)
+           |  }
+           |}
+           |Contract Bar() {
+           |  pub fn bar() -> (U256, U256) {
+           |    return (0, 1)
+           |  }
+           |}
+           |""".stripMargin
+
+      testPass(code)
     }
   }
 
@@ -971,7 +1013,7 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |}
            |""".stripMargin
 
-      runSimpleTest(code)
+      testPass(code)
     }
 
     {
@@ -997,7 +1039,33 @@ class TestingSpec extends AlephiumSpec with ContextGenerators with CompilerFixtu
            |}
            |""".stripMargin
 
-      runSimpleTest(code)
+      testPass(code)
     }
+  }
+
+  it should "support specifying dust amount in unit tests" in new UnitTestFixture {
+    def code(num: Int, settings: String = "") =
+      s"""
+         |Contract Foo() {
+         |  mapping[U256, U256] map
+         |
+         |  pub fn foo(num: U256) -> () {
+         |    for (let mut i = 0; i < num; i += 1) {
+         |      map.insert!(i, i)
+         |    }
+         |  }
+         |
+         |  test "foo"
+         |  $settings
+         |  approve{address -> ALPH: 1 alph} {
+         |    foo($num)
+         |  }
+         |}
+         |""".stripMargin
+
+    (0 to ContractRunner.MaxRetryTimes).foreach(num => testPass(code(num)))
+    testFail(code(ContractRunner.MaxRetryTimes + 1))
+    testPass(code(ContractRunner.MaxRetryTimes + 1, "with dustAmount = 0.4 alph"))
+    testFail(code(ContractRunner.MaxRetryTimes + 2, "with dustAmount = 0.4 alph"))
   }
 }
