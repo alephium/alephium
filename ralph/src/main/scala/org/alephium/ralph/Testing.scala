@@ -97,6 +97,10 @@ object Testing {
       getSetting[Val.Bool](state, Val.Bool, "updateImmFields").map(_.v)
     }
 
+    private def getDustAmount(state: Compiler.State[Ctx]): Option[U256] = {
+      getSetting[Val.U256](state, Val.U256, "dustAmount").map(_.v)
+    }
+
     def compile(state: Compiler.State[Ctx]): SettingsValue = {
       Ast.UniqueDef.checkDuplicates(defs, "test settings")
       defs.find(d => !SettingsDef.keys.contains(d.name)).foreach { invalidDef =>
@@ -110,18 +114,21 @@ object Testing {
         getGroup(state).getOrElse(0),
         getBlockHash(state),
         getBlockTimeStamp(state),
-        getUpdateImmFields(state).getOrElse(false)
+        getUpdateImmFields(state).getOrElse(false),
+        getDustAmount(state)
       )
     }
   }
   object SettingsDef {
-    val keys: Seq[String] = Seq("group", "blockHash", "blockTimeStamp", "updateImmFields")
+    val keys: Seq[String] =
+      Seq("group", "blockHash", "blockTimeStamp", "updateImmFields", "dustAmount")
   }
   final case class SettingsValue(
       group: Int,
       blockHash: Option[BlockHash],
       blockTimeStamp: Option[TimeStamp],
-      updateImmFields: Boolean
+      updateImmFields: Boolean,
+      dustAmount: Option[U256]
   )
 
   private def getAssetAddress[Ctx <: StatelessContext](
@@ -791,6 +798,7 @@ object Testing {
       worldState <- from(createWorldState(groupIndex))
       blockHash      = test.settings.flatMap(_.blockHash).getOrElse(BlockHash.random)
       blockTimeStamp = test.settings.flatMap(_.blockTimeStamp).getOrElse(TimeStamp.now())
+      dustAmount     = test.settings.flatMap(_.dustAmount)
       txId           = TransactionId.random
       createFunc = () =>
         createContracts(
@@ -822,8 +830,8 @@ object Testing {
         worldState,
         createFunc,
         runFunc,
-        ContractRunner.MaxRetryTimes,
-        U256.Zero
+        if (dustAmount.isEmpty) ContractRunner.MaxRetryTimes else 0,
+        dustAmount.getOrElse(U256.Zero)
       ) match {
         case Right(_) => Right(())
         case Left(Left(error)) =>
@@ -896,6 +904,7 @@ object Testing {
   }
 
   // scalastyle:off parameter.number
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def runTestsWithUpdateImmFields(
       createWorldState: GroupIndex => IOResult[WorldState.Staging],
       sourceCode: String,
@@ -912,13 +921,14 @@ object Testing {
     if (filtered.nonEmpty) {
       for {
         multiContracts <- Compiler.compileMultiContract(sourceCode).left.map(_.format(sourceCode))
-        _ <- filtered.foreachE { contract =>
-          val index = multiContracts.contracts.indexWhere(_.ident == contract.ast.ident)
-          val state = Compiler.State.buildFor(multiContracts, index)(options)
-          contract.ast.check(state)
+        _ <- filtered.foreachE { c =>
+          val index    = multiContracts.contracts.indexWhere(_.ident == c.ast.ident)
+          val state    = Compiler.State.buildFor(multiContracts, index)(options)
+          val contract = multiContracts.contracts(index).asInstanceOf[Ast.Contract]
+          contract.check(state)
           state.setGenDebugCode()
-          val contractCode = state.withUpdateImmFields(allow = true)(contract.ast.genCode(state))
-          contract.tests match {
+          val contractCode = state.withUpdateImmFields(allow = true)(contract.genCode(state))
+          c.tests match {
             case Some(tests) =>
               tests.tests.foreachE { test =>
                 if (test.isUpdateImmFields) {
@@ -927,7 +937,7 @@ object Testing {
                     sourceCode,
                     contractCodes,
                     contractCode,
-                    contract.ast,
+                    contract,
                     tests,
                     test
                   )
