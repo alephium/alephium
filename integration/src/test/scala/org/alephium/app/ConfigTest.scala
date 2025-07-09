@@ -31,5 +31,6 @@ class ConfigTest extends AlephiumActorSpec {
     val specialTx = theConfig.genesisBlocks(3)(3).coinbase
     specialTx.unsigned.fixedOutputs.head.lockTime is ALPH.LaunchTimestamp
     specialTx.unsigned.fixedOutputs.last.lockTime is ALPH.LaunchTimestamp.plusHoursUnsafe(3 * 24)
+    clique.stop()
   }
 }

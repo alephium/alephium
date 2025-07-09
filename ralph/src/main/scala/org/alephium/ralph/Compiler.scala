@@ -164,7 +164,7 @@ object Compiler {
         state: State[C]
     ): Seq[Type] = {
       val argsType = args.flatMap(_.getType(state))
-      getReturnType(argsType, state)
+      state.resolveTypes(getReturnType(argsType, state))
     }
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
       args.flatMap(_.genCode(state))
@@ -324,7 +324,7 @@ object Compiler {
         state: Compiler.State[C]
     ): Seq[Type] = {
       if (inputType == state.resolveTypes(argsType)) {
-        state.resolveTypes(returnType)
+        returnType
       } else {
         throw Error(
           s"Invalid args type ${quote(inputType)} for func $name, expected ${quote(argsType)}",

@@ -2052,9 +2052,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
     {
       info("invalid field in child contract")
 
-      val child =
+      def child(contractDef: String) =
         s"""
-           |Contract Child($$x: U256$$, y: U256) extends Parent(x) {
+           |Contract $contractDef {
            |  pub fn bar() -> () {
            |  }
            |}
@@ -2063,8 +2063,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
            |""".stripMargin
 
       testContractError(
-        child,
+        child(s"Child($$x: U256$$, y: U256) extends Parent(x)"),
         "Invalid contract inheritance fields, expected \"List(Argument(Ident(x),U256,true,false))\", got \"List(Argument(Ident(x),U256,false,false))\""
+      )
+      testContractError(
+        child(s"$$Child$$() extends Parent()"),
+        "Invalid contract inheritance fields, expected \"List(Argument(Ident(x),U256,true,false))\", got \"List()\""
       )
     }
 
@@ -4833,7 +4837,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
     test(
       "Bar.encodeFields!()",
       AVector(
-        "The return values of the function \"Bar.encodeFields\" are not used. Please add `let (_, _) = ` before the function call to explicitly ignore its return value."
+        "The return values of the function \"Bar.encodeFields\" are not used. Please add `let _ = ` before the function call to explicitly ignore its return value."
       )
     )
   }
@@ -10381,5 +10385,33 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
            |""".stripMargin
       compileContract(code).isRight is true
     }
+  }
+
+  it should "use unique name for tuple types" in {
+    val code =
+      s"""
+         |Contract Foo(bar: Bar, baz: Baz) {
+         |  pub fn getBar() -> (Bar, Bool) {
+         |    return (bar, true)
+         |  }
+         |  pub fn getBaz() -> (Baz, Bool) {
+         |    return (baz, false)
+         |  }
+         |  pub fn foo() -> () {
+         |    let (barContract, _) = getBar()
+         |    let (bazContract, _) = getBaz()
+         |    barContract.bar()
+         |    bazContract.baz()
+         |  }
+         |}
+         |Contract Bar() {
+         |  pub fn bar() -> () {}
+         |}
+         |Contract Baz() {
+         |  pub fn baz() -> () {}
+         |}
+         |""".stripMargin
+
+    compileContract(code).isRight is true
   }
 }

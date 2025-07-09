@@ -2317,7 +2317,7 @@ object Ast {
           val fields = tuple.types.view.zipWithIndex.map { case (tpe, index) =>
             Ast.StructField(Ast.Ident(s"_$index"), isMutable = true, resolveType(tpe))
           }
-          val name   = s"$TuplePrefix(${fields.map(_.tpe.signature).mkString(",")})"
+          val name   = s"$TuplePrefix(${fields.map(_.tpe).mkString(",")})"
           val struct = Ast.Struct(Ast.TypeId(name), fields.toSeq)
           tuples.addOne(tuple -> struct)
           struct.tpe
@@ -3352,7 +3352,7 @@ object Ast {
       if (fields != parentContract.fields) {
         throw Compiler.Error(
           s"Invalid contract inheritance fields, expected ${quote(parentContract.fields)}, got ${quote(fields)}",
-          fields.headOption.flatMap(_.sourceIndex)
+          fields.headOption.flatMap(_.sourceIndex).orElse(contract.ident.sourceIndex)
         )
       }
     }
