@@ -10386,4 +10386,32 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
       compileContract(code).isRight is true
     }
   }
+
+  it should "use unique name for tuple types" in {
+    val code =
+      s"""
+         |Contract Foo(bar: Bar, baz: Baz) {
+         |  pub fn getBar() -> (Bar, Bool) {
+         |    return (bar, true)
+         |  }
+         |  pub fn getBaz() -> (Baz, Bool) {
+         |    return (baz, false)
+         |  }
+         |  pub fn foo() -> () {
+         |    let (barContract, _) = getBar()
+         |    let (bazContract, _) = getBaz()
+         |    barContract.bar()
+         |    bazContract.baz()
+         |  }
+         |}
+         |Contract Bar() {
+         |  pub fn bar() -> () {}
+         |}
+         |Contract Baz() {
+         |  pub fn baz() -> () {}
+         |}
+         |""".stripMargin
+
+    compileContract(code).isRight is true
+  }
 }
