@@ -201,6 +201,8 @@ class RestServer(
     for {
       binding <- httpBindingPromise.future
       _       <- binding.close().asScala
+      _       <- server.close().asScala
+      _       <- vertx.close().asScala
     } yield {
       logger.info(s"http unbound")
       ()

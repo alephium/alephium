@@ -3352,7 +3352,7 @@ object Ast {
       if (fields != parentContract.fields) {
         throw Compiler.Error(
           s"Invalid contract inheritance fields, expected ${quote(parentContract.fields)}, got ${quote(fields)}",
-          fields.headOption.flatMap(_.sourceIndex)
+          fields.headOption.flatMap(_.sourceIndex).orElse(contract.ident.sourceIndex)
         )
       }
     }

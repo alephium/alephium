@@ -1633,7 +1633,7 @@ class ServerUtils(implicit
       extraUtxosInfo: ExtraUtxosInfo = ExtraUtxosInfo.empty
   ): Try[BuildExecuteScriptTxResult] = {
     for {
-      lockupPair <- query.getLockPair(query.group)
+      lockupPair <- query.getLockPair()
       result <- lockupPair._1 match {
         case lockupScript: LockupScript.P2PK =>
           for {

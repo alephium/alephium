@@ -27,7 +27,7 @@ import org.alephium.api.{model => api}
 import org.alephium.api.{ApiError, Try}
 import org.alephium.api.model.{Address => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.api.model.BuildDeployContractTx.Code
-import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
+import org.alephium.crypto.{BIP340Schnorr, SecP256K1, SecP256R1}
 import org.alephium.flow.{FlowFixture, GhostUncleFixture}
 import org.alephium.flow.core.{maxForkDepth, AMMContract, BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.gasestimation._
@@ -43,7 +43,14 @@ import org.alephium.protocol.model.{
   _
 }
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
+import org.alephium.protocol.vm.{
+  GasBox,
+  GasPrice,
+  LockupScript,
+  PublicKeyLike,
+  TokenIssuance,
+  UnlockScript
+}
 import org.alephium.ralph.{Compiler, SourceIndex}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
@@ -5107,6 +5114,52 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .leftValue
       .detail is "Invalid gas estimation multiplier precision, maximum allowed precision is 2"
+  }
+
+  it should "build execute script tx with group derived from contract in TxScript" in new ContractFixture {
+    setHardForkSince(HardFork.Danube)
+    val (_, fromPublicKey) = SecP256R1.generatePriPub()
+    val publicKeyLike      = PublicKeyLike.SecP256R1(fromPublicKey)
+
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val block = transferWithGas(
+      blockFlow,
+      genesisPrivateKey,
+      LockupScript.p2pk(publicKeyLike, chainIndex.from),
+      AVector.empty[(TokenId, U256)],
+      ALPH.alph(10),
+      nonCoinbaseMinGasPrice
+    )
+    addAndCheck(blockFlow, block)
+
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    emit Debug(`foo`)
+         |  }
+         |}
+         |""".stripMargin
+
+    val (_, fooId) = createContract(foo, AVector.empty, AVector.empty)
+    val script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooId.toHexString}).foo()
+         |}
+         |$foo
+         |""".stripMargin
+
+    val scriptBytecode = serialize(Compiler.compileTxScript(script).rightValue)
+    val query = BuildExecuteScriptTx(
+      fromPublicKey.bytes,
+      fromPublicKeyType = Some(BuildTxCommon.GLSecP256R1),
+      scriptBytecode,
+      group = None
+    )
+
+    val result = serverUtils.buildExecuteScriptTx(blockFlow, query).rightValue
+    result.fromGroup is fooId.groupIndex.value
   }
 
   it should "estimate gas using gas estimation multiplier" in new ContractFixture {

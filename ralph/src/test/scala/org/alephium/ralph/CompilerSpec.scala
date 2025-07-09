@@ -2052,9 +2052,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
     {
       info("invalid field in child contract")
 
-      val child =
+      def child(contractDef: String) =
         s"""
-           |Contract Child($$x: U256$$, y: U256) extends Parent(x) {
+           |Contract $contractDef {
            |  pub fn bar() -> () {
            |  }
            |}
@@ -2063,8 +2063,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
            |""".stripMargin
 
       testContractError(
-        child,
+        child(s"Child($$x: U256$$, y: U256) extends Parent(x)"),
         "Invalid contract inheritance fields, expected \"List(Argument(Ident(x),U256,true,false))\", got \"List(Argument(Ident(x),U256,false,false))\""
+      )
+      testContractError(
+        child(s"$$Child$$() extends Parent()"),
+        "Invalid contract inheritance fields, expected \"List(Argument(Ident(x),U256,true,false))\", got \"List()\""
       )
     }
 
