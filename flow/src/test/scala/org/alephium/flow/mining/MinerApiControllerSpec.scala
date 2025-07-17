@@ -401,31 +401,31 @@ class MinerApiControllerSpec extends AlephiumActorSpec with SocketUtil {
   }
 
   it should "test calcPublishDelay" in new Fixture {
-    miningSetting.jobBroadcastDelay is Duration.unsafe(250)
+    miningSetting.minTaskBroadcastInterval is Duration.unsafe(250)
     val now = TimeStamp.now()
     MinerApiController.calcPublishDelay(now, now.plusMillisUnsafe(1)) is Some(
-      miningSetting.jobBroadcastDelay
+      miningSetting.minTaskBroadcastInterval
     )
-    MinerApiController.calcPublishDelay(now, now) is Some(miningSetting.jobBroadcastDelay)
+    MinerApiController.calcPublishDelay(now, now) is Some(miningSetting.minTaskBroadcastInterval)
     MinerApiController.calcPublishDelay(now, now.minusUnsafe(Duration.unsafe(1))) is
-      miningSetting.jobBroadcastDelay - Duration.unsafe(1)
+      miningSetting.minTaskBroadcastInterval - Duration.unsafe(1)
     MinerApiController.calcPublishDelay(now, now.minusUnsafe(Duration.unsafe(249))) is
-      miningSetting.jobBroadcastDelay - Duration.unsafe(249)
+      miningSetting.minTaskBroadcastInterval - Duration.unsafe(249)
     MinerApiController.calcPublishDelay(
       now,
-      now.minusUnsafe(miningSetting.jobBroadcastDelay)
+      now.minusUnsafe(miningSetting.minTaskBroadcastInterval)
     ) is None
     MinerApiController.calcPublishDelay(
       now,
-      now.minusUnsafe(miningSetting.jobBroadcastDelay + Duration.unsafe(1))
+      now.minusUnsafe(miningSetting.minTaskBroadcastInterval + Duration.unsafe(1))
     ) is None
     MinerApiController.calcPublishDelay(
       now,
-      now.minusUnsafe(miningSetting.jobBroadcastDelay + Duration.unsafe(2))
+      now.minusUnsafe(miningSetting.minTaskBroadcastInterval + Duration.unsafe(2))
     ) is None
     MinerApiController.calcPublishDelay(
       now,
-      now.minusUnsafe(miningSetting.jobBroadcastDelay.timesUnsafe(2))
+      now.minusUnsafe(miningSetting.minTaskBroadcastInterval.timesUnsafe(2))
     ) is None
   }
 

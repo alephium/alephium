@@ -94,7 +94,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.node.assetTrieCacheMaxByteSize is 200_000_000
     config.node.contractTrieCacheMaxByteSize is 20_000_000
 
-    config.mining.jobBroadcastDelay is Duration.unsafe(250)
+    config.mining.minTaskBroadcastInterval is Duration.unsafe(250)
   }
 
   it should "load rhone config" in {

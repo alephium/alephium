@@ -91,12 +91,12 @@ object MinerApiController {
   )(implicit miningSetting: MiningSetting): Option[Duration] = {
     now -- lastPublishTs match {
       case Some(delta) =>
-        if (delta < miningSetting.jobBroadcastDelay) {
-          miningSetting.jobBroadcastDelay - delta
+        if (delta < miningSetting.minTaskBroadcastInterval) {
+          miningSetting.minTaskBroadcastInterval - delta
         } else {
           None
         }
-      case None => Some(miningSetting.jobBroadcastDelay)
+      case None => Some(miningSetting.minTaskBroadcastInterval)
     }
   }
 
