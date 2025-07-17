@@ -132,7 +132,8 @@ final case class MiningSetting(
     batchDelay: Duration,
     apiInterface: InetAddress,
     pollingInterval: Duration,
-    jobCacheSizePerChain: Int
+    jobCacheSizePerChain: Int,
+    jobBroadcastDelay: Duration
 )
 
 final case class NetworkSetting(
@@ -388,7 +389,8 @@ object AlephiumConfig {
       batchDelay: Duration,
       apiInterface: InetAddress,
       pollingInterval: Duration,
-      jobCacheSizePerChain: Int
+      jobCacheSizePerChain: Int,
+      jobBroadcastDelay: Duration
   ) {
     def toMiningSetting(addresses: Option[AVector[Address.Asset]]): MiningSetting = {
       MiningSetting(
@@ -397,7 +399,8 @@ object AlephiumConfig {
         batchDelay,
         apiInterface,
         pollingInterval,
-        jobCacheSizePerChain
+        jobCacheSizePerChain,
+        jobBroadcastDelay
       )
     }
   }
