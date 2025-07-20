@@ -19,7 +19,7 @@ package org.alephium.flow.network.interclique
 import scala.collection.mutable
 
 import org.alephium.flow.Utils
-import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
+import org.alephium.flow.core.{maxForkDepth, maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
@@ -368,9 +368,9 @@ trait SyncV2Handler { _: BrokerHandler =>
           log.debug(
             s"Received chain state from $remoteAddress: ${BrokerHandler.showChainState(tips)}"
           )
-          blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateChainState(tips)
           tips.foreach(tip => remoteChainTips(tip.chainIndex) = tip)
           checkSyncedByChainState()
+          blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateChainState(tips, isRemoteNearlySynced)
         } else {
           log.warning(
             s"Invalid chain state ${BrokerHandler.showChainState(tips)} from $remoteAddress"
@@ -430,6 +430,16 @@ trait SyncV2Handler { _: BrokerHandler =>
     receive
   }
   // scalastyle:on method.length
+
+  private[interclique] def isRemoteNearlySynced: Boolean = {
+    !remoteSynced && remoteChainTips.exists { remoteTip =>
+      selfChainTips(remoteTip.chainIndex) match {
+        case Some(selfTip) =>
+          selfTip.height > remoteTip.height && selfTip.height - remoteTip.height < maxForkDepth
+        case None => true // We haven't sent the chain state to the peer yet.
+      }
+    }
+  }
 
   private def checkSyncedByChainState(): Unit = {
     if (!selfSynced && selfChainTips.nonEmpty) {
