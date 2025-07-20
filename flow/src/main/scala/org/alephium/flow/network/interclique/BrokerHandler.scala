@@ -18,6 +18,8 @@ package org.alephium.flow.network.interclique
 
 import scala.collection.mutable
 
+import akka.actor.Cancellable
+
 import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxForkDepth, maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, TxHandler}
@@ -318,6 +320,12 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
       }
     }
   }
+
+  override def postStop(): Unit = {
+    super.postStop()
+    checkPendingRequestTask.foreach(_.cancel())
+    checkPendingRequestTask = None
+  }
 }
 
 object BrokerHandler {
@@ -352,9 +360,13 @@ trait SyncV2Handler { _: BrokerHandler =>
   private[interclique] val selfChainTips   = FlattenIndexedArray.empty[ChainTip]
   private[interclique] val remoteChainTips = FlattenIndexedArray.empty[ChainTip]
 
+  protected var checkPendingRequestTask: Option[Cancellable] = None
+
   // scalastyle:off method.length
   def syncingV2: Receive = {
-    schedule(self, BaseBrokerHandler.CheckPendingRequest, RequestTimeout)
+    checkPendingRequestTask = Some(
+      scheduleCancellable(self, BaseBrokerHandler.CheckPendingRequest, RequestTimeout)
+    )
 
     val receive: Receive = {
       case BaseBrokerHandler.SendChainState(tips) =>
