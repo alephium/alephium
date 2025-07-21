@@ -28,7 +28,7 @@ import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import org.scalacheck.Gen
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{maxForkDepth, BlockFlow}
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils, TxHandler}
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
@@ -405,7 +405,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     setRemoteBrokerInfo()
     val tips = genChainTips()
     brokerHandler ! BaseBrokerHandler.Received(ChainState(tips))
-    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateChainState(tips))
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateChainState(tips, true))
   }
 
   it should "stop handler and publish misbehavior if the tip size is invalid" in new Fixture {
@@ -481,6 +481,13 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       }
       blockFlow.getMaxHeightByWeight(chainIndex) isE size
       AVector.from(blocks)
+    }
+
+    def reset(): Unit = {
+      brokerHandlerActor.selfChainTips.reset()
+      brokerHandlerActor.remoteChainTips.reset()
+      brokerHandlerActor.selfSynced = false
+      brokerHandlerActor.remoteSynced = false
     }
   }
 
@@ -1092,13 +1099,6 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandlerActor.selfSynced is false
     brokerHandlerActor.remoteSynced is false
 
-    def reset(): Unit = {
-      brokerHandlerActor.selfChainTips.reset()
-      brokerHandlerActor.remoteChainTips.reset()
-      brokerHandlerActor.selfSynced = false
-      brokerHandlerActor.remoteSynced = false
-    }
-
     reset()
     val chainTips = genChainTips()
     chainTips.length is 3
@@ -1110,14 +1110,17 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips))
     brokerHandlerActor.selfSynced is false
     brokerHandlerActor.remoteSynced is false
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateChainState(chainTips, true))
 
     reset()
-    val index0  = nextInt(0, chainTips.length - 1)
-    val newTip0 = chainTips(index0).copy(weight = chainTips(index0).weight + Weight(1))
+    val index0          = nextInt(0, chainTips.length - 1)
+    val newTip0         = chainTips(index0).copy(weight = chainTips(index0).weight + Weight(1))
+    val remoteChainTips = chainTips.replace(index0, newTip0)
     brokerHandler ! BaseBrokerHandler.SendChainState(chainTips)
-    brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips.replace(index0, newTip0)))
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(remoteChainTips))
     brokerHandlerActor.selfSynced is false
     brokerHandlerActor.remoteSynced is true
+    blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.UpdateChainState(remoteChainTips, false))
 
     reset()
     val index1 = (index0 + 1) % chainTips.length
@@ -1134,6 +1137,45 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandler ! BaseBrokerHandler.Received(ChainState(chainTips))
     brokerHandlerActor.selfSynced is true
     brokerHandlerActor.remoteSynced is true
+  }
+
+  it should "check if the remote peer is nearly synced" in new SyncV2Fixture {
+    setRemoteBrokerInfo()
+
+    val tips = genChainTips(maxForkDepth + 1)
+    brokerHandler ! BaseBrokerHandler.SendChainState(tips)
+    brokerHandler ! BaseBrokerHandler.Received(ChainState(tips))
+    eventually {
+      brokerHandlerActor.selfSynced is true
+      brokerHandlerActor.remoteSynced is true
+      brokerHandlerActor.isRemoteNearlySynced is false
+    }
+
+    (0 until tips.length).foreach { index =>
+      reset()
+      val newTip     = tips(index).copy(height = 1, weight = Weight.zero)
+      val remoteTips = tips.replace(index, newTip)
+      brokerHandler ! BaseBrokerHandler.SendChainState(tips)
+      brokerHandler ! BaseBrokerHandler.Received(ChainState(remoteTips))
+      eventually {
+        brokerHandlerActor.selfSynced is true
+        brokerHandlerActor.remoteSynced is false
+        brokerHandlerActor.isRemoteNearlySynced is false
+      }
+    }
+
+    (0 until tips.length).foreach { index =>
+      reset()
+      val newTip     = tips(index).copy(height = 2, weight = Weight.zero)
+      val remoteTips = tips.replace(index, newTip)
+      brokerHandler ! BaseBrokerHandler.SendChainState(tips)
+      brokerHandler ! BaseBrokerHandler.Received(ChainState(remoteTips))
+      eventually {
+        brokerHandlerActor.selfSynced is true
+        brokerHandlerActor.remoteSynced is false
+        brokerHandlerActor.isRemoteNearlySynced is true
+      }
+    }
   }
 
   it should "update the sync state when receiving the locators from v1 peer" in new SyncV2Fixture {
