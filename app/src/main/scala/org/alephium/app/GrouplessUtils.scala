@@ -218,7 +218,12 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
           val buildingTxInProgress = buildingTxsInProgress.sortBy(_.remainingAmounts._1).head
           val remmainingAlph       = buildingTxInProgress.remainingAmounts._1
           val remainingTokens      = buildingTxInProgress.remainingAmounts._2
-          Left(failed(notEnoughBalanceError(remmainingAlph, remainingTokens)))
+          val errorMessage = grouplessTransferError(
+            remmainingAlph,
+            remainingTokens,
+            buildingTxInProgress.errorMessage
+          )
+          Left(failed(errorMessage))
       }
     } yield {
       buildResult
@@ -423,7 +428,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
             val tx = BuildSimpleTransferTxResult.from(unsignedTx)
             BuildGrouplessTransferTxResult.from(AVector(tx)).map(Right(_))
 
-          case Left(_) =>
+          case Left(errorMessage) =>
             val (alphBalance, tokenBalances) = getAvailableBalances(utxos)
             val maxGasFee                    = gasPrice * getMaximalGasPerTx()
             val remainAlph = maxGasFee
@@ -438,7 +443,8 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
               utxos,
               allLockupScriptsWithUtxos.remove(index).map(_._1),
               (remainAlph, remainTokens),
-              AVector.empty
+              AVector.empty,
+              errorMessage
             )
             rec(index + 1)
         }
@@ -449,9 +455,10 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
   }
   // scalastyle:on method.length
 
-  private def notEnoughBalanceError(
+  private def grouplessTransferError(
       alphBalance: U256,
-      tokenBalances: AVector[(TokenId, U256)]
+      tokenBalances: AVector[(TokenId, U256)],
+      errorMessage: String
   ): String = {
     val notEnoughAssets = ArrayBuffer.empty[String]
 
@@ -466,7 +473,7 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
     }
 
     if (notEnoughAssets.isEmpty) {
-      "Not enough balance"
+      errorMessage
     } else {
       s"Not enough balance: ${notEnoughAssets.mkString(", ")}"
     }
@@ -611,7 +618,8 @@ object GrouplessUtils {
       utxos: AVector[AssetOutputInfo],
       remainingLockupScripts: AVector[LockupScript.GroupedAsset],
       remainingAmounts: (U256, AVector[(TokenId, U256)]),
-      builtUnsignedTxsSoFar: AVector[UnsignedTransaction]
+      builtUnsignedTxsSoFar: AVector[UnsignedTransaction],
+      errorMessage: String
   )
 
   def buildPublicKeyLikes(
