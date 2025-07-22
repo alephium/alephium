@@ -1284,4 +1284,38 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         checkBalance(blockFlow, toLockupScript, totalAmount.subUnsafe(gasFee))
     }
   }
+
+  it should "return the correct error message if building the transfer tx fails" in new P2PKFixture {
+    val outputs = AVector.fill(200)(
+      UnsignedTransaction.TxOutputInfo(baseLockupScript, ALPH.cent(1), AVector.empty, None)
+    )
+    (0 until 3).foreach { _ =>
+      val unsignedTx = blockFlow
+        .transfer(
+          genesisPublicKey,
+          outputs,
+          None,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          ExtraUtxosInfo.empty
+        )
+        .rightValue
+        .rightValue
+      val tx    = Transaction.from(unsignedTx, genesisPrivateKey)
+      val block = mineWithTxs(blockFlow, tx.chainIndex)((_, _) => AVector(tx))
+      addAndCheck(blockFlow, block)
+    }
+    val balance =
+      blockFlow.getUsableUtxos(baseLockupScript, Int.MaxValue).rightValue.sumBy(_.output.amount.v)
+    balance is ALPH.alph(6).v
+
+    val toLockupScript = assetLockupGen(groupIndexGen.sample.get).sample.get
+    val destinations =
+      AVector(Destination(Address.Asset(toLockupScript), Some(Amount(ALPH.alph(3)))))
+    failTransfer(
+      destinations,
+      None,
+      "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-address` endpoint to consolidate the inputs first"
+    )
+  }
 }

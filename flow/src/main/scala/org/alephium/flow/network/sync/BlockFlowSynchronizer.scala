@@ -58,8 +58,9 @@ object BlockFlowSynchronizer {
   final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends V1Command
   case object CleanDownloading                                          extends Command
   final case class BlockAnnouncement(hash: BlockHash)                   extends Command
-  final case class UpdateChainState(tips: AVector[ChainTip])            extends V2Command
-  final case class UpdateAncestors(chains: AVector[(ChainIndex, Int)])  extends V2Command
+  final case class UpdateChainState(tips: AVector[ChainTip], remoteNearlySynced: Boolean)
+      extends V2Command
+  final case class UpdateAncestors(chains: AVector[(ChainIndex, Int)]) extends V2Command
   final case class UpdateSkeletons(
       requests: AVector[(ChainIndex, BlockHeightRange)],
       responses: AVector[AVector[BlockHeader]]
@@ -199,6 +200,23 @@ trait BlockFlowSynchronizerV2 extends SyncState with BlockFlowSynchronizerV1 {
     }
   }
 
+  private[sync] val nearlySyncedRemoteBrokers = mutable.Set.empty[BrokerStatusTracker.BrokerActor]
+
+  private def sendChainStateToPeers(chainState: FlowHandler.UpdateChainState): Unit = {
+    val peers = samplePeers(P2PV2)
+    peers.foreach { case (actor, broker) =>
+      actor ! BrokerHandler.SendChainState(chainState.filterFor(broker.info))
+    }
+    nearlySyncedRemoteBrokers.view
+      .filter(b => !peers.exists(_._1 == b))
+      .foreach { broker =>
+        getBrokerStatus(broker).foreach { remote =>
+          broker ! BrokerHandler.SendChainState(chainState.filterFor(remote.info))
+        }
+      }
+    nearlySyncedRemoteBrokers.clear()
+  }
+
   def handleV2: Receive = handleV1Base orElse {
     case BlockFlowSynchronizer.Sync =>
       if (brokers.nonEmpty) {
@@ -208,13 +226,11 @@ trait BlockFlowSynchronizerV2 extends SyncState with BlockFlowSynchronizerV1 {
       scheduleSync()
 
     case chainState: FlowHandler.UpdateChainState =>
-      samplePeers(P2PV2).foreach { case (actor, broker) =>
-        actor ! BrokerHandler.SendChainState(chainState.filterFor(broker.info))
-      }
+      sendChainStateToPeers(chainState)
       handleSelfChainState(chainState.tips)
 
-    case BlockFlowSynchronizer.UpdateChainState(tips) =>
-      handlePeerChainState(tips)
+    case BlockFlowSynchronizer.UpdateChainState(tips, remoteNearlySynced) =>
+      handlePeerChainState(tips, remoteNearlySynced)
 
     case BlockFlowSynchronizer.UpdateAncestors(ancestors) =>
       handleAncestors(ancestors)
@@ -328,8 +344,14 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
-  def handlePeerChainState(tips: AVector[ChainTip]): Unit = {
+  def handlePeerChainState(tips: AVector[ChainTip], remoteNearlySynced: Boolean): Unit = {
     val brokerActor: BrokerActor = ActorRefT(sender())
+    if (remoteNearlySynced) {
+      nearlySyncedRemoteBrokers.addOne(brokerActor)
+    } else {
+      nearlySyncedRemoteBrokers.remove(brokerActor)
+    }
+
     getBrokerStatus(brokerActor).foreach(_.updateTips(tips))
     tips.foreach { chainTip =>
       val chainIndex = chainTip.chainIndex

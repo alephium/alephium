@@ -400,31 +400,32 @@ class MinerApiControllerSpec extends AlephiumActorSpec with SocketUtil {
     }
   }
 
-  it should "test calcPublishDelay" in {
+  it should "test calcPublishDelay" in new Fixture {
+    miningSetting.minTaskBroadcastInterval is Duration.unsafe(250)
     val now = TimeStamp.now()
     MinerApiController.calcPublishDelay(now, now.plusMillisUnsafe(1)) is Some(
-      MinerApiController.publishJobsDelay
+      miningSetting.minTaskBroadcastInterval
     )
-    MinerApiController.calcPublishDelay(now, now) is Some(MinerApiController.publishJobsDelay)
+    MinerApiController.calcPublishDelay(now, now) is Some(miningSetting.minTaskBroadcastInterval)
     MinerApiController.calcPublishDelay(now, now.minusUnsafe(Duration.unsafe(1))) is
-      MinerApiController.publishJobsDelay - Duration.unsafe(1)
-    MinerApiController.calcPublishDelay(now, now.minusUnsafe(Duration.unsafe(9))) is
-      MinerApiController.publishJobsDelay - Duration.unsafe(9)
+      miningSetting.minTaskBroadcastInterval - Duration.unsafe(1)
+    MinerApiController.calcPublishDelay(now, now.minusUnsafe(Duration.unsafe(249))) is
+      miningSetting.minTaskBroadcastInterval - Duration.unsafe(249)
     MinerApiController.calcPublishDelay(
       now,
-      now.minusUnsafe(MinerApiController.publishJobsDelay)
+      now.minusUnsafe(miningSetting.minTaskBroadcastInterval)
     ) is None
     MinerApiController.calcPublishDelay(
       now,
-      now.minusUnsafe(MinerApiController.publishJobsDelay + Duration.unsafe(1))
+      now.minusUnsafe(miningSetting.minTaskBroadcastInterval + Duration.unsafe(1))
     ) is None
     MinerApiController.calcPublishDelay(
       now,
-      now.minusUnsafe(MinerApiController.publishJobsDelay + Duration.unsafe(2))
+      now.minusUnsafe(miningSetting.minTaskBroadcastInterval + Duration.unsafe(2))
     ) is None
     MinerApiController.calcPublishDelay(
       now,
-      now.minusUnsafe(MinerApiController.publishJobsDelay.timesUnsafe(2))
+      now.minusUnsafe(miningSetting.minTaskBroadcastInterval.timesUnsafe(2))
     ) is None
   }
 

@@ -44,8 +44,6 @@ object MinerApiController {
       miningSetting: MiningSetting
   ): Props = Props(new MinerApiController(blockFlow, allHandlers))
 
-  val publishJobsDelay: Duration = Duration.ofMillisUnsafe(10)
-
   sealed trait Command
   final case class Received(message: ClientMessage) extends Command
   final case class BuildJobsComplete(
@@ -90,15 +88,15 @@ object MinerApiController {
   @inline private[mining] def calcPublishDelay(
       now: TimeStamp,
       lastPublishTs: TimeStamp
-  ): Option[Duration] = {
+  )(implicit miningSetting: MiningSetting): Option[Duration] = {
     now -- lastPublishTs match {
       case Some(delta) =>
-        if (delta < MinerApiController.publishJobsDelay) {
-          MinerApiController.publishJobsDelay - delta
+        if (delta < miningSetting.minTaskBroadcastInterval) {
+          miningSetting.minTaskBroadcastInterval - delta
         } else {
           None
         }
-      case None => Some(MinerApiController.publishJobsDelay)
+      case None => Some(miningSetting.minTaskBroadcastInterval)
     }
   }
 
