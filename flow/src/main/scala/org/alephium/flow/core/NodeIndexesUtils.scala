@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStateId
@@ -103,7 +103,7 @@ trait NodeIndexesUtils { Self: FlowUtils =>
       txOutputOpt <- resultOpt match {
         case Some(TxIdTxOutputLocators(txId, txOutputLocators)) =>
           for {
-            locator <- getOutputLocator(blockFlow, spentBlockHash, txOutputLocators, maxForkDepth)
+            locator <- getOutputLocator(spentBlockHash, txOutputLocators, maxForkDepth)
             block   <- blockFlow.getBlock(locator.blockHash)
           } yield Some(
             (txId, block.getTransaction(locator.txIndex).getOutput(locator.txOutputIndex))
@@ -116,8 +116,24 @@ trait NodeIndexesUtils { Self: FlowUtils =>
     }
   }
 
+  private[core] def calcBlockDiffUnsafe(
+      locatorHash: BlockHash,
+      spentHash: BlockHash
+  ): Int = {
+    val locatorChainIndex = ChainIndex.from(locatorHash)
+    val spentChainIndex   = ChainIndex.from(spentHash)
+    val locatorHeight     = blockFlow.getHeightUnsafe(locatorHash)
+    val spentHeight = if (locatorChainIndex == spentChainIndex) {
+      blockFlow.getHeightUnsafe(spentHash)
+    } else {
+      val outTips  = getOutTipsUnsafe(spentHash, locatorChainIndex.from)
+      val blockDep = outTips(locatorChainIndex.to.value)
+      blockFlow.getHeightUnsafe(blockDep)
+    }
+    spentHeight - locatorHeight
+  }
+
   private def getOutputLocator(
-      blockFlow: BlockFlow,
       spentBlockHash: BlockHash,
       locators: AVector[TxOutputLocator],
       maxForkDepth: Int
@@ -128,9 +144,10 @@ trait NodeIndexesUtils { Self: FlowUtils =>
       Right(locators(0))
     } else {
       for {
-        spentBlockHeight <- blockFlow.getHeight(spentBlockHash)
         partitioned <- locators.partitionE(locator =>
-          blockFlow.getHeight(locator.blockHash).map(spentBlockHeight - _ > maxForkDepth)
+          IOUtils
+            .tryExecute(calcBlockDiffUnsafe(locator.blockHash, spentBlockHash))
+            .map(_ > maxForkDepth)
         )
         (deepLocators, shallowLocators) = partitioned
         deepMainChainLocators <- deepLocators.filterE(p => isBlockInMainChain(p.blockHash))
