@@ -19,6 +19,7 @@ package org.alephium.flow.network.sync
 import java.net.InetSocketAddress
 
 import scala.collection.mutable
+import scala.util.Random
 
 import akka.actor.{ActorSystem, Props, Terminated}
 import com.typesafe.scalalogging.LazyLogging
@@ -524,13 +525,13 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private def collectAndAssignTasks(
       chains: AVector[SyncStatePerChain]
   ): mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]] = {
-    val orderedChains  = chains.sortBy(_.taskSize)(Ordering[Int].reverse)
-    val orderedBrokers = brokers.sortBy(_._2.requestNum)
-    val acc            = mutable.HashMap.empty[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]]
+    val orderedChains = chains.sortBy(_.taskSize)(Ordering[Int].reverse)
+    val selector      = SyncState.CircularSelector(brokers)
+    val acc           = mutable.HashMap.empty[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]]
 
     @scala.annotation.tailrec
     def iter(): mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]] = {
-      val continue = collectAndAssignTasks(orderedChains, orderedBrokers, acc)
+      val continue = collectAndAssignTasks(orderedChains, selector, acc)
       if (continue) iter() else acc
     }
 
@@ -539,14 +540,14 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def collectAndAssignTasks(
       orderedChains: AVector[SyncStatePerChain],
-      orderedBrokers: scala.collection.Seq[(BrokerActor, BrokerStatus)],
+      selector: CircularSelector[(BrokerActor, BrokerStatus)],
       acc: mutable.HashMap[BrokerActor, mutable.ArrayBuffer[BlockDownloadTask]]
   ) = {
     var size = 0
     orderedChains.foreach { state =>
       state.nextTask { task =>
         val selectedBroker = if (task.toHeader.isDefined) {
-          orderedBrokers.find(_._2.canDownload(task))
+          selector.next(_._2.canDownload(task))
         } else {
           // download the latest blocks from the `originBroker`
           getBrokerStatus(state.originBroker).flatMap { status =>
@@ -864,5 +865,29 @@ object SyncState {
   object SyncStatePerChain {
     def apply(chainIndex: ChainIndex, bestTip: ChainTip, broker: BrokerActor): SyncStatePerChain =
       new SyncStatePerChain(broker, chainIndex, bestTip)
+  }
+
+  final class CircularSelector[T](val elements: scala.collection.Seq[T], index: Int) {
+    private var currentIndex: Int = index
+    def next(cond: T => Boolean): Option[T] = {
+      val result = find(cond)
+      currentIndex += 1
+      if (currentIndex == elements.length) currentIndex = 0
+      result
+    }
+
+    private def find(cond: T => Boolean): Option[T] = {
+      val result = elements.view.slice(currentIndex, elements.length).find(cond)
+      if (result.isDefined) {
+        result
+      } else {
+        elements.view.slice(0, currentIndex).find(cond)
+      }
+    }
+  }
+
+  object CircularSelector {
+    def apply[T](elements: scala.collection.Seq[T]): CircularSelector[T] =
+      new CircularSelector(elements, Random.nextInt(elements.length))
   }
 }
