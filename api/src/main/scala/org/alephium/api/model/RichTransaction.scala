@@ -35,9 +35,10 @@ object RichTransaction {
   def from(
       transaction: Transaction,
       assetInputs: AVector[RichAssetInput],
-      contractInputs: AVector[RichContractInput]
+      contractInputs: AVector[RichContractInput],
+      isConflicted: Boolean
   ): RichTransaction = {
-    val richUnsigned = RichUnsignedTx.fromProtocol(transaction.unsigned, assetInputs)
+    val richUnsigned = RichUnsignedTx.fromProtocol(transaction.unsigned, assetInputs, isConflicted)
 
     RichTransaction(
       unsigned = richUnsigned,

@@ -193,7 +193,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         chain.getTxStatus(tx.id) isE Some(
           TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex)
         )
-        chain.getTransaction(tx.id) isE Some(tx)
+        chain.getTransaction(tx.id) isE Some((tx, block.hash))
       }
     }
     longChain.foreach { block =>
@@ -211,7 +211,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         chain.getTxStatus(tx.id) isE Some(
           TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex)
         )
-        chain.getTransaction(tx.id) isE Some(tx)
+        chain.getTransaction(tx.id) isE Some((tx, block.hash))
       }
     }
   }
@@ -240,7 +240,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         chain.getTxStatus(tx.id) isE Some(
           TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex)
         )
-        chain.getTransaction(tx.id) isE Some(tx)
+        chain.getTransaction(tx.id) isE Some((tx, block.hash))
       }
     }
     longChain.foreachWithIndex { case (block, blockIndex) =>
@@ -252,7 +252,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
               shortChain.length - blockIndex
             )
           )
-          chain.getTransaction(tx.id) isE Some(tx)
+          chain.getTransaction(tx.id) isE Some((tx, shortChain(blockIndex).hash))
         } else {
           chain.getTxStatus(tx.id) isE None
           chain.getTransaction(tx.id) isE None
@@ -266,7 +266,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         chain.getTxStatus(tx.id) isE Some(
           TxStatus(TxIndex(longChain(blockIndex).hash, txIndex), longChain.length - blockIndex)
         )
-        chain.getTransaction(tx.id) isE Some(tx)
+        chain.getTransaction(tx.id) isE Some((tx, longChain(blockIndex).hash))
       }
     }
     longChain.foreachWithIndex { case (block, blockIndex) =>
@@ -274,7 +274,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         chain.getTxStatus(tx.id) isE Some(
           TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex)
         )
-        chain.getTransaction(tx.id) isE Some(tx)
+        chain.getTransaction(tx.id) isE Some((tx, block.hash))
       }
     }
   }
