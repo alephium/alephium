@@ -27,7 +27,10 @@ final case class WalletBalance(
 )
 
 object WalletBalance {
-  def from(totalBalance: Amount, balances: AVector[WalletBalance.WalletAddressBalance]): WalletBalance = WalletBalance(
+  def from(
+      totalBalance: Amount,
+      balances: AVector[WalletBalance.WalletAddressBalance]
+  ): WalletBalance = WalletBalance(
     totalBalance,
     totalBalance.hint,
     balances
