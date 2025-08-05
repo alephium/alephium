@@ -895,7 +895,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Balances"
+                  "$ref": "#/components/schemas/WalletBalance"
                 },
                 "example": {
                   "totalBalance": "10000000000000000000",
@@ -903,10 +903,13 @@
                   "balances": [
                     {
                       "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                      "balance": "10000000000000000000",
-                      "balanceHint": "10 ALPH",
-                      "lockedBalance": "0",
-                      "lockedBalanceHint": "0 ALPH"
+                      "balance": {
+                        "balance": "10000000000000000000",
+                        "balanceHint": "10 ALPH",
+                        "lockedBalance": "5000000000000000000",
+                        "lockedBalanceHint": "5 ALPH",
+                        "utxoNum": 3
+                      }
                     }
                   ]
                 }
@@ -13638,39 +13641,6 @@
           }
         }
       },
-      "AddressBalance": {
-        "title": "AddressBalance",
-        "type": "object",
-        "required": [
-          "address",
-          "balance",
-          "balanceHint",
-          "lockedBalance",
-          "lockedBalanceHint"
-        ],
-        "properties": {
-          "address": {
-            "type": "string",
-            "format": "address"
-          },
-          "balance": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "balanceHint": {
-            "type": "string",
-            "format": "x.x ALPH"
-          },
-          "lockedBalance": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "lockedBalanceHint": {
-            "type": "string",
-            "format": "x.x ALPH"
-          }
-        }
-      },
       "AddressInfo": {
         "title": "AddressInfo",
         "type": "object",
@@ -13857,31 +13827,6 @@
           "utxoNum": {
             "type": "integer",
             "format": "int32"
-          }
-        }
-      },
-      "Balances": {
-        "title": "Balances",
-        "type": "object",
-        "required": [
-          "totalBalance",
-          "totalBalanceHint",
-          "balances"
-        ],
-        "properties": {
-          "totalBalance": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "totalBalanceHint": {
-            "type": "string",
-            "format": "x.x ALPH"
-          },
-          "balances": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AddressBalance"
-            }
           }
         }
       },
@@ -17944,6 +17889,48 @@
           "publicKey": {
             "type": "string",
             "format": "public-key"
+          }
+        }
+      },
+      "WalletAddressBalance": {
+        "title": "WalletAddressBalance",
+        "type": "object",
+        "required": [
+          "address",
+          "balance"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "format": "address"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Balance"
+          }
+        }
+      },
+      "WalletBalance": {
+        "title": "WalletBalance",
+        "type": "object",
+        "required": [
+          "totalBalance",
+          "totalBalanceHint",
+          "balances"
+        ],
+        "properties": {
+          "totalBalance": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "totalBalanceHint": {
+            "type": "string",
+            "format": "x.x ALPH"
+          },
+          "balances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletAddressBalance"
+            }
           }
         }
       },

@@ -18,6 +18,7 @@ package org.alephium.wallet.json
 
 import org.scalatest.Assertion
 
+import org.alephium.api.{model => api}
 import org.alephium.api.model.{Amount, Destination}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.json.Json._
@@ -77,16 +78,25 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
 
   it should "Balances.AddressBalance" in {
     val json =
-      s"""{"address":"$address","balance":"$balance","balanceHint":"1 ALPH","lockedBalance":"$lockedBalance","lockedBalanceHint":"2 ALPH"}"""
-    val addressBalance = Balances.AddressBalance.from(address, balance, lockedBalance)
+      s"""{"address":"$address","balance":{"balance":"$balance","balanceHint":"1 ALPH","lockedBalance":"$lockedBalance","lockedBalanceHint":"2 ALPH","utxoNum":1}}"""
+    val addressBalance = WalletBalance.WalletAddressBalance.from(
+      address,
+      api.Balance.from(balance, lockedBalance, None, None, 1)
+    )
     check(addressBalance, json)
   }
 
   it should "Balances" in {
     val json =
-      s"""{"totalBalance":"$balance","totalBalanceHint":"1 ALPH","balances":[{"address":"$address","balance":"$balance","balanceHint":"1 ALPH","lockedBalance":"$lockedBalance","lockedBalanceHint":"2 ALPH"}]}"""
+      s"""{"totalBalance":"$balance","totalBalanceHint":"1 ALPH","balances":[{"address":"$address","balance":{"balance":"$balance","balanceHint":"1 ALPH","lockedBalance":"$lockedBalance","lockedBalanceHint":"2 ALPH","utxoNum":1}}]}"""
     val balances =
-      Balances.from(balance, AVector(Balances.AddressBalance.from(address, balance, lockedBalance)))
+      WalletBalance.from(
+        balance,
+        AVector(
+          WalletBalance.WalletAddressBalance
+            .from(address, api.Balance.from(balance, lockedBalance, None, None, 1))
+        )
+      )
     check(balances, json)
   }
 

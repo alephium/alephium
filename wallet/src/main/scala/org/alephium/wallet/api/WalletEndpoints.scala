@@ -93,10 +93,10 @@ trait WalletEndpoints
       .in(query[String]("password"))
       .summary("Delete your wallet file (can be recovered with your mnemonic)")
 
-  val getBalances: BaseEndpoint[String, Balances] =
+  val getBalances: BaseEndpoint[String, WalletBalance] =
     wallet.get
       .in("balances")
-      .out(jsonBodyWithAlph[Balances])
+      .out(jsonBodyWithAlph[WalletBalance])
       .summary("Get your total balance")
 
   val transfer: BaseEndpoint[(String, Transfer), TransferResult] =
