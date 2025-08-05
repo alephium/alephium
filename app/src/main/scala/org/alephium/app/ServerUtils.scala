@@ -45,14 +45,13 @@ import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.mempool.MemPool._
-import org.alephium.io.{IOError, IOResult}
+import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.{vm, ALPH, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.{Balance => _, ContractOutput => ProtocolContractOutput, _}
 import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
 import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
-import org.alephium.protocol.vm.nodeindexes.TxIdTxOutputLocators
 import org.alephium.ralph
 import org.alephium.ralph.{CompiledContract, Compiler, Testing}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
@@ -85,9 +84,15 @@ class ServerUtils(implicit
     getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
       heightedBlocks
         .mapE(_._2.mapE { case (block, height) =>
-          BlockEntry.from(block, height).left.map(failed)
+          getBlockEntry(blockFlow, block, height)
         })
         .map(BlocksPerTimeStampRange.apply)
+    }
+  }
+
+  private def getBlockEntry(blockFlow: BlockFlow, block: Block, height: Int): Try[BlockEntry] = {
+    getConflictedTxsFromBlock(blockFlow, block.hash).flatMap { conflictedTxs =>
+      BlockEntry.from(block, height, conflictedTxs).left.map(failed)
     }
   }
 
@@ -99,8 +104,9 @@ class ServerUtils(implicit
       heightedBlocks
         .mapE(_._2.mapE { case (block, height) =>
           for {
-            blockEntry <- BlockEntry.from(block, height).left.map(failed)
-            events     <- getEventsByBlockHash(blockFlow, blockEntry.hash)
+            conflictedTxs <- getConflictedTxsFromBlock(blockFlow, block.hash)
+            blockEntry    <- BlockEntry.from(block, height, conflictedTxs).left.map(failed)
+            events        <- getEventsByBlockHash(blockFlow, blockEntry.hash)
           } yield {
             BlockAndEvents(blockEntry, events.events)
           }
@@ -118,11 +124,9 @@ class ServerUtils(implicit
       heightedBlocks
         .mapE(_._2.mapE { case (block, height) =>
           for {
-            transactions <- block.transactions.mapE(tx =>
-              getRichTransaction(blockFlow, tx, block.hash)
-            )
-            blockEntry <- RichBlockEntry.from(block, height, transactions).left.map(failed)
-            events     <- getEventsByBlockHash(blockFlow, blockEntry.hash)
+            transactions <- getRichTransactionsFromBlock(blockFlow, block)
+            blockEntry   <- RichBlockEntry.from(block, height, transactions).left.map(failed)
+            events       <- getEventsByBlockHash(blockFlow, blockEntry.hash)
           } yield {
             RichBlockAndEvents(blockEntry, events.events)
           }
@@ -592,7 +596,7 @@ class ServerUtils(implicit
         .getHeight(block.header)
         .left
         .map(failedInIO)
-      blockEntry <- BlockEntry.from(block, height).left.map(failed)
+      blockEntry <- getBlockEntry(blockFlow, block, height)
     } yield blockEntry
 
   def getRichBlockAndEvents(blockFlow: BlockFlow, hash: BlockHash): Try[RichBlockAndEvents] =
@@ -606,21 +610,63 @@ class ServerUtils(implicit
         .getHeight(block.header)
         .left
         .map(failedInIO)
-      transactions <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx, hash))
-      blockEntry   <- RichBlockEntry.from(block, height, transactions).left.map(failed)
+      transactions              <- getRichTransactionsFromBlock(blockFlow, block)
+      blockEntry                <- RichBlockEntry.from(block, height, transactions).left.map(failed)
       contractEventsByBlockHash <- getEventsByBlockHash(blockFlow, hash)
     } yield RichBlockAndEvents(blockEntry, contractEventsByBlockHash.events)
+
+  private[app] def getConflictedTxsFromBlockUnsafe(
+      blockFlow: BlockFlow,
+      blockHash: BlockHash
+  ): Option[AVector[TransactionId]] = {
+    val storage = blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex
+    storage.getOptUnsafe(blockHash) match {
+      case Some(sources) =>
+        if (sources.isEmpty) {
+          None
+        } else {
+          val txs =
+            sources.find(source => blockFlow.isBlockInMainChainUnsafe(source.intraBlock)).map(_.txs)
+          Some(txs.getOrElse(sources.head.txs))
+        }
+      case None => None
+    }
+  }
+
+  private def getConflictedTxsFromBlock(
+      blockFlow: BlockFlow,
+      blockHash: BlockHash
+  ): Try[Option[AVector[TransactionId]]] =
+    wrapResult(IOUtils.tryExecute(getConflictedTxsFromBlockUnsafe(blockFlow, blockHash)))
+
+  private def getRichTransactionsFromBlock(
+      blockFlow: BlockFlow,
+      block: Block
+  ): Try[AVector[RichTransaction]] = {
+    for {
+      conflictedTxsOpt <- getConflictedTxsFromBlock(blockFlow, block.hash)
+      filtered = conflictedTxsOpt match {
+        case None => block.transactions
+        case Some(conflictedTxs) =>
+          block.transactions.filterNot(tx => conflictedTxs.contains(tx.id))
+      }
+      transactions <- filtered.mapE(tx =>
+        getRichTransaction(blockFlow, tx, block.hash, isConflicted = false)
+      )
+    } yield transactions
+  }
 
   private[app] def getRichTransaction(
       blockFlow: BlockFlow,
       transaction: Transaction,
-      spentBlockHash: BlockHash
+      spentBlockHash: BlockHash,
+      isConflicted: Boolean
   ): Try[RichTransaction] = {
     for {
       assetInputs    <- getRichAssetInputs(blockFlow, transaction, spentBlockHash)
       contractInputs <- getRichContractInputs(blockFlow, transaction, spentBlockHash)
     } yield {
-      RichTransaction.from(transaction, assetInputs, contractInputs)
+      RichTransaction.from(transaction, assetInputs, contractInputs, isConflicted)
     }
   }
 
@@ -691,7 +737,7 @@ class ServerUtils(implicit
               Left(notFound(resource))
             }
           }
-        case Some((block, height)) => BlockEntry.from(block, height).left.map(failed)
+        case Some((block, height)) => getBlockEntry(blockFlow, block, height)
       }
     } yield blockEntry
 
@@ -760,13 +806,9 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.Transaction] = {
-    getTransactionAndConvert(
-      blockFlow,
-      txId,
-      fromGroup,
-      toGroup,
-      tx => model.Transaction.fromProtocol(tx)
-    )
+    getTransactionInfo(blockFlow, txId, fromGroup, toGroup).map { case (tx, _, isConflicted) =>
+      model.Transaction.fromProtocol(tx, isConflicted)
+    }
   }
 
   def getRichTransaction(
@@ -775,36 +817,10 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.RichTransaction] = {
-    for {
-      blockHash       <- getBlockHashForTransaction(blockFlow, txId)
-      transaction     <- getTransactionAndConvert(blockFlow, txId, fromGroup, toGroup, identity)
-      richTransaction <- getRichTransaction(blockFlow, transaction, blockHash)
-    } yield richTransaction
-  }
-
-  def getBlockHashForTransaction(blockFlow: BlockFlow, txId: TransactionId): Try[BlockHash] = {
-    val outputRef = TxOutputRef.key(txId, 0)
-    for {
-      locatorsOpt <- wrapResult(blockFlow.getTxIdTxOutputLocatorsFromOutputRef(outputRef))
-      locators <- locatorsOpt.toRight(
-        notFound(s"Transaction id for output ref ${outputRef.value.toHexString}")
-      )
-      mainchainBlockHash <- getMainChainBlockHashFromOutputLocators(blockFlow, locators)
-    } yield mainchainBlockHash
-  }
-
-  def getMainChainBlockHashFromOutputLocators(
-      blockFlow: BlockFlow,
-      locators: TxIdTxOutputLocators
-  ): Try[BlockHash] = {
-    for {
-      locatorOpt <- locators.txOutputLocators.findE(locator =>
-        isBlockInMainChain(blockFlow, locator.blockHash)
-      )
-      locator <- locatorOpt.toRight(
-        notFound(s"Main chain block hash for ${locators.txId}")
-      )
-    } yield locator.blockHash
+    getTransactionInfo(blockFlow, txId, fromGroup, toGroup).flatMap {
+      case (tx, blockHash, isConflicted) =>
+        getRichTransaction(blockFlow, tx, blockHash, isConflicted)
+    }
   }
 
   def getRawTransaction(
@@ -813,22 +829,30 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.RawTransaction] = {
-    getTransactionAndConvert(
-      blockFlow,
-      txId,
-      fromGroup,
-      toGroup,
-      tx => RawTransaction(serialize(tx))
-    )
+    getTransactionAndBlockHash(blockFlow, txId, fromGroup, toGroup).map { case (tx, _) =>
+      RawTransaction(serialize(tx))
+    }
   }
 
-  def getTransactionAndConvert[T](
+  private def getTransactionInfo(
       blockFlow: BlockFlow,
       txId: TransactionId,
       fromGroup: Option[GroupIndex],
-      toGroup: Option[GroupIndex],
-      convert: Transaction => T
-  ): Try[T] = {
+      toGroup: Option[GroupIndex]
+  ): Try[(Transaction, BlockHash, Boolean)] = {
+    for {
+      result <- getTransactionAndBlockHash(blockFlow, txId, fromGroup, toGroup)
+      (tx, blockHash) = result
+      conflictedTxs <- getConflictedTxsFromBlock(blockFlow, blockHash)
+    } yield (tx, blockHash, conflictedTxs.exists(_.contains(txId)))
+  }
+
+  private def getTransactionAndBlockHash(
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      fromGroup: Option[GroupIndex],
+      toGroup: Option[GroupIndex]
+  ): Try[(Transaction, BlockHash)] = {
     val result = (fromGroup, toGroup) match {
       case (Some(from), Some(to)) =>
         blockFlow.getTransaction(txId, ChainIndex(from, to)).left.map(failed)
@@ -838,10 +862,9 @@ class ServerUtils(implicit
         }
         blockFlow.searchTransaction(txId, chainIndexes).left.map(failed)
     }
-
     result.flatMap {
-      case Some(tx) => Right(convert(tx))
-      case None     => Left(notFound(s"Transaction ${txId.toHexString}"))
+      case Some(result) => Right(result)
+      case None         => Left(notFound(s"Transaction ${txId.toHexString}"))
     }
   }
 

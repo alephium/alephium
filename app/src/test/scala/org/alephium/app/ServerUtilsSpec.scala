@@ -218,7 +218,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     def checkTx(blockFlow: BlockFlow, tx: Transaction, chainIndex: ChainIndex) = {
-      check(blockFlow, tx, chainIndex, serverUtils.getTransaction, api.Transaction.fromProtocol(tx))
+      check(
+        blockFlow,
+        tx,
+        chainIndex,
+        serverUtils.getTransaction,
+        api.Transaction.fromProtocol(tx, isConflicted = false)
+      )
       check(blockFlow, tx, chainIndex, serverUtils.getRawTransaction, RawTransaction(serialize(tx)))
     }
   }
@@ -4726,7 +4732,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     block.ghostUncleHashes.rightValue is AVector(ghostUncleHash)
     addAndCheck(blockFlow, block)
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).rightValue is
-      BlockEntry.from(block, blockFlow.getHeightUnsafe(block.hash)).rightValue
+      BlockEntry.from(block, blockFlow.getHeightUnsafe(block.hash), None).rightValue
 
     val invalidBlockHash = randomBlockHash(chainIndex)
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, invalidBlockHash).leftValue.detail is
@@ -4741,13 +4747,15 @@ class ServerUtilsSpec extends AlephiumSpec {
     val invalidBlockHash = randomBlockHash(chainIndex)
     val block            = emptyBlock(blockFlow, chainIndex)
     addAndCheck(blockFlow, block)
-    serverUtils.getBlock(blockFlow, block.hash).rightValue is BlockEntry.from(block, 1).rightValue
+    serverUtils.getBlock(blockFlow, block.hash).rightValue is BlockEntry
+      .from(block, 1, None)
+      .rightValue
     serverUtils.getBlock(blockFlow, invalidBlockHash).leftValue.detail is
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
 
     val transactions =
       block.transactions
-        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash))
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash, isConflicted = false))
         .rightValue
     serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue is RichBlockAndEvents(
       RichBlockEntry
@@ -5283,7 +5291,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "find rich block when node.indexes.tx-output-ref-index is enabled" in new TxOutputRefIndexFixture {
     val transactions =
       block.transactions
-        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash))
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash, false))
         .rightValue
     serverUtils
       .getRichBlockAndEvents(blockFlow, block.hash)
@@ -5317,6 +5325,99 @@ class ServerUtilsSpec extends AlephiumSpec {
       ) is true
   }
 
+  trait ConflictedTxsFixture extends Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.node.indexes.tx-output-ref-index", "true")
+    )
+
+    var now = TimeStamp.now()
+    def nextBlockTs: TimeStamp = {
+      val newTs = now.plusMillisUnsafe(1)
+      now = newTs
+      newTs
+    }
+
+    val chainIndex0 = ChainIndex.unsafe(0, 1)
+    val chainIndex1 = ChainIndex.unsafe(0, 2)
+
+    val block0 = transfer(blockFlow, chainIndex0, nextBlockTs)
+    val block1 = transfer(blockFlow, chainIndex1, nextBlockTs)
+
+    addAndCheck(blockFlow, block0, block1)
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs))
+    addAndCheck(
+      blockFlow,
+      emptyBlock(blockFlow, ChainIndex.unsafe(1, 1), nextBlockTs),
+      emptyBlock(blockFlow, ChainIndex.unsafe(2, 2), nextBlockTs)
+    )
+
+    val serverUtils = new ServerUtils()
+  }
+
+  it should "return empty inputs/outputs for conflicted txs" in new ConflictedTxsFixture {
+    private def checkConflictedTx(tx: Transaction) = {
+      val result = serverUtils.getTransaction(blockFlow, tx.id, None, None).rightValue
+      result.unsigned.inputs.isEmpty is true
+      result.unsigned.fixedOutputs.isEmpty is true
+      result is api.Transaction.fromProtocol(tx, isConflicted = true)
+    }
+
+    private def checkNonConflictedTx(tx: Transaction) = {
+      val result = serverUtils.getTransaction(blockFlow, tx.id, None, None).rightValue
+      result.unsigned.inputs.nonEmpty is true
+      result.unsigned.fixedOutputs.nonEmpty is true
+      result is api.Transaction.fromProtocol(tx, isConflicted = false)
+    }
+
+    checkNonConflictedTx(block0.nonCoinbase.head)
+    checkConflictedTx(block1.nonCoinbase.head)
+  }
+
+  it should "ignore conflicted txs in block response" in new ConflictedTxsFixture {
+    private def checkBlockWithConflictedTxs(block: Block, conflictedTxs: AVector[TransactionId]) = {
+      assume(conflictedTxs.nonEmpty)
+      val result0 = serverUtils.getBlock(blockFlow, block.hash).rightValue
+      result0.transactions.length isnot block.transactions.length
+      conflictedTxs.foreach(id => result0.transactions.exists(_.unsigned.txId == id) is false)
+
+      val result1 = serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue
+      result1.block.transactions.length isnot block.transactions.length
+      conflictedTxs.foreach(id => result1.block.transactions.exists(_.unsigned.txId == id) is false)
+
+      val timeInterval = TimeInterval(block.timestamp, block.timestamp)
+      val result2      = serverUtils.getBlocks(blockFlow, timeInterval).rightValue
+      result2.blocks.flatMap(identity) is AVector(result0)
+
+      val result3 = serverUtils.getRichBlocksAndEvents(blockFlow, timeInterval).rightValue
+      result3.blocksAndEvents.flatMap(identity) is AVector(result1)
+    }
+
+    private def checkBlockWithoutConflictedTxs(block: Block) = {
+      val height  = blockFlow.getHeightUnsafe(block.hash)
+      val result0 = serverUtils.getBlock(blockFlow, block.hash).rightValue
+      result0.transactions.length is block.transactions.length
+      result0 is api.BlockEntry.from(block, height, None).rightValue
+
+      val result1 = serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue
+      result1.block.transactions.length is block.transactions.length
+      val richTxs = block.transactions.map(tx =>
+        serverUtils.getRichTransaction(blockFlow, tx.id, None, None).rightValue
+      )
+      result1.block is api.RichBlockEntry.from(block, height, richTxs).rightValue
+
+      val timeInterval = TimeInterval(block.timestamp, block.timestamp)
+      val result2      = serverUtils.getBlocks(blockFlow, timeInterval).rightValue
+      result2.blocks.flatMap(identity) is AVector(result0)
+
+      val result3 = serverUtils.getRichBlocksAndEvents(blockFlow, timeInterval).rightValue
+      result3.blocksAndEvents.flatMap(identity) is AVector(result1)
+    }
+
+    checkBlockWithoutConflictedTxs(block0)
+    checkBlockWithConflictedTxs(block1, AVector(block1.nonCoinbase.head.id))
+  }
+
   it should "get rich transaction that spends asset output" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.node.indexes.tx-output-ref-index", "true")
@@ -5346,10 +5447,11 @@ class ServerUtilsSpec extends AlephiumSpec {
       val txIdRef = serverUtils.getTxIdFromOutputRef(blockFlow, input.outputRef).rightValue
       RichInput.from(input, outputToBeSpent.asInstanceOf[model.AssetOutput], txIdRef)
     }
-    val richTransaction = RichTransaction.from(transaction, AVector(richInput), AVector.empty)
+    val richTransaction =
+      RichTransaction.from(transaction, AVector(richInput), AVector.empty, isConflicted = false)
 
     serverUtils
-      .getRichTransaction(blockFlow, transaction, block1.hash)
+      .getRichTransaction(blockFlow, transaction, block1.hash, isConflicted = false)
       .rightValue is richTransaction
 
     serverUtils
@@ -5428,10 +5530,15 @@ class ServerUtilsSpec extends AlephiumSpec {
       RichInput.from(input, contractOutputToBeSpent.asInstanceOf[model.ContractOutput], txIdRef)
     }
     val richTransaction =
-      RichTransaction.from(scriptTransaction, AVector(richAssetInput), AVector(richContractInput))
+      RichTransaction.from(
+        scriptTransaction,
+        AVector(richAssetInput),
+        AVector(richContractInput),
+        isConflicted = false
+      )
 
     serverUtils
-      .getRichTransaction(blockFlow, scriptTransaction, scriptBlock.hash)
+      .getRichTransaction(blockFlow, scriptTransaction, scriptBlock.hash, isConflicted = false)
       .rightValue is richTransaction
     serverUtils
       .getRichTransaction(
@@ -5445,7 +5552,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val height = if (hardFork.isDanubeEnabled()) 4 else 3
     val richBlockAndEvents = {
       val richTxs = scriptBlock.transactions
-        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, scriptBlock.hash))
+        .mapE(tx =>
+          serverUtils.getRichTransaction(blockFlow, tx, scriptBlock.hash, isConflicted = false)
+        )
         .rightValue
       RichBlockAndEvents(
         RichBlockEntry.from(scriptBlock, height, richTxs).rightValue,
