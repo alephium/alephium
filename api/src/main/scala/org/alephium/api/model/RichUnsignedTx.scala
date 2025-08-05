@@ -48,8 +48,17 @@ final case class RichUnsignedTx(
 object RichUnsignedTx {
   def fromProtocol(
       unsignedTx: UnsignedTransaction,
-      inputs: AVector[RichAssetInput]
+      richInputs: AVector[RichAssetInput],
+      isConflicted: Boolean
   ): RichUnsignedTx = {
+    val (inputs, outputs) = if (isConflicted) {
+      (AVector.empty[RichAssetInput], AVector.empty[FixedAssetOutput])
+    } else {
+      val outputs = unsignedTx.fixedOutputs.zipWithIndex.map { case (out, index) =>
+        FixedAssetOutput.fromProtocol(out, unsignedTx.id, index)
+      }
+      (richInputs, outputs)
+    }
     RichUnsignedTx(
       unsignedTx.id,
       unsignedTx.version,
@@ -58,9 +67,7 @@ object RichUnsignedTx {
       unsignedTx.gasAmount.value,
       unsignedTx.gasPrice.value,
       inputs,
-      unsignedTx.fixedOutputs.zipWithIndex.map { case (out, index) =>
-        FixedAssetOutput.fromProtocol(out, unsignedTx.id, index)
-      }
+      outputs
     )
   }
 }

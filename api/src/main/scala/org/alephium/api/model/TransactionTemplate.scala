@@ -54,7 +54,7 @@ object TransactionTemplate {
       seenAt: TimeStamp
   ): TransactionTemplate = {
     TransactionTemplate(
-      UnsignedTx.fromProtocol(template.unsigned),
+      UnsignedTx.fromProtocol(template.unsigned, isConflicted = false),
       template.inputSignatures.map(sig => serialize(sig)),
       template.scriptSignatures.map(sig => serialize(sig)),
       seenAt

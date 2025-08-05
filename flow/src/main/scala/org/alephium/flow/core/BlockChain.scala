@@ -383,10 +383,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
-  def getTransaction(txId: TransactionId): IOResult[Option[Transaction]] = {
+  def getTransaction(txId: TransactionId): IOResult[Option[(Transaction, BlockHash)]] = {
     IOUtils.tryExecute(getCanonicalTxIndex(txId)).flatMap {
-      case Some(index) => getBlock(index.hash).map(block => Some(block.transactions(index.index)))
-      case None        => Right(None)
+      case Some(index) =>
+        getBlock(index.hash).map(block => Some((block.transactions(index.index), index.hash)))
+      case None => Right(None)
     }
   }
 
