@@ -80,11 +80,23 @@ class ServerUtils(implicit
     } yield blocks
   }
 
+  private def getConflictedTxsFromBlock(
+      blockFlow: BlockFlow,
+      blockHash: BlockHash
+  ): Try[AVector[TransactionId]] =
+    wrapResult(blockFlow.getConflictedTxsFromBlock(blockHash).map(_.getOrElse(AVector.empty)))
+
+  private def getBlockEntry(blockFlow: BlockFlow, block: Block, height: Int): Try[BlockEntry] = {
+    getConflictedTxsFromBlock(blockFlow, block.hash).flatMap { conflictedTxs =>
+      BlockEntry.from(block, height, conflictedTxs).left.map(failed)
+    }
+  }
+
   def getBlocks(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[BlocksPerTimeStampRange] = {
     getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
       heightedBlocks
         .mapE(_._2.mapE { case (block, height) =>
-          BlockEntry.from(block, height).left.map(failed)
+          getBlockEntry(blockFlow, block, height)
         })
         .map(BlocksPerTimeStampRange.apply)
     }
@@ -98,7 +110,7 @@ class ServerUtils(implicit
       heightedBlocks
         .mapE(_._2.mapE { case (block, height) =>
           for {
-            blockEntry <- BlockEntry.from(block, height).left.map(failed)
+            blockEntry <- getBlockEntry(blockFlow, block, height)
             events     <- getEventsByBlockHash(blockFlow, blockEntry.hash)
           } yield {
             BlockAndEvents(blockEntry, events.events)
@@ -120,8 +132,12 @@ class ServerUtils(implicit
             transactions <- block.transactions.mapE(tx =>
               getRichTransaction(blockFlow, tx, block.hash)
             )
-            blockEntry <- RichBlockEntry.from(block, height, transactions).left.map(failed)
-            events     <- getEventsByBlockHash(blockFlow, blockEntry.hash)
+            conflictedTxs <- getConflictedTxsFromBlock(blockFlow, block.hash)
+            blockEntry <- RichBlockEntry
+              .from(block, height, transactions, conflictedTxs)
+              .left
+              .map(failed)
+            events <- getEventsByBlockHash(blockFlow, blockEntry.hash)
           } yield {
             RichBlockAndEvents(blockEntry, events.events)
           }
@@ -599,7 +615,7 @@ class ServerUtils(implicit
         .getHeight(block.header)
         .left
         .map(failedInIO)
-      blockEntry <- BlockEntry.from(block, height).left.map(failed)
+      blockEntry <- getBlockEntry(blockFlow, block, height)
     } yield blockEntry
 
   def getRichBlockAndEvents(blockFlow: BlockFlow, hash: BlockHash): Try[RichBlockAndEvents] =
@@ -613,8 +629,9 @@ class ServerUtils(implicit
         .getHeight(block.header)
         .left
         .map(failedInIO)
-      transactions <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx, hash))
-      blockEntry   <- RichBlockEntry.from(block, height, transactions).left.map(failed)
+      transactions  <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx, hash))
+      conflictedTxs <- getConflictedTxsFromBlock(blockFlow, block.hash)
+      blockEntry <- RichBlockEntry.from(block, height, transactions, conflictedTxs).left.map(failed)
       contractEventsByBlockHash <- getEventsByBlockHash(blockFlow, hash)
     } yield RichBlockAndEvents(blockEntry, contractEventsByBlockHash.events)
 
@@ -698,7 +715,7 @@ class ServerUtils(implicit
               Left(notFound(resource))
             }
           }
-        case Some((block, height)) => BlockEntry.from(block, height).left.map(failed)
+        case Some((block, height)) => getBlockEntry(blockFlow, block, height)
       }
     } yield blockEntry
 

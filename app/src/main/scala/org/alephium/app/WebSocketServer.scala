@@ -149,7 +149,7 @@ object WebSocketServer {
     private def handleEvent(event: EventBus.Event): Unit = {
       event match {
         case BlockNotify(block, height) =>
-          BlockEntry.from(block, height) match {
+          BlockEntry.from(block, height, AVector.empty) match {
             case Right(blockEntry) =>
               val params       = writeJs(blockEntry)
               val notification = write(Notification("block_notify", params))

@@ -1283,6 +1283,10 @@ trait TxUtils { Self: FlowUtils =>
     chain.isTxConfirmed(txId)
   }
 
+  def getConflictedTxsFromBlock(blockHash: BlockHash): IOResult[Option[AVector[TransactionId]]] = {
+    IOUtils.tryExecute(getConflictedTxsFromBlockUnsafe(blockHash))
+  }
+
   def getConflictedTxsFromBlockUnsafe(blockHash: BlockHash): Option[AVector[TransactionId]] = {
     val storage = blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex
     storage.getOptUnsafe(blockHash) match {

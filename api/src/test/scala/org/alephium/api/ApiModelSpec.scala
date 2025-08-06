@@ -64,7 +64,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       Hash.zero,
       Hash.zero,
       ByteString.empty,
-      AVector(GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript)))
+      AVector(GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript))),
+      AVector.empty
     )
   val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo =
@@ -112,7 +113,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
        |  "depStateHash":"${blockEntry.depStateHash.toHexString}",
        |  "txsHash":"${blockEntry.txsHash.toHexString}",
        |  "target":"${Hex.toHexString(blockEntry.target)}",
-       |  "ghostUncles":${write(blockEntry.ghostUncles)}
+       |  "ghostUncles":${write(blockEntry.ghostUncles)},
+       |  "conflictedTxs": ${write(blockEntry.conflictedTxs)}
        |}""".stripMargin
   }
   def parseFail[A: Reader](jsonRaw: String): String = {

@@ -4726,7 +4726,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     block.ghostUncleHashes.rightValue is AVector(ghostUncleHash)
     addAndCheck(blockFlow, block)
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).rightValue is
-      BlockEntry.from(block, blockFlow.getHeightUnsafe(block.hash)).rightValue
+      BlockEntry.from(block, blockFlow.getHeightUnsafe(block.hash), AVector.empty).rightValue
 
     val invalidBlockHash = randomBlockHash(chainIndex)
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, invalidBlockHash).leftValue.detail is
@@ -4741,7 +4741,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val invalidBlockHash = randomBlockHash(chainIndex)
     val block            = emptyBlock(blockFlow, chainIndex)
     addAndCheck(blockFlow, block)
-    serverUtils.getBlock(blockFlow, block.hash).rightValue is BlockEntry.from(block, 1).rightValue
+    serverUtils.getBlock(blockFlow, block.hash).rightValue is BlockEntry
+      .from(block, 1, AVector.empty)
+      .rightValue
     serverUtils.getBlock(blockFlow, invalidBlockHash).leftValue.detail is
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
 
@@ -4751,7 +4753,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         .rightValue
     serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue is RichBlockAndEvents(
       RichBlockEntry
-        .from(block, 1, transactions)
+        .from(block, 1, transactions, AVector.empty)
         .rightValue,
       AVector.empty
     )
@@ -5288,7 +5290,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils
       .getRichBlockAndEvents(blockFlow, block.hash)
       .rightValue is RichBlockAndEvents(
-      RichBlockEntry.from(block, 1, transactions).rightValue,
+      RichBlockEntry.from(block, 1, transactions, AVector.empty).rightValue,
       AVector.empty
     )
   }
@@ -5378,6 +5380,43 @@ class ServerUtilsSpec extends AlephiumSpec {
       fromGroupConfirmations = 2,
       toGroupConfirmations = 2
     )
+  }
+
+  it should "return conflicted txs in the block response" in new ConflictedTxsFixture {
+    private def checkBlockWithConflictedTxs(block: Block, conflictedTxs: AVector[TransactionId]) = {
+      assume(conflictedTxs.nonEmpty)
+      val result0 = serverUtils.getBlock(blockFlow, block.hash).rightValue
+      result0.conflictedTxs is conflictedTxs
+
+      val result1 = serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue
+      result1.block.conflictedTxs is conflictedTxs
+
+      val timeInterval = TimeInterval(block.timestamp, block.timestamp)
+      val result2      = serverUtils.getBlocks(blockFlow, timeInterval).rightValue
+      result2.blocks.flatMap(identity) is AVector(result0)
+
+      val result3 = serverUtils.getRichBlocksAndEvents(blockFlow, timeInterval).rightValue
+      result3.blocksAndEvents.flatMap(identity) is AVector(result1)
+    }
+
+    private def checkBlockWithoutConflictedTxs(block: Block) = {
+      val result0 = serverUtils.getBlock(blockFlow, block.hash).rightValue
+      result0.conflictedTxs.isEmpty is true
+
+      val result1 = serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue
+      result1.block.conflictedTxs.isEmpty is true
+
+      val timeInterval = TimeInterval(block.timestamp, block.timestamp)
+      val result2      = serverUtils.getBlocks(blockFlow, timeInterval).rightValue
+      result2.blocks.flatMap(identity) is AVector(result0)
+
+      val result3 = serverUtils.getRichBlocksAndEvents(blockFlow, timeInterval).rightValue
+      result3.blocksAndEvents.flatMap(identity) is AVector(result1)
+    }
+
+    checkBlockWithoutConflictedTxs(block0)
+    checkBlockWithConflictedTxs(block1, AVector(block1.nonCoinbase.head.id))
+    checkBlockWithConflictedTxs(block2, AVector(block2.nonCoinbase.head.id))
   }
 
   it should "return correct status if the conflicted tx is only on the fork chain" in new ConflictedTxsFixture {
@@ -5563,7 +5602,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, scriptBlock.hash))
         .rightValue
       RichBlockAndEvents(
-        RichBlockEntry.from(scriptBlock, height, richTxs).rightValue,
+        RichBlockEntry.from(scriptBlock, height, richTxs, AVector.empty).rightValue,
         AVector(ContractEventByBlockHash(scriptTransaction.id, contractAddress, 0, AVector.empty))
       )
     }
