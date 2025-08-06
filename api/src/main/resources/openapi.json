@@ -15562,6 +15562,18 @@
           }
         }
       },
+      "Conflicted": {
+        "title": "Conflicted",
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "Constant": {
         "title": "Constant",
         "type": "object",
@@ -17625,6 +17637,9 @@
             "$ref": "#/components/schemas/Confirmed"
           },
           {
+            "$ref": "#/components/schemas/Conflicted"
+          },
+          {
             "$ref": "#/components/schemas/MemPooled"
           },
           {
@@ -17635,6 +17650,7 @@
           "propertyName": "type",
           "mapping": {
             "Confirmed": "#/components/schemas/Confirmed",
+            "Conflicted": "#/components/schemas/Conflicted",
             "MemPooled": "#/components/schemas/MemPooled",
             "TxNotFound": "#/components/schemas/TxNotFound"
           }
