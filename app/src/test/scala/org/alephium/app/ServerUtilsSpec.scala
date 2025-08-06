@@ -5418,6 +5418,17 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkBlockWithConflictedTxs(block1, AVector(block1.nonCoinbase.head.id))
   }
 
+  it should "return conflicted tx status" in new ConflictedTxsFixture {
+    val tx0 = block0.transactions.head.id
+    val tx1 = block0.transactions.last.id
+    serverUtils.getTransactionStatus(blockFlow, tx0, block0.chainIndex).rightValue is a[Confirmed]
+    serverUtils.getTransactionStatus(blockFlow, tx1, block0.chainIndex).rightValue is a[Confirmed]
+    val tx2 = block1.transactions.head.id
+    val tx3 = block1.transactions.last.id
+    serverUtils.getTransactionStatus(blockFlow, tx2, block1.chainIndex).rightValue is Conflicted()
+    serverUtils.getTransactionStatus(blockFlow, tx3, block1.chainIndex).rightValue is a[Confirmed]
+  }
+
   it should "get rich transaction that spends asset output" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.node.indexes.tx-output-ref-index", "true")

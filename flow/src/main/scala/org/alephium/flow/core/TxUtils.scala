@@ -1283,10 +1283,25 @@ trait TxUtils { Self: FlowUtils =>
     chain.isTxConfirmed(txId)
   }
 
+  def getConflictedTxsFromBlockUnsafe(blockHash: BlockHash): Option[AVector[TransactionId]] = {
+    val storage = blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex
+    storage.getOptUnsafe(blockHash) match {
+      case Some(sources) =>
+        if (sources.isEmpty) {
+          None
+        } else {
+          val txs =
+            sources.find(source => blockFlow.isBlockInMainChainUnsafe(source.intraBlock)).map(_.txs)
+          Some(txs.getOrElse(sources.head.txs))
+        }
+      case None => None
+    }
+  }
+
   def getTxConfirmedStatus(
       txId: TransactionId,
       chainIndex: ChainIndex
-  ): IOResult[Option[Confirmed]] =
+  ): IOResult[Option[TxStatus]] =
     IOUtils.tryExecute {
       assume(brokerConfig.contains(chainIndex.from))
       val chain = getBlockChain(chainIndex)
@@ -1295,19 +1310,25 @@ trait TxUtils { Self: FlowUtils =>
         if (chainIndex.isIntraGroup) {
           Some(Confirmed(chainStatus.index, confirmations, confirmations, confirmations))
         } else {
-          val confirmHash = chainStatus.index.hash
-          val fromGroupConfirmations =
-            getFromGroupConfirmationsUnsafe(confirmHash, chainIndex)
-          val toGroupConfirmations =
-            getToGroupConfirmationsUnsafe(confirmHash, chainIndex)
-          Some(
-            Confirmed(
-              chainStatus.index,
-              confirmations,
-              fromGroupConfirmations,
-              toGroupConfirmations
+          val confirmHash      = chainStatus.index.hash
+          val conflictedTxsOpt = getConflictedTxsFromBlockUnsafe(confirmHash)
+          val isConflictedTx   = conflictedTxsOpt.exists(_.contains(txId))
+          if (isConflictedTx) {
+            Some(BlockFlowState.Conflicted)
+          } else {
+            val fromGroupConfirmations =
+              getFromGroupConfirmationsUnsafe(confirmHash, chainIndex)
+            val toGroupConfirmations =
+              getToGroupConfirmationsUnsafe(confirmHash, chainIndex)
+            Some(
+              Confirmed(
+                chainStatus.index,
+                confirmations,
+                fromGroupConfirmations,
+                toGroupConfirmations
+              )
             )
-          )
+          }
         }
       }
     }

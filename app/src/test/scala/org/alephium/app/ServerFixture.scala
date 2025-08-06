@@ -391,7 +391,7 @@ object ServerFixture {
     override def getTxConfirmedStatus(
         txId: TransactionId,
         chainIndex: ChainIndex
-    ): IOResult[Option[BlockFlowState.Confirmed]] = {
+    ): IOResult[Option[BlockFlowState.TxStatus]] = {
       assume(brokerConfig.contains(chainIndex.from))
       if (chainIndex == blockChainIndex) {
         Right(Some(BlockFlowState.Confirmed(TxIndex(block.hash, 0), 1, 2, 3)))

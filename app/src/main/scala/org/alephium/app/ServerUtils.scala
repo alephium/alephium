@@ -528,6 +528,8 @@ class ServerUtils(implicit
           confirmed.fromGroupConfirmations,
           confirmed.toGroupConfirmations
         )
+      case Some(BlockFlowState.Conflicted) =>
+        Conflicted()
       case Some(BlockFlowState.MemPooled) =>
         MemPooled()
       case None =>
@@ -615,29 +617,11 @@ class ServerUtils(implicit
       contractEventsByBlockHash <- getEventsByBlockHash(blockFlow, hash)
     } yield RichBlockAndEvents(blockEntry, contractEventsByBlockHash.events)
 
-  private[app] def getConflictedTxsFromBlockUnsafe(
-      blockFlow: BlockFlow,
-      blockHash: BlockHash
-  ): Option[AVector[TransactionId]] = {
-    val storage = blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex
-    storage.getOptUnsafe(blockHash) match {
-      case Some(sources) =>
-        if (sources.isEmpty) {
-          None
-        } else {
-          val txs =
-            sources.find(source => blockFlow.isBlockInMainChainUnsafe(source.intraBlock)).map(_.txs)
-          Some(txs.getOrElse(sources.head.txs))
-        }
-      case None => None
-    }
-  }
-
   private def getConflictedTxsFromBlock(
       blockFlow: BlockFlow,
       blockHash: BlockHash
   ): Try[Option[AVector[TransactionId]]] =
-    wrapResult(IOUtils.tryExecute(getConflictedTxsFromBlockUnsafe(blockFlow, blockHash)))
+    wrapResult(IOUtils.tryExecute(blockFlow.getConflictedTxsFromBlockUnsafe(blockHash)))
 
   private def getRichTransactionsFromBlock(
       blockFlow: BlockFlow,
