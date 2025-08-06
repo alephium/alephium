@@ -5343,8 +5343,13 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val block0 = transfer(blockFlow, chainIndex0, nextBlockTs)
     val block1 = transfer(blockFlow, chainIndex1, nextBlockTs)
+    addAndCheck(blockFlow, block1)
 
-    addAndCheck(blockFlow, block0, block1)
+    val block2 =
+      transfer(blockFlow, chainIndex1, nextBlockTs) // it uses the conflicted tx from block1
+    addAndCheck(blockFlow, block2)
+
+    addAndCheck(blockFlow, block0)
     addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs))
     addAndCheck(
       blockFlow,
@@ -5357,21 +5362,33 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "return empty inputs/outputs for conflicted txs" in new ConflictedTxsFixture {
     private def checkConflictedTx(tx: Transaction) = {
-      val result = serverUtils.getTransaction(blockFlow, tx.id, None, None).rightValue
-      result.unsigned.inputs.isEmpty is true
-      result.unsigned.fixedOutputs.isEmpty is true
-      result is api.Transaction.fromProtocol(tx, isConflicted = true)
+      val result0 = serverUtils.getTransaction(blockFlow, tx.id, None, None).rightValue
+      result0.unsigned.inputs.isEmpty is true
+      result0.unsigned.fixedOutputs.isEmpty is true
+      result0 is api.Transaction.fromProtocol(tx, isConflicted = true)
+
+      val result1 = serverUtils.getRichTransaction(blockFlow, tx.id, None, None).rightValue
+      result1.unsigned.inputs.isEmpty is true
+      result1.unsigned.fixedOutputs.isEmpty is true
+      result1 is api.RichTransaction.from(tx, AVector.empty, AVector.empty, isConflicted = true)
     }
 
-    private def checkNonConflictedTx(tx: Transaction) = {
-      val result = serverUtils.getTransaction(blockFlow, tx.id, None, None).rightValue
-      result.unsigned.inputs.nonEmpty is true
-      result.unsigned.fixedOutputs.nonEmpty is true
-      result is api.Transaction.fromProtocol(tx, isConflicted = false)
+    private def checkNonConflictedTx(tx: Transaction, blockHash: BlockHash) = {
+      val result0 = serverUtils.getTransaction(blockFlow, tx.id, None, None).rightValue
+      result0.unsigned.inputs.nonEmpty is true
+      result0.unsigned.fixedOutputs.nonEmpty is true
+      result0 is api.Transaction.fromProtocol(tx, isConflicted = false)
+
+      val result1 = serverUtils.getRichTransaction(blockFlow, tx.id, None, None).rightValue
+      result1.unsigned.inputs.nonEmpty is true
+      result1.unsigned.fixedOutputs.nonEmpty is true
+      val richInputs = serverUtils.getRichAssetInputs(blockFlow, tx, blockHash).rightValue
+      result1 is api.RichTransaction.from(tx, richInputs, AVector.empty, isConflicted = false)
     }
 
-    checkNonConflictedTx(block0.nonCoinbase.head)
+    checkNonConflictedTx(block0.nonCoinbase.head, block0.hash)
     checkConflictedTx(block1.nonCoinbase.head)
+    checkConflictedTx(block2.nonCoinbase.head)
   }
 
   it should "ignore conflicted txs in block response" in new ConflictedTxsFixture {
@@ -5416,6 +5433,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     checkBlockWithoutConflictedTxs(block0)
     checkBlockWithConflictedTxs(block1, AVector(block1.nonCoinbase.head.id))
+    checkBlockWithConflictedTxs(block2, AVector(block2.nonCoinbase.head.id))
   }
 
   it should "return conflicted tx status" in new ConflictedTxsFixture {

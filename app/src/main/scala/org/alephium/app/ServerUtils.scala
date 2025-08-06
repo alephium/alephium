@@ -646,11 +646,15 @@ class ServerUtils(implicit
       spentBlockHash: BlockHash,
       isConflicted: Boolean
   ): Try[RichTransaction] = {
-    for {
-      assetInputs    <- getRichAssetInputs(blockFlow, transaction, spentBlockHash)
-      contractInputs <- getRichContractInputs(blockFlow, transaction, spentBlockHash)
-    } yield {
-      RichTransaction.from(transaction, assetInputs, contractInputs, isConflicted)
+    if (isConflicted) {
+      Right(RichTransaction.from(transaction, AVector.empty, AVector.empty, isConflicted))
+    } else {
+      for {
+        assetInputs    <- getRichAssetInputs(blockFlow, transaction, spentBlockHash)
+        contractInputs <- getRichContractInputs(blockFlow, transaction, spentBlockHash)
+      } yield {
+        RichTransaction.from(transaction, assetInputs, contractInputs, isConflicted)
+      }
     }
   }
 
