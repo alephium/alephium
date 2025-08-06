@@ -524,6 +524,14 @@ class ServerUtils(implicit
           confirmed.fromGroupConfirmations,
           confirmed.toGroupConfirmations
         )
+      case Some(conflicted: BlockFlowState.Conflicted) =>
+        Conflicted(
+          conflicted.index.hash,
+          conflicted.index.index,
+          conflicted.chainConfirmations,
+          conflicted.fromGroupConfirmations,
+          conflicted.toGroupConfirmations
+        )
       case Some(BlockFlowState.MemPooled) =>
         MemPooled()
       case None =>

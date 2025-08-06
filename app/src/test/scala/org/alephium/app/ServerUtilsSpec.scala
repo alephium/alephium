@@ -5317,6 +5317,94 @@ class ServerUtilsSpec extends AlephiumSpec {
       ) is true
   }
 
+  trait ConflictedTxsFixture extends Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.node.indexes.tx-output-ref-index", "true")
+    )
+
+    var now = TimeStamp.now()
+    def nextBlockTs: TimeStamp = {
+      val newTs = now.plusMillisUnsafe(1)
+      now = newTs
+      newTs
+    }
+
+    val chainIndex0 = ChainIndex.unsafe(0, 1)
+    val chainIndex1 = ChainIndex.unsafe(0, 2)
+
+    val block0 = transfer(blockFlow, chainIndex0, nextBlockTs)
+    val block1 = transfer(blockFlow, chainIndex1, nextBlockTs)
+    addAndCheck(blockFlow, block1)
+
+    val block2 =
+      transfer(blockFlow, chainIndex1, nextBlockTs) // it uses the conflicted tx from block1
+    addAndCheck(blockFlow, block2)
+
+    addAndCheck(blockFlow, block0)
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs))
+    addAndCheck(
+      blockFlow,
+      emptyBlock(blockFlow, ChainIndex.unsafe(1, 1), nextBlockTs),
+      emptyBlock(blockFlow, ChainIndex.unsafe(2, 2), nextBlockTs)
+    )
+
+    val serverUtils = new ServerUtils()
+  }
+
+  it should "return conflicted tx status" in new ConflictedTxsFixture {
+    val tx0 = block0.transactions.head.id
+    val tx1 = block0.transactions.last.id
+    serverUtils.getTransactionStatus(blockFlow, tx0, block0.chainIndex).rightValue is a[Confirmed]
+    serverUtils.getTransactionStatus(blockFlow, tx1, block0.chainIndex).rightValue is a[Confirmed]
+    val tx2 = block1.transactions.head.id
+    val tx3 = block1.transactions.last.id
+    serverUtils.getTransactionStatus(blockFlow, tx2, block1.chainIndex).rightValue is Conflicted(
+      block1.hash,
+      txIndex = 0,
+      chainConfirmations = 2,
+      fromGroupConfirmations = 1,
+      toGroupConfirmations = 1
+    )
+    serverUtils.getTransactionStatus(blockFlow, tx3, block1.chainIndex).rightValue is a[Confirmed]
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, block1.chainIndex, nextBlockTs))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(2, 2), nextBlockTs))
+    serverUtils.getTransactionStatus(blockFlow, tx2, block1.chainIndex).rightValue is Conflicted(
+      block1.hash,
+      txIndex = 0,
+      chainConfirmations = 3,
+      fromGroupConfirmations = 2,
+      toGroupConfirmations = 2
+    )
+  }
+
+  it should "return correct status if the conflicted tx is only on the fork chain" in new ConflictedTxsFixture {
+    val blockFlow1 = isolatedBlockFlow()
+    addAndCheck(blockFlow1, block1, block2)
+
+    val blocks = (0 until 3).flatMap { _ =>
+      brokerConfig.chainIndexes.map { chainIndex =>
+        val block = emptyBlock(blockFlow1, chainIndex, nextBlockTs)
+        addAndCheck(blockFlow1, block)
+        block
+      }
+    }
+
+    blockFlow.isBlockInMainChainUnsafe(block0.hash) is true
+    blockFlow.isBlockInMainChainUnsafe(block1.hash) is true
+    blockFlow.isBlockInMainChainUnsafe(block2.hash) is true
+    val tx = block1.nonCoinbase.head.id
+    serverUtils.getTransactionStatus(blockFlow, tx, block1.chainIndex).rightValue is a[Conflicted]
+
+    addAndCheck(blockFlow, blocks: _*)
+    blockFlow.isBlockInMainChainUnsafe(block0.hash) is false
+    blockFlow.isBlockInMainChainUnsafe(block1.hash) is true
+    blockFlow.isBlockInMainChainUnsafe(block2.hash) is true
+    serverUtils.getTransactionStatus(blockFlow, tx, block1.chainIndex).rightValue is a[Confirmed]
+  }
+
   it should "get rich transaction that spends asset output" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.node.indexes.tx-output-ref-index", "true")
