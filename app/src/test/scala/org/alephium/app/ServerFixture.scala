@@ -74,7 +74,7 @@ trait ServerFixture
   lazy val dummyBlockHeader =
     blockGen.sample.get.header.copy(timestamp = (TimeStamp.now() - Duration.ofMinutes(5).get).get)
   lazy val dummyBlock      = blockGen.sample.get.copy(header = dummyBlockHeader)
-  lazy val dummyBlockEntry = BlockEntry.from(dummyBlock, 1, None).rightValue
+  lazy val dummyBlockEntry = BlockEntry.from(dummyBlock, 1).rightValue
   lazy val dummyFetchResponse = BlocksPerTimeStampRange(
     AVector(AVector(dummyBlockEntry))
   )
@@ -450,9 +450,9 @@ object ServerFixture {
     override def getTransaction(
         txId: TransactionId,
         chainIndex: ChainIndex
-    ): Either[String, Option[(Transaction, BlockHash)]] = {
+    ): Either[String, Option[Transaction]] = {
       if (brokerConfig.chainIndexes.contains(chainIndex) && txId == dummyTx.id) {
-        Right(Some((dummyTx, block.hash)))
+        Right(Some(dummyTx))
       } else {
         Right(None)
       }
@@ -461,9 +461,9 @@ object ServerFixture {
     override def searchTransaction(
         txId: TransactionId,
         chainIndexes: AVector[ChainIndex]
-    ): Either[String, Option[(Transaction, BlockHash)]] = {
+    ): Either[String, Option[Transaction]] = {
       if (chainIndexes.exists(brokerConfig.chainIndexes.contains) && txId == dummyTx.id) {
-        Right(Some((dummyTx, block.hash)))
+        Right(Some(dummyTx))
       } else {
         Right(None)
       }

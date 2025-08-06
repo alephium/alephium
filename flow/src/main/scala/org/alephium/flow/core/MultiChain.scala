@@ -187,13 +187,10 @@ trait MultiChain extends BlockPool with BlockHeaderPool with FlowDifficultyAdjus
   }
 
   def isBlockInMainChain(blockHash: BlockHash): IOResult[Boolean] = {
-    IOUtils.tryExecute(isBlockInMainChainUnsafe(blockHash))
-  }
-
-  def isBlockInMainChainUnsafe(blockHash: BlockHash): Boolean = {
-    val height = getHeightUnsafe(blockHash)
-    val hashes = getHeaderChain(ChainIndex.from(blockHash)).getHashesUnsafe(height)
-    hashes.headOption.contains(blockHash)
+    for {
+      height <- getHeight(blockHash)
+      hashes <- getHashes(ChainIndex.from(blockHash), height)
+    } yield hashes.headOption.contains(blockHash)
   }
 
   private def getMainChainBlockByGhostUncleUnsafe(

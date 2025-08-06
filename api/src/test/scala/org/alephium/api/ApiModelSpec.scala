@@ -1646,8 +1646,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode UnsignedTx" in {
-    val unsignedTx0 = UnsignedTx.fromProtocol(unsignedTransaction, isConflicted = false)
-    val jsonRaw0 =
+    val unsignedTx = UnsignedTx.fromProtocol(unsignedTransaction)
+    val jsonRaw =
       s"""
          |{
          |  "txId": "${unsignedTransaction.id.toHexString}",
@@ -1656,31 +1656,15 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},
          |  "gasAmount": ${minimalGas.value},
          |  "gasPrice": "${nonCoinbaseMinGasPrice.value}",
-         |  "inputs": ${write(unsignedTx0.inputs)},
-         |  "fixedOutputs": ${write(unsignedTx0.fixedOutputs)}
+         |  "inputs": ${write(unsignedTx.inputs)},
+         |  "fixedOutputs": ${write(unsignedTx.fixedOutputs)}
          |}""".stripMargin
 
-    checkData(unsignedTx0, jsonRaw0)
-
-    val unsignedTx1 = UnsignedTx.fromProtocol(unsignedTransaction, isConflicted = true)
-    val jsonRaw1 =
-      s"""
-         |{
-         |  "txId": "${unsignedTransaction.id.toHexString}",
-         |  "version": ${unsignedTransaction.version},
-         |  "networkId": ${unsignedTransaction.networkId.id},
-         |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},
-         |  "gasAmount": ${minimalGas.value},
-         |  "gasPrice": "${nonCoinbaseMinGasPrice.value}",
-         |  "inputs": [],
-         |  "fixedOutputs": []
-         |}""".stripMargin
-
-    checkData(unsignedTx1, jsonRaw1)
+    checkData(unsignedTx, jsonRaw)
   }
 
   it should "encode/decode Transaction" in {
-    val tx = api.Transaction.fromProtocol(transaction, isConflicted = false)
+    val tx = api.Transaction.fromProtocol(transaction)
     val jsonRaw = s"""
                      |{
                      |  "unsigned": ${write(tx.unsigned)},
@@ -1695,7 +1679,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "calc output ref correctly" in {
-    val tx = api.Transaction.fromProtocol(transaction, isConflicted = false)
+    val tx = api.Transaction.fromProtocol(transaction)
     tx.unsigned.fixedOutputs.zipWithIndex.foreach { case (output, index) =>
       output.key is transaction.fixedOutputRefs(index).key.value
     }
