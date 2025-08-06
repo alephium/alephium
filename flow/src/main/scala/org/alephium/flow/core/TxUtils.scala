@@ -1466,7 +1466,7 @@ trait TxUtils { Self: FlowUtils =>
   def getTransaction(
       txId: TransactionId,
       chainIndex: ChainIndex
-  ): Either[String, Option[Transaction]] = {
+  ): Either[String, Option[(Transaction, BlockHash)]] = {
     if (brokerConfig.contains(chainIndex.from)) {
       val chain = Self.blockFlow.getBlockChain(chainIndex)
       chain.getTransaction(txId).left.map(_.toString)
@@ -1478,7 +1478,7 @@ trait TxUtils { Self: FlowUtils =>
   def searchTransaction(
       txId: TransactionId,
       chainIndexes: AVector[ChainIndex]
-  ): Either[String, Option[Transaction]] = {
+  ): Either[String, Option[(Transaction, BlockHash)]] = {
     searchByIndexes(txId, chainIndexes, getTransaction)
   }
 

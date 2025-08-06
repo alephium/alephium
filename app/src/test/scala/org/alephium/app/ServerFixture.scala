@@ -450,9 +450,9 @@ object ServerFixture {
     override def getTransaction(
         txId: TransactionId,
         chainIndex: ChainIndex
-    ): Either[String, Option[Transaction]] = {
+    ): Either[String, Option[(Transaction, BlockHash)]] = {
       if (brokerConfig.chainIndexes.contains(chainIndex) && txId == dummyTx.id) {
-        Right(Some(dummyTx))
+        Right(Some((dummyTx, block.hash)))
       } else {
         Right(None)
       }
@@ -461,9 +461,9 @@ object ServerFixture {
     override def searchTransaction(
         txId: TransactionId,
         chainIndexes: AVector[ChainIndex]
-    ): Either[String, Option[Transaction]] = {
+    ): Either[String, Option[(Transaction, BlockHash)]] = {
       if (chainIndexes.exists(brokerConfig.chainIndexes.contains) && txId == dummyTx.id) {
-        Right(Some(dummyTx))
+        Right(Some((dummyTx, block.hash)))
       } else {
         Right(None)
       }

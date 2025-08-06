@@ -5405,6 +5405,33 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.getTransactionStatus(blockFlow, tx, block1.chainIndex).rightValue is a[Confirmed]
   }
 
+  it should "return empty rich inputs for conflicted txs" in new ConflictedTxsFixture {
+    private def checkTx(tx: Transaction) = {
+      val result = serverUtils.getTransaction(blockFlow, tx.id, None, None).rightValue
+      result.unsigned.inputs.isEmpty is false
+      result.unsigned.fixedOutputs.isEmpty is false
+      result is api.Transaction.fromProtocol(tx)
+    }
+
+    val tx0 = block0.nonCoinbase.head
+    val tx1 = block1.nonCoinbase.head
+    val tx2 = block2.nonCoinbase.head
+
+    checkTx(tx0)
+    checkTx(tx1)
+    checkTx(tx2)
+
+    val richTx0     = serverUtils.getRichTransaction(blockFlow, tx0.id, None, None).rightValue
+    val richInputs0 = serverUtils.getRichAssetInputs(blockFlow, tx0, block0.hash).rightValue
+    richTx0 is api.RichTransaction.from(tx0, richInputs0, AVector.empty)
+
+    val richTx1 = serverUtils.getRichTransaction(blockFlow, tx1.id, None, None).rightValue
+    richTx1 is api.RichTransaction.from(tx1, richInputs0, AVector.empty)
+
+    val richTx2 = serverUtils.getRichTransaction(blockFlow, tx2.id, None, None).rightValue
+    richTx2 is api.RichTransaction.from(tx2, AVector.empty, AVector.empty)
+  }
+
   it should "get rich transaction that spends asset output" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.node.indexes.tx-output-ref-index", "true")

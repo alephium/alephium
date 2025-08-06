@@ -52,7 +52,6 @@ import org.alephium.protocol.model.{Balance => _, ContractOutput => ProtocolCont
 import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
 import org.alephium.protocol.vm.{failed => _, BlockHash => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
-import org.alephium.protocol.vm.nodeindexes.TxIdTxOutputLocators
 import org.alephium.ralph
 import org.alephium.ralph.{CompiledContract, Compiler, Testing}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
@@ -663,16 +662,16 @@ class ServerUtils(implicit
       transaction: Transaction,
       spentBlockHash: BlockHash
   ): Try[AVector[RichAssetInput]] = {
-    transaction.unsigned.inputs.mapE { assetInput =>
+    transaction.unsigned.inputs.foldE(AVector.empty[RichAssetInput]) { case (acc, input) =>
       for {
-        txOutputOpt <- wrapResult(blockFlow.getTxOutput(assetInput.outputRef, spentBlockHash))
-        richInput <- txOutputOpt match {
+        txOutputOpt <- wrapResult(blockFlow.getTxOutput(input.outputRef, spentBlockHash))
+        richInputs <- txOutputOpt match {
           case Some((txId, txOutput)) =>
-            Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput], txId))
-          case None =>
-            Left(notFound(s"Transaction output for asset output reference ${assetInput.outputRef}"))
+            val richInput = RichInput.from(input, txOutput.asInstanceOf[AssetOutput], txId)
+            Right(acc :+ richInput)
+          case None => Right(acc)
         }
-      } yield richInput
+      } yield richInputs
     }
   }
 
@@ -784,35 +783,10 @@ class ServerUtils(implicit
       toGroup: Option[GroupIndex]
   ): Try[model.RichTransaction] = {
     for {
-      blockHash       <- getBlockHashForTransaction(blockFlow, txId)
-      transaction     <- getTransactionAndConvert(blockFlow, txId, fromGroup, toGroup, identity)
+      txInfo <- getTransactionInfo(blockFlow, txId, fromGroup, toGroup)
+      (transaction, blockHash) = txInfo
       richTransaction <- getRichTransaction(blockFlow, transaction, blockHash)
     } yield richTransaction
-  }
-
-  def getBlockHashForTransaction(blockFlow: BlockFlow, txId: TransactionId): Try[BlockHash] = {
-    val outputRef = TxOutputRef.key(txId, 0)
-    for {
-      locatorsOpt <- wrapResult(blockFlow.getTxIdTxOutputLocatorsFromOutputRef(outputRef))
-      locators <- locatorsOpt.toRight(
-        notFound(s"Transaction id for output ref ${outputRef.value.toHexString}")
-      )
-      mainchainBlockHash <- getMainChainBlockHashFromOutputLocators(blockFlow, locators)
-    } yield mainchainBlockHash
-  }
-
-  def getMainChainBlockHashFromOutputLocators(
-      blockFlow: BlockFlow,
-      locators: TxIdTxOutputLocators
-  ): Try[BlockHash] = {
-    for {
-      locatorOpt <- locators.txOutputLocators.findE(locator =>
-        isBlockInMainChain(blockFlow, locator.blockHash)
-      )
-      locator <- locatorOpt.toRight(
-        notFound(s"Main chain block hash for ${locators.txId}")
-      )
-    } yield locator.blockHash
   }
 
   def getRawTransaction(
@@ -830,13 +804,12 @@ class ServerUtils(implicit
     )
   }
 
-  def getTransactionAndConvert[T](
+  private def getTransactionInfo(
       blockFlow: BlockFlow,
       txId: TransactionId,
       fromGroup: Option[GroupIndex],
-      toGroup: Option[GroupIndex],
-      convert: Transaction => T
-  ): Try[T] = {
+      toGroup: Option[GroupIndex]
+  ): Try[(Transaction, BlockHash)] = {
     val result = (fromGroup, toGroup) match {
       case (Some(from), Some(to)) =>
         blockFlow.getTransaction(txId, ChainIndex(from, to)).left.map(failed)
@@ -848,10 +821,19 @@ class ServerUtils(implicit
     }
 
     result.flatMap {
-      case Some(tx) => Right(convert(tx))
-      case None     => Left(notFound(s"Transaction ${txId.toHexString}"))
+      case Some(result) => Right(result)
+      case None         => Left(notFound(s"Transaction ${txId.toHexString}"))
     }
   }
+
+  def getTransactionAndConvert[T](
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      fromGroup: Option[GroupIndex],
+      toGroup: Option[GroupIndex],
+      convert: Transaction => T
+  ): Try[T] =
+    getTransactionInfo(blockFlow, txId, fromGroup, toGroup).map(info => convert(info._1))
 
   def getEventsByTxId(
       blockFlow: BlockFlow,
