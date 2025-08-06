@@ -4061,7 +4061,8 @@
                             "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                             "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                           }
-                        ]
+                        ],
+                        "conflictedTxs": []
                       }
                     ]
                   ]
@@ -4303,7 +4304,8 @@
                               "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                               "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                             }
-                          ]
+                          ],
+                          "conflictedTxs": []
                         },
                         "events": [
                           {
@@ -4551,7 +4553,8 @@
                               "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                               "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                             }
-                          ]
+                          ],
+                          "conflictedTxs": []
                         },
                         "events": [
                           {
@@ -4796,7 +4799,8 @@
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                     }
-                  ]
+                  ],
+                  "conflictedTxs": []
                 }
               }
             }
@@ -5020,7 +5024,8 @@
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                     }
-                  ]
+                  ],
+                  "conflictedTxs": []
                 }
               }
             }
@@ -5245,7 +5250,8 @@
                         "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                         "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                       }
-                    ]
+                    ],
+                    "conflictedTxs": []
                   },
                   "events": [
                     {
@@ -5476,7 +5482,8 @@
                         "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                         "miner": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
                       }
-                    ]
+                    ],
+                    "conflictedTxs": []
                   },
                   "events": [
                     {
@@ -13957,7 +13964,8 @@
           "depStateHash",
           "txsHash",
           "target",
-          "ghostUncles"
+          "ghostUncles",
+          "conflictedTxs"
         ],
         "properties": {
           "hash": {
@@ -14016,6 +14024,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/GhostUncleBlockEntry"
+            }
+          },
+          "conflictedTxs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "32-byte-hash"
             }
           }
         }
@@ -15562,6 +15577,43 @@
           }
         }
       },
+      "Conflicted": {
+        "title": "Conflicted",
+        "type": "object",
+        "required": [
+          "blockHash",
+          "txIndex",
+          "chainConfirmations",
+          "fromGroupConfirmations",
+          "toGroupConfirmations",
+          "type"
+        ],
+        "properties": {
+          "blockHash": {
+            "type": "string",
+            "format": "block-hash"
+          },
+          "txIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainConfirmations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fromGroupConfirmations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroupConfirmations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "Constant": {
         "title": "Constant",
         "type": "object",
@@ -16743,7 +16795,8 @@
           "depStateHash",
           "txsHash",
           "target",
-          "ghostUncles"
+          "ghostUncles",
+          "conflictedTxs"
         ],
         "properties": {
           "hash": {
@@ -16802,6 +16855,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/GhostUncleBlockEntry"
+            }
+          },
+          "conflictedTxs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "32-byte-hash"
             }
           }
         }
@@ -17625,6 +17685,9 @@
             "$ref": "#/components/schemas/Confirmed"
           },
           {
+            "$ref": "#/components/schemas/Conflicted"
+          },
+          {
             "$ref": "#/components/schemas/MemPooled"
           },
           {
@@ -17635,6 +17698,7 @@
           "propertyName": "type",
           "mapping": {
             "Confirmed": "#/components/schemas/Confirmed",
+            "Conflicted": "#/components/schemas/Conflicted",
             "MemPooled": "#/components/schemas/MemPooled",
             "TxNotFound": "#/components/schemas/TxNotFound"
           }
