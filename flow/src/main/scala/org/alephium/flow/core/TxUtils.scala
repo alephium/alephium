@@ -1283,10 +1283,27 @@ trait TxUtils { Self: FlowUtils =>
     chain.isTxConfirmed(txId)
   }
 
-  def getTxConfirmedStatus(
+  def getConflictedTxsFromBlock(blockHash: BlockHash): IOResult[Option[AVector[TransactionId]]] = {
+    IOUtils.tryExecute(getConflictedTxsFromBlockUnsafe(blockHash))
+  }
+
+  def getConflictedTxsFromBlockUnsafe(blockHash: BlockHash): Option[AVector[TransactionId]] = {
+    val storage = blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex
+    storage.getOptUnsafe(blockHash) match {
+      case Some(sources) =>
+        if (sources.isEmpty) {
+          None
+        } else {
+          sources.find(source => blockFlow.isBlockInMainChainUnsafe(source.intraBlock)).map(_.txs)
+        }
+      case None => None
+    }
+  }
+
+  def getTxConfirmationStatus(
       txId: TransactionId,
       chainIndex: ChainIndex
-  ): IOResult[Option[Confirmed]] =
+  ): IOResult[Option[TxStatus]] =
     IOUtils.tryExecute {
       assume(brokerConfig.contains(chainIndex.from))
       val chain = getBlockChain(chainIndex)
@@ -1300,14 +1317,27 @@ trait TxUtils { Self: FlowUtils =>
             getFromGroupConfirmationsUnsafe(confirmHash, chainIndex)
           val toGroupConfirmations =
             getToGroupConfirmationsUnsafe(confirmHash, chainIndex)
-          Some(
-            Confirmed(
-              chainStatus.index,
-              confirmations,
-              fromGroupConfirmations,
-              toGroupConfirmations
+          val conflictedTxsOpt = getConflictedTxsFromBlockUnsafe(confirmHash)
+          val isConflictedTx   = conflictedTxsOpt.exists(_.contains(txId))
+          if (isConflictedTx) {
+            Some(
+              BlockFlowState.Conflicted(
+                chainStatus.index,
+                confirmations,
+                fromGroupConfirmations,
+                toGroupConfirmations
+              )
             )
-          )
+          } else {
+            Some(
+              Confirmed(
+                chainStatus.index,
+                confirmations,
+                fromGroupConfirmations,
+                toGroupConfirmations
+              )
+            )
+          }
         }
       }
     }
@@ -1399,7 +1429,7 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, Option[TxStatus]] = {
     if (brokerConfig.contains(chainIndex.from)) {
       for {
-        status <- getTxConfirmedStatus(txId, chainIndex)
+        status <- getTxConfirmationStatus(txId, chainIndex)
           .map[Option[TxStatus]] {
             case Some(status) => Some(status)
             case None         => if (isInMemPool(txId, chainIndex)) Some(MemPooled) else None

@@ -20,9 +20,10 @@ import akka.util.ByteString
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.model.{Block, BlockHash}
+import org.alephium.protocol.model.{Block, BlockHash, TransactionId}
 import org.alephium.util.{AVector, TimeStamp}
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class RichBlockEntry(
     hash: BlockHash,
     timestamp: TimeStamp,
@@ -36,14 +37,16 @@ final case class RichBlockEntry(
     depStateHash: Hash,
     txsHash: Hash,
     target: ByteString,
-    ghostUncles: AVector[GhostUncleBlockEntry]
+    ghostUncles: AVector[GhostUncleBlockEntry],
+    conflictedTxs: Option[AVector[TransactionId]] = None
 )
 
 object RichBlockEntry {
   def from(
       block: Block,
       height: Int,
-      transactions: AVector[RichTransaction]
+      transactions: AVector[RichTransaction],
+      conflictedTxs: Option[AVector[TransactionId]]
   )(implicit
       networkConfig: NetworkConfig
   ): Either[String, RichBlockEntry] = {
@@ -71,7 +74,8 @@ object RichBlockEntry {
         depStateHash = block.header.depStateHash,
         txsHash = block.header.txsHash,
         target = block.header.target.bits,
-        ghostUncles = ghostUncleBlockData
+        ghostUncles = ghostUncleBlockData,
+        conflictedTxs = conflictedTxs
       )
     )
   }

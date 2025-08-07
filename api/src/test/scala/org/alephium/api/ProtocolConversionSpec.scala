@@ -63,12 +63,12 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
   it should "convert UnsignedTransaction" in new Fixture {
     checkData[UnsignedTx, protocol.UnsignedTransaction](
       unsignedTransaction,
-      UnsignedTx.fromProtocol(_, isConflicted = false),
+      UnsignedTx.fromProtocol,
       _.toProtocol().rightValue
     )
 
     UnsignedTx
-      .fromProtocol(unsignedTransaction, isConflicted = false)
+      .fromProtocol(unsignedTransaction)
       .copy(txId = protocol.TransactionId.random)
       .toProtocol()
       .leftValue is "Invalid hash"
@@ -77,7 +77,7 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
   it should "convert Transaction" in new Fixture {
     checkData[Transaction, protocol.Transaction](
       transaction,
-      Transaction.fromProtocol(_, isConflicted = false),
+      Transaction.fromProtocol,
       _.toProtocol().rightValue
     )
   }
@@ -100,7 +100,7 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
 
       checkData[Transaction, protocol.Transaction](
         tx,
-        Transaction.fromProtocol(_, isConflicted = false),
+        Transaction.fromProtocol,
         _.toProtocol().rightValue
       )
     }

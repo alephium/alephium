@@ -45,7 +45,7 @@ import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.flow.mempool.MemPool._
-import org.alephium.io.{IOError, IOResult, IOUtils}
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.{vm, ALPH, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.{Balance => _, ContractOutput => ProtocolContractOutput, _}
@@ -80,6 +80,18 @@ class ServerUtils(implicit
     } yield blocks
   }
 
+  private def getConflictedTxsFromBlock(
+      blockFlow: BlockFlow,
+      blockHash: BlockHash
+  ): Try[Option[AVector[TransactionId]]] =
+    wrapResult(blockFlow.getConflictedTxsFromBlock(blockHash))
+
+  private def getBlockEntry(blockFlow: BlockFlow, block: Block, height: Int): Try[BlockEntry] = {
+    getConflictedTxsFromBlock(blockFlow, block.hash).flatMap { conflictedTxs =>
+      BlockEntry.from(block, height, conflictedTxs).left.map(failed)
+    }
+  }
+
   def getBlocks(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[BlocksPerTimeStampRange] = {
     getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
       heightedBlocks
@@ -87,12 +99,6 @@ class ServerUtils(implicit
           getBlockEntry(blockFlow, block, height)
         })
         .map(BlocksPerTimeStampRange.apply)
-    }
-  }
-
-  private def getBlockEntry(blockFlow: BlockFlow, block: Block, height: Int): Try[BlockEntry] = {
-    getConflictedTxsFromBlock(blockFlow, block.hash).flatMap { conflictedTxs =>
-      BlockEntry.from(block, height, conflictedTxs).left.map(failed)
     }
   }
 
@@ -104,9 +110,8 @@ class ServerUtils(implicit
       heightedBlocks
         .mapE(_._2.mapE { case (block, height) =>
           for {
-            conflictedTxs <- getConflictedTxsFromBlock(blockFlow, block.hash)
-            blockEntry    <- BlockEntry.from(block, height, conflictedTxs).left.map(failed)
-            events        <- getEventsByBlockHash(blockFlow, blockEntry.hash)
+            blockEntry <- getBlockEntry(blockFlow, block, height)
+            events     <- getEventsByBlockHash(blockFlow, blockEntry.hash)
           } yield {
             BlockAndEvents(blockEntry, events.events)
           }
@@ -124,9 +129,15 @@ class ServerUtils(implicit
       heightedBlocks
         .mapE(_._2.mapE { case (block, height) =>
           for {
-            transactions <- getRichTransactionsFromBlock(blockFlow, block)
-            blockEntry   <- RichBlockEntry.from(block, height, transactions).left.map(failed)
-            events       <- getEventsByBlockHash(blockFlow, blockEntry.hash)
+            transactions <- block.transactions.mapE(tx =>
+              getRichTransaction(blockFlow, tx, block.hash)
+            )
+            conflictedTxs <- getConflictedTxsFromBlock(blockFlow, block.hash)
+            blockEntry <- RichBlockEntry
+              .from(block, height, transactions, conflictedTxs)
+              .left
+              .map(failed)
+            events <- getEventsByBlockHash(blockFlow, blockEntry.hash)
           } yield {
             RichBlockAndEvents(blockEntry, events.events)
           }
@@ -528,6 +539,14 @@ class ServerUtils(implicit
           confirmed.fromGroupConfirmations,
           confirmed.toGroupConfirmations
         )
+      case Some(conflicted: BlockFlowState.Conflicted) =>
+        Conflicted(
+          conflicted.index.hash,
+          conflicted.index.index,
+          conflicted.chainConfirmations,
+          conflicted.fromGroupConfirmations,
+          conflicted.toGroupConfirmations
+        )
       case Some(BlockFlowState.MemPooled) =>
         MemPooled()
       case None =>
@@ -610,63 +629,22 @@ class ServerUtils(implicit
         .getHeight(block.header)
         .left
         .map(failedInIO)
-      transactions              <- getRichTransactionsFromBlock(blockFlow, block)
-      blockEntry                <- RichBlockEntry.from(block, height, transactions).left.map(failed)
+      transactions  <- block.transactions.mapE(tx => getRichTransaction(blockFlow, tx, hash))
+      conflictedTxs <- getConflictedTxsFromBlock(blockFlow, block.hash)
+      blockEntry <- RichBlockEntry.from(block, height, transactions, conflictedTxs).left.map(failed)
       contractEventsByBlockHash <- getEventsByBlockHash(blockFlow, hash)
     } yield RichBlockAndEvents(blockEntry, contractEventsByBlockHash.events)
-
-  private[app] def getConflictedTxsFromBlockUnsafe(
-      blockFlow: BlockFlow,
-      blockHash: BlockHash
-  ): Option[AVector[TransactionId]] = {
-    val storage = blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex
-    storage.getOptUnsafe(blockHash) match {
-      case Some(sources) =>
-        if (sources.isEmpty) {
-          None
-        } else {
-          val txs =
-            sources.find(source => blockFlow.isBlockInMainChainUnsafe(source.intraBlock)).map(_.txs)
-          Some(txs.getOrElse(sources.head.txs))
-        }
-      case None => None
-    }
-  }
-
-  private def getConflictedTxsFromBlock(
-      blockFlow: BlockFlow,
-      blockHash: BlockHash
-  ): Try[Option[AVector[TransactionId]]] =
-    wrapResult(IOUtils.tryExecute(getConflictedTxsFromBlockUnsafe(blockFlow, blockHash)))
-
-  private def getRichTransactionsFromBlock(
-      blockFlow: BlockFlow,
-      block: Block
-  ): Try[AVector[RichTransaction]] = {
-    for {
-      conflictedTxsOpt <- getConflictedTxsFromBlock(blockFlow, block.hash)
-      filtered = conflictedTxsOpt match {
-        case None => block.transactions
-        case Some(conflictedTxs) =>
-          block.transactions.filterNot(tx => conflictedTxs.contains(tx.id))
-      }
-      transactions <- filtered.mapE(tx =>
-        getRichTransaction(blockFlow, tx, block.hash, isConflicted = false)
-      )
-    } yield transactions
-  }
 
   private[app] def getRichTransaction(
       blockFlow: BlockFlow,
       transaction: Transaction,
-      spentBlockHash: BlockHash,
-      isConflicted: Boolean
+      spentBlockHash: BlockHash
   ): Try[RichTransaction] = {
     for {
       assetInputs    <- getRichAssetInputs(blockFlow, transaction, spentBlockHash)
       contractInputs <- getRichContractInputs(blockFlow, transaction, spentBlockHash)
     } yield {
-      RichTransaction.from(transaction, assetInputs, contractInputs, isConflicted)
+      RichTransaction.from(transaction, assetInputs, contractInputs)
     }
   }
 
@@ -701,16 +679,16 @@ class ServerUtils(implicit
       transaction: Transaction,
       spentBlockHash: BlockHash
   ): Try[AVector[RichAssetInput]] = {
-    transaction.unsigned.inputs.mapE { assetInput =>
+    transaction.unsigned.inputs.foldE(AVector.empty[RichAssetInput]) { case (acc, input) =>
       for {
-        txOutputOpt <- wrapResult(blockFlow.getTxOutput(assetInput.outputRef, spentBlockHash))
-        richInput <- txOutputOpt match {
+        txOutputOpt <- wrapResult(blockFlow.getTxOutput(input.outputRef, spentBlockHash))
+        richInputs <- txOutputOpt match {
           case Some((txId, txOutput)) =>
-            Right(RichInput.from(assetInput, txOutput.asInstanceOf[AssetOutput], txId))
-          case None =>
-            Left(notFound(s"Transaction output for asset output reference ${assetInput.outputRef}"))
+            val richInput = RichInput.from(input, txOutput.asInstanceOf[AssetOutput], txId)
+            Right(acc :+ richInput)
+          case None => Right(acc)
         }
-      } yield richInput
+      } yield richInputs
     }
   }
 
@@ -806,9 +784,13 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.Transaction] = {
-    getTransactionInfo(blockFlow, txId, fromGroup, toGroup).map { case (tx, _, isConflicted) =>
-      model.Transaction.fromProtocol(tx, isConflicted)
-    }
+    getTransactionAndConvert(
+      blockFlow,
+      txId,
+      fromGroup,
+      toGroup,
+      tx => model.Transaction.fromProtocol(tx)
+    )
   }
 
   def getRichTransaction(
@@ -817,10 +799,11 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.RichTransaction] = {
-    getTransactionInfo(blockFlow, txId, fromGroup, toGroup).flatMap {
-      case (tx, blockHash, isConflicted) =>
-        getRichTransaction(blockFlow, tx, blockHash, isConflicted)
-    }
+    for {
+      txInfo <- getTransactionInfo(blockFlow, txId, fromGroup, toGroup)
+      (transaction, blockHash) = txInfo
+      richTransaction <- getRichTransaction(blockFlow, transaction, blockHash)
+    } yield richTransaction
   }
 
   def getRawTransaction(
@@ -829,25 +812,16 @@ class ServerUtils(implicit
       fromGroup: Option[GroupIndex],
       toGroup: Option[GroupIndex]
   ): Try[model.RawTransaction] = {
-    getTransactionAndBlockHash(blockFlow, txId, fromGroup, toGroup).map { case (tx, _) =>
-      RawTransaction(serialize(tx))
-    }
+    getTransactionAndConvert(
+      blockFlow,
+      txId,
+      fromGroup,
+      toGroup,
+      tx => RawTransaction(serialize(tx))
+    )
   }
 
   private def getTransactionInfo(
-      blockFlow: BlockFlow,
-      txId: TransactionId,
-      fromGroup: Option[GroupIndex],
-      toGroup: Option[GroupIndex]
-  ): Try[(Transaction, BlockHash, Boolean)] = {
-    for {
-      result <- getTransactionAndBlockHash(blockFlow, txId, fromGroup, toGroup)
-      (tx, blockHash) = result
-      conflictedTxs <- getConflictedTxsFromBlock(blockFlow, blockHash)
-    } yield (tx, blockHash, conflictedTxs.exists(_.contains(txId)))
-  }
-
-  private def getTransactionAndBlockHash(
       blockFlow: BlockFlow,
       txId: TransactionId,
       fromGroup: Option[GroupIndex],
@@ -862,11 +836,21 @@ class ServerUtils(implicit
         }
         blockFlow.searchTransaction(txId, chainIndexes).left.map(failed)
     }
+
     result.flatMap {
       case Some(result) => Right(result)
       case None         => Left(notFound(s"Transaction ${txId.toHexString}"))
     }
   }
+
+  def getTransactionAndConvert[T](
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      fromGroup: Option[GroupIndex],
+      toGroup: Option[GroupIndex],
+      convert: Transaction => T
+  ): Try[T] =
+    getTransactionInfo(blockFlow, txId, fromGroup, toGroup).map(info => convert(info._1))
 
   def getEventsByTxId(
       blockFlow: BlockFlow,

@@ -31,6 +31,7 @@ import org.alephium.protocol.model.{
 }
 import org.alephium.util.{AVector, TimeStamp}
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BlockEntry(
     hash: BlockHash,
     timestamp: TimeStamp,
@@ -44,7 +45,8 @@ final case class BlockEntry(
     depStateHash: Hash,
     txsHash: Hash,
     target: ByteString,
-    ghostUncles: AVector[GhostUncleBlockEntry]
+    ghostUncles: AVector[GhostUncleBlockEntry],
+    conflictedTxs: Option[AVector[TransactionId]] = None
 ) {
   def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, Block] = {
     for {
@@ -76,7 +78,7 @@ final case class BlockEntry(
 }
 
 object BlockEntry {
-  def from(block: Block, height: Int, conflictedTxsOpt: Option[AVector[TransactionId]])(implicit
+  def from(block: Block, height: Int, conflictedTxs: Option[AVector[TransactionId]])(implicit
       networkConfig: NetworkConfig
   ): Either[String, BlockEntry] = {
     val ghostUncleBlockDataEither = {
@@ -89,10 +91,6 @@ object BlockEntry {
         }
       }
     }
-    val filtered = conflictedTxsOpt match {
-      case None                => block.transactions
-      case Some(conflictedTxs) => block.transactions.filterNot(tx => conflictedTxs.contains(tx.id))
-    }
     ghostUncleBlockDataEither.map(ghostUncleBlockData =>
       BlockEntry(
         hash = block.header.hash,
@@ -101,13 +99,14 @@ object BlockEntry {
         chainTo = block.header.chainIndex.to.value,
         height = height,
         deps = block.header.blockDeps.deps,
-        transactions = filtered.map(Transaction.fromProtocol(_, isConflicted = false)),
+        transactions = block.transactions.map(Transaction.fromProtocol(_)),
         nonce = block.header.nonce.value,
         version = block.header.version,
         depStateHash = block.header.depStateHash,
         txsHash = block.header.txsHash,
         target = block.header.target.bits,
-        ghostUncles = ghostUncleBlockData
+        ghostUncles = ghostUncleBlockData,
+        conflictedTxs = conflictedTxs
       )
     )
   }

@@ -49,7 +49,7 @@ class MultisigTest extends AlephiumActorSpec {
 
     decodedTx.fromGroup is unsignedTx.fromGroup.value
     decodedTx.toGroup is unsignedTx.toGroup.value
-    decodedTx.unsignedTx is UnsignedTx.fromProtocol(unsignedTx, isConflicted = false)
+    decodedTx.unsignedTx is UnsignedTx.fromProtocol(unsignedTx)
 
     val submitTx = submitTransaction(buildTxResult, privateKey).head
     request[ApiError.InternalServerError](
@@ -322,7 +322,7 @@ class MultisigTest extends AlephiumActorSpec {
 
       decodedTx.fromGroup is unsignedTx.fromGroup.value
       decodedTx.toGroup is unsignedTx.toGroup.value
-      decodedTx.unsignedTx is UnsignedTx.fromProtocol(unsignedTx, isConflicted = false)
+      decodedTx.unsignedTx is UnsignedTx.fromProtocol(unsignedTx)
 
       val submitMultisigTx = signAndSubmitMultisigTransaction(buildTxResult, unlockPrivKeys)
       assume(submitMultisigTx.length == 1)
