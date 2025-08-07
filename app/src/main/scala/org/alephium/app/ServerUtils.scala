@@ -83,8 +83,8 @@ class ServerUtils(implicit
   private def getConflictedTxsFromBlock(
       blockFlow: BlockFlow,
       blockHash: BlockHash
-  ): Try[AVector[TransactionId]] =
-    wrapResult(blockFlow.getConflictedTxsFromBlock(blockHash).map(_.getOrElse(AVector.empty)))
+  ): Try[Option[AVector[TransactionId]]] =
+    wrapResult(blockFlow.getConflictedTxsFromBlock(blockHash))
 
   private def getBlockEntry(blockFlow: BlockFlow, block: Block, height: Int): Try[BlockEntry] = {
     getConflictedTxsFromBlock(blockFlow, block.hash).flatMap { conflictedTxs =>

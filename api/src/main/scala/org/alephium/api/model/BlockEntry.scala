@@ -31,6 +31,7 @@ import org.alephium.protocol.model.{
 }
 import org.alephium.util.{AVector, TimeStamp}
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BlockEntry(
     hash: BlockHash,
     timestamp: TimeStamp,
@@ -45,7 +46,7 @@ final case class BlockEntry(
     txsHash: Hash,
     target: ByteString,
     ghostUncles: AVector[GhostUncleBlockEntry],
-    conflictedTxs: AVector[TransactionId]
+    conflictedTxs: Option[AVector[TransactionId]] = None
 ) {
   def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, Block] = {
     for {
@@ -77,7 +78,7 @@ final case class BlockEntry(
 }
 
 object BlockEntry {
-  def from(block: Block, height: Int, conflictedTxs: AVector[TransactionId])(implicit
+  def from(block: Block, height: Int, conflictedTxs: Option[AVector[TransactionId]])(implicit
       networkConfig: NetworkConfig
   ): Either[String, BlockEntry] = {
     val ghostUncleBlockDataEither = {

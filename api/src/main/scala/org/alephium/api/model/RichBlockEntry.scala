@@ -23,6 +23,7 @@ import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model.{Block, BlockHash, TransactionId}
 import org.alephium.util.{AVector, TimeStamp}
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class RichBlockEntry(
     hash: BlockHash,
     timestamp: TimeStamp,
@@ -37,7 +38,7 @@ final case class RichBlockEntry(
     txsHash: Hash,
     target: ByteString,
     ghostUncles: AVector[GhostUncleBlockEntry],
-    conflictedTxs: AVector[TransactionId]
+    conflictedTxs: Option[AVector[TransactionId]]
 )
 
 object RichBlockEntry {
@@ -45,7 +46,7 @@ object RichBlockEntry {
       block: Block,
       height: Int,
       transactions: AVector[RichTransaction],
-      conflictedTxs: AVector[TransactionId]
+      conflictedTxs: Option[AVector[TransactionId]]
   )(implicit
       networkConfig: NetworkConfig
   ): Either[String, RichBlockEntry] = {

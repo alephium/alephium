@@ -4726,7 +4726,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     block.ghostUncleHashes.rightValue is AVector(ghostUncleHash)
     addAndCheck(blockFlow, block)
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).rightValue is
-      BlockEntry.from(block, blockFlow.getHeightUnsafe(block.hash), AVector.empty).rightValue
+      BlockEntry.from(block, blockFlow.getHeightUnsafe(block.hash), None).rightValue
 
     val invalidBlockHash = randomBlockHash(chainIndex)
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, invalidBlockHash).leftValue.detail is
@@ -4742,7 +4742,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val block            = emptyBlock(blockFlow, chainIndex)
     addAndCheck(blockFlow, block)
     serverUtils.getBlock(blockFlow, block.hash).rightValue is BlockEntry
-      .from(block, 1, AVector.empty)
+      .from(block, 1, None)
       .rightValue
     serverUtils.getBlock(blockFlow, invalidBlockHash).leftValue.detail is
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
@@ -4753,7 +4753,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         .rightValue
     serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue is RichBlockAndEvents(
       RichBlockEntry
-        .from(block, 1, transactions, AVector.empty)
+        .from(block, 1, transactions, None)
         .rightValue,
       AVector.empty
     )
@@ -5290,7 +5290,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils
       .getRichBlockAndEvents(blockFlow, block.hash)
       .rightValue is RichBlockAndEvents(
-      RichBlockEntry.from(block, 1, transactions, AVector.empty).rightValue,
+      RichBlockEntry.from(block, 1, transactions, None).rightValue,
       AVector.empty
     )
   }
@@ -5386,10 +5386,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     private def checkBlockWithConflictedTxs(block: Block, conflictedTxs: AVector[TransactionId]) = {
       assume(conflictedTxs.nonEmpty)
       val result0 = serverUtils.getBlock(blockFlow, block.hash).rightValue
-      result0.conflictedTxs is conflictedTxs
+      result0.conflictedTxs is Some(conflictedTxs)
 
       val result1 = serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue
-      result1.block.conflictedTxs is conflictedTxs
+      result1.block.conflictedTxs is Some(conflictedTxs)
 
       val timeInterval = TimeInterval(block.timestamp, block.timestamp)
       val result2      = serverUtils.getBlocks(blockFlow, timeInterval).rightValue
@@ -5602,7 +5602,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, scriptBlock.hash))
         .rightValue
       RichBlockAndEvents(
-        RichBlockEntry.from(scriptBlock, height, richTxs, AVector.empty).rightValue,
+        RichBlockEntry.from(scriptBlock, height, richTxs, None).rightValue,
         AVector(ContractEventByBlockHash(scriptTransaction.id, contractAddress, 0, AVector.empty))
       )
     }

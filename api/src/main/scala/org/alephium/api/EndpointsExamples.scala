@@ -189,7 +189,7 @@ trait EndpointsExamples extends ErrorExamples {
     hash,
     hash.bytes,
     AVector(ghostUncleBlockEntry),
-    AVector.empty
+    None
   )
 
   private lazy val richTransaction = RichTransaction(
@@ -234,7 +234,7 @@ trait EndpointsExamples extends ErrorExamples {
     hash,
     hash.bytes,
     AVector(ghostUncleBlockEntry),
-    AVector.empty
+    None
   )
 
   private val eventByBlockHash = ContractEventByBlockHash(

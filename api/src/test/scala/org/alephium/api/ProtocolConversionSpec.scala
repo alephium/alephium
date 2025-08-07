@@ -116,9 +116,7 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
       checkData[BlockEntry, protocol.Block](
         block,
         BlockEntry
-          .from(_, 0, AVector.empty)(
-            NetworkConfigFixture.PreRhone
-          ) // height not needed for protocol
+          .from(_, 0, None)(NetworkConfigFixture.PreRhone) // height not needed for protocol
           .rightValue,
         _.toProtocol().rightValue
       )
@@ -133,7 +131,7 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
 
     genesis.isGenesis is true
     genesis.transactions.isEmpty is true
-    BlockEntry.from(genesis, 0, AVector.empty).isRight is true
+    BlockEntry.from(genesis, 0, None).isRight is true
   }
 
   trait Fixture extends ApiModelFixture {
