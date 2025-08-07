@@ -19,7 +19,7 @@ package org.alephium.flow.network.sync
 import scala.collection.mutable
 import scala.util.Random
 
-import org.alephium.flow.core.maxSyncBlocksPerChain
+import org.alephium.flow.network.{MaxRequestNum, SimpleRateLimiter}
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.SyncState.{BlockBatch, BlockDownloadTask}
 import org.alephium.flow.setting.NetworkSetting
@@ -31,12 +31,11 @@ import org.alephium.util.{ActorRefT, AVector}
 object BrokerStatusTracker {
   type BrokerActor = ActorRefT[BrokerHandler.Command]
 
-  val MaxRequestNum: Int = maxSyncBlocksPerChain * 16
-
   final class BrokerStatus(
       val info: BrokerInfo,
       val version: P2PVersion,
-      private[sync] val tips: FlattenIndexedArray[ChainTip]
+      private[sync] val tips: FlattenIndexedArray[ChainTip],
+      private[sync] val rateLimiter: SimpleRateLimiter
   ) {
     private[sync] var requestNum   = 0
     private[sync] val pendingTasks = mutable.Set.empty[BlockDownloadTask]
@@ -51,7 +50,8 @@ object BrokerStatusTracker {
     def canDownload(task: BlockDownloadTask)(implicit groupConfig: GroupConfig): Boolean = {
       requestNum < MaxRequestNum &&
       !pendingTasks.contains(task) &&
-      !missOrUnableDownload(task.chainIndex, task.id)
+      !missOrUnableDownload(task.chainIndex, task.id) &&
+      rateLimiter.tryRequest(task.size)
     }
     def addPendingTask(task: BlockDownloadTask): Unit = {
       requestNum += task.size
@@ -117,14 +117,16 @@ object BrokerStatusTracker {
       requestNum = 0
       pendingTasks.clear()
       missedBlocks.clear()
+      rateLimiter.clear()
     }
   }
 
   object BrokerStatus {
     def apply(info: BrokerInfo, version: P2PVersion)(implicit
-        groupConfig: GroupConfig
+        groupConfig: GroupConfig,
+        networkSetting: NetworkSetting
     ): BrokerStatus = {
-      new BrokerStatus(info, version, FlattenIndexedArray.empty)
+      new BrokerStatus(info, version, FlattenIndexedArray.empty, SimpleRateLimiter.default)
     }
   }
 }

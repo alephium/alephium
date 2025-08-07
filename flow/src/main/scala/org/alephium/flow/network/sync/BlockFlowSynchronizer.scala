@@ -21,7 +21,7 @@ import java.net.InetSocketAddress
 import scala.collection.mutable
 import scala.util.Random
 
-import akka.actor.{ActorSystem, Props, Terminated}
+import akka.actor.{ActorSystem, Cancellable, Props, Terminated}
 import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
@@ -69,6 +69,7 @@ object BlockFlowSynchronizer {
   final case class UpdateBlockDownloaded(
       result: AVector[(SyncState.BlockDownloadTask, AVector[Block], Boolean)]
   ) extends V2Command
+  case object ContinueDownload extends V2Command
   final case class AddFlowData[T <: FlowData](datas: AVector[T], dataOrigin: DataOrigin)
       extends Command
 }
@@ -241,6 +242,9 @@ trait BlockFlowSynchronizerV2 extends SyncState with BlockFlowSynchronizerV1 {
 
     case BlockFlowSynchronizer.UpdateBlockDownloaded(result) =>
       handleBlockDownloaded(result)
+
+    case BlockFlowSynchronizer.ContinueDownload =>
+      downloadBlocks()
 
     case event: ChainHandler.FlowDataValidationEvent =>
       onBlockProcessedV2(event)
@@ -506,6 +510,8 @@ trait SyncState { _: BlockFlowSynchronizer =>
     downloadBlocks()
   }
 
+  private[sync] var continueDownloadTask: Option[Cancellable] = None
+
   private[sync] def downloadBlocks(): Unit = {
     val chains = syncingChains.array.collect {
       case Some(chain) if !chain.isTaskQueueEmpty => chain
@@ -518,6 +524,18 @@ trait SyncState { _: BlockFlowSynchronizer =>
           s"Trying to download blocks from ${remoteAddress(brokerActor)}, tasks: ${SyncState.showTasks(tasks)}"
         )
         brokerActor ! BrokerHandler.DownloadBlockTasks(tasks)
+      }
+      continueDownloadTask.foreach(_.cancel())
+      continueDownloadTask = if (allTasks.isEmpty) {
+        Some(
+          scheduleCancellable(
+            self,
+            BlockFlowSynchronizer.ContinueDownload,
+            RateLimiterWindowSize.divUnsafe(2)
+          )
+        )
+      } else {
+        None
       }
     }
   }

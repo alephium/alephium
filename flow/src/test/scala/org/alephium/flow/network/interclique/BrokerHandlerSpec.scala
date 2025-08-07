@@ -30,7 +30,7 @@ import org.scalacheck.Gen
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.{maxForkDepth, BlockFlow}
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils, TxHandler}
-import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.network.{CliqueManager, MaxRequestNum}
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.flow.network.broker.{InboundBrokerHandler => BaseInboundBrokerHandler}
 import org.alephium.flow.network.broker.{ChainTipInfo, ConnectionHandler, MisbehaviorManager}
@@ -1202,6 +1202,30 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     addAndCheck(blockFlow, blocks.last)
     brokerHandler ! BaseBrokerHandler.Received(InvRequest(blocks.map(b => AVector(b.hash))))
     eventually(brokerHandlerActor.selfSynced is true)
+  }
+
+  it should "ignore block requests due to rate limiting" in new SyncV2Fixture {
+    brokerHandlerActor.rateLimiter.tryRequest(MaxRequestNum - 3)
+
+    val blocks  = genBlocks(4)
+    val heights = AVector((chainIndex, BlockHeightRange.from(1, 2, 1)))
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsRequest(defaultRequestId, heights)
+    )
+    connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
+      val payload = Message
+        .deserialize(message)
+        .rightValue
+        .payload
+        .asInstanceOf[BlocksAndUnclesByHeightsResponse]
+      payload.id is defaultRequestId
+      payload.blocks is AVector(blocks.take(2))
+    }
+
+    brokerHandler ! BaseBrokerHandler.Received(
+      BlocksAndUnclesByHeightsRequest(defaultRequestId, heights)
+    )
+    connectionHandler.expectNoMessage()
   }
 
   it should "get next height" in new Fixture {

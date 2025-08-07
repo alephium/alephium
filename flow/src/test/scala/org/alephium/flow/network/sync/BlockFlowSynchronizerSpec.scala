@@ -26,7 +26,7 @@ import org.scalacheck.Gen
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.{ChainHandler, DependencyHandler, FlowHandler, TestUtils}
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.InterCliqueManager
+import org.alephium.flow.network.{InterCliqueManager, MaxRequestNum}
 import org.alephium.flow.network.broker.{
   BrokerHandler,
   ChainTipInfo,
@@ -856,7 +856,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val chainTips = genChainTips.map(tip => tip.copy(height = Int.MaxValue))
     brokerStatus.updateTips(chainTips)
 
-    val allTasks = allChains.sortBy(_._2.length).reverse.map(_._2.head).slice(0, 7)
+    val allTasks = allChains.sortBy(_._2.length).reverse.map(_._2.head).slice(0, 6)
     blockFlowSynchronizerActor.downloadBlocks()
     probe.expectMsgPF() { case BrokerHandler.DownloadBlockTasks(tasks) => tasks is allTasks }
   }
@@ -1106,6 +1106,30 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.isSynced is true
     chain1.validating.addOne(block.hash)
     blockFlowSynchronizerActor.isSynced is true
+  }
+
+  it should "continue to download blocks" in new BlockFlowSynchronizerV2Fixture {
+    import SyncState._
+
+    val chainIndex                   = ChainIndex.unsafe(0, 0)
+    val (brokerActor, status, probe) = addBroker()
+    val syncingChain                 = addSyncingChain(chainIndex, Int.MaxValue, brokerActor)
+    val task = BlockDownloadTask(chainIndex, 1, 50, Some(emptyBlock(blockFlow, chainIndex).header))
+
+    syncingChain.batchIds.addOne(task.id)
+    syncingChain.taskQueue.addOne(task)
+    blockFlowSynchronizerActor.continueDownloadTask is None
+    probe.expectNoMessage()
+
+    status.requestNum = MaxRequestNum
+    blockFlowSynchronizer ! BlockFlowSynchronizer.ContinueDownload
+    probe.expectNoMessage()
+    blockFlowSynchronizerActor.continueDownloadTask.isDefined is true
+
+    status.requestNum = 0
+    blockFlowSynchronizer ! BlockFlowSynchronizer.ContinueDownload
+    probe.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
+    blockFlowSynchronizerActor.continueDownloadTask is None
   }
 
   it should "ignore v1 commands" in new BlockFlowSynchronizerV2Fixture {
