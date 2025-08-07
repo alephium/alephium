@@ -51,9 +51,9 @@ final case class Transaction(
 }
 
 object Transaction {
-  def fromProtocol(transaction: protocol.Transaction, isConflicted: Boolean): Transaction = {
+  def fromProtocol(transaction: protocol.Transaction): Transaction = {
     Transaction(
-      UnsignedTx.fromProtocol(transaction.unsigned, isConflicted),
+      UnsignedTx.fromProtocol(transaction.unsigned),
       transaction.scriptExecutionOk,
       transaction.contractInputs.map(OutputRef.from),
       transaction.generatedOutputs.zipWithIndex.map { case (out, index) =>

@@ -64,7 +64,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       Hash.zero,
       Hash.zero,
       ByteString.empty,
-      AVector(GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript)))
+      AVector(GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript))),
+      None
     )
   val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo =
@@ -164,6 +165,43 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw =
       s"""{"blocks":[[${blockEntryJson(entries.head)},${blockEntryJson(entries.last)}]]}"""
     checkData(response, jsonRaw)
+  }
+
+  it should "encode/decode RichBlockEntry" in {
+    val entry = RichBlockEntry(
+      BlockHash.zero,
+      TimeStamp.unsafe(0),
+      1,
+      1,
+      1,
+      AVector(BlockHash.zero),
+      AVector.empty,
+      ByteString.empty,
+      1.toByte,
+      Hash.zero,
+      Hash.zero,
+      ByteString.empty,
+      AVector(GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript))),
+      None
+    )
+    val jsonRaw =
+      s"""
+         |{
+         |  "hash":"${entry.hash.toHexString}",
+         |  "timestamp":${entry.timestamp.millis},
+         |  "chainFrom":${entry.chainFrom},
+         |  "chainTo":${entry.chainTo},
+         |  "height":${entry.height},
+         |  "deps":${write(entry.deps.map(_.toHexString))},
+         |  "transactions":${write(entry.transactions)},
+         |  "nonce":"${Hex.toHexString(entry.nonce)}",
+         |  "version":${entry.version},
+         |  "depStateHash":"${entry.depStateHash.toHexString}",
+         |  "txsHash":"${entry.txsHash.toHexString}",
+         |  "target":"${Hex.toHexString(entry.target)}",
+         |  "ghostUncles":${write(entry.ghostUncles)}
+         |}""".stripMargin
+    checkData(entry, jsonRaw)
   }
 
   it should "encode/decode NodeInfo" in {
@@ -1646,8 +1684,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode UnsignedTx" in {
-    val unsignedTx0 = UnsignedTx.fromProtocol(unsignedTransaction, isConflicted = false)
-    val jsonRaw0 =
+    val unsignedTx = UnsignedTx.fromProtocol(unsignedTransaction)
+    val jsonRaw =
       s"""
          |{
          |  "txId": "${unsignedTransaction.id.toHexString}",
@@ -1656,31 +1694,15 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},
          |  "gasAmount": ${minimalGas.value},
          |  "gasPrice": "${nonCoinbaseMinGasPrice.value}",
-         |  "inputs": ${write(unsignedTx0.inputs)},
-         |  "fixedOutputs": ${write(unsignedTx0.fixedOutputs)}
+         |  "inputs": ${write(unsignedTx.inputs)},
+         |  "fixedOutputs": ${write(unsignedTx.fixedOutputs)}
          |}""".stripMargin
 
-    checkData(unsignedTx0, jsonRaw0)
-
-    val unsignedTx1 = UnsignedTx.fromProtocol(unsignedTransaction, isConflicted = true)
-    val jsonRaw1 =
-      s"""
-         |{
-         |  "txId": "${unsignedTransaction.id.toHexString}",
-         |  "version": ${unsignedTransaction.version},
-         |  "networkId": ${unsignedTransaction.networkId.id},
-         |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},
-         |  "gasAmount": ${minimalGas.value},
-         |  "gasPrice": "${nonCoinbaseMinGasPrice.value}",
-         |  "inputs": [],
-         |  "fixedOutputs": []
-         |}""".stripMargin
-
-    checkData(unsignedTx1, jsonRaw1)
+    checkData(unsignedTx, jsonRaw)
   }
 
   it should "encode/decode Transaction" in {
-    val tx = api.Transaction.fromProtocol(transaction, isConflicted = false)
+    val tx = api.Transaction.fromProtocol(transaction)
     val jsonRaw = s"""
                      |{
                      |  "unsigned": ${write(tx.unsigned)},
@@ -1695,7 +1717,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "calc output ref correctly" in {
-    val tx = api.Transaction.fromProtocol(transaction, isConflicted = false)
+    val tx = api.Transaction.fromProtocol(transaction)
     tx.unsigned.fixedOutputs.zipWithIndex.foreach { case (output, index) =>
       output.key is transaction.fixedOutputRefs(index).key.value
     }

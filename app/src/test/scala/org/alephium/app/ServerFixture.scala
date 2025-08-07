@@ -388,7 +388,7 @@ object ServerFixture {
 
     // scalastyle:off no.equal
     val blockChainIndex = ChainIndex.from(block.hash, config.broker.groups)
-    override def getTxConfirmedStatus(
+    override def getTxConfirmationStatus(
         txId: TransactionId,
         chainIndex: ChainIndex
     ): IOResult[Option[BlockFlowState.Confirmed]] = {

@@ -585,7 +585,7 @@ trait EndpointsLogic extends Endpoints {
         DecodeUnsignedTxResult(
           unsignedTx.fromGroup.value,
           unsignedTx.toGroup.value,
-          UnsignedTx.fromProtocol(unsignedTx, isConflicted = false)
+          UnsignedTx.fromProtocol(unsignedTx)
         )
       }
     )

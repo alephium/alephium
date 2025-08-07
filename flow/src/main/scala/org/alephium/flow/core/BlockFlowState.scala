@@ -1039,5 +1039,11 @@ object BlockFlowState {
       toGroupConfirmations: Int
   ) extends TxStatus
 
+  final case class Conflicted(
+      index: TxIndex,
+      chainConfirmations: Int,
+      fromGroupConfirmations: Int,
+      toGroupConfirmations: Int
+  ) extends TxStatus
   final case object MemPooled extends TxStatus
 }

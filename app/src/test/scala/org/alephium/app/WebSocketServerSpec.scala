@@ -68,7 +68,8 @@ class WebSocketServerSpec
           BlockHash.random,
           Address.Asset(LockupScript.p2pkh(PublicKey.generate))
         )
-      )
+      ),
+      None
     )
     val result = writeJs(blockEntry)
     show(result) is write(blockEntry)
