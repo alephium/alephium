@@ -291,13 +291,13 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def tryValidateMoreBlocksFromAllChains(): Unit = {
     val acc = mutable.ArrayBuffer.empty[DownloadedBlock]
-    syncingChains.foreach(_.tryValidateMoreBlocks(acc))
+    syncingChains.foreach(_.tryValidateMoreBlocks(acc, isNodeSynced))
     validateMoreBlocks(acc)
   }
 
   private def tryValidateMoreBlocksFromChain(chainState: SyncStatePerChain): Unit = {
     val acc = mutable.ArrayBuffer.empty[DownloadedBlock]
-    chainState.tryValidateMoreBlocks(acc)
+    chainState.tryValidateMoreBlocks(acc, isNodeSynced)
     validateMoreBlocks(acc)
   }
 
@@ -666,9 +666,10 @@ trait SyncState { _: BlockFlowSynchronizer =>
 object SyncState {
   import BrokerStatusTracker.BrokerActor
 
-  val SkeletonSize: Int = 16
-  val BatchSize: Int    = 128
-  val MaxQueueSize: Int = SkeletonSize * BatchSize
+  val SkeletonSize: Int                  = 16
+  val BatchSize: Int                     = 128
+  val MaxQueueSize: Int                  = SkeletonSize * BatchSize
+  val MaxValidationBlocksWhenSynced: Int = 5
 
   def addToMap[K, V](map: mutable.HashMap[K, mutable.ArrayBuffer[V]], key: K, value: V): Unit = {
     map.get(key) match {
@@ -803,9 +804,13 @@ object SyncState {
       }
     }
 
-    def tryValidateMoreBlocks(acc: mutable.ArrayBuffer[DownloadedBlock]): Unit = {
-      if (validating.size < maxSyncBlocksPerChain && pendingQueue.nonEmpty) {
-        val selected = pendingQueue.view.take(maxSyncBlocksPerChain).map(_._2).toSeq
+    def tryValidateMoreBlocks(
+        acc: mutable.ArrayBuffer[DownloadedBlock],
+        isNodeSynced: Boolean
+    ): Unit = {
+      val size = if (isNodeSynced) MaxValidationBlocksWhenSynced else maxSyncBlocksPerChain
+      if (validating.size < size && pendingQueue.nonEmpty) {
+        val selected = pendingQueue.view.take(size).map(_._2).toSeq
         logger.debug(
           s"Sending more blocks for validation: ${selected.size}, chain index: $chainIndex"
         )

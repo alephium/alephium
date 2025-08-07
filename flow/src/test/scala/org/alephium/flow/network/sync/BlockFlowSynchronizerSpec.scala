@@ -1360,7 +1360,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     state.downloadedBlocks.isEmpty is true
     state.pendingQueue.isEmpty is true
-    state.tryValidateMoreBlocks(acc)
+    state.tryValidateMoreBlocks(acc, false)
     acc.isEmpty is true
 
     val batchId0          = BlockBatch(51, 100)
@@ -1374,20 +1374,27 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     state.onBlockDownloaded(state.originBroker, brokerInfo, batchId0, blocks0)
     state.pendingQueue.size is blocks0.length
-    state.tryValidateMoreBlocks(acc)
+    state.tryValidateMoreBlocks(acc, false)
     acc.toSeq is Seq.from(downloadedBlocks0)
     state.validating.size is acc.length
     state.pendingQueue.isEmpty is true
 
     state.onBlockDownloaded(state.originBroker, brokerInfo, batchId1, blocks1)
     state.pendingQueue.size is blocks1.length
-    state.tryValidateMoreBlocks(acc)
+    state.tryValidateMoreBlocks(acc, false)
     acc.toSeq is Seq.from(downloadedBlocks0)
     state.validating.size is acc.length
     state.pendingQueue.size is blocks1.length
 
     blocks0.foreach(b => state.handleFinalizedBlock(b.hash))
-    state.tryValidateMoreBlocks(acc)
+    state.tryValidateMoreBlocks(acc, true)
+    acc.toSeq is Seq.from(
+      downloadedBlocks0 ++ downloadedBlocks1.take(MaxValidationBlocksWhenSynced)
+    )
+    state.validating.size is MaxValidationBlocksWhenSynced
+    state.pendingQueue.size is blocks1.length - MaxValidationBlocksWhenSynced
+
+    state.tryValidateMoreBlocks(acc, false)
     acc.toSeq is Seq.from(downloadedBlocks0 ++ downloadedBlocks1)
     state.validating.size is blocks1.length
     state.pendingQueue.isEmpty is true
@@ -1406,7 +1413,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     state.onBlockDownloaded(state.originBroker, brokerInfo, batchId, blocks)
     state.pendingQueue.size is downloadedBlocks.length
 
-    state.tryValidateMoreBlocks(mutable.ArrayBuffer.empty)
+    state.tryValidateMoreBlocks(mutable.ArrayBuffer.empty, false)
     state.validating.size is downloadedBlocks.length
     state.pendingQueue.isEmpty is true
 
