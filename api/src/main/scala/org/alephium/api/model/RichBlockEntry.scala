@@ -38,7 +38,7 @@ final case class RichBlockEntry(
     txsHash: Hash,
     target: ByteString,
     ghostUncles: AVector[GhostUncleBlockEntry],
-    conflictedTxs: Option[AVector[TransactionId]]
+    conflictedTxs: Option[AVector[TransactionId]] = None
 )
 
 object RichBlockEntry {

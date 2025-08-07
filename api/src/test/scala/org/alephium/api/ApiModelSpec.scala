@@ -167,6 +167,43 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(response, jsonRaw)
   }
 
+  it should "encode/decode RichBlockEntry" in {
+    val entry = RichBlockEntry(
+      BlockHash.zero,
+      TimeStamp.unsafe(0),
+      1,
+      1,
+      1,
+      AVector(BlockHash.zero),
+      AVector.empty,
+      ByteString.empty,
+      1.toByte,
+      Hash.zero,
+      Hash.zero,
+      ByteString.empty,
+      AVector(GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript))),
+      None
+    )
+    val jsonRaw =
+      s"""
+         |{
+         |  "hash":"${entry.hash.toHexString}",
+         |  "timestamp":${entry.timestamp.millis},
+         |  "chainFrom":${entry.chainFrom},
+         |  "chainTo":${entry.chainTo},
+         |  "height":${entry.height},
+         |  "deps":${write(entry.deps.map(_.toHexString))},
+         |  "transactions":${write(entry.transactions)},
+         |  "nonce":"${Hex.toHexString(entry.nonce)}",
+         |  "version":${entry.version},
+         |  "depStateHash":"${entry.depStateHash.toHexString}",
+         |  "txsHash":"${entry.txsHash.toHexString}",
+         |  "target":"${Hex.toHexString(entry.target)}",
+         |  "ghostUncles":${write(entry.ghostUncles)}
+         |}""".stripMargin
+    checkData(entry, jsonRaw)
+  }
+
   it should "encode/decode NodeInfo" in {
     val nodeInfo =
       NodeInfo(
