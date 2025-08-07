@@ -1300,7 +1300,7 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getTxConfirmedStatus(
+  def getTxConfirmationStatus(
       txId: TransactionId,
       chainIndex: ChainIndex
   ): IOResult[Option[TxStatus]] =
@@ -1429,7 +1429,7 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, Option[TxStatus]] = {
     if (brokerConfig.contains(chainIndex.from)) {
       for {
-        status <- getTxConfirmedStatus(txId, chainIndex)
+        status <- getTxConfirmationStatus(txId, chainIndex)
           .map[Option[TxStatus]] {
             case Some(status) => Some(status)
             case None         => if (isInMemPool(txId, chainIndex)) Some(MemPooled) else None
