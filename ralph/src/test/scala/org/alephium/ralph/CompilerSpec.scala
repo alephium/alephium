@@ -1308,6 +1308,24 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
            |""".stripMargin
       test(code)
     }
+
+    {
+      info("load array elements in different sub scopes")
+      val code =
+        s"""
+           |struct Foo {
+           |  mut a: U256,
+           |  b: [ByteVec; 2]
+           |}
+           |Contract Bar(mut foos: [Foo; 3]) {
+           |  pub fn bar(cond: Bool, index0: U256, index1: U256) -> Foo {
+           |    return if (cond) foos[index0] else foos[index1]
+           |  }
+           |}
+           |""".stripMargin
+
+      compileContract(code).isRight is true
+    }
   }
 
   it should "avoid using array index variables whenever possible" in {
