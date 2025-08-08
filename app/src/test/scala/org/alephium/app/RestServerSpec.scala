@@ -473,7 +473,7 @@ abstract class RestServerSpec(
       ) { response =>
         val tx = response.as[Transaction]
         response.code is StatusCode.Ok
-        tx is Transaction.fromProtocol(dummyTx, isConflicted = false)
+        tx is Transaction.fromProtocol(dummyTx)
       }
 
       verifyResponseWithNodes(
@@ -484,7 +484,7 @@ abstract class RestServerSpec(
       ) { response =>
         val tx = response.as[Transaction]
         response.code is StatusCode.Ok
-        tx is Transaction.fromProtocol(dummyTx, isConflicted = false)
+        tx is Transaction.fromProtocol(dummyTx)
       }
 
       verifyResponseWithNodes(
@@ -495,7 +495,7 @@ abstract class RestServerSpec(
       ) { response =>
         val tx = response.as[Transaction]
         response.code is StatusCode.Ok
-        tx is Transaction.fromProtocol(dummyTx, isConflicted = false)
+        tx is Transaction.fromProtocol(dummyTx)
       }
 
       val txId = TransactionId.generate.toHexString

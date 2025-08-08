@@ -14017,6 +14017,13 @@
             "items": {
               "$ref": "#/components/schemas/GhostUncleBlockEntry"
             }
+          },
+          "conflictedTxs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "32-byte-hash"
+            }
           }
         }
       },
@@ -15562,6 +15569,43 @@
           }
         }
       },
+      "Conflicted": {
+        "title": "Conflicted",
+        "type": "object",
+        "required": [
+          "blockHash",
+          "txIndex",
+          "chainConfirmations",
+          "fromGroupConfirmations",
+          "toGroupConfirmations",
+          "type"
+        ],
+        "properties": {
+          "blockHash": {
+            "type": "string",
+            "format": "block-hash"
+          },
+          "txIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainConfirmations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fromGroupConfirmations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroupConfirmations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "Constant": {
         "title": "Constant",
         "type": "object",
@@ -16803,6 +16847,13 @@
             "items": {
               "$ref": "#/components/schemas/GhostUncleBlockEntry"
             }
+          },
+          "conflictedTxs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "32-byte-hash"
+            }
           }
         }
       },
@@ -17625,6 +17676,9 @@
             "$ref": "#/components/schemas/Confirmed"
           },
           {
+            "$ref": "#/components/schemas/Conflicted"
+          },
+          {
             "$ref": "#/components/schemas/MemPooled"
           },
           {
@@ -17635,6 +17689,7 @@
           "propertyName": "type",
           "mapping": {
             "Confirmed": "#/components/schemas/Confirmed",
+            "Conflicted": "#/components/schemas/Conflicted",
             "MemPooled": "#/components/schemas/MemPooled",
             "TxNotFound": "#/components/schemas/TxNotFound"
           }
