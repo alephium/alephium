@@ -112,12 +112,12 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     case BlockAnnouncement(hash) =>
       // When the node is synced, it should download new blocks only through block announcements.
       // Ignoring them may trigger a new round of synchronization using v2.
-      if (!isSyncingUsingV2 || isNodeSynced) handleBlockAnnouncement(hash)
+      if (!isSyncingUsingV2 || isNearSynced) handleBlockAnnouncement(hash)
 
     case AddFlowData(datas, dataOrigin) =>
       // When the node is synced, it should download new blocks only through block announcements.
       // Ignoring them may trigger a new round of synchronization using v2.
-      if (!isSyncingUsingV2 || isNodeSynced) {
+      if (!isSyncingUsingV2 || isNearSynced) {
         val message = DependencyHandler.AddFlowData(datas, dataOrigin)
         allHandlers.dependencyHandler.tell(message, sender())
       }
@@ -257,6 +257,7 @@ trait BlockFlowSynchronizerV2 extends SyncState with BlockFlowSynchronizerV1 {
   }
 }
 
+// scalastyle:off number.of.methods
 trait SyncState { _: BlockFlowSynchronizer =>
   import BrokerStatusTracker._
   import SyncState._
@@ -265,6 +266,9 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private[sync] val bestChainTips    = FlattenIndexedArray.empty[(BrokerActor, ChainTip)]
   private[sync] val selfChainTips    = FlattenIndexedArray.empty[ChainTip]
   private[sync] val syncingChains    = FlattenIndexedArray.empty[SyncStatePerChain]
+  private var _isNearSynced          = false
+
+  private[sync] def isNearSynced: Boolean = _isNearSynced
 
   def handleBlockDownloaded(
       result: AVector[(BlockDownloadTask, AVector[Block], Boolean)]
@@ -291,13 +295,13 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   private def tryValidateMoreBlocksFromAllChains(): Unit = {
     val acc = mutable.ArrayBuffer.empty[DownloadedBlock]
-    syncingChains.foreach(_.tryValidateMoreBlocks(acc, isNodeSynced))
+    syncingChains.foreach(_.tryValidateMoreBlocks(acc, isNearSynced))
     validateMoreBlocks(acc)
   }
 
   private def tryValidateMoreBlocksFromChain(chainState: SyncStatePerChain): Unit = {
     val acc = mutable.ArrayBuffer.empty[DownloadedBlock]
-    chainState.tryValidateMoreBlocks(acc, isNodeSynced)
+    chainState.tryValidateMoreBlocks(acc, isNearSynced)
     validateMoreBlocks(acc)
   }
 
@@ -368,6 +372,16 @@ trait SyncState { _: BlockFlowSynchronizer =>
         case None => bestChainTips(chainIndex) = (brokerActor, chainTip)
       }
     }
+
+    _isNearSynced = checkIsNearSynced
+  }
+
+  private def checkIsNearSynced: Boolean = {
+    selfChainTips.nonEmpty && selfChainTips.forall { selfTip =>
+      bestChainTips(selfTip.chainIndex).exists { case (_, bestTip) =>
+        (bestTip.height - selfTip.height) < maxSyncBlocksPerChain
+      }
+    }
   }
 
   private def hasBestChainTips: Boolean = {
@@ -378,6 +392,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     chainTips.foreach { chainTip =>
       this.selfChainTips(chainTip.chainIndex) = Some(chainTip)
     }
+    _isNearSynced = checkIsNearSynced
     if (!isSyncingUsingV2) {
       tryStartSync()
     } else if (isSynced) {
@@ -662,6 +677,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 }
+// scalastyle:on number.of.methods
 
 object SyncState {
   import BrokerStatusTracker.BrokerActor
@@ -806,9 +822,9 @@ object SyncState {
 
     def tryValidateMoreBlocks(
         acc: mutable.ArrayBuffer[DownloadedBlock],
-        isNodeSynced: Boolean
+        isNearSynced: Boolean
     ): Unit = {
-      val size = if (isNodeSynced) MaxValidationBlocksWhenSynced else maxSyncBlocksPerChain
+      val size = if (isNearSynced) MaxValidationBlocksWhenSynced else maxSyncBlocksPerChain
       if (validating.size < size && pendingQueue.nonEmpty) {
         val selected = pendingQueue.view.take(size).map(_._2).toSeq
         logger.debug(

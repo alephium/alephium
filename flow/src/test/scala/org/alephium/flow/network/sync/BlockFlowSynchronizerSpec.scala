@@ -272,8 +272,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
     allProbes.dependencyHandler.expectNoMessage()
 
-    blockFlowSynchronizer ! InterCliqueManager.SyncedResult(true)
-    eventually(blockFlowSynchronizerActor.isNodeSynced is true)
+    val chainTips = genChainTips
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(chainTips)
+    blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateChainState(chainTips, false)
+    eventually(blockFlowSynchronizerActor.isNearSynced is true)
     blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
     eventually(
       allProbes.dependencyHandler.expectMsg(
@@ -1157,10 +1159,63 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     probe.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
     probe.expectNoMessage()
 
-    blockFlowSynchronizer ! InterCliqueManager.SyncedResult(true)
-    eventually(blockFlowSynchronizerActor.isNodeSynced is true)
+    val chainTips = genChainTips
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(chainTips)
+    probe.expectMsgPF() { case _: BrokerHandler.SendChainState => true }
+    blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateChainState(chainTips, false)
+    eventually(blockFlowSynchronizerActor.isNearSynced is true)
     probe.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
     probe.expectMsg(BrokerHandler.DownloadBlocks(AVector(blockHash)))
+  }
+
+  it should "check if the node is near synced" in new BlockFlowSynchronizerV2Fixture {
+    blockFlowSynchronizerActor.isNearSynced is false
+
+    blockFlowSynchronizerActor.selfChainTips.isEmpty is true
+    blockFlowSynchronizerActor.bestChainTips.isEmpty is true
+    val selfChainTips0 = genChainTips.map(chainTip => chainTip.copy(height = 10))
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips0)
+    blockFlowSynchronizerActor.selfChainTips.isEmpty is false
+    blockFlowSynchronizerActor.isNearSynced is false
+
+    val (brokerActor0, _, _) = addBroker()
+    blockFlowSynchronizerActor.selfChainTips.reset()
+    val bestChainTips0 =
+      genChainTips.map(chainTip => chainTip.copy(height = 100, weight = Weight(0)))
+    blockFlowSynchronizer.tell(
+      BlockFlowSynchronizer.UpdateChainState(bestChainTips0, false),
+      brokerActor0.ref
+    )
+
+    blockFlowSynchronizerActor.selfChainTips.isEmpty is true
+    blockFlowSynchronizerActor.bestChainTips.isEmpty is false
+    blockFlowSynchronizerActor.isNearSynced is false
+
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips0)
+    blockFlowSynchronizerActor.selfChainTips.isEmpty is false
+    blockFlowSynchronizerActor.isNearSynced is false
+
+    val index          = nextInt(selfChainTips0.length - 1)
+    val chainTip       = selfChainTips0(index)
+    val selfChainTips1 = selfChainTips0.replace(index, chainTip.copy(height = 60))
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips1)
+    blockFlowSynchronizerActor.isNearSynced is false
+
+    val selfChainTips2 = selfChainTips0.map(chainTip => chainTip.copy(height = 60))
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips2)
+    blockFlowSynchronizerActor.isNearSynced is true
+
+    val selfChainTips3 = selfChainTips0.map(chainTip => chainTip.copy(height = 110))
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips3)
+    blockFlowSynchronizerActor.isNearSynced is true
+
+    val bestChainTips1 =
+      bestChainTips0.map(chainTip => chainTip.copy(height = 170, weight = Weight(1)))
+    blockFlowSynchronizer.tell(
+      BlockFlowSynchronizer.UpdateChainState(bestChainTips1, false),
+      brokerActor0.ref
+    )
+    blockFlowSynchronizerActor.isNearSynced is false
   }
 
   behavior of "SyncStatePerChain"
