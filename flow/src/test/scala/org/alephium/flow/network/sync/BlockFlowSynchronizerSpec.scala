@@ -21,11 +21,12 @@ import scala.reflect.ClassTag
 
 import akka.actor.{PoisonPill, Props}
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
+import org.scalacheck.Gen
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.{ChainHandler, DependencyHandler, FlowHandler, TestUtils}
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.InterCliqueManager
+import org.alephium.flow.network.{InterCliqueManager, MaxRequestNum}
 import org.alephium.flow.network.broker.{
   BrokerHandler,
   ChainTipInfo,
@@ -271,8 +272,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
     allProbes.dependencyHandler.expectNoMessage()
 
-    blockFlowSynchronizer ! InterCliqueManager.SyncedResult(true)
-    eventually(blockFlowSynchronizerActor.isNodeSynced is true)
+    val chainTips = genChainTips
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(chainTips)
+    blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateChainState(chainTips, false)
+    eventually(blockFlowSynchronizerActor.isNearSynced is true)
     blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(AVector(block), DataOrigin.Local)
     eventually(
       allProbes.dependencyHandler.expectMsg(
@@ -807,7 +810,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     }
   }
 
-  it should "download blocks from multiple peers" in new BlockFlowSynchronizerV2Fixture {
+  it should "dispatch block download tasks evenly across multiple peers" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
@@ -815,47 +818,22 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       ("alephium.network.enable-p2p-v2", true)
     )
 
-    val (brokerActor0, brokerStatus0, probe0) = addBroker()
-    val (brokerActor1, brokerStatus1, probe1) = addBroker()
-    val allTasks = brokerConfig.chainIndexes.map { chainIndex =>
-      val syncingChain  = addSyncingChain(chainIndex, Int.MaxValue, brokerActor0)
-      val tasksPerChain = genTasks(chainIndex, brokerConfig.chainNum - chainIndex.flattenIndex)
+    val brokers = Seq.fill(32)(addBroker())
+    brokerConfig.chainIndexes.foreach { chainIndex =>
+      val syncingChain  = addSyncingChain(chainIndex, Int.MaxValue, brokers.head._1)
+      val tasksPerChain = genTasks(chainIndex, 6)
       syncingChain.taskQueue.addAll(tasksPerChain)
       tasksPerChain
     }
     val chainTips = genChainTips.map(tip => tip.copy(height = Int.MaxValue))
-    brokerStatus0.updateTips(chainTips)
-    brokerStatus1.updateTips(chainTips)
-
-    val orderedTasks = AVector.from(0 until brokerConfig.chainNum).flatMap { i =>
-      AVector.from(0 until brokerConfig.chainNum).flatMap { j =>
-        val tasksPerChain = allTasks(j)
-        if (tasksPerChain.length > i) {
-          AVector(tasksPerChain(i))
-        } else {
-          AVector.empty[BlockDownloadTask]
-        }
-      }
-    }
+    brokers.foreach(_._2.updateTips(chainTips))
 
     blockFlowSynchronizerActor.downloadBlocks()
-    val broker0Tasks = orderedTasks.slice(0, 7)
-    val broker1Tasks = orderedTasks.slice(7, 14)
-    probe0.expectMsgPF() { case BrokerHandler.DownloadBlockTasks(tasks) =>
-      tasks is broker0Tasks
-    }
-    probe1.expectMsgPF() { case BrokerHandler.DownloadBlockTasks(tasks) =>
-      tasks is broker1Tasks
-    }
-
-    val downloadedBlocks = broker1Tasks.map(task => (task, AVector.empty[Block], true))
-    blockFlowSynchronizer.tell(
-      BlockFlowSynchronizer.UpdateBlockDownloaded(downloadedBlocks),
-      brokerActor1.ref
-    )
-    probe1.expectMsgPF() { case BrokerHandler.DownloadBlockTasks(tasks) =>
-      // chain 0 -> 0 has more tasks
-      tasks is orderedTasks.slice(16, 23)
+    brokers.foreach { broker =>
+      broker._3.expectMsgPF() { case msg: BrokerHandler.DownloadBlockTasks =>
+        msg.tasks.length is 3
+        msg.tasks.foreach(_.size is BatchSize)
+      }
     }
   }
 
@@ -880,39 +858,9 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val chainTips = genChainTips.map(tip => tip.copy(height = Int.MaxValue))
     brokerStatus.updateTips(chainTips)
 
-    val allTasks = allChains.sortBy(_._2.length).reverse.map(_._2.head).slice(0, 7)
+    val allTasks = allChains.sortBy(_._2.length).reverse.map(_._2.head).slice(0, 6)
     blockFlowSynchronizerActor.downloadBlocks()
     probe.expectMsgPF() { case BrokerHandler.DownloadBlockTasks(tasks) => tasks is allTasks }
-  }
-
-  it should "collect tasks in order of broker capacity" in new BlockFlowSynchronizerV2Fixture {
-    import SyncState._
-
-    val brokers      = AVector.from((0 until 4).map(_ => addBroker()))
-    val chainIndex   = ChainIndex.unsafe(0, 0)
-    val syncingChain = addSyncingChain(chainIndex, Int.MaxValue, brokers.head._1)
-    val allTasks     = genTasks(chainIndex, 16)
-    syncingChain.taskQueue.addAll(allTasks)
-
-    val chainTips = genChainTips.map(tip => tip.copy(height = Int.MaxValue))
-    brokers.shuffle().foreachWithIndex { case ((_, status, _), index) =>
-      status.requestNum = MaxRequestNum - (BatchSize * (index + 1))
-      status.updateTips(chainTips)
-    }
-
-    val probes = brokers.sortBy(_._2.requestNum).map(_._3)
-    blockFlowSynchronizerActor.downloadBlocks()
-    val tasksPerBroker = AVector(
-      allTasks.slice(0, 4),
-      allTasks.slice(4, 7),
-      allTasks.slice(7, 9),
-      allTasks.slice(9, 10)
-    )
-    probes.foreachWithIndex { case (probe, index) =>
-      probe.expectMsgPF() { case BrokerHandler.DownloadBlockTasks(tasks) =>
-        tasks is tasksPerBroker(index)
-      }
-    }
   }
 
   it should "handle missed blocks" in new BlockFlowSynchronizerV2Fixture {
@@ -920,16 +868,17 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     val chainIndex                            = ChainIndex.unsafe(0, 0)
     val (brokerActor0, brokerStatus0, probe0) = addBroker()
-    val (brokerActor1, brokerStatus1, probe1) = addBroker()
     val syncingChain = addSyncingChain(chainIndex, Int.MaxValue, brokerActor0)
     val task = BlockDownloadTask(chainIndex, 1, 50, Some(emptyBlock(blockFlow, chainIndex).header))
 
     syncingChain.batchIds.addOne(task.id)
-    brokerStatus1.updateTips(AVector(syncingChain.bestTip))
     syncingChain.taskQueue.addOne(task)
     blockFlowSynchronizerActor.downloadBlocks()
     probe0.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
     syncingChain.taskQueue.isEmpty is true
+
+    val (brokerActor1, brokerStatus1, probe1) = addBroker()
+    brokerStatus1.updateTips(AVector(syncingChain.bestTip))
 
     brokerStatus0.missedBlocks.isEmpty is true
     brokerStatus1.missedBlocks.isEmpty is true
@@ -954,9 +903,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     import SyncState._
 
     val chainIndex                            = ChainIndex.unsafe(0, 0)
-    val brokers                               = Seq.fill(2)(addBroker())
-    val (brokerActor0, brokerStatus0, probe0) = brokers(0)
-    val (brokerActor1, _, probe1)             = brokers(1)
+    val (brokerActor0, brokerStatus0, probe0) = addBroker()
     val selfChainTips                         = genChainTips
     val bestChainTips =
       selfChainTips.replace(0, selfChainTips(0).copy(weight = selfChainTips(0).weight + Weight(1)))
@@ -964,10 +911,11 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val task = BlockDownloadTask(chainIndex, 1, 50, Some(emptyBlock(blockFlow, chainIndex).header))
 
     syncingChain.batchIds.addOne(task.id)
-    brokers.foreach(_._2.updateTips(bestChainTips))
+    brokerStatus0.updateTips(bestChainTips)
     blockFlowSynchronizerActor.isSyncingUsingV2 = true
     selfChainTips.foreach(tip => blockFlowSynchronizerActor.selfChainTips(tip.chainIndex) = tip)
     syncingChain.taskQueue.addOne(task)
+
     blockFlowSynchronizerActor.downloadBlocks()
     probe0.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
     syncingChain.taskQueue.isEmpty is true
@@ -975,6 +923,9 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
       BlockFlowSynchronizer.UpdateChainState(bestChainTips, false),
       brokerActor0.ref
     )
+
+    val (brokerActor1, brokerStatus1, probe1) = addBroker()
+    brokerStatus1.updateTips(bestChainTips)
 
     blockFlowSynchronizer.tell(
       BlockFlowSynchronizer.UpdateBlockDownloaded(AVector((task, AVector.empty, false))),
@@ -985,8 +936,6 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val listener = TestProbe()
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
     watch(brokerActor0.ref)
-
-    brokers.drop(2).foreach(_._2.missedBlocks.update(chainIndex, mutable.Set(task.id)))
 
     EventFilter.debug(start = "Clear syncing state and resync", occurrences = 1).intercept {
       blockFlowSynchronizer.tell(
@@ -1068,11 +1017,12 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
   it should "reschedule download tasks if the peer is terminated" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
 
-    val chainIndex                 = ChainIndex.unsafe(0, 0)
-    val brokers                    = Seq.fill(2)(addBroker())
-    val (_, brokerStatus0, probe0) = brokers(0)
-    val (brokerActor1, _, probe1)  = brokers(1)
-    val syncingChain               = addSyncingChain(chainIndex, Int.MaxValue, brokerActor1)
+    val chainIndex                            = ChainIndex.unsafe(0, 0)
+    val brokers                               = Seq.fill(2)(addBroker())
+    val (_, brokerStatus0, probe0)            = brokers(0)
+    val (brokerActor1, brokerStatus1, probe1) = brokers(1)
+    val syncingChain = addSyncingChain(chainIndex, Int.MaxValue, brokerActor1)
+    brokerStatus1.requestNum = MaxRequestNum
     brokerStatus0.updateTips(AVector(syncingChain.bestTip))
     blockFlowSynchronizerActor.isSyncingUsingV2 = true
 
@@ -1082,6 +1032,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.downloadBlocks()
     probe0.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
     probe1.expectNoMessage()
+    brokerStatus1.requestNum = 0
 
     probe0.ref ! PoisonPill
     eventually(probe1.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task))))
@@ -1159,6 +1110,30 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.isSynced is true
   }
 
+  it should "continue to download blocks" in new BlockFlowSynchronizerV2Fixture {
+    import SyncState._
+
+    val chainIndex                   = ChainIndex.unsafe(0, 0)
+    val (brokerActor, status, probe) = addBroker()
+    val syncingChain                 = addSyncingChain(chainIndex, Int.MaxValue, brokerActor)
+    val task = BlockDownloadTask(chainIndex, 1, 50, Some(emptyBlock(blockFlow, chainIndex).header))
+
+    syncingChain.batchIds.addOne(task.id)
+    syncingChain.taskQueue.addOne(task)
+    blockFlowSynchronizerActor.continueDownloadTask is None
+    probe.expectNoMessage()
+
+    status.requestNum = MaxRequestNum
+    blockFlowSynchronizer ! BlockFlowSynchronizer.ContinueDownload
+    probe.expectNoMessage()
+    blockFlowSynchronizerActor.continueDownloadTask.isDefined is true
+
+    status.requestNum = 0
+    blockFlowSynchronizer ! BlockFlowSynchronizer.ContinueDownload
+    probe.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
+    blockFlowSynchronizerActor.continueDownloadTask is None
+  }
+
   it should "ignore v1 commands" in new BlockFlowSynchronizerV2Fixture {
     import BlockFlowSynchronizer._
 
@@ -1184,10 +1159,63 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     probe.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
     probe.expectNoMessage()
 
-    blockFlowSynchronizer ! InterCliqueManager.SyncedResult(true)
-    eventually(blockFlowSynchronizerActor.isNodeSynced is true)
+    val chainTips = genChainTips
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(chainTips)
+    probe.expectMsgPF() { case _: BrokerHandler.SendChainState => true }
+    blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateChainState(chainTips, false)
+    eventually(blockFlowSynchronizerActor.isNearSynced is true)
     probe.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
     probe.expectMsg(BrokerHandler.DownloadBlocks(AVector(blockHash)))
+  }
+
+  it should "check if the node is near synced" in new BlockFlowSynchronizerV2Fixture {
+    blockFlowSynchronizerActor.isNearSynced is false
+
+    blockFlowSynchronizerActor.selfChainTips.isEmpty is true
+    blockFlowSynchronizerActor.bestChainTips.isEmpty is true
+    val selfChainTips0 = genChainTips.map(chainTip => chainTip.copy(height = 10))
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips0)
+    blockFlowSynchronizerActor.selfChainTips.isEmpty is false
+    blockFlowSynchronizerActor.isNearSynced is false
+
+    val (brokerActor0, _, _) = addBroker()
+    blockFlowSynchronizerActor.selfChainTips.reset()
+    val bestChainTips0 =
+      genChainTips.map(chainTip => chainTip.copy(height = 100, weight = Weight(0)))
+    blockFlowSynchronizer.tell(
+      BlockFlowSynchronizer.UpdateChainState(bestChainTips0, false),
+      brokerActor0.ref
+    )
+
+    blockFlowSynchronizerActor.selfChainTips.isEmpty is true
+    blockFlowSynchronizerActor.bestChainTips.isEmpty is false
+    blockFlowSynchronizerActor.isNearSynced is false
+
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips0)
+    blockFlowSynchronizerActor.selfChainTips.isEmpty is false
+    blockFlowSynchronizerActor.isNearSynced is false
+
+    val index          = nextInt(selfChainTips0.length - 1)
+    val chainTip       = selfChainTips0(index)
+    val selfChainTips1 = selfChainTips0.replace(index, chainTip.copy(height = 60))
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips1)
+    blockFlowSynchronizerActor.isNearSynced is false
+
+    val selfChainTips2 = selfChainTips0.map(chainTip => chainTip.copy(height = 60))
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips2)
+    blockFlowSynchronizerActor.isNearSynced is true
+
+    val selfChainTips3 = selfChainTips0.map(chainTip => chainTip.copy(height = 110))
+    blockFlowSynchronizer ! FlowHandler.UpdateChainState(selfChainTips3)
+    blockFlowSynchronizerActor.isNearSynced is true
+
+    val bestChainTips1 =
+      bestChainTips0.map(chainTip => chainTip.copy(height = 170, weight = Weight(1)))
+    blockFlowSynchronizer.tell(
+      BlockFlowSynchronizer.UpdateChainState(bestChainTips1, false),
+      brokerActor0.ref
+    )
+    blockFlowSynchronizerActor.isNearSynced is false
   }
 
   behavior of "SyncStatePerChain"
@@ -1387,7 +1415,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     state.downloadedBlocks.isEmpty is true
     state.pendingQueue.isEmpty is true
-    state.tryValidateMoreBlocks(acc)
+    state.tryValidateMoreBlocks(acc, false)
     acc.isEmpty is true
 
     val batchId0          = BlockBatch(51, 100)
@@ -1401,20 +1429,27 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     state.onBlockDownloaded(state.originBroker, brokerInfo, batchId0, blocks0)
     state.pendingQueue.size is blocks0.length
-    state.tryValidateMoreBlocks(acc)
+    state.tryValidateMoreBlocks(acc, false)
     acc.toSeq is Seq.from(downloadedBlocks0)
     state.validating.size is acc.length
     state.pendingQueue.isEmpty is true
 
     state.onBlockDownloaded(state.originBroker, brokerInfo, batchId1, blocks1)
     state.pendingQueue.size is blocks1.length
-    state.tryValidateMoreBlocks(acc)
+    state.tryValidateMoreBlocks(acc, false)
     acc.toSeq is Seq.from(downloadedBlocks0)
     state.validating.size is acc.length
     state.pendingQueue.size is blocks1.length
 
     blocks0.foreach(b => state.handleFinalizedBlock(b.hash))
-    state.tryValidateMoreBlocks(acc)
+    state.tryValidateMoreBlocks(acc, true)
+    acc.toSeq is Seq.from(
+      downloadedBlocks0 ++ downloadedBlocks1.take(MaxValidationBlocksWhenSynced)
+    )
+    state.validating.size is MaxValidationBlocksWhenSynced
+    state.pendingQueue.size is blocks1.length - MaxValidationBlocksWhenSynced
+
+    state.tryValidateMoreBlocks(acc, false)
     acc.toSeq is Seq.from(downloadedBlocks0 ++ downloadedBlocks1)
     state.validating.size is blocks1.length
     state.pendingQueue.isEmpty is true
@@ -1433,7 +1468,7 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     state.onBlockDownloaded(state.originBroker, brokerInfo, batchId, blocks)
     state.pendingQueue.size is downloadedBlocks.length
 
-    state.tryValidateMoreBlocks(mutable.ArrayBuffer.empty)
+    state.tryValidateMoreBlocks(mutable.ArrayBuffer.empty, false)
     state.validating.size is downloadedBlocks.length
     state.pendingQueue.isEmpty is true
 
@@ -1515,5 +1550,36 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     testMoveOne(None)
     state.downloadedBlocks.addOne((batchId, AVector.empty))
     testMoveOne(Some(BlockHeightRange.from(128, 256, 128)))
+  }
+
+  it should "test CircularSelector" in {
+    val nums = 0 until 10
+
+    def test(index: Int, num: Int) = {
+      var step     = 0
+      val selector = new SyncState.CircularSelector[Int](nums, index)
+      selector.next { value =>
+        step += 1
+        value == num
+      } is Some(num)
+      if (index <= num) {
+        step is (num - index + 1)
+      } else {
+        step is (nums.length - (index - num) + 1)
+      }
+
+      step = 0
+      selector.next { value =>
+        step += 1
+        value == 10
+      } is None
+      step is 10
+    }
+
+    forAll(Gen.choose(0, 9)) { index =>
+      forAll(Gen.choose(0, 9)) { num =>
+        test(index, num)
+      }
+    }
   }
 }

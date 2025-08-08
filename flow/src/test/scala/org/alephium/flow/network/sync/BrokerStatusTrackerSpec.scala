@@ -20,6 +20,7 @@ import akka.actor.ActorRef
 import akka.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
+import org.alephium.flow.network.MaxRequestNum
 import org.alephium.flow.network.sync.BrokerStatusTracker.BrokerStatus
 import org.alephium.flow.network.sync.SyncState.{BlockBatch, BlockDownloadTask}
 import org.alephium.flow.setting.NetworkSetting
@@ -111,7 +112,7 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
     status.canDownload(task) is false
 
     status.updateTips(genChainTips(5))
-    status.requestNum = BrokerStatusTracker.MaxRequestNum
+    status.requestNum = MaxRequestNum
     status.canDownload(task) is false
     status.requestNum = 0
 
@@ -127,6 +128,14 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
     status.pendingTasks.contains(task) is false
     status.pendingTasks.add(task)
     status.canDownload(task) is false
+
+    status.clear()
+    status.updateTips(genChainTips(Int.MaxValue))
+    val task1 = BlockDownloadTask(ChainIndex.unsafe(0, 0), 1, MaxRequestNum / 2, None)
+    status.canDownload(task1) is true
+    status.canDownload(task1) is true
+    status.requestNum = 0
+    status.canDownload(task1) is false
   }
 
   it should "add/get/remove pending requests" in new BrokerStatusFixture {
