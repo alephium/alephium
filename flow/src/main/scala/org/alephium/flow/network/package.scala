@@ -17,6 +17,8 @@
 package org.alephium.flow
 
 import org.alephium.flow.core.maxSyncBlocksPerChain
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.model.NetworkId
 import org.alephium.util.Duration
 
 package object network {
@@ -25,4 +27,12 @@ package object network {
   val RateLimiterWindowSizeMainnet: Duration = Duration.ofSecondsUnsafe(30)
   val RateLimiterWindowSize: Duration        = Duration.ofSecondsUnsafe(10)
   // scalastyle:on magic.number
+
+  def getRateLimiterWindowSize(implicit networkSetting: NetworkSetting): Duration = {
+    if (networkSetting.networkId == NetworkId.AlephiumMainNet) {
+      RateLimiterWindowSizeMainnet
+    } else {
+      RateLimiterWindowSize
+    }
+  }
 }

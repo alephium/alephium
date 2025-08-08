@@ -17,7 +17,6 @@
 package org.alephium.flow.network
 
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.model.NetworkId
 import org.alephium.util.{Duration, TimeStamp}
 
 final class SimpleRateLimiter(maxRequests: Int, windowSize: Duration) {
@@ -54,11 +53,6 @@ object SimpleRateLimiter {
     new SimpleRateLimiter(maxRequests, windowSize)
 
   def default(implicit networkSetting: NetworkSetting): SimpleRateLimiter = {
-    val windowSize = if (networkSetting.networkId == NetworkId.AlephiumMainNet) {
-      RateLimiterWindowSizeMainnet
-    } else {
-      RateLimiterWindowSize
-    }
-    SimpleRateLimiter(MaxRequestNum, windowSize)
+    SimpleRateLimiter(MaxRequestNum, getRateLimiterWindowSize)
   }
 }

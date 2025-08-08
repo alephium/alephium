@@ -546,7 +546,7 @@ trait SyncState { _: BlockFlowSynchronizer =>
           scheduleCancellable(
             self,
             BlockFlowSynchronizer.ContinueDownload,
-            RateLimiterWindowSize.divUnsafe(2)
+            getRateLimiterWindowSize.divUnsafe(2)
           )
         )
       } else {
