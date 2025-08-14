@@ -1290,15 +1290,19 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def getConflictedTxsFromBlockUnsafe(blockHash: BlockHash): Option[AVector[TransactionId]] = {
-    val storage = blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex
-    storage.getOptUnsafe(blockHash) match {
-      case Some(sources) =>
-        if (sources.isEmpty) {
-          None
-        } else {
-          sources.find(source => blockFlow.isBlockInMainChainUnsafe(source.intraBlock)).map(_.txs)
-        }
-      case None => None
+    if (ChainIndex.from(blockHash).isIntraGroup) {
+      None
+    } else {
+      val storage = blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex
+      storage.getOptUnsafe(blockHash) match {
+        case Some(sources) =>
+          if (sources.isEmpty) {
+            None
+          } else {
+            sources.find(source => blockFlow.isBlockInMainChainUnsafe(source.intraBlock)).map(_.txs)
+          }
+        case None => None
+      }
     }
   }
 

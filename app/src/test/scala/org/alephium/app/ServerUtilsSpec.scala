@@ -5344,7 +5344,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block2)
 
     addAndCheck(blockFlow, block0)
-    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs))
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs)
+    addAndCheck(blockFlow, block3)
     addAndCheck(
       blockFlow,
       emptyBlock(blockFlow, ChainIndex.unsafe(1, 1), nextBlockTs),
@@ -5417,6 +5418,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkBlockWithoutConflictedTxs(block0)
     checkBlockWithConflictedTxs(block1, AVector(block1.nonCoinbase.head.id))
     checkBlockWithConflictedTxs(block2, AVector(block2.nonCoinbase.head.id))
+    checkBlockWithoutConflictedTxs(block3)
   }
 
   it should "return correct status if the conflicted tx is only on the fork chain" in new ConflictedTxsFixture {
