@@ -5882,6 +5882,14 @@
               "type": "string",
               "format": "address"
             }
+          },
+          {
+            "name": "error-if-exceed-max-utxos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
