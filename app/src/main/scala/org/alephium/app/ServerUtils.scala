@@ -207,12 +207,16 @@ class ServerUtils(implicit
     }
   }
 
-  def getUTXOsIncludePool(blockFlow: BlockFlow, address: Address): Try[UTXOs] = {
+  def getUTXOsIncludePool(
+      blockFlow: BlockFlow,
+      address: Address,
+      errorIfExceedMaxUtxos: Boolean
+  ): Try[UTXOs] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
     for {
       _ <- checkGroup(address.lockupScript)
       utxos <- blockFlow
-        .getUTXOs(address.lockupScript, utxosLimit, getMempoolUtxos = true)
+        .getUTXOs(address.lockupScript, utxosLimit, getMempoolUtxos = true, errorIfExceedMaxUtxos)
         .map(_.map(outputInfo => UTXO.from(outputInfo.ref, outputInfo.output)))
         .left
         .flatMap(tooManyUtxos)

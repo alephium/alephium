@@ -297,10 +297,11 @@ trait Endpoints
       .summary("Get the balance of an address")
 
   // TODO: query based on token id?
-  val getUTXOs: BaseEndpoint[Address, UTXOs] =
+  val getUTXOs: BaseEndpoint[(Address, Option[Boolean]), UTXOs] =
     addressesEndpoint.get
       .in(path[Address]("address"))
       .in("utxos")
+      .in(query[Option[Boolean]]("error-if-exceed-max-utxos"))
       .out(jsonBody[UTXOs])
       .summary("Get the UTXOs of an address")
 
