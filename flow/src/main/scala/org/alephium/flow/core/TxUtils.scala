@@ -162,15 +162,17 @@ trait TxUtils { Self: FlowUtils =>
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
-    getUTXOs(lockupScript, utxosLimit, getMempoolUtxos).map { utxos =>
+    getUTXOs(lockupScript, utxosLimit, getMempoolUtxos, errorIfExceedMaxUtxos = true).map { utxos =>
       TxUtils.getBalance(utxos.map(_.output))
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def getUTXOs(
       lockupScript: LockupScript,
       utxosLimit: Int,
-      getMempoolUtxos: Boolean
+      getMempoolUtxos: Boolean,
+      errorIfExceedMaxUtxos: Boolean = true
   ): IOResult[AVector[OutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
@@ -183,7 +185,7 @@ trait TxUtils { Self: FlowUtils =>
           getImmutableGroupView(groupIndex)
         }
         blockFlowGroupView.flatMap(
-          _.getRelevantUtxos(ls, utxosLimit, errorIfExceedMaxUtxos = true).map(_.as[OutputInfo])
+          _.getRelevantUtxos(ls, utxosLimit, errorIfExceedMaxUtxos).map(_.as[OutputInfo])
         )
       case ls: LockupScript.P2C =>
         getBestPersistedWorldState(groupIndex).flatMap(

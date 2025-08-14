@@ -316,7 +316,8 @@ object ServerFixture {
     override def getUTXOs(
         lockupScript: LockupScript,
         utxosLimit: Int,
-        getMempoolUtxos: Boolean
+        getMempoolUtxos: Boolean,
+        errorIfExceedMaxUtxos: Boolean
     ): IOResult[AVector[OutputInfo]] = {
       val assetOutputInfos = AVector(U256.One, U256.Two).map { amount =>
         val tokens = AVector((TokenId.hash("token1"), U256.One))

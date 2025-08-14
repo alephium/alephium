@@ -945,7 +945,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(fromAddress, fromAddressBalance, 2)
 
     val utxos =
-      serverUtils.getUTXOsIncludePool(blockFlow, fromAddress).rightValue.utxos
+      serverUtils.getUTXOsIncludePool(blockFlow, fromAddress, true).rightValue.utxos
     val destination1 = generateDestination(chainIndex)
     val destination2 = generateDestination(chainIndex)
     val destinations = AVector(destination1, destination2)
@@ -4588,7 +4588,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
 
     val genesisAddressUtxos =
-      serverUtils.getUTXOsIncludePool(blockFlow, genesisAddress).rightValue.utxos
+      serverUtils.getUTXOsIncludePool(blockFlow, genesisAddress, true).rightValue.utxos
     genesisAddressUtxos.length is 1
     val genesisAddressUtxosAmount = genesisAddressUtxos.head.amount.value
 
@@ -5913,8 +5913,16 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils0 = createServerUtils(9)
     serverUtils0.getBalance(blockFlow, apiAddress, true).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
-    serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
+    serverUtils0
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript), true)
+      .leftValue
+      .detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
+    serverUtils0
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript), false)
+      .rightValue
+      .utxos
+      .length is 9
 
     val serverUtils1 = createServerUtils(10)
     serverUtils1
@@ -5923,7 +5931,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .balance
       .value is ALPH.alph(10)
     serverUtils1
-      .getUTXOsIncludePool(blockFlow, assetAddress)
+      .getUTXOsIncludePool(blockFlow, assetAddress, true)
       .rightValue
       .utxos
       .length is 10
@@ -5935,7 +5943,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .balance
       .value is ALPH.alph(10)
     serverUtils2
-      .getUTXOsIncludePool(blockFlow, assetAddress)
+      .getUTXOsIncludePool(blockFlow, assetAddress, true)
       .rightValue
       .utxos
       .length is 10
