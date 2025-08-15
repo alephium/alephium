@@ -32,7 +32,6 @@ import sttp.model.StatusCode
 import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
 import org.alephium.api.model.{
-  Amount,
   BuildGrouplessTransferTxResult,
   BuildSimpleTransferTxResult,
   Destination,
@@ -79,7 +78,7 @@ trait WalletService extends Service {
   def deleteWallet(wallet: String, password: String): Either[WalletError, Unit]
   def getBalances(
       wallet: String
-  ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Amount)]]]
+  ): Future[Either[WalletError, AVector[(Address.Asset, api.Balance)]]]
   def getAddresses(wallet: String): Either[WalletError, Addresses]
   def getAddressInfo(wallet: String, address: Address.Asset): Either[WalletError, AddressInfo]
   def getMinerAddresses(
@@ -340,7 +339,7 @@ object WalletService {
 
     override def getBalances(
         wallet: String
-    ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Amount)]]] =
+    ): Future[Either[WalletError, AVector[(Address.Asset, api.Balance)]]] =
       withAddressesFut(wallet) { case (_, addresses) =>
         Future
           .sequence(addresses.toSeq.map(getBalance))
@@ -585,12 +584,12 @@ object WalletService {
 
     private def getBalance(
         address: Address.Asset
-    ): Future[Either[WalletError, (Address.Asset, Amount, Amount)]] = {
+    ): Future[Either[WalletError, (Address.Asset, api.Balance)]] = {
       blockFlowClient
         .fetchBalance(api.Address.fromProtocol(address))
         .map(
-          _.map { case (amount, lockedAmount) =>
-            (address, amount, lockedAmount)
+          _.map { balance =>
+            (address, balance)
           }.left.map(error => BlockFlowClientError(error))
         )
     }
