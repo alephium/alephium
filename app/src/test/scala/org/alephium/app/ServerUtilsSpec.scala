@@ -5994,6 +5994,11 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "run unit tests" in new Fixture {
     val serverUtils = new ServerUtils
 
+    def test(code: String, compilerOptions: Option[CompilerOptions] = None): Option[String] = {
+      val project = api.Compile.Project(code, compilerOptions)
+      serverUtils.compileProject(blockFlow, project).rightValue.testError
+    }
+
     {
       val now = TimeStamp.now()
 
@@ -6011,11 +6016,8 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(now))).isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(TimeStamp.zero)))
-        .leftValue
-        .detail is
+      test(code(now)).isEmpty is true
+      test(code(TimeStamp.zero)).value is
         s"""|-- error (9:5): Testing error
             |9 |    testCheck!(foo() == 0)
             |  |    ^^^^^^^^^^^^^^^^^^^^^^
@@ -6043,11 +6045,8 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(30))).isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(20)))
-        .leftValue
-        .detail is
+      test(code(30)).isEmpty is true
+      test(code(20)).value is
         s"""|-- error (9:5): Testing error
             |9 |    testCheck!(add() == 20)
             |  |    ^^^^^^^^^^^^^^^^^^^^^^^
@@ -6079,11 +6078,8 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code("1 alph"))).isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("2 alph")))
-        .leftValue
-        .detail is
+      test(code("1 alph")).isEmpty is true
+      test(code("2 alph")).value is
         s"""|-- error (16:5): Testing error
             |16 |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == 2 alph)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -6117,20 +6113,14 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(30, 10))).isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(20, 10)))
-        .leftValue
-        .detail is
+      test(code(30, 10)).isEmpty is true
+      test(code(20, 10)).value is
         s"""|-- error (17:5): Testing error
             |17 |    testCheck!(base() == result)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
             |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed: left(U256(30)) is not equal to right(U256(20))
             |""".stripMargin
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(30, 20)))
-        .leftValue
-        .detail is
+      test(code(30, 20)).value is
         s"""|-- error (17:5): Testing error
             |17 |    testCheck!(base() == result)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -6160,12 +6150,9 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
 
       val correct = "Bar { a: 1, b: [1, 0], c: [0; 2] }"
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(correct))).isRight is true
+      test(code(correct)).isEmpty is true
       val invalid0 = "Bar { a: 0, b: [1, 0], c: [0; 2] }"
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(invalid0)))
-        .leftValue
-        .detail is
+      test(code(invalid0)).value is
         s"""|-- error (14:9): Testing error
             |14 |  after Self(Bar { a: 0, b: [1, 0], c: [0; 2] }) {
             |   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -6173,10 +6160,7 @@ class ServerUtilsSpec extends AlephiumSpec {
             |""".stripMargin
 
       val invalid1 = "Bar { a: 1, b: [1, 1], c: [0; 2] }"
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(invalid1)))
-        .leftValue
-        .detail is
+      test(code(invalid1)).value is
         s"""|-- error (14:9): Testing error
             |14 |  after Self(Bar { a: 1, b: [1, 1], c: [0; 2] }) {
             |   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -6208,7 +6192,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
 
     {
@@ -6224,13 +6208,9 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val options0 = CompilerOptions(skipTests = Some(true))
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code, Some(options0)))
-        .isRight is true
+      test(code, Some(options0)).isEmpty is true
       val options1 = CompilerOptions(skipTests = Some(false))
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code, Some(options1)))
-        .isRight is false
+      test(code, Some(options1)).isEmpty is false
     }
 
     {
@@ -6250,13 +6230,10 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
 
       Seq("foo0(1)", "1 / foo1()", "foo1() / foo1()").foreach { expr =>
-        serverUtils.compileProject(blockFlow, api.Compile.Project(code(expr))).isRight is true
+        test(code(expr)).isEmpty is true
       }
 
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("foo1() / 1")))
-        .leftValue
-        .detail is
+      test(code("foo1() / 1")).value is
         s"""|-- error (10:5): Testing error
             |10 |    testFail!(foo1() / 1)
             |   |    ^^^^^^^^^^^^^^^^^^^^^
@@ -6280,7 +6257,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
 
     {
@@ -6296,13 +6273,8 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("testEqual!(foo(), 0)")))
-        .isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("testEqual!(foo(), 1)")))
-        .leftValue
-        .detail is
+      test(code("testEqual!(foo(), 0)")).isEmpty is true
+      test(code("testEqual!(foo(), 1)")).value is
         s"""|-- error (7:5): Testing error
             |7 |    testEqual!(foo(), 1)
             |  |    ^^^^^^^^^^^^^^^^^^^^
@@ -6334,32 +6306,21 @@ class ServerUtilsSpec extends AlephiumSpec {
         "testFail!(foo(9, 0))",
         "testError!(foo(4, 3), 0)\ntestError!(foo(3, 4), 1)\ntestFail!(foo(9, 0))"
       ).foreach { testCall =>
-        serverUtils
-          .compileProject(blockFlow, api.Compile.Project(code(testCall)))
-          .isRight is true
+        test(code(testCall)).isEmpty is true
       }
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(4, 3), 1)")))
-        .leftValue
-        .detail is
+      test(code("testError!(foo(4, 3), 1)")).value is
         s"""|-- error (12:5): Testing error
             |12 |    testError!(foo(4, 3), 1)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
             |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected error code in test. Expected: 1, but got: 0.
             |""".stripMargin
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(3, 4), 0)")))
-        .leftValue
-        .detail is
+      test(code("testError!(foo(3, 4), 0)")).value is
         s"""|-- error (12:5): Testing error
             |12 |    testError!(foo(3, 4), 0)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
             |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected error code in test. Expected: 0, but got: 1.
             |""".stripMargin
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(9, 0), 1)")))
-        .leftValue
-        .detail is
+      test(code("testError!(foo(9, 0), 1)")).value is
         s"""|-- error (12:5): Testing error
             |12 |    testError!(foo(9, 0), 1)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -6385,7 +6346,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |    }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
 
     {
@@ -6413,7 +6374,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |    }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
 
     {
@@ -6435,14 +6396,10 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(1))).isRight is true
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(2))).isRight is true
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(3))).isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(4)))
-        .leftValue
-        .detail
-        .contains("Insufficient funds to cover the minimum amount") is true
+      test(code(1)).isEmpty is true
+      test(code(2)).isEmpty is true
+      test(code(3)).isEmpty is true
+      test(code(4)).value.contains("Insufficient funds to cover the minimum amount") is true
     }
 
     {
@@ -6462,7 +6419,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
 
     {
@@ -6486,7 +6443,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
   }
 
@@ -6510,7 +6467,11 @@ class ServerUtilsSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val serverUtils = new ServerUtils
-    serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+    serverUtils
+      .compileProject(blockFlow, api.Compile.Project(code))
+      .rightValue
+      .testError
+      .isEmpty is true
   }
 
   it should "support auto fund in test-contract endpoint" in {
