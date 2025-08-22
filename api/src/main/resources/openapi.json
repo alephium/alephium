@@ -15462,6 +15462,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "testError": {
+            "type": "string"
           }
         }
       },
