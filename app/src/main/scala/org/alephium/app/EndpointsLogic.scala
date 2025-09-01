@@ -210,8 +210,10 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.getBalance(blockFlow, address, getMempoolUtxos.getOrElse(true)))
   }
 
-  val getUTXOsLogic = serverLogic(getUTXOs) { address =>
-    Future.successful(serverUtils.getUTXOsIncludePool(blockFlow, address))
+  val getUTXOsLogic = serverLogic(getUTXOs) { case (address, errorIfExceedMaxUtxos) =>
+    Future.successful(
+      serverUtils.getUTXOsIncludePool(blockFlow, address, errorIfExceedMaxUtxos.getOrElse(true))
+    )
   }
 
   val getGroupLogic = serverLogic(getGroup) {
@@ -585,7 +587,7 @@ trait EndpointsLogic extends Endpoints {
         DecodeUnsignedTxResult(
           unsignedTx.fromGroup.value,
           unsignedTx.toGroup.value,
-          UnsignedTx.fromProtocol(unsignedTx, isConflicted = false)
+          UnsignedTx.fromProtocol(unsignedTx)
         )
       }
     )

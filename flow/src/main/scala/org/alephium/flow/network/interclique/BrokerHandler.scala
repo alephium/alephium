@@ -24,7 +24,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxForkDepth, maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
+import org.alephium.flow.network._
 import org.alephium.flow.network.broker.{
   BrokerHandler => BaseBrokerHandler,
   ChainTipInfo,
@@ -570,18 +570,25 @@ trait SyncV2Handler { _: BrokerHandler =>
     }
   }
 
+  private[interclique] val rateLimiter = SimpleRateLimiter.default
+
   private def handleBlocksRequest(
       id: RequestId,
       chains: AVector[(ChainIndex, BlockHeightRange)]
   ): Unit = {
-    handleFlowDataRequest(
-      id,
-      chains,
-      (chainIndex, range) =>
-        blockflow.getBlockChain(chainIndex).getBlocksWithUnclesByHeights(range.heights),
-      BlocksAndUnclesByHeightsResponse.apply,
-      "BlocksAndUnclesByHeights"
-    )
+    val size = chains.sumBy(_._2.length)
+    if (!rateLimiter.tryRequest(size)) {
+      log.info(s"Ignored block download request from remote $remoteAddress due to rate limiting")
+    } else {
+      handleFlowDataRequest(
+        id,
+        chains,
+        (chainIndex, range) =>
+          blockflow.getBlockChain(chainIndex).getBlocksWithUnclesByHeights(range.heights),
+        BlocksAndUnclesByHeightsResponse.apply,
+        "BlocksAndUnclesByHeights"
+      )
+    }
   }
 
   private def handleGetAncestors(chains: AVector[ChainTipInfo]): Unit = {

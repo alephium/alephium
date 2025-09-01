@@ -188,6 +188,15 @@ abstract class RestServerSpec(
       val utxos = response.as[UTXOs]
       utxos.utxos.length is 2
     }
+
+    Get(
+      s"/addresses/$dummyKeyAddress/utxos?error-if-exceed-max-utxos=false",
+      getPort(group)
+    ) check { response =>
+      response.code is StatusCode.Ok
+      val utxos = response.as[UTXOs]
+      utxos.utxos.length is 2
+    }
   }
 
   it should "call GET /blockflow/hashes" in {
@@ -473,7 +482,7 @@ abstract class RestServerSpec(
       ) { response =>
         val tx = response.as[Transaction]
         response.code is StatusCode.Ok
-        tx is Transaction.fromProtocol(dummyTx, isConflicted = false)
+        tx is Transaction.fromProtocol(dummyTx)
       }
 
       verifyResponseWithNodes(
@@ -484,7 +493,7 @@ abstract class RestServerSpec(
       ) { response =>
         val tx = response.as[Transaction]
         response.code is StatusCode.Ok
-        tx is Transaction.fromProtocol(dummyTx, isConflicted = false)
+        tx is Transaction.fromProtocol(dummyTx)
       }
 
       verifyResponseWithNodes(
@@ -495,7 +504,7 @@ abstract class RestServerSpec(
       ) { response =>
         val tx = response.as[Transaction]
         response.code is StatusCode.Ok
-        tx is Transaction.fromProtocol(dummyTx, isConflicted = false)
+        tx is Transaction.fromProtocol(dummyTx)
       }
 
       val txId = TransactionId.generate.toHexString

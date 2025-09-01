@@ -661,29 +661,28 @@ object Compiler {
       (ref, codes)
     }
 
-    def getLocalArrayVarIndex(): Ast.Ident = {
-      getLocalArrayVarIndex(
-        addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
-      )
+    private def addGeneratedLocalVarInFunctionScope(ident: Ast.Ident, tpe: Type): Unit = {
+      val sname      = checkNewVariable(ident)
+      val isLocal    = true
+      val isMutable  = true
+      val isTemplate = false
+      val index      = getAndUpdateVarIndex(isTemplate, isLocal, isMutable).toByte
+      val varInfo =
+        VarInfo.Local(ident, tpe, isMutable, isUnused = false, index, isGenerated = true)
+      trackAndAddVarInfoInScope(sname, varInfo, FunctionRoot)
     }
 
-    def getImmFieldArrayVarIndex(): Ast.Ident = {
-      getImmFieldArrayVarIndex(
-        addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
-      )
-    }
+    def getLocalArrayVarIndex(): Ast.Ident =
+      getLocalArrayVarIndex(addGeneratedLocalVarInFunctionScope(_, Type.U256))
 
-    def getMutFieldArrayVarIndex(): Ast.Ident = {
-      getMutFieldArrayVarIndex(
-        addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
-      )
-    }
+    def getImmFieldArrayVarIndex(): Ast.Ident =
+      getImmFieldArrayVarIndex(addGeneratedLocalVarInFunctionScope(_, Type.U256))
 
-    def getSubContractIdVar(): Ast.Ident = {
-      getSubContractIdVar(
-        addLocalVariable(_, Type.ByteVec, isMutable = true, isUnused = false, isGenerated = true)
-      )
-    }
+    def getMutFieldArrayVarIndex(): Ast.Ident =
+      getMutFieldArrayVarIndex(addGeneratedLocalVarInFunctionScope(_, Type.U256))
+
+    def getSubContractIdVar(): Ast.Ident =
+      getSubContractIdVar(addGeneratedLocalVarInFunctionScope(_, Type.ByteVec))
 
     def addVariablesRef(
         ident: Ast.Ident,
@@ -713,17 +712,31 @@ object Compiler {
       s"${scopedNamePrefix(scopeId)}$name"
     }
 
-    @inline private def addVarInfo(name: String, varInfo: VarInfo): VarKey = {
-      val varKey = VarKey(name, variableScope)
+    @inline private def addVarInfoInScope(
+        name: String,
+        varInfo: VarInfo,
+        scope: VariableScope
+    ): VarKey = {
+      val varKey = VarKey(name, scope)
       assume(!varTable.contains(varKey))
       varTable(varKey) = varInfo
       varKey
     }
 
-    @inline private def trackAndAddVarInfo(sname: String, varInfo: VarInfo): Unit = {
-      val varKey = addVarInfo(sname, varInfo)
+    @inline private def addVarInfo(name: String, varInfo: VarInfo): VarKey =
+      addVarInfoInScope(name, varInfo, variableScope)
+
+    @inline private def trackAndAddVarInfoInScope(
+        sname: String,
+        varInfo: VarInfo,
+        scope: VariableScope
+    ): Unit = {
+      val varKey = addVarInfoInScope(sname, varInfo, scope)
       trackGenCodePhaseNewVars(varKey)
     }
+
+    @inline private def trackAndAddVarInfo(sname: String, varInfo: VarInfo): Unit =
+      trackAndAddVarInfoInScope(sname, varInfo, variableScope)
 
     private[ralph] def addMapVar(ident: Ast.Ident, tpe: Type.Map, mapIndex: Int): Unit = {
       val sname = checkNewVariable(ident)

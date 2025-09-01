@@ -452,7 +452,7 @@ lazy val integration = project("integration")
 val publishSettings = Seq(
   organization := "org.alephium",
   homepage     := Some(url("https://github.com/alephium/alephium")),
-  licenses     := Seq("LGPL 3.0" -> new URL("https://www.gnu.org/licenses/lgpl-3.0.en.html")),
+  licenses     := Seq("LGPL 3.0" -> new URI("https://www.gnu.org/licenses/lgpl-3.0.en.html").toURL),
   developers := List(
     Developer(
       id = "alephium core dev",

@@ -162,15 +162,17 @@ trait TxUtils { Self: FlowUtils =>
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
-    getUTXOs(lockupScript, utxosLimit, getMempoolUtxos).map { utxos =>
+    getUTXOs(lockupScript, utxosLimit, getMempoolUtxos, errorIfExceedMaxUtxos = true).map { utxos =>
       TxUtils.getBalance(utxos.map(_.output))
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def getUTXOs(
       lockupScript: LockupScript,
       utxosLimit: Int,
-      getMempoolUtxos: Boolean
+      getMempoolUtxos: Boolean,
+      errorIfExceedMaxUtxos: Boolean = true
   ): IOResult[AVector[OutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
@@ -183,7 +185,7 @@ trait TxUtils { Self: FlowUtils =>
           getImmutableGroupView(groupIndex)
         }
         blockFlowGroupView.flatMap(
-          _.getRelevantUtxos(ls, utxosLimit, errorIfExceedMaxUtxos = true).map(_.as[OutputInfo])
+          _.getRelevantUtxos(ls, utxosLimit, errorIfExceedMaxUtxos).map(_.as[OutputInfo])
         )
       case ls: LockupScript.P2C =>
         getBestPersistedWorldState(groupIndex).flatMap(
@@ -1283,10 +1285,31 @@ trait TxUtils { Self: FlowUtils =>
     chain.isTxConfirmed(txId)
   }
 
-  def getTxConfirmedStatus(
+  def getConflictedTxsFromBlock(blockHash: BlockHash): IOResult[Option[AVector[TransactionId]]] = {
+    IOUtils.tryExecute(getConflictedTxsFromBlockUnsafe(blockHash))
+  }
+
+  def getConflictedTxsFromBlockUnsafe(blockHash: BlockHash): Option[AVector[TransactionId]] = {
+    if (ChainIndex.from(blockHash).isIntraGroup) {
+      None
+    } else {
+      val storage = blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex
+      storage.getOptUnsafe(blockHash) match {
+        case Some(sources) =>
+          if (sources.isEmpty) {
+            None
+          } else {
+            sources.find(source => blockFlow.isBlockInMainChainUnsafe(source.intraBlock)).map(_.txs)
+          }
+        case None => None
+      }
+    }
+  }
+
+  def getTxConfirmationStatus(
       txId: TransactionId,
       chainIndex: ChainIndex
-  ): IOResult[Option[Confirmed]] =
+  ): IOResult[Option[TxStatus]] =
     IOUtils.tryExecute {
       assume(brokerConfig.contains(chainIndex.from))
       val chain = getBlockChain(chainIndex)
@@ -1300,14 +1323,27 @@ trait TxUtils { Self: FlowUtils =>
             getFromGroupConfirmationsUnsafe(confirmHash, chainIndex)
           val toGroupConfirmations =
             getToGroupConfirmationsUnsafe(confirmHash, chainIndex)
-          Some(
-            Confirmed(
-              chainStatus.index,
-              confirmations,
-              fromGroupConfirmations,
-              toGroupConfirmations
+          val conflictedTxsOpt = getConflictedTxsFromBlockUnsafe(confirmHash)
+          val isConflictedTx   = conflictedTxsOpt.exists(_.contains(txId))
+          if (isConflictedTx) {
+            Some(
+              BlockFlowState.Conflicted(
+                chainStatus.index,
+                confirmations,
+                fromGroupConfirmations,
+                toGroupConfirmations
+              )
             )
-          )
+          } else {
+            Some(
+              Confirmed(
+                chainStatus.index,
+                confirmations,
+                fromGroupConfirmations,
+                toGroupConfirmations
+              )
+            )
+          }
         }
       }
     }
@@ -1399,7 +1435,7 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, Option[TxStatus]] = {
     if (brokerConfig.contains(chainIndex.from)) {
       for {
-        status <- getTxConfirmedStatus(txId, chainIndex)
+        status <- getTxConfirmationStatus(txId, chainIndex)
           .map[Option[TxStatus]] {
             case Some(status) => Some(status)
             case None         => if (isInMemPool(txId, chainIndex)) Some(MemPooled) else None

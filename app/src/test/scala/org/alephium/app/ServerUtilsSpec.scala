@@ -218,13 +218,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     def checkTx(blockFlow: BlockFlow, tx: Transaction, chainIndex: ChainIndex) = {
-      check(
-        blockFlow,
-        tx,
-        chainIndex,
-        serverUtils.getTransaction,
-        api.Transaction.fromProtocol(tx, isConflicted = false)
-      )
+      check(blockFlow, tx, chainIndex, serverUtils.getTransaction, api.Transaction.fromProtocol(tx))
       check(blockFlow, tx, chainIndex, serverUtils.getRawTransaction, RawTransaction(serialize(tx)))
     }
   }
@@ -951,7 +945,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(fromAddress, fromAddressBalance, 2)
 
     val utxos =
-      serverUtils.getUTXOsIncludePool(blockFlow, fromAddress).rightValue.utxos
+      serverUtils.getUTXOsIncludePool(blockFlow, fromAddress, true).rightValue.utxos
     val destination1 = generateDestination(chainIndex)
     val destination2 = generateDestination(chainIndex)
     val destinations = AVector(destination1, destination2)
@@ -4594,7 +4588,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
 
     val genesisAddressUtxos =
-      serverUtils.getUTXOsIncludePool(blockFlow, genesisAddress).rightValue.utxos
+      serverUtils.getUTXOsIncludePool(blockFlow, genesisAddress, true).rightValue.utxos
     genesisAddressUtxos.length is 1
     val genesisAddressUtxosAmount = genesisAddressUtxos.head.amount.value
 
@@ -4755,11 +4749,11 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val transactions =
       block.transactions
-        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash, isConflicted = false))
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash))
         .rightValue
     serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue is RichBlockAndEvents(
       RichBlockEntry
-        .from(block, 1, transactions)
+        .from(block, 1, transactions, None)
         .rightValue,
       AVector.empty
     )
@@ -5291,12 +5285,12 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "find rich block when node.indexes.tx-output-ref-index is enabled" in new TxOutputRefIndexFixture {
     val transactions =
       block.transactions
-        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash, false))
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, block.hash))
         .rightValue
     serverUtils
       .getRichBlockAndEvents(blockFlow, block.hash)
       .rightValue is RichBlockAndEvents(
-      RichBlockEntry.from(block, 1, transactions).rightValue,
+      RichBlockEntry.from(block, 1, transactions, None).rightValue,
       AVector.empty
     )
   }
@@ -5343,9 +5337,15 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val block0 = transfer(blockFlow, chainIndex0, nextBlockTs)
     val block1 = transfer(blockFlow, chainIndex1, nextBlockTs)
+    addAndCheck(blockFlow, block1)
 
-    addAndCheck(blockFlow, block0, block1)
-    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs))
+    val block2 =
+      transfer(blockFlow, chainIndex1, nextBlockTs) // it uses the conflicted tx from block1
+    addAndCheck(blockFlow, block2)
+
+    addAndCheck(blockFlow, block0)
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs)
+    addAndCheck(blockFlow, block3)
     addAndCheck(
       blockFlow,
       emptyBlock(blockFlow, ChainIndex.unsafe(1, 1), nextBlockTs),
@@ -5355,35 +5355,42 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils = new ServerUtils()
   }
 
-  it should "return empty inputs/outputs for conflicted txs" in new ConflictedTxsFixture {
-    private def checkConflictedTx(tx: Transaction) = {
-      val result = serverUtils.getTransaction(blockFlow, tx.id, None, None).rightValue
-      result.unsigned.inputs.isEmpty is true
-      result.unsigned.fixedOutputs.isEmpty is true
-      result is api.Transaction.fromProtocol(tx, isConflicted = true)
-    }
+  it should "return conflicted tx status" in new ConflictedTxsFixture {
+    val tx0 = block0.transactions.head.id
+    val tx1 = block0.transactions.last.id
+    serverUtils.getTransactionStatus(blockFlow, tx0, block0.chainIndex).rightValue is a[Confirmed]
+    serverUtils.getTransactionStatus(blockFlow, tx1, block0.chainIndex).rightValue is a[Confirmed]
+    val tx2 = block1.transactions.head.id
+    val tx3 = block1.transactions.last.id
+    serverUtils.getTransactionStatus(blockFlow, tx2, block1.chainIndex).rightValue is Conflicted(
+      block1.hash,
+      txIndex = 0,
+      chainConfirmations = 2,
+      fromGroupConfirmations = 1,
+      toGroupConfirmations = 1
+    )
+    serverUtils.getTransactionStatus(blockFlow, tx3, block1.chainIndex).rightValue is a[Confirmed]
 
-    private def checkNonConflictedTx(tx: Transaction) = {
-      val result = serverUtils.getTransaction(blockFlow, tx.id, None, None).rightValue
-      result.unsigned.inputs.nonEmpty is true
-      result.unsigned.fixedOutputs.nonEmpty is true
-      result is api.Transaction.fromProtocol(tx, isConflicted = false)
-    }
-
-    checkNonConflictedTx(block0.nonCoinbase.head)
-    checkConflictedTx(block1.nonCoinbase.head)
+    addAndCheck(blockFlow, emptyBlock(blockFlow, block1.chainIndex, nextBlockTs))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(2, 2), nextBlockTs))
+    serverUtils.getTransactionStatus(blockFlow, tx2, block1.chainIndex).rightValue is Conflicted(
+      block1.hash,
+      txIndex = 0,
+      chainConfirmations = 3,
+      fromGroupConfirmations = 2,
+      toGroupConfirmations = 2
+    )
   }
 
-  it should "ignore conflicted txs in block response" in new ConflictedTxsFixture {
+  it should "return conflicted txs in the block response" in new ConflictedTxsFixture {
     private def checkBlockWithConflictedTxs(block: Block, conflictedTxs: AVector[TransactionId]) = {
       assume(conflictedTxs.nonEmpty)
       val result0 = serverUtils.getBlock(blockFlow, block.hash).rightValue
-      result0.transactions.length isnot block.transactions.length
-      conflictedTxs.foreach(id => result0.transactions.exists(_.unsigned.txId == id) is false)
+      result0.conflictedTxs is Some(conflictedTxs)
 
       val result1 = serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue
-      result1.block.transactions.length isnot block.transactions.length
-      conflictedTxs.foreach(id => result1.block.transactions.exists(_.unsigned.txId == id) is false)
+      result1.block.conflictedTxs is Some(conflictedTxs)
 
       val timeInterval = TimeInterval(block.timestamp, block.timestamp)
       val result2      = serverUtils.getBlocks(blockFlow, timeInterval).rightValue
@@ -5394,17 +5401,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     private def checkBlockWithoutConflictedTxs(block: Block) = {
-      val height  = blockFlow.getHeightUnsafe(block.hash)
       val result0 = serverUtils.getBlock(blockFlow, block.hash).rightValue
-      result0.transactions.length is block.transactions.length
-      result0 is api.BlockEntry.from(block, height, None).rightValue
+      result0.conflictedTxs.isEmpty is true
 
       val result1 = serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue
-      result1.block.transactions.length is block.transactions.length
-      val richTxs = block.transactions.map(tx =>
-        serverUtils.getRichTransaction(blockFlow, tx.id, None, None).rightValue
-      )
-      result1.block is api.RichBlockEntry.from(block, height, richTxs).rightValue
+      result1.block.conflictedTxs.isEmpty is true
 
       val timeInterval = TimeInterval(block.timestamp, block.timestamp)
       val result2      = serverUtils.getBlocks(blockFlow, timeInterval).rightValue
@@ -5416,6 +5417,60 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     checkBlockWithoutConflictedTxs(block0)
     checkBlockWithConflictedTxs(block1, AVector(block1.nonCoinbase.head.id))
+    checkBlockWithConflictedTxs(block2, AVector(block2.nonCoinbase.head.id))
+    checkBlockWithoutConflictedTxs(block3)
+  }
+
+  it should "return correct status if the conflicted tx is only on the fork chain" in new ConflictedTxsFixture {
+    val blockFlow1 = isolatedBlockFlow()
+    addAndCheck(blockFlow1, block1, block2)
+
+    val blocks = (0 until 3).flatMap { _ =>
+      brokerConfig.chainIndexes.map { chainIndex =>
+        val block = emptyBlock(blockFlow1, chainIndex, nextBlockTs)
+        addAndCheck(blockFlow1, block)
+        block
+      }
+    }
+
+    blockFlow.isBlockInMainChainUnsafe(block0.hash) is true
+    blockFlow.isBlockInMainChainUnsafe(block1.hash) is true
+    blockFlow.isBlockInMainChainUnsafe(block2.hash) is true
+    val tx = block1.nonCoinbase.head.id
+    serverUtils.getTransactionStatus(blockFlow, tx, block1.chainIndex).rightValue is a[Conflicted]
+
+    addAndCheck(blockFlow, blocks: _*)
+    blockFlow.isBlockInMainChainUnsafe(block0.hash) is false
+    blockFlow.isBlockInMainChainUnsafe(block1.hash) is true
+    blockFlow.isBlockInMainChainUnsafe(block2.hash) is true
+    serverUtils.getTransactionStatus(blockFlow, tx, block1.chainIndex).rightValue is a[Confirmed]
+  }
+
+  it should "return empty rich inputs for conflicted txs" in new ConflictedTxsFixture {
+    private def checkTx(tx: Transaction) = {
+      val result = serverUtils.getTransaction(blockFlow, tx.id, None, None).rightValue
+      result.unsigned.inputs.isEmpty is false
+      result.unsigned.fixedOutputs.isEmpty is false
+      result is api.Transaction.fromProtocol(tx)
+    }
+
+    val tx0 = block0.nonCoinbase.head
+    val tx1 = block1.nonCoinbase.head
+    val tx2 = block2.nonCoinbase.head
+
+    checkTx(tx0)
+    checkTx(tx1)
+    checkTx(tx2)
+
+    val richTx0     = serverUtils.getRichTransaction(blockFlow, tx0.id, None, None).rightValue
+    val richInputs0 = serverUtils.getRichAssetInputs(blockFlow, tx0, block0.hash).rightValue
+    richTx0 is api.RichTransaction.from(tx0, richInputs0, AVector.empty)
+
+    val richTx1 = serverUtils.getRichTransaction(blockFlow, tx1.id, None, None).rightValue
+    richTx1 is api.RichTransaction.from(tx1, richInputs0, AVector.empty)
+
+    val richTx2 = serverUtils.getRichTransaction(blockFlow, tx2.id, None, None).rightValue
+    richTx2 is api.RichTransaction.from(tx2, AVector.empty, AVector.empty)
   }
 
   it should "get rich transaction that spends asset output" in new Fixture {
@@ -5447,11 +5502,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       val txIdRef = serverUtils.getTxIdFromOutputRef(blockFlow, input.outputRef).rightValue
       RichInput.from(input, outputToBeSpent.asInstanceOf[model.AssetOutput], txIdRef)
     }
-    val richTransaction =
-      RichTransaction.from(transaction, AVector(richInput), AVector.empty, isConflicted = false)
+    val richTransaction = RichTransaction.from(transaction, AVector(richInput), AVector.empty)
 
     serverUtils
-      .getRichTransaction(blockFlow, transaction, block1.hash, isConflicted = false)
+      .getRichTransaction(blockFlow, transaction, block1.hash)
       .rightValue is richTransaction
 
     serverUtils
@@ -5530,15 +5584,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       RichInput.from(input, contractOutputToBeSpent.asInstanceOf[model.ContractOutput], txIdRef)
     }
     val richTransaction =
-      RichTransaction.from(
-        scriptTransaction,
-        AVector(richAssetInput),
-        AVector(richContractInput),
-        isConflicted = false
-      )
+      RichTransaction.from(scriptTransaction, AVector(richAssetInput), AVector(richContractInput))
 
     serverUtils
-      .getRichTransaction(blockFlow, scriptTransaction, scriptBlock.hash, isConflicted = false)
+      .getRichTransaction(blockFlow, scriptTransaction, scriptBlock.hash)
       .rightValue is richTransaction
     serverUtils
       .getRichTransaction(
@@ -5552,12 +5601,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     val height = if (hardFork.isDanubeEnabled()) 4 else 3
     val richBlockAndEvents = {
       val richTxs = scriptBlock.transactions
-        .mapE(tx =>
-          serverUtils.getRichTransaction(blockFlow, tx, scriptBlock.hash, isConflicted = false)
-        )
+        .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, scriptBlock.hash))
         .rightValue
       RichBlockAndEvents(
-        RichBlockEntry.from(scriptBlock, height, richTxs).rightValue,
+        RichBlockEntry.from(scriptBlock, height, richTxs, None).rightValue,
         AVector(ContractEventByBlockHash(scriptTransaction.id, contractAddress, 0, AVector.empty))
       )
     }
@@ -5868,8 +5915,16 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils0 = createServerUtils(9)
     serverUtils0.getBalance(blockFlow, apiAddress, true).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
-    serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
+    serverUtils0
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript), true)
+      .leftValue
+      .detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
+    serverUtils0
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript), false)
+      .rightValue
+      .utxos
+      .length is 9
 
     val serverUtils1 = createServerUtils(10)
     serverUtils1
@@ -5878,7 +5933,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .balance
       .value is ALPH.alph(10)
     serverUtils1
-      .getUTXOsIncludePool(blockFlow, assetAddress)
+      .getUTXOsIncludePool(blockFlow, assetAddress, true)
       .rightValue
       .utxos
       .length is 10
@@ -5890,7 +5945,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .balance
       .value is ALPH.alph(10)
     serverUtils2
-      .getUTXOsIncludePool(blockFlow, assetAddress)
+      .getUTXOsIncludePool(blockFlow, assetAddress, true)
       .rightValue
       .utxos
       .length is 10
@@ -5939,6 +5994,11 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "run unit tests" in new Fixture {
     val serverUtils = new ServerUtils
 
+    def test(code: String, compilerOptions: Option[CompilerOptions] = None): Option[String] = {
+      val project = api.Compile.Project(code, compilerOptions)
+      serverUtils.compileProject(blockFlow, project).rightValue.testError
+    }
+
     {
       val now = TimeStamp.now()
 
@@ -5956,11 +6016,8 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(now))).isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(TimeStamp.zero)))
-        .leftValue
-        .detail is
+      test(code(now)).isEmpty is true
+      test(code(TimeStamp.zero)).value is
         s"""|-- error (9:5): Testing error
             |9 |    testCheck!(foo() == 0)
             |  |    ^^^^^^^^^^^^^^^^^^^^^^
@@ -5988,11 +6045,8 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(30))).isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(20)))
-        .leftValue
-        .detail is
+      test(code(30)).isEmpty is true
+      test(code(20)).value is
         s"""|-- error (9:5): Testing error
             |9 |    testCheck!(add() == 20)
             |  |    ^^^^^^^^^^^^^^^^^^^^^^^
@@ -6024,11 +6078,8 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code("1 alph"))).isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("2 alph")))
-        .leftValue
-        .detail is
+      test(code("1 alph")).isEmpty is true
+      test(code("2 alph")).value is
         s"""|-- error (16:5): Testing error
             |16 |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == 2 alph)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -6062,20 +6113,14 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(30, 10))).isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(20, 10)))
-        .leftValue
-        .detail is
+      test(code(30, 10)).isEmpty is true
+      test(code(20, 10)).value is
         s"""|-- error (17:5): Testing error
             |17 |    testCheck!(base() == result)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
             |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed: left(U256(30)) is not equal to right(U256(20))
             |""".stripMargin
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(30, 20)))
-        .leftValue
-        .detail is
+      test(code(30, 20)).value is
         s"""|-- error (17:5): Testing error
             |17 |    testCheck!(base() == result)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -6105,12 +6150,9 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
 
       val correct = "Bar { a: 1, b: [1, 0], c: [0; 2] }"
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(correct))).isRight is true
+      test(code(correct)).isEmpty is true
       val invalid0 = "Bar { a: 0, b: [1, 0], c: [0; 2] }"
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(invalid0)))
-        .leftValue
-        .detail is
+      test(code(invalid0)).value is
         s"""|-- error (14:9): Testing error
             |14 |  after Self(Bar { a: 0, b: [1, 0], c: [0; 2] }) {
             |   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -6118,10 +6160,7 @@ class ServerUtilsSpec extends AlephiumSpec {
             |""".stripMargin
 
       val invalid1 = "Bar { a: 1, b: [1, 1], c: [0; 2] }"
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(invalid1)))
-        .leftValue
-        .detail is
+      test(code(invalid1)).value is
         s"""|-- error (14:9): Testing error
             |14 |  after Self(Bar { a: 1, b: [1, 1], c: [0; 2] }) {
             |   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -6153,7 +6192,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
 
     {
@@ -6169,13 +6208,9 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val options0 = CompilerOptions(skipTests = Some(true))
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code, Some(options0)))
-        .isRight is true
+      test(code, Some(options0)).isEmpty is true
       val options1 = CompilerOptions(skipTests = Some(false))
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code, Some(options1)))
-        .isRight is false
+      test(code, Some(options1)).isEmpty is false
     }
 
     {
@@ -6195,13 +6230,10 @@ class ServerUtilsSpec extends AlephiumSpec {
            |""".stripMargin
 
       Seq("foo0(1)", "1 / foo1()", "foo1() / foo1()").foreach { expr =>
-        serverUtils.compileProject(blockFlow, api.Compile.Project(code(expr))).isRight is true
+        test(code(expr)).isEmpty is true
       }
 
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("foo1() / 1")))
-        .leftValue
-        .detail is
+      test(code("foo1() / 1")).value is
         s"""|-- error (10:5): Testing error
             |10 |    testFail!(foo1() / 1)
             |   |    ^^^^^^^^^^^^^^^^^^^^^
@@ -6225,7 +6257,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
 
     {
@@ -6241,13 +6273,8 @@ class ServerUtilsSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("testEqual!(foo(), 0)")))
-        .isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("testEqual!(foo(), 1)")))
-        .leftValue
-        .detail is
+      test(code("testEqual!(foo(), 0)")).isEmpty is true
+      test(code("testEqual!(foo(), 1)")).value is
         s"""|-- error (7:5): Testing error
             |7 |    testEqual!(foo(), 1)
             |  |    ^^^^^^^^^^^^^^^^^^^^
@@ -6279,32 +6306,21 @@ class ServerUtilsSpec extends AlephiumSpec {
         "testFail!(foo(9, 0))",
         "testError!(foo(4, 3), 0)\ntestError!(foo(3, 4), 1)\ntestFail!(foo(9, 0))"
       ).foreach { testCall =>
-        serverUtils
-          .compileProject(blockFlow, api.Compile.Project(code(testCall)))
-          .isRight is true
+        test(code(testCall)).isEmpty is true
       }
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(4, 3), 1)")))
-        .leftValue
-        .detail is
+      test(code("testError!(foo(4, 3), 1)")).value is
         s"""|-- error (12:5): Testing error
             |12 |    testError!(foo(4, 3), 1)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
             |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected error code in test. Expected: 1, but got: 0.
             |""".stripMargin
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(3, 4), 0)")))
-        .leftValue
-        .detail is
+      test(code("testError!(foo(3, 4), 0)")).value is
         s"""|-- error (12:5): Testing error
             |12 |    testError!(foo(3, 4), 0)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
             |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected error code in test. Expected: 0, but got: 1.
             |""".stripMargin
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code("testError!(foo(9, 0), 1)")))
-        .leftValue
-        .detail is
+      test(code("testError!(foo(9, 0), 1)")).value is
         s"""|-- error (12:5): Testing error
             |12 |    testError!(foo(9, 0), 1)
             |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -6330,7 +6346,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |    }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
 
     {
@@ -6358,7 +6374,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |    }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
 
     {
@@ -6380,14 +6396,10 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(1))).isRight is true
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(2))).isRight is true
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code(3))).isRight is true
-      serverUtils
-        .compileProject(blockFlow, api.Compile.Project(code(4)))
-        .leftValue
-        .detail
-        .contains("Insufficient funds to cover the minimum amount") is true
+      test(code(1)).isEmpty is true
+      test(code(2)).isEmpty is true
+      test(code(3)).isEmpty is true
+      test(code(4)).value.contains("Insufficient funds to cover the minimum amount") is true
     }
 
     {
@@ -6407,7 +6419,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
 
     {
@@ -6431,7 +6443,7 @@ class ServerUtilsSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+      test(code).isEmpty is true
     }
   }
 
@@ -6455,7 +6467,11 @@ class ServerUtilsSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val serverUtils = new ServerUtils
-    serverUtils.compileProject(blockFlow, api.Compile.Project(code)).isRight is true
+    serverUtils
+      .compileProject(blockFlow, api.Compile.Project(code))
+      .rightValue
+      .testError
+      .isEmpty is true
   }
 
   it should "support auto fund in test-contract endpoint" in {

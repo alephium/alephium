@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alephium API",
-    "version": "4.1.0"
+    "version": "4.2.3"
   },
   "servers": [
     {
@@ -5884,6 +5884,14 @@
             "schema": {
               "type": "string",
               "format": "address"
+            }
+          },
+          {
+            "name": "error-if-exceed-max-utxos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -13962,6 +13970,13 @@
             "items": {
               "$ref": "#/components/schemas/GhostUncleBlockEntry"
             }
+          },
+          "conflictedTxs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "32-byte-hash"
+            }
           }
         }
       },
@@ -15392,6 +15407,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "testError": {
+            "type": "string"
           }
         }
       },
@@ -15472,6 +15490,43 @@
       },
       "Confirmed": {
         "title": "Confirmed",
+        "type": "object",
+        "required": [
+          "blockHash",
+          "txIndex",
+          "chainConfirmations",
+          "fromGroupConfirmations",
+          "toGroupConfirmations",
+          "type"
+        ],
+        "properties": {
+          "blockHash": {
+            "type": "string",
+            "format": "block-hash"
+          },
+          "txIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainConfirmations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fromGroupConfirmations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroupConfirmations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "Conflicted": {
+        "title": "Conflicted",
         "type": "object",
         "required": [
           "blockHash",
@@ -16748,6 +16803,13 @@
             "items": {
               "$ref": "#/components/schemas/GhostUncleBlockEntry"
             }
+          },
+          "conflictedTxs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "32-byte-hash"
+            }
           }
         }
       },
@@ -17570,6 +17632,9 @@
             "$ref": "#/components/schemas/Confirmed"
           },
           {
+            "$ref": "#/components/schemas/Conflicted"
+          },
+          {
             "$ref": "#/components/schemas/MemPooled"
           },
           {
@@ -17580,6 +17645,7 @@
           "propertyName": "type",
           "mapping": {
             "Confirmed": "#/components/schemas/Confirmed",
+            "Conflicted": "#/components/schemas/Conflicted",
             "MemPooled": "#/components/schemas/MemPooled",
             "TxNotFound": "#/components/schemas/TxNotFound"
           }
