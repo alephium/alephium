@@ -49,7 +49,7 @@ object ListConflictedData extends App with ApiModelCodec {
   )
 
   implicit val conflictedTxsSourceRW: RW[ConflictedTxsSource] = macroRW
-  implicit val dataRw: RW[Data]               = macroRW
+  implicit val dataRw: RW[Data]                               = macroRW
 
   val rootPath       = Platform.getRootPath()
   val (blockFlow, _) = Node.buildBlockFlowUnsafe(rootPath)
@@ -58,10 +58,12 @@ object ListConflictedData extends App with ApiModelCodec {
     .asInstanceOf[RocksDBKeyValueStorage[BlockHash, AVector[ConflictedTxsSource]]]
 
   val buffer = scala.collection.mutable.ArrayBuffer.empty[(BlockHash, AVector[ConflictedTxsSource])]
-  storage.iterate { (block, txs) => buffer.append((block, txs)) }
+  storage.iterate { (block, txs) =>
+    if (!ChainIndex.from(block).isIntraGroup) buffer.append((block, txs))
+  }
 
   val data = buffer.toSeq.map { case (block, txs) =>
-    val conflictedTxs= blockFlow.getConflictedTxsFromBlock(block).toOption.get
+    val conflictedTxs = blockFlow.getConflictedTxsFromBlock(block).toOption.get
     Data(block, txs, conflictedTxs)
   }
 
