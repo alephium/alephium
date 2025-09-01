@@ -1705,14 +1705,13 @@ class ServerUtils(implicit
         .compileProject(query.code, compilerOptions)
         .left
         .map(error => failed(error.format(query.code)))
-      _ <-
-        if (compilerOptions.skipTests) {
-          Right(())
-        } else {
-          runTests(blockFlow, query.code, result._1, compilerOptions)
-        }
     } yield {
-      CompileProjectResult.from(result._1, result._2, result._3, result._4)
+      val testError = if (compilerOptions.skipTests) {
+        None
+      } else {
+        runTests(blockFlow, query.code, result._1, compilerOptions)
+      }
+      CompileProjectResult.from(result._1, result._2, result._3, result._4, testError)
     }
   }
 
@@ -1721,16 +1720,16 @@ class ServerUtils(implicit
       sourceCode: String,
       contracts: AVector[CompiledContract],
       compilerOptions: ralph.CompilerOptions
-  ): Try[Unit] = {
-    Testing
-      .run(
-        groupIndex => blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()),
-        sourceCode,
-        contracts,
-        compilerOptions
-      )
-      .left
-      .map(failed)
+  ): Option[String] = {
+    Testing.run(
+      groupIndex => blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()),
+      sourceCode,
+      contracts,
+      compilerOptions
+    ) match {
+      case Right(_)    => None
+      case Left(error) => Some(error)
+    }
   }
 
   def getContractState(
