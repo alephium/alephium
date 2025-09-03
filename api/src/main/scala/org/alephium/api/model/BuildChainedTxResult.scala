@@ -17,16 +17,32 @@ package org.alephium.api.model
 
 sealed trait BuildChainedTxResult {
   val value: GasInfo with ChainIndexInfo with TransactionInfo
+  val Type: String
 }
 
 @upickle.implicits.key("Transfer")
 final case class BuildChainedTransferTxResult(value: BuildSimpleTransferTxResult)
-    extends BuildChainedTxResult
+    extends BuildChainedTxResult {
+  val Type: String = BuildChainedTransferTxResult.Type
+}
+object BuildChainedTransferTxResult {
+  val Type = "Transfer"
+}
 
 @upickle.implicits.key("DeployContract")
 final case class BuildChainedDeployContractTxResult(value: BuildSimpleDeployContractTxResult)
-    extends BuildChainedTxResult
+    extends BuildChainedTxResult {
+  val Type: String = BuildChainedDeployContractTxResult.Type
+}
+object BuildChainedDeployContractTxResult {
+  val Type = "DeployContract"
+}
 
 @upickle.implicits.key("ExecuteScript")
 final case class BuildChainedExecuteScriptTxResult(value: BuildSimpleExecuteScriptTxResult)
-    extends BuildChainedTxResult
+    extends BuildChainedTxResult {
+  val Type: String = BuildChainedExecuteScriptTxResult.Type
+}
+object BuildChainedExecuteScriptTxResult {
+  val Type = "ExecuteScript"
+}

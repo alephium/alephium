@@ -24,6 +24,7 @@ import org.alephium.util
 
 sealed trait Val {
   def flattenSize(): Int
+  val Type: String
 }
 
 object Val {
@@ -48,29 +49,53 @@ object Val {
 @upickle.implicits.key("Bool")
 final case class ValBool(value: Boolean) extends Val.Primitive {
   override def toVmVal: vm.Val = vm.Val.Bool(value)
+  val Type: String             = ValBool.Type
+}
+object ValBool {
+  val Type = "Bool"
 }
 
 @upickle.implicits.key("I256")
 final case class ValI256(value: util.I256) extends Val.Primitive {
   override def toVmVal: vm.Val = vm.Val.I256(value)
+  val Type: String             = ValI256.Type
+}
+object ValI256 {
+  val Type = "I256"
 }
 
 @upickle.implicits.key("U256")
 final case class ValU256(value: util.U256) extends Val.Primitive {
   override def toVmVal: vm.Val = vm.Val.U256(value)
+  val Type: String             = ValU256.Type
+}
+object ValU256 {
+  val Type = "U256"
 }
 
 @upickle.implicits.key("ByteVec")
 final case class ValByteVec(value: ByteString) extends Val.Primitive {
   override def toVmVal: vm.Val = vm.Val.ByteVec(value)
+  val Type: String             = ValByteVec.Type
+}
+object ValByteVec {
+  val Type = "ByteVec"
 }
 
 @upickle.implicits.key("Address")
 final case class ValAddress(value: model.Address) extends Val.Primitive {
   override def toVmVal: vm.Val = vm.Val.Address(value.lockupScript)
+  val Type: String             = ValAddress.Type
+}
+object ValAddress {
+  val Type = "Address"
 }
 
 @upickle.implicits.key("Array")
 final case class ValArray(value: util.AVector[Val]) extends Val {
   def flattenSize(): Int = value.sumBy(_.flattenSize())
+  val Type: String       = ValArray.Type
+}
+object ValArray {
+  val Type = "Array"
 }
