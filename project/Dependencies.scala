@@ -54,10 +54,9 @@ object Dependencies {
     "com.softwaremill.sttp.apispec" %% "openapi-model" % Version.apispec
   lazy val `tapir-swagger-ui` =
     "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui" % Version.tapir
-  lazy val `tapir-client` = "com.softwaremill.sttp.tapir" %% "tapir-sttp-client" % Version.tapir
-  lazy val `tapir-files`  = "com.softwaremill.sttp.tapir" %% "tapir-files"       % Version.tapir
-  lazy val `sttp-backend` =
-    "com.softwaremill.sttp.client3" %% "async-http-client-backend-future" % Version.sttp
+  lazy val `tapir-client` = "com.softwaremill.sttp.tapir"   %% "tapir-sttp-client" % Version.tapir
+  lazy val `tapir-files`  = "com.softwaremill.sttp.tapir"   %% "tapir-files"       % Version.tapir
+  lazy val `sttp-backend` = "com.softwaremill.sttp.client3" %% "core"              % Version.sttp
 
   lazy val `prometheus-simple-client` = "io.prometheus" % "simpleclient" % Version.prometheus
   lazy val `prometheus-simple-client-common` =
