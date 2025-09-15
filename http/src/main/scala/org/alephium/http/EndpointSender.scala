@@ -20,8 +20,8 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
 import com.typesafe.scalalogging.StrictLogging
-import sttp.client3.Request
 import sttp.client3.HttpClientFutureBackend
+import sttp.client3.Request
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.DecodeResult
 import sttp.tapir.client.sttp.SttpClientInterpreter
