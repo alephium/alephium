@@ -1734,7 +1734,7 @@ trait RestServerFixture
   lazy val blocksExporter = new BlocksExporter(node.blockFlow, rootPath)
   val walletConfig: WalletConfig = WalletConfig(
     None,
-    (new java.io.File("")).toPath,
+    Files.tmpDir.resolve(Hash.random.shortHex),
     Duration.ofMinutesUnsafe(0),
     apiConfig.apiKey,
     apiConfig.enableHttpMetrics,
