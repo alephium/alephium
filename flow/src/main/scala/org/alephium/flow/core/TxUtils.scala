@@ -993,6 +993,7 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  // scalastyle:off parameter.number
   def sweepAddress(
       targetBlockHashOpt: Option[BlockHash],
       fromLockPair: (LockupScript.Asset, UnlockScript),
@@ -1001,7 +1002,8 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       maxAttoAlphPerUTXOOpt: Option[U256],
-      utxosLimit: Int
+      utxosLimit: Int,
+      sweepAlphOnly: Boolean
   ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
     val (fromLockupScript, fromUnlockScript) = fromLockPair
     sweepAddressFromScripts(
@@ -1013,7 +1015,8 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt,
       gasPrice,
       maxAttoAlphPerUTXOOpt,
-      utxosLimit
+      utxosLimit,
+      sweepAlphOnly
     )
   }
 
@@ -1032,7 +1035,8 @@ trait TxUtils { Self: FlowUtils =>
       allTokenUtxos: AVector[AssetOutputInfo],
       allAlphUtxos: AVector[AssetOutputInfo],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      sweepAlphOnly: Boolean
   ): (AVector[UnsignedTransaction], AVector[AssetOutputInfo], Option[String]) = {
     assume(allTokenUtxos.forall(_.output.tokens.length == 1))
 
@@ -1041,7 +1045,15 @@ trait TxUtils { Self: FlowUtils =>
       if (isConsolidation(fromLockupScript, toLockupScript) && lockTimeOpt.isEmpty) {
         utxosPerToken.filter(_._2.length > 1)
       } else {
-        utxosPerToken
+        if (sweepAlphOnly) {
+          utxosPerToken
+            .map { case (tokenId, utxos) =>
+              (tokenId, utxos.filter(_.output.amount > dustUtxoAmount))
+            }
+            .filter(_._2.length > 0)
+        } else {
+          utxosPerToken
+        }
       }
 
     // group based on token id, so that utxos with the same token can
@@ -1061,7 +1073,8 @@ trait TxUtils { Self: FlowUtils =>
           tokenUtxos,
           alphUtxos.sorted(UtxoSelectionAlgo.AssetAscendingOrder.byAlph),
           gasOpt,
-          gasPrice
+          gasPrice,
+          sweepAlphOnly
         ) match {
           case Right((unsignedTx, restAlphUtxos)) =>
             unsignedTxs.addOne(unsignedTx)
@@ -1080,7 +1093,8 @@ trait TxUtils { Self: FlowUtils =>
               tokenUtxos,
               alphUtxos.sorted(UtxoSelectionAlgo.AssetDescendingOrder.byAlph),
               gasOpt,
-              gasPrice
+              gasPrice,
+              sweepAlphOnly
             ).map { case (unsignedTx, restAlphUtxos) =>
               unsignedTxs.addOne(unsignedTx)
               alphUtxos = restAlphUtxos
@@ -1110,7 +1124,8 @@ trait TxUtils { Self: FlowUtils =>
       tokenUtxos: AVector[AssetOutputInfo],
       alphUtxos: AVector[AssetOutputInfo],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      sweepAlphOnly: Boolean
   ): Either[String, (UnsignedTransaction, AVector[AssetOutputInfo])] = {
     for {
       totalAlphAmount <- checkTotalAttoAlphAmount(tokenUtxos.map(_.output.amount))
@@ -1140,12 +1155,17 @@ trait TxUtils { Self: FlowUtils =>
         fromLockupScript,
         fromUnlockScript,
         (tokenUtxos ++ selectedSoFor.selected).map(asset => (asset.ref, asset.output)),
-        buildTokenOutputs(totalAmountPerToken, toLockupScript, lockTimeOpt) :+ changeOutput,
+        if (sweepAlphOnly) {
+          buildTokenOutputs(totalAmountPerToken, fromLockupScript, None) :+ changeOutput
+        } else {
+          buildTokenOutputs(totalAmountPerToken, toLockupScript, lockTimeOpt) :+ changeOutput
+        },
         gas,
         gasPrice
       )
     } yield (unsignedTx, selectedSoFor.rest)
   }
+  // scalastyle:on parameter.number
 
   private def checkEstimatedGas(
       gasOpt: Option[GasBox],
@@ -1237,7 +1257,8 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       maxAttoAlphPerUTXOOpt: Option[U256],
-      utxosLimit: Int
+      utxosLimit: Int,
+      sweepAlphOnly: Boolean
   ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
     val checkResult = checkProvidedGas(gasOpt, gasPrice)
 
@@ -1258,7 +1279,8 @@ trait TxUtils { Self: FlowUtils =>
             allTokenUtxos,
             allAlphUtxos,
             gasOpt,
-            gasPrice
+            gasPrice,
+            sweepAlphOnly
           )
           val (sweepAlphTxs, error1) = buildSweepAlphTxs(
             fromLockupScript,

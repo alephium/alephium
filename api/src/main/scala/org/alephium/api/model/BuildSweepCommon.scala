@@ -29,4 +29,5 @@ trait BuildSweepCommon {
   def targetBlockHash: Option[BlockHash]
   def utxosLimit: Option[Int]
   def group: Option[GroupIndex]
+  def sweepAlphOnly: Option[Boolean]
 }

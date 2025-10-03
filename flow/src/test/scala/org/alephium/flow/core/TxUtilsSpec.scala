@@ -889,7 +889,8 @@ class TxUtilsSpec extends AlephiumSpec {
           None,
           nonCoinbaseMinGasPrice,
           None,
-          defaultUtxoLimit
+          defaultUtxoLimit,
+          sweepAlphOnly = false
         )
         .rightValue
         .rightValue
@@ -907,7 +908,8 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   trait SweepAlphFixture extends FlowFixture {
-    lazy val isConsolidation         = Random.nextBoolean()
+    lazy val sweepAlphOnly           = false
+    lazy val isConsolidation         = !sweepAlphOnly && Random.nextBoolean()
     lazy val chainIndex              = ChainIndex.unsafe(0, 0)
     lazy val (privateKey, publicKey) = chainIndex.from.generateKey
     lazy val fromLockupScript        = LockupScript.p2pkh(publicKey)
@@ -969,8 +971,18 @@ class TxUtilsSpec extends AlephiumSpec {
       utxos
     }
 
-    def checkAndSignTx(unsignedTx: UnsignedTransaction): Transaction = {
-      unsignedTx.fixedOutputs.foreach(_.lockupScript is toLockupScript)
+    def checkAndSignTx(
+        unsignedTx: UnsignedTransaction,
+        sweepAlphOnly: Boolean = false
+    ): Transaction = {
+      if (sweepAlphOnly) {
+        unsignedTx.fixedOutputs
+          .dropRight(1)
+          .foreach(_.lockupScript is fromLockupScript)
+        unsignedTx.fixedOutputs.last.lockupScript is toLockupScript
+      } else {
+        unsignedTx.fixedOutputs.foreach(_.lockupScript is toLockupScript)
+      }
       unsignedTx.gasAmount is GasEstimation
         .estimateWithInputScript(
           (fromLockupScript, fromUnlockScript),
@@ -1032,6 +1044,26 @@ class TxUtilsSpec extends AlephiumSpec {
       }
     }
 
+    def submitAlphOnlySweepTxsAndCheckBalances(txs: AVector[Transaction]) = {
+      val (alph0, tokens0) = getBalances(fromLockupScript)
+      val totalGasFee      = submitSweepTxs(txs)
+      val (alph1, tokens1) = getBalances(toLockupScript)
+      val (alph2, tokens2) = getBalances(fromLockupScript)
+
+      val tokenDustAmount = blockFlow
+        .getUTXOs(fromLockupScript, Int.MaxValue, true)
+        .rightValue
+        .filter(_.output.tokens.nonEmpty)
+        .length
+        .mulUnsafe(dustUtxoAmount)
+
+      alph0.subUnsafe(tokenDustAmount).subUnsafe(totalGasFee) is alph1
+      alph2 is tokenDustAmount
+
+      tokens0.sortBy(_._1) is tokens2.sortBy(_._1)
+      tokens1.length is 0
+    }
+
     def sweep() = {
       blockFlow
         .sweepAddress(
@@ -1042,7 +1074,8 @@ class TxUtilsSpec extends AlephiumSpec {
           None,
           nonCoinbaseMinGasPrice,
           None,
-          Int.MaxValue
+          Int.MaxValue,
+          sweepAlphOnly = false
         )
         .rightValue
     }
@@ -1052,6 +1085,16 @@ class TxUtilsSpec extends AlephiumSpec {
     override lazy val isConsolidation = false
     val numOfUtxos                    = Random.between(1, 1000)
     val utxos                         = getAlphOutputs(numOfUtxos)
+    utxos.length is numOfUtxos
+    val txs = testSweepALPH(utxos)
+    txs.length is (utxos.length - 1) / ALPH.MaxTxInputNum + 1
+    submitSweepTxsAndCheckBalances(txs)
+  }
+
+  it should "sweep ALPH with ALPH only option on" in new SweepAlphFixture {
+    override lazy val sweepAlphOnly = true
+    val numOfUtxos                  = Random.between(1, 1000)
+    val utxos                       = getAlphOutputs(numOfUtxos)
     utxos.length is numOfUtxos
     val txs = testSweepALPH(utxos)
     txs.length is (utxos.length - 1) / ALPH.MaxTxInputNum + 1
@@ -1156,7 +1199,8 @@ class TxUtilsSpec extends AlephiumSpec {
     def getTokenOutputs(
         numOfTokens: Int,
         numOfUtxosPerToken: Int,
-        amountPerUtxo: U256 = U256.One
+        tokenAmountPerUtxo: U256 = U256.One,
+        alphAmountPerUtxo: U256 = dustUtxoAmount
     ): AVector[AssetOutputInfo] = {
       val prevAllUtxos   = blockFlow.getUsableUtxos(fromLockupScript, Int.MaxValue).rightValue
       val prevTokenUtxos = prevAllUtxos.filter(_.output.tokens.nonEmpty)
@@ -1164,10 +1208,10 @@ class TxUtilsSpec extends AlephiumSpec {
         val tokenId = TokenId.random
         AVector.from(0 until numOfUtxosPerToken).map { _ =>
           AssetOutput(
-            dustUtxoAmount,
+            alphAmountPerUtxo,
             fromLockupScript,
             TimeStamp.zero,
-            AVector((tokenId, amountPerUtxo)),
+            AVector((tokenId, tokenAmountPerUtxo)),
             ByteString.empty
           )
         }
@@ -1203,7 +1247,8 @@ class TxUtilsSpec extends AlephiumSpec {
         tokenUtxos,
         alphUtxos,
         gasOpt,
-        nonCoinbaseMinGasPrice
+        nonCoinbaseMinGasPrice,
+        sweepAlphOnly
       )
       checker(restAlphUtxos)
       sweepTokenTxs.length is numOfTxs
@@ -1212,20 +1257,38 @@ class TxUtilsSpec extends AlephiumSpec {
       } else {
         AVector.empty
       }
-      sweepTokenTxs.map(checkAndSignTx) ++ sweepAlphTxs
+      sweepTokenTxs.map(checkAndSignTx(_, sweepAlphOnly)) ++ sweepAlphTxs
     }
   }
 
-  it should "sweep one token with multiple outputs into one tx" in new SweepTokenFixture {
-    val tokenOutputs = getTokenOutputs(1, 100)
-    val txs          = testSweepToken(tokenOutputs, AVector.empty, 1)
-    submitSweepTxsAndCheckBalances(txs)
+  it should "sweep one token with multiple outputs into one tx" in {
+    new SweepTokenFixture {
+      val tokenOutputs = getTokenOutputs(1, 100)
+      val txs          = testSweepToken(tokenOutputs, AVector.empty, 1)
+      submitSweepTxsAndCheckBalances(txs)
+    }
+
+    new SweepTokenFixture {
+      override lazy val sweepAlphOnly = true
+      val tokenOutputs = getTokenOutputs(1, 100, alphAmountPerUtxo = dustUtxoAmount * 2)
+      val txs          = testSweepToken(tokenOutputs, AVector.empty, 1)
+      submitAlphOnlySweepTxsAndCheckBalances(txs)
+    }
   }
 
-  it should "sweep one token with multiple outputs into multiple txs" in new SweepTokenFixture {
-    val tokenOutputs = getTokenOutputs(1, 300)
-    val txs          = testSweepToken(tokenOutputs, AVector.empty, 3)
-    submitSweepTxsAndCheckBalances(txs)
+  it should "sweep one token with multiple outputs into multiple txs" in {
+    new SweepTokenFixture {
+      val tokenOutputs = getTokenOutputs(1, 300)
+      val txs          = testSweepToken(tokenOutputs, AVector.empty, 3)
+      submitSweepTxsAndCheckBalances(txs)
+    }
+
+    new SweepTokenFixture {
+      override lazy val sweepAlphOnly = true
+      val tokenOutputs = getTokenOutputs(1, 300, alphAmountPerUtxo = dustUtxoAmount * 2)
+      val txs          = testSweepToken(tokenOutputs, AVector.empty, 3)
+      submitAlphOnlySweepTxsAndCheckBalances(txs)
+    }
   }
 
   it should "sweep utxos with the same token into one transaction as much as possible" in new SweepTokenFixture {
@@ -1242,15 +1305,33 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "sweep multiple tokens into one tx" in new SweepTokenFixture {
-    val tokenOutputs = getTokenOutputs(5, 20)
-    val txs          = testSweepToken(tokenOutputs, AVector.empty, 1)
-    submitSweepTxsAndCheckBalances(txs)
+    new SweepTokenFixture {
+      val tokenOutputs = getTokenOutputs(5, 20)
+      val txs          = testSweepToken(tokenOutputs, AVector.empty, 1)
+      submitSweepTxsAndCheckBalances(txs)
+    }
+
+    new SweepTokenFixture {
+      override lazy val sweepAlphOnly = true
+      val tokenOutputs = getTokenOutputs(5, 20, alphAmountPerUtxo = dustUtxoAmount * 4)
+      val txs          = testSweepToken(tokenOutputs, AVector.empty, 1)
+      submitAlphOnlySweepTxsAndCheckBalances(txs)
+    }
   }
 
   it should "sweep multiple tokens into multiple txs" in new SweepTokenFixture {
-    val tokenOutputs = getTokenOutputs(15, 20)
-    val txs          = testSweepToken(tokenOutputs, AVector.empty, 3)
-    submitSweepTxsAndCheckBalances(txs)
+    new SweepTokenFixture {
+      val tokenOutputs = getTokenOutputs(15, 20)
+      val txs          = testSweepToken(tokenOutputs, AVector.empty, 3)
+      submitSweepTxsAndCheckBalances(txs)
+    }
+
+    new SweepTokenFixture {
+      override lazy val sweepAlphOnly = true
+      val tokenOutputs = getTokenOutputs(15, 20, alphAmountPerUtxo = dustUtxoAmount * 4)
+      val txs          = testSweepToken(tokenOutputs, AVector.empty, 3)
+      submitAlphOnlySweepTxsAndCheckBalances(txs)
+    }
   }
 
   it should "not consolidate tokens that have only one utxo" in new SweepTokenFixture {
@@ -1276,7 +1357,30 @@ class TxUtilsSpec extends AlephiumSpec {
     tokenOutputs1.foreach { output =>
       txs1.exists(_.unsigned.inputs.exists(_.outputRef == output.ref)) is true
     }
+
     submitSweepTxsAndCheckBalances(txs1)
+  }
+
+  it should "not consolidate tokens that only have dustUtxoAmount with Alph only sweep" in {
+    new SweepTokenFixture {
+      override lazy val sweepAlphOnly = true
+      val tokenOutputs                = getTokenOutputs(5, 20, alphAmountPerUtxo = dustUtxoAmount)
+      testSweepToken(tokenOutputs, AVector.empty, 0)
+    }
+
+    new SweepTokenFixture {
+      override lazy val sweepAlphOnly = true
+      val tokenOutputs                = getTokenOutputs(15, 20, alphAmountPerUtxo = dustUtxoAmount)
+      testSweepToken(tokenOutputs, AVector.empty, 0)
+    }
+
+    new SweepTokenFixture {
+      override lazy val sweepAlphOnly = true
+      val tokenOutputs                = getTokenOutputs(15, 20, alphAmountPerUtxo = dustUtxoAmount)
+      val alphOutputs                 = getAlphOutputs(1)
+      val txs                         = testSweepToken(tokenOutputs, alphOutputs, 0)
+      submitAlphOnlySweepTxsAndCheckBalances(txs)
+    }
   }
 
   it should "return empty txs if all tokens have only one utxo when consolidating" in new SweepTokenFixture {
@@ -1293,11 +1397,27 @@ class TxUtilsSpec extends AlephiumSpec {
     submitSweepTxsAndCheckBalances(txs)
   }
 
+  it should "only sweep ALPH with ALPH only sweep" in new SweepTokenFixture {
+    override lazy val sweepAlphOnly = true
+
+    val tokenOutputs = getTokenOutputs(3, 40)
+    val alphOutputs  = getAlphOutputs(2)
+    val txs          = testSweepToken(tokenOutputs, alphOutputs, 0, None, None)
+    submitAlphOnlySweepTxsAndCheckBalances(txs)
+  }
+
   it should "use ALPH utxos if token utxos cannot cover the gas fee" in new SweepTokenFixture {
     override lazy val isConsolidation = false
     val tokenOutputs                  = getTokenOutputs(500, 1)
     val alphOutputs                   = getAlphOutputs(4)
-    val txs = testSweepToken(tokenOutputs, alphOutputs, 4, None, None, _.isEmpty is true)
+    val txs = testSweepToken(
+      tokenOutputs,
+      alphOutputs,
+      4,
+      None,
+      None,
+      _.isEmpty is true
+    )
     submitSweepTxsAndCheckBalances(txs)
   }
 
@@ -1312,7 +1432,8 @@ class TxUtilsSpec extends AlephiumSpec {
         tokenOutputs,
         AVector.empty,
         None,
-        nonCoinbaseMinGasPrice
+        nonCoinbaseMinGasPrice,
+        sweepAlphOnly
       )
       .leftValue is "Not enough ALPH for gas fee in sweeping"
   }
@@ -1329,7 +1450,8 @@ class TxUtilsSpec extends AlephiumSpec {
         tokenOutputs,
         alphOutputs,
         Some(minimalGas),
-        nonCoinbaseMinGasPrice
+        nonCoinbaseMinGasPrice,
+        sweepAlphOnly
       )
       .leftValue
       .startsWith("The specified gas amount is not enough") is true
@@ -1352,7 +1474,8 @@ class TxUtilsSpec extends AlephiumSpec {
         tokenOutputs,
         alphOutputs,
         Some(gas),
-        nonCoinbaseMinGasPrice
+        nonCoinbaseMinGasPrice,
+        sweepAlphOnly
       )
       .isLeft is true
 
@@ -1384,10 +1507,10 @@ class TxUtilsSpec extends AlephiumSpec {
 
     val txs0 = sweep().rightValue
     txs0.length is 5
-    val gasFee0 = submitSweepTxs(txs0.map(checkAndSignTx))
+    val gasFee0 = submitSweepTxs(txs0.map(checkAndSignTx(_, sweepAlphOnly)))
     val txs1    = sweep().rightValue
     txs1.length is 2
-    val gasFee1     = submitSweepTxs(txs1.map(checkAndSignTx))
+    val gasFee1     = submitSweepTxs(txs1.map(checkAndSignTx(_, sweepAlphOnly)))
     val totalGasFee = gasFee0.addUnsafe(gasFee1)
 
     val (alph1, tokens1) = getBalances(toLockupScript)
@@ -1629,7 +1752,8 @@ class TxUtilsSpec extends AlephiumSpec {
           None,
           nonCoinbaseMinGasPrice,
           None,
-          Int.MaxValue
+          Int.MaxValue,
+          sweepAlphOnly = false
         )
         .rightValue
         .rightValue
@@ -1653,7 +1777,8 @@ class TxUtilsSpec extends AlephiumSpec {
           None,
           nonCoinbaseMinGasPrice,
           Some(ALPH.oneAlph),
-          Int.MaxValue
+          Int.MaxValue,
+          sweepAlphOnly = false
         )
         .rightValue
         .rightValue

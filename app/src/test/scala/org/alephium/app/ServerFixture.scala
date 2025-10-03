@@ -359,6 +359,7 @@ object ServerFixture {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }
 
+    // scalastyle:off parameter.number
     override def sweepAddress(
         targetBlockHashOpt: Option[BlockHash],
         fromLockPair: (LockupScript.Asset, UnlockScript),
@@ -367,12 +368,12 @@ object ServerFixture {
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
         maxAttoAlphPerUTXOOpt: Option[U256],
-        utxosLimit: Int
+        utxosLimit: Int,
+        sweepAlphOnly: Boolean
     ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
       Right(Right(AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
     }
 
-    // scalastyle:off parameter.number
     override def sweepAddressFromScripts(
         targetBlockHashOpt: Option[BlockHash],
         fromLockupScript: LockupScript.Asset,
@@ -382,10 +383,12 @@ object ServerFixture {
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
         maxAttoAlphPerUTXOOpt: Option[U256],
-        utxosLimit: Int
+        utxosLimit: Int,
+        sweepAlphOnly: Boolean
     ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
       Right(Right(AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
     }
+    // scalastyle:on parameter.number
 
     // scalastyle:off no.equal
     val blockChainIndex = ChainIndex.from(block.hash, config.broker.groups)

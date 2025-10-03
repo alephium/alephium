@@ -1140,7 +1140,8 @@ class ServerUtils(implicit
       query.gasAmount,
       query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
       query.maxAttoAlphPerUTXO.map(_.value),
-      getUtxosLimit(query.utxosLimit)
+      getUtxosLimit(query.utxosLimit),
+      query.sweepAlphOnly.getOrElse(false)
     ) match {
       case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
       case Right(Left(error))        => Left(failed(error))
