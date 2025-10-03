@@ -14880,6 +14880,9 @@
           "group": {
             "type": "integer",
             "format": "group-index"
+          },
+          "sweepAlphOnly": {
+            "type": "boolean"
           }
         }
       },
@@ -14980,6 +14983,9 @@
               "P2HMPK",
               "P2MPKH"
             ]
+          },
+          "sweepAlphOnly": {
+            "type": "boolean"
           }
         }
       },

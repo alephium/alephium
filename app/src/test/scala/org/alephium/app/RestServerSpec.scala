@@ -390,6 +390,25 @@ abstract class RestServerSpec(
         Address.asset(dummyToAddress).value.groupIndex
       )
     }
+
+    Post(
+      s"/transactions/sweep-address/build",
+      body = s"""
+                |{
+                |  "fromPublicKey": "$dummyKeyHex",
+                |  "toAddress": "$dummyToAddress",
+                |  "sweepAlphOnly": true
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.Ok
+      response.as[BuildSweepAddressTransactionsResult] is dummySweepAddressBuildTransactionsResult(
+        ServerFixture.dummySweepAddressTx(dummyTx, dummyToLockupScript, None, true),
+        Address.asset(dummyKeyAddress).value.groupIndex,
+        Address.asset(dummyToAddress).value.groupIndex
+      )
+    }
+
     Post(
       s"/transactions/sweep-address/build",
       body = s"""

@@ -152,14 +152,25 @@ object ServerFixture {
   def dummySweepAddressTx(
       tx: Transaction,
       toLockupScript: LockupScript.Asset,
-      lockTimeOpt: Option[TimeStamp]
+      lockTimeOpt: Option[TimeStamp],
+      sweepAlphOnly: Boolean = false
   ): Transaction = {
-    val output = TxOutput.asset(
-      U256.Ten,
-      toLockupScript,
-      AVector((TokenId.hash("token1"), U256.One), (TokenId.hash("token2"), U256.Two)),
-      lockTimeOpt
-    )
+    val output = if (sweepAlphOnly) {
+      TxOutput.asset(
+        U256.Ten,
+        toLockupScript,
+        AVector.empty,
+        lockTimeOpt
+      )
+    } else {
+      TxOutput.asset(
+        U256.Ten,
+        toLockupScript,
+        AVector((TokenId.hash("token1"), U256.One), (TokenId.hash("token2"), U256.Two)),
+        lockTimeOpt
+      )
+    }
+
     tx.copy(
       unsigned = tx.unsigned.copy(fixedOutputs = AVector(output))
     )
@@ -371,7 +382,11 @@ object ServerFixture {
         utxosLimit: Int,
         sweepAlphOnly: Boolean
     ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
-      Right(Right(AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
+      Right(
+        Right(
+          AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt, sweepAlphOnly).unsigned)
+        )
+      )
     }
 
     override def sweepAddressFromScripts(
@@ -386,7 +401,11 @@ object ServerFixture {
         utxosLimit: Int,
         sweepAlphOnly: Boolean
     ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
-      Right(Right(AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
+      Right(
+        Right(
+          AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt, sweepAlphOnly).unsigned)
+        )
+      )
     }
     // scalastyle:on parameter.number
 

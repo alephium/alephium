@@ -870,7 +870,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "estimate gas for sweep all tx" in new FlowFixture {
     val txValidation = TxValidation.build
-    def test(inputNum: Int, numOfTxs: Int) = {
+    def test(inputNum: Int, numOfTxs: Int, sweepAlphOnly: Boolean) = {
       val blockflow = isolatedBlockFlow()
       val block     = transfer(blockflow, ChainIndex.unsafe(0, 0))
       val tx        = block.nonCoinbase.head
@@ -890,7 +890,7 @@ class TxUtilsSpec extends AlephiumSpec {
           nonCoinbaseMinGasPrice,
           None,
           defaultUtxoLimit,
-          sweepAlphOnly = false
+          sweepAlphOnly
         )
         .rightValue
         .rightValue
@@ -903,8 +903,10 @@ class TxUtilsSpec extends AlephiumSpec {
       }
     }
 
-    test(1, 0)
-    (2 to 10).foreach(test(_, 1))
+    test(1, 0, false)
+    (2 to 10).foreach(test(_, 1, false))
+    test(1, 0, true)
+    (2 to 10).foreach(test(_, 1, true))
   }
 
   trait SweepAlphFixture extends FlowFixture {
@@ -1075,7 +1077,7 @@ class TxUtilsSpec extends AlephiumSpec {
           nonCoinbaseMinGasPrice,
           None,
           Int.MaxValue,
-          sweepAlphOnly = false
+          false
         )
         .rightValue
     }
