@@ -1162,12 +1162,16 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       LockupScript.P2PK(fromLockupScript.publicKey, toGroupIndex)
     }
 
-    def buildSweepTxsAndSubmit(groupIndex: Option[GroupIndex]): U256 = {
+    def buildSweepTxsAndSubmit(
+        groupIndex: Option[GroupIndex],
+        sweepAlphOnly: Option[Boolean] = None
+    ): U256 = {
       val query = BuildSweepAddressTransactions(
         fromLockupScript.publicKey.rawBytes,
         Some(BuildTxCommon.GLWebAuthn),
         Address.Asset(toLockupScript),
-        group = groupIndex
+        group = groupIndex,
+        sweepAlphOnly = sweepAlphOnly
       )
       val unsignedTxs =
         serverUtils.buildSweepAddressTransactions(blockFlow, query).rightValue.unsignedTxs
@@ -1177,6 +1181,47 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         acc.addUnsafe(unsignedTx.gasFee)
       }
     }
+  }
+
+  trait P2PKSweepAlphOnlyFixture extends P2PKSweepFixture {
+    private val tokenContract = "Contract SweepToken() { pub fn main() -> () {} }"
+    private val tokenIssuance = Some(
+      TokenIssuance.Info(Val.U256(U256.MaxValue), Some(LockupScript.p2pkh(genesisPublicKey)))
+    )
+    lazy val tokenId: TokenId = TokenId.from(
+      createContract(tokenContract, tokenIssuanceInfo = tokenIssuance, chainIndex = chainIndex)._1
+    )
+
+    override val toGroupIndex: GroupIndex =
+      groupIndexGen.retryUntil(_ != fromGroupIndex).sample.getOrElse(fromGroupIndex)
+    override val toLockupScript: LockupScript.Asset =
+      assetLockupGen(toGroupIndex).sample.getOrElse(
+        LockupScript.P2PK(fromLockupScript.publicKey, toGroupIndex)
+      )
+
+    val tokenSweepAmount: U256 = ALPH.alph(5)
+
+    val outputInfos = AVector(
+      UnsignedTransaction.TxOutputInfo(
+        fromLockupScript,
+        dustUtxoAmount,
+        AVector(tokenId -> tokenSweepAmount),
+        None
+      )
+    )
+    val unsignedTx = blockFlow
+      .transfer(
+        genesisPublicKey,
+        outputInfos,
+        None,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+      .rightValue
+
+    mineWithTx(Transaction.from(unsignedTx, genesisPrivateKey))
   }
 
   it should "sweep from one group: P2PK" in new P2PKSweepFixture {
@@ -1217,6 +1262,34 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         }
         checkBalance(blockFlow, toLockupScript, totalAmount.subUnsafe(gasFee))
     }
+  }
+
+  it should "sweep from one group with ALPH only: P2PK" in new P2PKSweepAlphOnlyFixture {
+    (1 to 5).foreach(index => transfer(ALPH.alph(index.toLong), fromLockupScript))
+
+    val initialFromBalance = blockFlow.getBalance(fromLockupScript, Int.MaxValue, false).rightValue
+    val initialFromTokenAmount = initialFromBalance.totalTokens
+      .find(_._1 == tokenId)
+      .map(_._2)
+      .getOrElse(U256.Zero)
+
+    initialFromTokenAmount is tokenSweepAmount
+
+    val gasFee = buildSweepTxsAndSubmit(Some(fromGroupIndex), sweepAlphOnly = Some(true))
+
+    val finalFromBalance = blockFlow.getBalance(fromLockupScript, Int.MaxValue, false).rightValue
+    val finalToBalance   = blockFlow.getBalance(toLockupScript, Int.MaxValue, false).rightValue
+
+    finalFromBalance.totalTokens
+      .find(_._1 == tokenId)
+      .map(_._2)
+      .getOrElse(U256.Zero) is initialFromTokenAmount
+    finalFromBalance.totalAlph is dustUtxoAmount
+
+    finalToBalance.totalTokens.find(_._1 == tokenId).map(_._2).getOrElse(U256.Zero) is U256.Zero
+    finalToBalance.totalAlph is initialFromBalance.totalAlph
+      .subUnsafe(gasFee)
+      .subUnsafe(dustUtxoAmount)
   }
 
   trait P2HMPKSweepFixture extends P2HMPKFixture with GrouplessSweepFixture {
