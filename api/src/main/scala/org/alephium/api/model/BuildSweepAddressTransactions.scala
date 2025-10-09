@@ -33,7 +33,8 @@ final case class BuildSweepAddressTransactions(
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None,
     utxosLimit: Option[Int] = None,
-    group: Option[GroupIndex] = None
+    group: Option[GroupIndex] = None,
+    sweepAlphOnly: Option[Boolean] = None
 ) extends BuildTxCommon
     with BuildTxCommon.FromPublicKey
     with BuildSweepCommon

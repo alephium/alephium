@@ -37,6 +37,7 @@ final case class BuildSweepMultisig(
     utxosLimit: Option[Int] = None,
     targetBlockHash: Option[BlockHash] = None,
     group: Option[GroupIndex] = None,
-    multiSigType: Option[MultiSigType] = Some(MultiSigType.P2MPKH)
+    multiSigType: Option[MultiSigType] = Some(MultiSigType.P2MPKH),
+    sweepAlphOnly: Option[Boolean] = None
 ) extends BuildMultisigCommon
     with BuildSweepCommon
