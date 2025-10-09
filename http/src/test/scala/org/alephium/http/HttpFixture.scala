@@ -18,7 +18,7 @@ package org.alephium.http
 
 import org.scalatest.Assertion
 import sttp.client3._
-import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
+import sttp.client3.HttpClientFutureBackend
 import sttp.model.{Method, Uri}
 
 import org.alephium.json.Json._
@@ -46,7 +46,7 @@ trait HttpFixture {
 
   type HttpRequest = RequestT[Identity, Either[String, String], Any]
 
-  val backend = AsyncHttpClientFutureBackend()
+  val backend = HttpClientFutureBackend()
 
   def httpRequest[T, R](
       method: Method,

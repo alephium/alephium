@@ -172,7 +172,6 @@ class RestServer(
     .handler(
       CorsHandler
         .create()
-        .addRelativeOrigin(".*.")
         .allowedMethod(HttpMethod.GET)
         .allowedMethod(HttpMethod.POST)
         .allowedMethod(HttpMethod.PUT)

@@ -72,7 +72,9 @@ object FastParseErrorUtil {
   /** Fetch the most recent error message. */
   def getLatestErrorMessage(traced: Parsed.TracedFailure, forIndex: Int): String = {
     // label is added to the tail-end because in `Parsed.TracedFailure.longMsg` label gets preference.
-    val stack = traced.stack.appended((traced.label, traced.index))
+    // Converting to Vector as:
+    //    [wartremover:ListAppend] Don't use List `:+` or `appended` method because too slow
+    val stack = traced.stack.toVector :+ (traced.label, traced.index)
 
     stack
       .filter(_._2 == forIndex) // all parsers for this index
