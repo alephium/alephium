@@ -124,40 +124,41 @@ trait TapirSchemasLike {
 
   implicit val buildChainedTxSchema: Schema[BuildChainedTx] =
     Schema.oneOfUsingField[BuildChainedTx, String](
-      _.Type,
+      _.`type`,
       identity
     )(
       List(
-        BuildChainedTransferTx.Type       -> Schema.derived[BuildChainedTransferTx],
-        BuildChainedDeployContractTx.Type -> Schema.derived[BuildChainedDeployContractTx],
-        BuildChainedExecuteScriptTx.Type  -> Schema.derived[BuildChainedExecuteScriptTx]
+        BuildChainedTransferTx.`type`       -> Schema.derived[BuildChainedTransferTx],
+        BuildChainedDeployContractTx.`type` -> Schema.derived[BuildChainedDeployContractTx],
+        BuildChainedExecuteScriptTx.`type`  -> Schema.derived[BuildChainedExecuteScriptTx]
       ): _*
     )
 
   implicit lazy val valSchema: Schema[Val] = Schema.oneOfUsingField[Val, String](
-    _.Type,
+    _.`type`,
     identity
   )(
     List(
-      ValBool.Type    -> Schema.derived[ValBool],
-      ValI256.Type    -> Schema.derived[ValI256],
-      ValU256.Type    -> Schema.derived[ValU256],
-      ValByteVec.Type -> Schema.derived[ValByteVec],
-      ValAddress.Type -> Schema.derived[ValAddress],
-      ValArray.Type   -> Schema.derived[ValArray]
+      ValBool.`type`    -> Schema.derived[ValBool],
+      ValI256.`type`    -> Schema.derived[ValI256],
+      ValU256.`type`    -> Schema.derived[ValU256],
+      ValByteVec.`type` -> Schema.derived[ValByteVec],
+      ValAddress.`type` -> Schema.derived[ValAddress],
+      ValArray.`type`   -> Schema.derived[ValArray]
     ): _*
   )
 
   implicit val buildChainedTxResultSchema: Schema[BuildChainedTxResult] =
     Schema.oneOfUsingField[BuildChainedTxResult, String](
-      _.Type,
+      _.`type`,
       identity
     )(
       List(
-        BuildChainedTransferTxResult.Type -> Schema.derived[BuildChainedTransferTxResult],
-        BuildChainedDeployContractTxResult.Type -> Schema
+        BuildChainedTransferTxResult.`type` -> Schema.derived[BuildChainedTransferTxResult],
+        BuildChainedDeployContractTxResult.`type` -> Schema
           .derived[BuildChainedDeployContractTxResult],
-        BuildChainedExecuteScriptTxResult.Type -> Schema.derived[BuildChainedExecuteScriptTxResult]
+        BuildChainedExecuteScriptTxResult.`type` -> Schema
+          .derived[BuildChainedExecuteScriptTxResult]
       ): _*
     )
 

@@ -24,7 +24,7 @@ import org.alephium.util
 
 sealed trait Val {
   def flattenSize(): Int
-  val Type: String
+  val `type`: String
 }
 
 object Val {
@@ -49,53 +49,53 @@ object Val {
 @upickle.implicits.key("Bool")
 final case class ValBool(value: Boolean) extends Val.Primitive {
   override def toVmVal: vm.Val = vm.Val.Bool(value)
-  val Type: String             = ValBool.Type
+  val `type`: String           = ValBool.`type`
 }
 object ValBool {
-  val Type = "Bool"
+  val `type` = "Bool"
 }
 
 @upickle.implicits.key("I256")
 final case class ValI256(value: util.I256) extends Val.Primitive {
   override def toVmVal: vm.Val = vm.Val.I256(value)
-  val Type: String             = ValI256.Type
+  val `type`: String           = ValI256.`type`
 }
 object ValI256 {
-  val Type = "I256"
+  val `type` = "I256"
 }
 
 @upickle.implicits.key("U256")
 final case class ValU256(value: util.U256) extends Val.Primitive {
   override def toVmVal: vm.Val = vm.Val.U256(value)
-  val Type: String             = ValU256.Type
+  val `type`: String           = ValU256.`type`
 }
 object ValU256 {
-  val Type = "U256"
+  val `type` = "U256"
 }
 
 @upickle.implicits.key("ByteVec")
 final case class ValByteVec(value: ByteString) extends Val.Primitive {
   override def toVmVal: vm.Val = vm.Val.ByteVec(value)
-  val Type: String             = ValByteVec.Type
+  val `type`: String           = ValByteVec.`type`
 }
 object ValByteVec {
-  val Type = "ByteVec"
+  val `type` = "ByteVec"
 }
 
 @upickle.implicits.key("Address")
 final case class ValAddress(value: model.Address) extends Val.Primitive {
   override def toVmVal: vm.Val = vm.Val.Address(value.lockupScript)
-  val Type: String             = ValAddress.Type
+  val `type`: String           = ValAddress.`type`
 }
 object ValAddress {
-  val Type = "Address"
+  val `type` = "Address"
 }
 
 @upickle.implicits.key("Array")
 final case class ValArray(value: util.AVector[Val]) extends Val {
   def flattenSize(): Int = value.sumBy(_.flattenSize())
-  val Type: String       = ValArray.Type
+  val `type`: String     = ValArray.`type`
 }
 object ValArray {
-  val Type = "Array"
+  val `type` = "Array"
 }

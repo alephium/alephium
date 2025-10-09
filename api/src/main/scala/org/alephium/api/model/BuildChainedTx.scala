@@ -18,31 +18,31 @@ package org.alephium.api.model
 
 sealed trait BuildChainedTx {
   val value: BuildTxCommon with BuildTxCommon.FromPublicKey
-  val Type: String
+  val `type`: String
 }
 
 @upickle.implicits.key("Transfer")
 final case class BuildChainedTransferTx(value: BuildTransferTx) extends BuildChainedTx {
-  val Type: String = BuildChainedTransferTx.Type
+  val `type`: String = BuildChainedTransferTx.`type`
 }
 object BuildChainedTransferTx {
-  val Type = "Transfer"
+  val `type` = "Transfer"
 }
 
 @upickle.implicits.key("DeployContract")
 final case class BuildChainedDeployContractTx(value: BuildDeployContractTx) extends BuildChainedTx {
-  val Type: String = BuildChainedDeployContractTx.Type
+  val `type`: String = BuildChainedDeployContractTx.`type`
 }
 
 object BuildChainedDeployContractTx {
-  val Type = "DeployContract"
+  val `type` = "DeployContract"
 }
 
 @upickle.implicits.key("ExecuteScript")
 final case class BuildChainedExecuteScriptTx(value: BuildExecuteScriptTx) extends BuildChainedTx {
-  val Type: String = BuildChainedExecuteScriptTx.Type
+  val `type`: String = BuildChainedExecuteScriptTx.`type`
 }
 
 object BuildChainedExecuteScriptTx {
-  val Type = "ExecuteScript"
+  val `type` = "ExecuteScript"
 }

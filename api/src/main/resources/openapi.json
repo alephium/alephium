@@ -14161,13 +14161,13 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
             "$ref": "#/components/schemas/BuildDeployContractTx"
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "DeployContract"
           }
@@ -14178,13 +14178,13 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
             "$ref": "#/components/schemas/BuildSimpleDeployContractTxResult"
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "DeployContract"
           }
@@ -14195,13 +14195,13 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
             "$ref": "#/components/schemas/BuildExecuteScriptTx"
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "ExecuteScript"
           }
@@ -14212,13 +14212,13 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
             "$ref": "#/components/schemas/BuildSimpleExecuteScriptTxResult"
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "ExecuteScript"
           }
@@ -14229,13 +14229,13 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
             "$ref": "#/components/schemas/BuildTransferTx"
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "Transfer"
           }
@@ -14246,13 +14246,13 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
             "$ref": "#/components/schemas/BuildSimpleTransferTxResult"
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "Transfer"
           }
@@ -14272,7 +14272,7 @@
           }
         ],
         "discriminator": {
-          "propertyName": "Type",
+          "propertyName": "type",
           "mapping": {
             "DeployContract": "#/components/schemas/BuildChainedDeployContractTx",
             "ExecuteScript": "#/components/schemas/BuildChainedExecuteScriptTx",
@@ -14294,7 +14294,7 @@
           }
         ],
         "discriminator": {
-          "propertyName": "Type",
+          "propertyName": "type",
           "mapping": {
             "DeployContract": "#/components/schemas/BuildChainedDeployContractTxResult",
             "ExecuteScript": "#/components/schemas/BuildChainedExecuteScriptTxResult",
@@ -17902,7 +17902,7 @@
           }
         ],
         "discriminator": {
-          "propertyName": "Type",
+          "propertyName": "type",
           "mapping": {
             "Address": "#/components/schemas/ValAddress",
             "Array": "#/components/schemas/ValArray",
@@ -17918,14 +17918,14 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
             "type": "string",
             "format": "address"
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "Address"
           }
@@ -17936,7 +17936,7 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
@@ -17945,7 +17945,7 @@
               "$ref": "#/components/schemas/Val"
             }
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "Array"
           }
@@ -17956,13 +17956,13 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
             "type": "boolean"
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "Bool"
           }
@@ -17973,14 +17973,14 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
             "type": "string",
             "format": "hex-string"
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "ByteVec"
           }
@@ -17991,14 +17991,14 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
             "type": "string",
             "format": "int256"
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "I256"
           }
@@ -18009,14 +18009,14 @@
         "type": "object",
         "required": [
           "value",
-          "Type"
+          "type"
         ],
         "properties": {
           "value": {
             "type": "string",
             "format": "uint256"
           },
-          "Type": {
+          "type": {
             "type": "string",
             "const": "U256"
           }
