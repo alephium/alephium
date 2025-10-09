@@ -19,7 +19,7 @@ package org.alephium.wallet.api
 import sttp.tapir.EndpointIO.Example
 
 import org.alephium.api.EndpointsExamples
-import org.alephium.api.model.Amount
+import org.alephium.api.model.Balance
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.config.GroupConfig
@@ -114,18 +114,23 @@ trait WalletExamples extends EndpointsExamples {
       )
     )
 
-  implicit val balancesExamples: List[Example[Balances]] =
+  implicit val balancesExamples: List[Example[WalletBalance]] =
     simpleExample(
-      Balances(
+      WalletBalance(
         balance,
         balance.hint,
         AVector(
-          Balances.AddressBalance(
+          WalletBalance.WalletAddressBalance(
             address,
-            balance,
-            balance.hint,
-            Amount.Zero,
-            Amount.Zero.hint
+            Balance(
+              balance,
+              balance.hint,
+              halfBalance,
+              halfBalance.hint,
+              None,
+              None,
+              utxoNum = 3
+            )
           )
         )
       )
