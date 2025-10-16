@@ -28,6 +28,7 @@ sealed abstract class AppIOError(reason: AppException) extends IOError(reason)
 object IOError {
   final case class Serde(e: SerdeError)         extends AppIOError(e)
   final case class KeyNotFound(e: AppException) extends AppIOError(e)
+  @SuppressWarnings(Array("org.wartremover.warts.ObjectThrowable"))
   final object MaxNodeReadLimitExceeded
       extends AppIOError(new AppException("MaxNodeReadLimitExceeded"))
   final case class ConfigError(e: AppException) extends AppIOError(e)

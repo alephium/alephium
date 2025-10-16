@@ -20,8 +20,8 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
 import com.typesafe.scalalogging.StrictLogging
+import sttp.client3.HttpClientFutureBackend
 import sttp.client3.Request
-import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.DecodeResult
 import sttp.tapir.client.sttp.SttpClientInterpreter
@@ -41,7 +41,7 @@ class EndpointSender(val maybeApiKey: Option[ApiKey])(implicit
     with Service
     with StrictLogging {
 
-  private val backend = AsyncHttpClientFutureBackend()
+  private val backend = HttpClientFutureBackend()
 
   protected def startSelfOnce(): Future[Unit] = Future.unit
 

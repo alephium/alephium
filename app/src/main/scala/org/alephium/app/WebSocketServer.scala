@@ -25,7 +25,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
 import io.vertx.core.eventbus.{EventBus => VertxEventBus}
-import io.vertx.core.http.{HttpServer, HttpServerOptions}
+import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.ApiModelCodec
@@ -35,7 +35,7 @@ import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{AVector, BaseActor, EventBus, Service}
+import org.alephium.util.{discard, AVector, BaseActor, EventBus, Service}
 
 class WebSocketServer(node: Node, wsPort: Int)(implicit
     val system: ActorSystem,
@@ -64,14 +64,24 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
 
   node.eventBus.tell(EventBus.Subscribe, eventHandler)
 
-  server.webSocketHandler { webSocket =>
-    webSocket.closeHandler(_ => eventHandler ! EventHandler.Unsubscribe(webSocket.textHandlerID()))
-
-    if (!webSocket.path().equals("/events")) {
-      webSocket.reject();
-    } else {
-      eventHandler ! EventHandler.Subscribe(webSocket.textHandlerID())
+  server.webSocketHandshakeHandler { handshake =>
+    discard {
+      if (!handshake.path().equals("/events")) {
+        handshake.reject();
+      } else {
+        handshake.accept().map { (webSocket: ServerWebSocket) =>
+          eventHandler ! EventHandler.Subscribe(webSocket.textHandlerID())
+        }
+      }
     }
+  }
+
+  server.webSocketHandler { webSocket =>
+    discard(
+      webSocket.closeHandler(_ =>
+        eventHandler ! EventHandler.Unsubscribe(webSocket.textHandlerID())
+      )
+    )
   }
 
   private val wsBindingPromise: Promise[HttpServer] = Promise()

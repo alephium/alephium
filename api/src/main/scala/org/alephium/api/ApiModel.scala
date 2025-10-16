@@ -325,7 +325,13 @@ trait ApiModelCodec {
   implicit val buildTransactionDeployContractRW: RW[BuildChainedDeployContractTx] =
     macroRW
   implicit val buildTransactionExecuteScriptRW: RW[BuildChainedExecuteScriptTx] = macroRW
-  implicit val buildTransactionRW: RW[BuildChainedTx]                           = macroRW
+  implicit val buildTransactionRW: RW[BuildChainedTx] =
+    RW.merge(
+      buildTransactionTransferRW,
+      buildTransactionDeployContractRW,
+      buildTransactionExecuteScriptRW
+    )
+
   implicit val buildTransactionTransferResultRW: RW[BuildChainedTransferTxResult] =
     macroRW
   implicit val buildTransactionDeployContractResultRW: RW[BuildChainedDeployContractTxResult] =

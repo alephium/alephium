@@ -28,8 +28,15 @@ import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, I256, TimeStamp, U256}
 
+@SuppressWarnings(
+  Array(
+    "org.wartremover.warts.JavaSerializable",
+    "org.wartremover.warts.Product",
+    "org.wartremover.warts.Serializable"
+  )
+)
 trait TapirSchemasLike {
   implicit def avectorSchema[T: Schema]: Schema[AVector[T]] = Schema(
     SArray(implicitly[Schema[T]])(_.toIterable)
@@ -51,6 +58,7 @@ trait TapirSchemasLike {
   implicit val signatureSchema: Schema[Signature]     = Schema(SString()).format("signature")
   implicit val timestampSchema: Schema[TimeStamp]     = Schema(SInteger()).format("int64")
   implicit val u256Schema: Schema[U256]               = Schema(SString()).format("uint256")
+  implicit val i256Schema: Schema[I256]               = Schema(SString()).format("int256")
   implicit val amountSchema: Schema[Amount]           = Schema(SString()).format("uint256")
   implicit val amountHintSchema: Schema[Amount.Hint]  = Schema(SString()).format("x.x ALPH")
   implicit val gasBoxSchema: Schema[GasBox]           = Schema(SInteger()).format("gas")
@@ -107,6 +115,52 @@ trait TapirSchemasLike {
     Schema.derived
   implicit val buildDeployContractTxResultSchema: Schema[BuildDeployContractTxResult] =
     Schema.derived
+
+  implicit val destinationSchema: Schema[Destination]                     = Schema.derived
+  implicit val outpuRefSchema: Schema[OutputRef]                          = Schema.derived
+  implicit val buildTransferTxSchema: Schema[BuildTransferTx]             = Schema.derived
+  implicit val buildDeployContractTxSchema: Schema[BuildDeployContractTx] = Schema.derived
+  implicit val buildExecuteScriptTxSchema: Schema[BuildExecuteScriptTx]   = Schema.derived
+
+  implicit val buildChainedTxSchema: Schema[BuildChainedTx] =
+    Schema.oneOfUsingField[BuildChainedTx, String](
+      _.`type`,
+      identity
+    )(
+      List(
+        BuildChainedTransferTx.`type`       -> Schema.derived[BuildChainedTransferTx],
+        BuildChainedDeployContractTx.`type` -> Schema.derived[BuildChainedDeployContractTx],
+        BuildChainedExecuteScriptTx.`type`  -> Schema.derived[BuildChainedExecuteScriptTx]
+      ): _*
+    )
+
+  implicit lazy val valSchema: Schema[Val] = Schema.oneOfUsingField[Val, String](
+    _.`type`,
+    identity
+  )(
+    List(
+      ValBool.`type`    -> Schema.derived[ValBool],
+      ValI256.`type`    -> Schema.derived[ValI256],
+      ValU256.`type`    -> Schema.derived[ValU256],
+      ValByteVec.`type` -> Schema.derived[ValByteVec],
+      ValAddress.`type` -> Schema.derived[ValAddress],
+      ValArray.`type`   -> Schema.derived[ValArray]
+    ): _*
+  )
+
+  implicit val buildChainedTxResultSchema: Schema[BuildChainedTxResult] =
+    Schema.oneOfUsingField[BuildChainedTxResult, String](
+      _.`type`,
+      identity
+    )(
+      List(
+        BuildChainedTransferTxResult.`type` -> Schema.derived[BuildChainedTransferTxResult],
+        BuildChainedDeployContractTxResult.`type` -> Schema
+          .derived[BuildChainedDeployContractTxResult],
+        BuildChainedExecuteScriptTxResult.`type` -> Schema
+          .derived[BuildChainedExecuteScriptTxResult]
+      ): _*
+    )
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   implicit val multisigTypeSchema: Schema[MultiSigType] =
