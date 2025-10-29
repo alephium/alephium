@@ -18,6 +18,7 @@ package org.alephium.ralph
 
 import java.nio.charset.StandardCharsets
 
+import scala.annotation.nowarn
 import scala.collection.{immutable, mutable}
 
 import akka.util.ByteString
@@ -34,7 +35,8 @@ final case class CompiledContract(
     code: StatefulContract,
     ast: Ast.Contract,
     warnings: AVector[Warning],
-    debugCode: StatefulContract
+    debugCode: StatefulContract,
+    tests: Option[Testing.CompiledUnitTests[StatefulContext]]
 )
 final case class CompiledScript(
     code: StatefulScript,
@@ -156,9 +158,30 @@ object Compiler {
     def useUpdateFields: Boolean
     def inline: Boolean = false
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type]
+    def getReturnType[C <: Ctx](
+        @nowarn ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: State[C]
+    ): Seq[Type] = {
+      val argsType = args.flatMap(_.getType(state))
+      state.resolveTypes(getReturnType(argsType, state))
+    }
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
       args.flatMap(_.genCode(state))
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
+    def genCode[C <: Ctx](
+        @nowarn ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: State[C]
+    ): Seq[Instr[C]] = {
+      val argsType = args.flatMap(_.getType(state))
+      val variadicInstrs = if (isVariadic) {
+        Seq(U256Const(Val.U256.unsafe(state.flattenTypeLength(argsType))))
+      } else {
+        Seq.empty
+      }
+      genCodeForArgs(args, state) ++ variadicInstrs ++ genCode(argsType)
+    }
     def genInlineCode[C <: Ctx](
         args: Seq[Ast.Expr[C]],
         state: Compiler.State[C],
@@ -245,11 +268,11 @@ object Compiler {
         tpe: Type,
         value: Val,
         instrs: Seq[Instr[Ctx]],
-        constantDef: Ast.ConstantDefinition
+        constantDef: Option[Ast.ConstantDefinition]
     ) extends VarInfo {
       def isMutable: Boolean   = false
       def isUnused: Boolean    = false
-      def isGenerated: Boolean = false
+      def isGenerated: Boolean = constantDef.isEmpty
       def isLocal: Boolean     = true
     }
     final case class InlinedArgument[Ctx <: StatelessContext](
@@ -301,7 +324,7 @@ object Compiler {
         state: Compiler.State[C]
     ): Seq[Type] = {
       if (inputType == state.resolveTypes(argsType)) {
-        state.resolveTypes(returnType)
+        returnType
       } else {
         throw Error(
           s"Invalid args type ${quote(inputType)} for func $name, expected ${quote(argsType)}",
@@ -387,12 +410,7 @@ object Compiler {
           }
         }
       } else {
-        var funcIndex = 0
-        funcs.map { func =>
-          val simpleFunc = from(func, funcIndex.toByte)
-          if (!func.inline) funcIndex += 1
-          simpleFunc
-        }
+        funcs.view.zipWithIndex.map { case (func, index) => from(func, index.toByte) }.toSeq
       }
     }
   }
@@ -459,7 +477,7 @@ object Compiler {
         mutable.HashMap.empty,
         0,
         funcTable,
-        immutable.Map(script.ident -> ContractInfo(ContractKind.TxScript, funcTable)),
+        immutable.Map(script.ident -> ContractInfo(script, ContractKind.TxScript, funcTable)),
         globalState
       )
     }
@@ -510,6 +528,7 @@ object Compiler {
   }
 
   final case class ContractInfo[Ctx <: StatelessContext](
+      ast: Ast.ContractT[Ctx],
       kind: ContractKind,
       funcs: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
   )
@@ -571,7 +590,8 @@ object Compiler {
       with Scope
       with VariableScoped
       with PhaseLike
-      with Constants[Ctx] {
+      with Constants[Ctx]
+      with Testing.State[Ctx] {
     def typeId: Ast.TypeId
     def selfContractType: Type = Type.Contract(typeId)
     def varTable: mutable.HashMap[VarKey, VarInfo]
@@ -641,29 +661,28 @@ object Compiler {
       (ref, codes)
     }
 
-    def getLocalArrayVarIndex(): Ast.Ident = {
-      getLocalArrayVarIndex(
-        addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
-      )
+    private def addGeneratedLocalVarInFunctionScope(ident: Ast.Ident, tpe: Type): Unit = {
+      val sname      = checkNewVariable(ident)
+      val isLocal    = true
+      val isMutable  = true
+      val isTemplate = false
+      val index      = getAndUpdateVarIndex(isTemplate, isLocal, isMutable).toByte
+      val varInfo =
+        VarInfo.Local(ident, tpe, isMutable, isUnused = false, index, isGenerated = true)
+      trackAndAddVarInfoInScope(sname, varInfo, FunctionRoot)
     }
 
-    def getImmFieldArrayVarIndex(): Ast.Ident = {
-      getImmFieldArrayVarIndex(
-        addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
-      )
-    }
+    def getLocalArrayVarIndex(): Ast.Ident =
+      getLocalArrayVarIndex(addGeneratedLocalVarInFunctionScope(_, Type.U256))
 
-    def getMutFieldArrayVarIndex(): Ast.Ident = {
-      getMutFieldArrayVarIndex(
-        addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
-      )
-    }
+    def getImmFieldArrayVarIndex(): Ast.Ident =
+      getImmFieldArrayVarIndex(addGeneratedLocalVarInFunctionScope(_, Type.U256))
 
-    def getSubContractIdVar(): Ast.Ident = {
-      getSubContractIdVar(
-        addLocalVariable(_, Type.ByteVec, isMutable = true, isUnused = false, isGenerated = true)
-      )
-    }
+    def getMutFieldArrayVarIndex(): Ast.Ident =
+      getMutFieldArrayVarIndex(addGeneratedLocalVarInFunctionScope(_, Type.U256))
+
+    def getSubContractIdVar(): Ast.Ident =
+      getSubContractIdVar(addGeneratedLocalVarInFunctionScope(_, Type.ByteVec))
 
     def addVariablesRef(
         ident: Ast.Ident,
@@ -680,7 +699,7 @@ object Compiler {
     def getVariablesRef(ident: Ast.Ident): VariablesRef[Ctx] = {
       getVariable(ident) match {
         case v: VarInfo.MultipleVar[Ctx @unchecked] => v.ref
-        case _ => throw Error(s"Struct ${ident.name} does not exist", ident.sourceIndex)
+        case _ => throw Error(s"Array or struct ${ident.name} does not exist", ident.sourceIndex)
       }
     }
 
@@ -693,17 +712,31 @@ object Compiler {
       s"${scopedNamePrefix(scopeId)}$name"
     }
 
-    @inline private def addVarInfo(name: String, varInfo: VarInfo): VarKey = {
-      val varKey = VarKey(name, variableScope)
+    @inline private def addVarInfoInScope(
+        name: String,
+        varInfo: VarInfo,
+        scope: VariableScope
+    ): VarKey = {
+      val varKey = VarKey(name, scope)
       assume(!varTable.contains(varKey))
       varTable(varKey) = varInfo
       varKey
     }
 
-    @inline private def trackAndAddVarInfo(sname: String, varInfo: VarInfo): Unit = {
-      val varKey = addVarInfo(sname, varInfo)
+    @inline private def addVarInfo(name: String, varInfo: VarInfo): VarKey =
+      addVarInfoInScope(name, varInfo, variableScope)
+
+    @inline private def trackAndAddVarInfoInScope(
+        sname: String,
+        varInfo: VarInfo,
+        scope: VariableScope
+    ): Unit = {
+      val varKey = addVarInfoInScope(sname, varInfo, scope)
       trackGenCodePhaseNewVars(varKey)
     }
+
+    @inline private def trackAndAddVarInfo(sname: String, varInfo: VarInfo): Unit =
+      trackAndAddVarInfoInScope(sname, varInfo, variableScope)
 
     private[ralph] def addMapVar(ident: Ast.Ident, tpe: Type.Map, mapIndex: Int): Unit = {
       val sname = checkNewVariable(ident)
@@ -716,6 +749,11 @@ object Compiler {
 
     @inline private[ralph] def hasMapVar(ident: Ast.Ident): Boolean = {
       getGlobalVariable(ident.name).exists(_.tpe.isMapType)
+    }
+
+    @inline private[ralph] def getTestingVar(ident: Ast.Ident): Option[VarInfo] = {
+      val sname = scopedName(ident.name)
+      varTable.get(VarKey(sname, variableScope))
     }
 
     def addInlinedArgument(ident: Ast.Ident, tpe: Type, instrs: Seq[Instr[Ctx]]): Unit = {
@@ -732,13 +770,17 @@ object Compiler {
       args.view.zipWithIndex.flatMap { case (argExpr, index) =>
         val code = argCodes(index)
         val arg  = funcDef.args(index)
+        val tpe  = resolveType(arg.tpe)
         argExpr match {
           case _: Ast.Variable[Ctx @unchecked] | _: Ast.Const[Ctx @unchecked] =>
-            addInlinedArgument(arg.ident, arg.tpe, code)
+            tpe match {
+              case _: Type.FixedSizeArray | _: Type.Struct => ()
+              case tpe => addInlinedArgument(arg.ident, tpe, code)
+            }
             Seq.empty[Instr[Ctx]]
           case _ =>
-            addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, false)
-            code ++ genStoreCode(arg.ident).flatten
+            addLocalVariable(arg.ident, tpe, arg.isMutable, arg.isUnused, false)
+            code ++ genStoreCode(arg.ident).reverse.flatten
         }
       }.toSeq
     }
@@ -783,29 +825,38 @@ object Compiler {
 
     private def addLocalVarsExceptArgs(func: Ast.FuncDef[Ctx]): Unit = {
       val argNames = func.args.map(arg => scopedName(func.id, arg.ident.name))
+      val prefix   = scopedNamePrefix(func.id)
+      val varInfos = mutable.ArrayBuffer.empty[(VarKey, VarInfo, Int)]
       varTable.view
-        .filterKeys(key =>
-          key.name.startsWith(scopedNamePrefix(func.id)) && !argNames.contains(key.name)
-        )
-        .collect { case (key, varInfo: VarInfo.Local) => (key, varInfo) }
-        .toSeq
-        .sortBy(_._2.index)
-        .foreach { case (key, varInfo) =>
-          val scopeRefs = key.scope.getScopeRefPath
-          addLocalVariable(scopeRefs, varInfo)
+        .filter { case (key, varInfo) =>
+          key.name.startsWith(prefix) &&
+          !argNames.contains(key.name) &&
+          !varInfo.isGenerated &&
+          varInfo.isLocal
+        }
+        .foreach {
+          case (key, info: VarInfo.Local) => varInfos.addOne((key, info, info.index.toInt))
+          case (key, info @ VarInfo.MultipleVar(_, _, _, _, ref: LocalVarRef[_])) =>
+            varInfos.addOne((key, info, ref.getConstantOffset()))
+          case _ => ()
+        }
+      varInfos
+        .sortBy(_._3)
+        .foreach { case (key, varInfo, _) =>
+          addLocalVariable(key.scope.getScopeRefPath, varInfo)
         }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    private def addLocalVariable(scopeRefs: Seq[Ast.Positioned], varInfo: VarInfo.Local): Unit = {
+    private def addLocalVariable(scopeRefs: Seq[Ast.Positioned], varInfo: VarInfo): Unit = {
       if (scopeRefs.isEmpty) {
-        addLocalVariable(varInfo)
+        addVarInfo(varInfo)
       } else {
         withScope(scopeRefs(0))(addLocalVariable(scopeRefs.drop(1), varInfo))
       }
     }
 
-    private def addLocalVariable(varInfo: VarInfo.Local): Unit = {
+    private def addVarInfo(varInfo: VarInfo): Unit = {
       addLocalVariable(
         varInfo.ident,
         varInfo.tpe,
@@ -907,13 +958,25 @@ object Compiler {
     }
     // scalastyle:on parameter.number
     // scalastyle:off method.length
-    def addConstant(ident: Ast.Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit = {
+
+    private[ralph] def addTestingConstant(ident: Ast.Ident, value: Val, tpe: Type): Unit = {
+      assume(tpe.toVal == value.tpe)
+      val sname = checkNewVariable(ident)
+      addVarInfo(sname, VarInfo.Constant(ident, tpe, value, Seq(value.toConstInstr), None))
+      ()
+    }
+
+    def addConstant(
+        ident: Ast.Ident,
+        value: Val,
+        constantDef: Option[Ast.ConstantDefinition]
+    ): Unit = {
       val sname = checkNewVariable(ident)
       assume(ident.name == sname)
       val varInfo =
         VarInfo.Constant(
           ident,
-          Type.fromVal(value.tpe),
+          Type.fromVal(value),
           value,
           Seq(value.toConstInstr),
           constantDef
@@ -982,8 +1045,9 @@ object Compiler {
           varTable.get(varKey).orElse(globalState.getConstantOpt(ident)) match {
             case Some(varInfo) => (varKey, varInfo)
             case None =>
+              val varName = if (isInTestContext) name else sname
               throw Error(
-                s"Variable $sname is not defined in the current scope or is used before being defined",
+                s"Variable $varName is not defined in the current scope or is used before being defined",
                 ident.sourceIndex
               )
           }
@@ -1069,9 +1133,9 @@ object Compiler {
       val unusedLocalConstants = mutable.ArrayBuffer.empty[(String, Option[SourceIndex])]
       val unusedFields         = mutable.ArrayBuffer.empty[(String, Option[SourceIndex])]
       unusedVars.foreach {
-        case (varKey, c: VarInfo.Constant[_]) =>
-          if (c.constantDef.definedIn(typeId)) {
-            unusedLocalConstants.addOne((varKey.name, c.constantDef.ident.sourceIndex))
+        case (varKey, VarInfo.Constant(_, _, _, _, Some(constantDef))) =>
+          if (constantDef.definedIn(typeId)) {
+            unusedLocalConstants.addOne((varKey.name, constantDef.ident.sourceIndex))
           }
         case (varKey, varInfo) if !varInfo.isLocal =>
           unusedFields.addOne((varKey.name, varInfo.ident.sourceIndex))
@@ -1089,11 +1153,11 @@ object Compiler {
         : Iterable[(Ast.TypeId, (String, Option[SourceIndex]))] = {
       val used = mutable.ArrayBuffer.empty[(Ast.TypeId, (String, Option[SourceIndex]))]
       varTable.foreach {
-        case (varKey, c: VarInfo.Constant[_]) =>
+        case (varKey, VarInfo.Constant(_, tpe, _, _, Some(constantDef))) =>
           if (accessedVars.contains(ReadVariable(varKey))) {
-            c.constantDef.origin match {
+            constantDef.origin match {
               case Some(originContractId) if originContractId != typeId =>
-                used.addOne((originContractId, (varKey.name, c.tpe.sourceIndex)))
+                used.addOne((originContractId, (varKey.name, tpe.sourceIndex)))
               case _ => ()
             }
           }
@@ -1174,7 +1238,7 @@ object Compiler {
 
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[Ctx]]]
 
-    def genStoreCode(offset: VarOffset[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
+    def genStoreCode(offset: VarOffset[Ctx], isLocal: Boolean, isMutable: Boolean): Seq[Instr[Ctx]]
 
     def resolveType(ident: Ast.Ident): Type = resolveType(getVariable(ident).tpe)
 
@@ -1183,6 +1247,8 @@ object Compiler {
       tpe match {
         case t: Type.FixedSizeArray =>
           Type.FixedSizeArray(resolveType(t.baseType), Left(calcArraySize(t)))
+        case t: Type.Tuple =>
+          globalState.resolveType(Type.Tuple(t.types.map(resolveType)))
         case _ => globalState.resolveType(tpe)
       }
     }
@@ -1329,6 +1395,15 @@ object Compiler {
         )
       }
     }
+
+    def checkInTestContext(funcName: String, sourceIndex: Option[SourceIndex]): Unit = {
+      if (!isInTestContext) {
+        throw Compiler.Error(
+          s"The `$funcName` function can only be used in unit tests",
+          sourceIndex
+        )
+      }
+    }
   }
   // scalastyle:on number.of.methods
 
@@ -1390,7 +1465,8 @@ object Compiler {
 
     def genStoreCode(
         offset: VarOffset[StatelessContext],
-        isLocal: Boolean
+        isLocal: Boolean,
+        isMutable: Boolean
     ): Seq[Instr[StatelessContext]] =
       genVarIndexCode(offset, isLocal, StoreLocal.apply, StoreLocalByIndex)
 
@@ -1439,6 +1515,10 @@ object Compiler {
       globalState: Ast.GlobalState[StatefulContext]
   )(implicit val compilerOptions: CompilerOptions)
       extends State[StatefulContext] {
+    lazy val mutFieldLength = contractTable(typeId).ast.fields
+      .flatMap(f => globalState.flattenTypeMutability(f.tpe, f.isMutable))
+      .count(identity)
+
     def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatefulContext] = {
       BuiltIn.statefulFuncs
         .getOrElse(
@@ -1466,6 +1546,18 @@ object Compiler {
       }
     }
 
+    private def tryCalcOffset(
+        offset: VarOffset[StatefulContext],
+        isLocal: Boolean,
+        isMutable: Boolean
+    ): VarOffset[StatefulContext] = {
+      if (allowUpdateImmFields && !isLocal && !isMutable) {
+        offset.add(ConstantVarOffset[StatefulContext](mutFieldLength))
+      } else {
+        offset
+      }
+    }
+
     def genLoadCode(
         ident: Ast.Ident,
         isTemplate: Boolean,
@@ -1478,22 +1570,39 @@ object Compiler {
         genLoadTemplateRef(ident, tpe, offset)
       } else {
         genVarIndexCode(
-          offset,
+          tryCalcOffset(offset, isLocal, isMutable),
           isLocal,
           LoadLocal.apply,
-          if (isMutable) LoadMutField.apply else LoadImmField.apply,
+          if (isMutable || allowUpdateImmFields) LoadMutField.apply else LoadImmField.apply,
           LoadLocalByIndex,
-          if (isMutable) LoadMutFieldByIndex else LoadImmFieldByIndex
+          if (isMutable || allowUpdateImmFields) LoadMutFieldByIndex else LoadImmFieldByIndex
         )
+      }
+    }
+
+    private def genStoreField(v: VarInfo.Field): Seq[Instr[StatefulContext]] = {
+      if (allowUpdateImmFields && !v.isMutable) {
+        Seq(StoreMutField((v.index + mutFieldLength).toByte))
+      } else {
+        Seq(StoreMutField(v.index))
+      }
+    }
+
+    private def genLoadImmField(fieldIndex: Byte): Seq[Instr[StatefulContext]] = {
+      if (allowUpdateImmFields) {
+        Seq(LoadMutField((fieldIndex + mutFieldLength).toByte))
+      } else {
+        Seq(LoadImmField(fieldIndex))
       }
     }
 
     def genStoreCode(
         offset: VarOffset[StatefulContext],
-        isLocal: Boolean
+        isLocal: Boolean,
+        isMutable: Boolean
     ): Seq[Instr[StatefulContext]] = {
       genVarIndexCode(
-        offset,
+        tryCalcOffset(offset, isLocal, isMutable),
         isLocal,
         StoreLocal.apply,
         StoreMutField.apply,
@@ -1512,7 +1621,7 @@ object Compiler {
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
       getVariable(ident) match {
         case v: VarInfo.Field =>
-          if (v.isMutable) Seq(LoadMutField(v.index)) else Seq(LoadImmField(v.index))
+          if (v.isMutable) Seq(LoadMutField(v.index)) else genLoadImmField(v.index)
         case v: VarInfo.Local => Seq(LoadLocal(v.index))
         case v: VarInfo.Template =>
           Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
@@ -1526,7 +1635,7 @@ object Compiler {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[StatefulContext]]] = {
       getVariable(ident) match {
-        case v: VarInfo.Field => Seq(Seq(StoreMutField(v.index)))
+        case v: VarInfo.Field => Seq(genStoreField(v))
         case v: VarInfo.Local => Seq(Seq(StoreLocal(v.index)))
         case _: VarInfo.Template =>
           throw Error(s"Unexpected template variable: ${ident.name}", ident.sourceIndex)

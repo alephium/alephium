@@ -19,8 +19,8 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.model.{BlockHash, ContractId, TxOutput, TxOutputRef}
+import org.alephium.io.{IOError, IOResult, IOUtils}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStateId
 import org.alephium.util.AVector
@@ -86,7 +86,10 @@ trait NodeIndexesUtils { Self: FlowUtils =>
     subContractIndexStorage.flatMap(_.subContractIndexCounterState.getOpt(parentContractId))
   }
 
-  def getTxOutput(outputRef: TxOutputRef, spentBlockHash: BlockHash): IOResult[Option[TxOutput]] = {
+  def getTxOutput(
+      outputRef: TxOutputRef,
+      spentBlockHash: BlockHash
+  ): IOResult[Option[(TransactionId, TxOutput)]] = {
     getTxOutput(outputRef, spentBlockHash, maxForkDepth)
   }
 
@@ -94,15 +97,17 @@ trait NodeIndexesUtils { Self: FlowUtils =>
       outputRef: TxOutputRef,
       spentBlockHash: BlockHash,
       maxForkDepth: Int
-  ): IOResult[Option[TxOutput]] = {
+  ): IOResult[Option[(TransactionId, TxOutput)]] = {
     for {
       resultOpt <- getTxIdTxOutputLocatorsFromOutputRef(outputRef)
       txOutputOpt <- resultOpt match {
-        case Some(TxIdTxOutputLocators(_, txOutputLocators)) =>
+        case Some(TxIdTxOutputLocators(txId, txOutputLocators)) =>
           for {
-            locator <- getOutputLocator(blockFlow, spentBlockHash, txOutputLocators, maxForkDepth)
+            locator <- getOutputLocator(spentBlockHash, txOutputLocators, maxForkDepth)
             block   <- blockFlow.getBlock(locator.blockHash)
-          } yield Some(block.getTransaction(locator.txIndex).getOutput(locator.txOutputIndex))
+          } yield Some(
+            (txId, block.getTransaction(locator.txIndex).getOutput(locator.txOutputIndex))
+          )
         case None =>
           Right(None)
       }
@@ -111,8 +116,24 @@ trait NodeIndexesUtils { Self: FlowUtils =>
     }
   }
 
+  private[core] def calcBlockDiffUnsafe(
+      locatorHash: BlockHash,
+      spentHash: BlockHash
+  ): Int = {
+    val locatorChainIndex = ChainIndex.from(locatorHash)
+    val spentChainIndex   = ChainIndex.from(spentHash)
+    val locatorHeight     = blockFlow.getHeightUnsafe(locatorHash)
+    val spentHeight = if (locatorChainIndex == spentChainIndex) {
+      blockFlow.getHeightUnsafe(spentHash)
+    } else {
+      val outTips  = getOutTipsUnsafe(spentHash, locatorChainIndex.from)
+      val blockDep = outTips(locatorChainIndex.to.value)
+      blockFlow.getHeightUnsafe(blockDep)
+    }
+    spentHeight - locatorHeight
+  }
+
   private def getOutputLocator(
-      blockFlow: BlockFlow,
       spentBlockHash: BlockHash,
       locators: AVector[TxOutputLocator],
       maxForkDepth: Int
@@ -123,9 +144,10 @@ trait NodeIndexesUtils { Self: FlowUtils =>
       Right(locators(0))
     } else {
       for {
-        spentBlockHeight <- blockFlow.getHeight(spentBlockHash)
         partitioned <- locators.partitionE(locator =>
-          blockFlow.getHeight(locator.blockHash).map(spentBlockHeight - _ > maxForkDepth)
+          IOUtils
+            .tryExecute(calcBlockDiffUnsafe(locator.blockHash, spentBlockHash))
+            .map(_ > maxForkDepth)
         )
         (deepLocators, shallowLocators) = partitioned
         deepMainChainLocators <- deepLocators.filterE(p => isBlockInMainChain(p.blockHash))
@@ -147,13 +169,28 @@ trait NodeIndexesUtils { Self: FlowUtils =>
       spentBlockHash: BlockHash,
       locators: AVector[TxOutputLocator]
   ): IOResult[TxOutputLocator] = {
-    val headerChain = blockFlow.getHeaderChain(spentBlockHash)
-
     locators
-      .findE(locator => headerChain.isBefore(locator.blockHash, spentBlockHash))
+      .findE(locator => isBefore(blockFlow, locator.blockHash, spentBlockHash))
       .flatMap {
         case Some(locator) => Right(locator)
         case None          => Left(IOError.keyNotFound("Cannot find the input info for the TX"))
       }
+  }
+
+  private[core] def isBefore(
+      blockFlow: BlockFlow,
+      previous: BlockHash,
+      current: BlockHash
+  ): IOResult[Boolean] = {
+    val previousChainIndex = ChainIndex.from(previous)
+    val currentChainIndex  = ChainIndex.from(current)
+
+    val chain = blockFlow.getHeaderChain(currentChainIndex)
+    if (currentChainIndex == previousChainIndex) {
+      chain.isBefore(previous, current)
+    } else {
+      val groupDeps = getOutTipsUnsafe(current, previousChainIndex.from)
+      chain.isBefore(previous, groupDeps(previousChainIndex.to.value))
+    }
   }
 }

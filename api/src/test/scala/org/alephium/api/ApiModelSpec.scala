@@ -25,12 +25,19 @@ import org.scalatest.EitherValues
 
 import org.alephium.api.{model => api}
 import org.alephium.api.UtilJson._
-import org.alephium.api.model._
+import org.alephium.api.model.{Address => _, _}
 import org.alephium.json.Json._
 import org.alephium.protocol._
-import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
-import org.alephium.ralph.TypeSignatureFixture
+import org.alephium.protocol.model.{AssetOutput => _, Balance => _, ContractOutput => _, _}
+import org.alephium.protocol.vm.{
+  GasBox,
+  GasPrice,
+  LockupScript,
+  PublicKeyLike,
+  StatefulContract,
+  UnlockScript
+}
+import org.alephium.ralph.{Compiler, TypeSignatureFixture}
 import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
@@ -42,7 +49,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   val zeroHash: String = BlockHash.zero.toHexString
   val ghostUncleHash: BlockHash =
     BlockHash.unsafe(Hex.unsafe("bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"))
-  val lockupScript = LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").get
+  val lockupScript = LockupScript.asset("1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y9n").rightValue
   def entryDummy(i: Int): BlockEntry =
     BlockEntry(
       BlockHash.zero,
@@ -57,7 +64,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       Hash.zero,
       Hash.zero,
       ByteString.empty,
-      AVector(GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript)))
+      AVector(GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript))),
+      None
     )
   val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo =
@@ -88,7 +96,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   def generateAddress(): Address.Asset = Address.p2pkh(PublicKey.generate)
   def generateContractAddress(): Address.Contract =
-    Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").get)
+    Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").rightValue)
 
   def blockEntryJson(blockEntry: BlockEntry): String = {
     s"""
@@ -157,6 +165,43 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw =
       s"""{"blocks":[[${blockEntryJson(entries.head)},${blockEntryJson(entries.last)}]]}"""
     checkData(response, jsonRaw)
+  }
+
+  it should "encode/decode RichBlockEntry" in {
+    val entry = RichBlockEntry(
+      BlockHash.zero,
+      TimeStamp.unsafe(0),
+      1,
+      1,
+      1,
+      AVector(BlockHash.zero),
+      AVector.empty,
+      ByteString.empty,
+      1.toByte,
+      Hash.zero,
+      Hash.zero,
+      ByteString.empty,
+      AVector(GhostUncleBlockEntry(ghostUncleHash, Address.Asset(lockupScript))),
+      None
+    )
+    val jsonRaw =
+      s"""
+         |{
+         |  "hash":"${entry.hash.toHexString}",
+         |  "timestamp":${entry.timestamp.millis},
+         |  "chainFrom":${entry.chainFrom},
+         |  "chainTo":${entry.chainTo},
+         |  "height":${entry.height},
+         |  "deps":${write(entry.deps.map(_.toHexString))},
+         |  "transactions":${write(entry.transactions)},
+         |  "nonce":"${Hex.toHexString(entry.nonce)}",
+         |  "version":${entry.version},
+         |  "depStateHash":"${entry.depStateHash.toHexString}",
+         |  "txsHash":"${entry.txsHash.toHexString}",
+         |  "target":"${Hex.toHexString(entry.target)}",
+         |  "ghostUncles":${write(entry.ghostUncles)}
+         |}""".stripMargin
+    checkData(entry, jsonRaw)
   }
 
   it should "encode/decode NodeInfo" in {
@@ -650,12 +695,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val contractId = ContractId.generate
 
     val transfer = BuildChainedTransferTxResult(
-      BuildTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
+      BuildSimpleTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
     )
     val transferJson = s"""
                           |{
                           |  "type": "Transfer",
                           |  "value": {
+                          |    "type": "BuildSimpleTransferTxResult",
                           |    "unsignedTx":"tx",
                           |    "gasAmount": 1,
                           |    "gasPrice": "1",
@@ -668,7 +714,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(transfer, transferJson)
 
     val deploy = BuildChainedDeployContractTxResult(
-      BuildDeployContractTxResult(
+      BuildSimpleDeployContractTxResult(
         fromGroup = 2,
         toGroup = 2,
         unsignedTx = "0000",
@@ -683,6 +729,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "type": "DeployContract",
          |  "value": {
+         |    "type": "BuildSimpleDeployContractTxResult",
          |    "fromGroup": 2,
          |    "toGroup": 2,
          |    "unsignedTx": "0000",
@@ -696,18 +743,38 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     checkData(deploy, deployJson)
 
-    val outputKey = TxOutputRef.key(txId, 0).value
+    val address         = generateAddress()
+    val contractAddress = generateContractAddress()
+    val simulationResult = SimulationResult(
+      AVector(
+        AddressAssetState(
+          contractAddress,
+          model.minimalAlphInContract,
+          Some(AVector(Token(TokenId.hash("token1"), ALPH.oneAlph)))
+        )
+      ),
+      AVector(
+        AddressAssetState(
+          contractAddress,
+          model.minimalAlphInContract,
+          Some(AVector(Token(TokenId.hash("token2"), ALPH.oneAlph)))
+        ),
+        AddressAssetState(
+          address,
+          model.dustUtxoAmount,
+          Some(AVector(Token(TokenId.hash("token1"), ALPH.oneAlph)))
+        )
+      )
+    )
     val execute = BuildChainedExecuteScriptTxResult(
-      BuildExecuteScriptTxResult(
+      BuildSimpleExecuteScriptTxResult(
         fromGroup = 1,
         toGroup = 1,
         unsignedTx = "0000",
         gasAmount = GasBox.unsafe(1),
         gasPrice = GasPrice(1),
         txId = txId,
-        simulatedOutputs = AVector(
-          Output.from(assetOutput, txId, 0)
-        )
+        simulationResult
       )
     )
     val executeJson =
@@ -715,24 +782,49 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "type": "ExecuteScript",
          |  "value": {
+         |    "type": "BuildSimpleExecuteScriptTxResult",
          |    "fromGroup": 1,
          |    "toGroup": 1,
          |    "unsignedTx": "0000",
          |    "gasAmount":1,
          |    "gasPrice":"1",
          |    "txId": "${txId.toHexString}",
-         |    "simulatedOutputs": [
-         |      {
-         |        "type": "AssetOutput",
-         |        "hint": -383063803,
-         |        "key": "${outputKey.toHexString}",
-         |        "attoAlphAmount": "1000000000000000000",
-         |        "address": "111111111111111111111111111111111",
-         |        "tokens": [],
-         |        "lockTime": 0,
-         |        "message": ""
-         |      }
-         |    ]
+         |    "simulationResult": {
+         |     "contractInputs":[
+         |       {
+         |         "address": "$contractAddress",
+         |         "attoAlphAmount":"100000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+         |              "amount":"1000000000000000000"
+         |            }
+         |         ]
+         |       }
+         |     ],
+         |     "generatedOutputs":[
+         |       {
+         |         "address": "$contractAddress",
+         |         "attoAlphAmount":"100000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+         |              "amount":"1000000000000000000"
+         |            }
+         |          ]
+         |       },
+         |       {
+         |         "address": "$address",
+         |         "attoAlphAmount":"1000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+         |              "amount":"1000000000000000000"
+         |            }
+         |          ]
+         |       }
+         |     ]
+         |   }
          |  }
          |}
          |""".stripMargin
@@ -839,8 +931,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val targetBlockHash    = BlockHash.generate
 
     val buildSweep = BuildSweepMultisig(
-      fromAddress,
-      fromPublicKeys,
+      api.Address.fromProtocol(fromAddress),
+      fromPublicKeys.map(_.bytes),
+      None,
+      None,
       toAddress,
       Some(maxAttoAlphPerUTXO),
       Some(lockTime),
@@ -870,9 +964,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val txId     = TransactionId.generate
     val gas      = GasBox.unsafe(1)
     val gasPrice = GasPrice(1)
-    val result   = BuildTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
+    val result   = BuildSimpleTransferTxResult("tx", gas, gasPrice, txId, 1, 2)
     val jsonRaw = s"""
                      |{
+                     |  "type": "BuildSimpleTransferTxResult",
                      |  "unsignedTx":"tx",
                      |  "gasAmount": 1,
                      |  "gasPrice": "1",
@@ -979,6 +1074,15 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         s""""$invaildApiKey""""
       ) is s"Api key must have at least 32 characters at index 0"
     }
+  }
+
+  it should "encode/decode CompilerOptions" in {
+    val options0 = CompilerOptions()
+    checkData(options0, "{}")
+    options0.toLangCompilerOptions().skipTests is false
+    val options1 = CompilerOptions(skipTests = Some(true))
+    checkData(options1, s"""{ "skipTests": true }""")
+    options1.toLangCompilerOptions().skipTests is true
   }
 
   it should "encode/decode Compile.Script" in {
@@ -1093,7 +1197,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode BuildDeployContractTxResult" in {
     val txId       = TransactionId.generate
     val contractId = ContractId.generate
-    val buildDeployContractTxResult = BuildDeployContractTxResult(
+    val buildDeployContractTxResult = BuildSimpleDeployContractTxResult(
       fromGroup = 2,
       toGroup = 2,
       unsignedTx = "0000",
@@ -1105,6 +1209,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw =
       s"""
          |{
+         |  "type": "BuildSimpleDeployContractTxResult",
          |  "fromGroup": 2,
          |  "toGroup": 2,
          |  "unsignedTx": "0000",
@@ -1140,26 +1245,85 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode BuildExecuteScriptTxResult" in {
-    val txId = TransactionId.generate
-    val buildExecuteScriptTxResult = BuildExecuteScriptTxResult(
+    val txId            = TransactionId.generate
+    val address         = Address.p2pkh(PublicKey.generate)
+    val contractAddress = generateContractAddress()
+    val simulationResult = SimulationResult(
+      AVector(
+        AddressAssetState(
+          contractAddress,
+          model.minimalAlphInContract,
+          Some(AVector(Token(TokenId.hash("token1"), U256.Two)))
+        )
+      ),
+      AVector(
+        AddressAssetState(
+          contractAddress,
+          model.minimalAlphInContract.addUnsafe(ALPH.oneAlph),
+          Some(AVector(Token(TokenId.hash("token1"), U256.One)))
+        ),
+        AddressAssetState(
+          address,
+          model.dustUtxoAmount,
+          Some(AVector(Token(TokenId.hash("token1"), U256.One)))
+        )
+      )
+    )
+    val buildExecuteScriptTxResult = BuildSimpleExecuteScriptTxResult(
       fromGroup = 1,
       toGroup = 1,
       unsignedTx = "0000",
       gasAmount = GasBox.unsafe(1),
       gasPrice = GasPrice(1),
       txId = txId,
-      simulatedOutputs = AVector.empty
+      simulationResult
     )
     val jsonRaw =
       s"""
          |{
+         |  "type": "BuildSimpleExecuteScriptTxResult",
          |  "fromGroup": 1,
          |  "toGroup": 1,
          |  "unsignedTx": "0000",
          |  "gasAmount":1,
          |  "gasPrice":"1",
          |  "txId": "${txId.toHexString}",
-         |  "simulatedOutputs": []
+         |  "simulationResult": {
+         |     "contractInputs":[
+         |       {
+         |         "address": "$contractAddress",
+         |         "attoAlphAmount":"100000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+         |              "amount":"2"
+         |            }
+         |          ]
+         |       }
+         |     ],
+         |     "generatedOutputs":[
+         |       {
+         |         "address": "$contractAddress",
+         |         "attoAlphAmount":"1100000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+         |              "amount":"1"
+         |            }
+         |          ]
+         |       },
+         |       {
+         |         "address": "$address",
+         |         "attoAlphAmount":"1000000000000000",
+         |         "tokens":[
+         |            {
+         |              "id":"2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+         |              "amount":"1"
+         |            }
+         |          ]
+         |       }
+         |     ]
+         |   }
          |}
          |""".stripMargin
 
@@ -1811,5 +1975,203 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         AVector(Token(tokenId0, U256.Zero), Token(tokenId1, U256.Zero), Token(tokenId2, U256.One))
       )
     ) isE (None, AVector(tokenId2 -> U256.One))
+  }
+
+  it should "check the minimal amount deposit for contract creation" in {
+    BuildTxCommon.getInitialAttoAlphAmount(None, HardFork.Leman) isE minimalAlphInContractPreRhone
+    BuildTxCommon.getInitialAttoAlphAmount(
+      Some(minimalAlphInContractPreRhone),
+      HardFork.Leman
+    ) isE minimalAlphInContractPreRhone
+    BuildTxCommon
+      .getInitialAttoAlphAmount(Some(minimalAlphInContractPreRhone - 1), HardFork.Leman)
+      .leftValue is "Expect 1 ALPH deposit to deploy a new contract"
+
+    BuildTxCommon.getInitialAttoAlphAmount(None, HardFork.Rhone) isE minimalAlphInContract
+    BuildTxCommon.getInitialAttoAlphAmount(
+      Some(minimalAlphInContract),
+      HardFork.Rhone
+    ) isE minimalAlphInContract
+    BuildTxCommon
+      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1), HardFork.Rhone)
+      .leftValue is "Expect 0.1 ALPH deposit to deploy a new contract"
+  }
+
+  trait GrouplessModelFixture {
+    val fromPublicKey           = PublicKeyLike.SecP256K1(PublicKey.generate)
+    val fromLockupScript        = LockupScript.p2pk(fromPublicKey, GroupIndex.unsafe(0))
+    val fromAddressWithGroup    = api.Address.from(fromLockupScript)
+    val fromAddressWithoutGroup = api.Address.from(fromPublicKey)
+  }
+
+  it should "getLockPair for BuildExecuteScriptTx" in new GrouplessModelFixture {
+    {
+      val script =
+        s"""
+           |TxScript Main {
+           |  assert!(1 == 1, 0)
+           |}
+      """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      val bytecode = serialize(compiled)
+      val request = BuildExecuteScriptTx(
+        fromPublicKey.publicKey.bytes,
+        fromPublicKeyType = Some(BuildTxCommon.GLSecP256K1),
+        bytecode,
+        group = None
+      )
+      request
+        .getLockPair()
+        .leftValue
+        .detail is s"Can not determine group: request has no explicit group and no contract address can be derived from TxScript"
+    }
+
+    {
+      val groupIndex = fromLockupScript.groupIndex
+      val request = BuildExecuteScriptTx(
+        fromPublicKey.publicKey.bytes,
+        fromPublicKeyType = Some(BuildTxCommon.GLSecP256K1),
+        ByteString(0, 0),
+        group = Some(groupIndex)
+      )
+      request.getLockPair().rightValue is (fromLockupScript, UnlockScript.P2PK)
+    }
+
+    {
+      val txId            = TransactionId.generate
+      val contractId      = ContractId.from(txId, 0, GroupIndex.unsafe(0))
+      val contractAddress = Address.contract(contractId)
+      val script =
+        s"""
+           |TxScript Main() {
+           |  Bar(#${contractId.toHexString}).bar()
+           |}
+           |
+           |Contract Bar() {
+           |  pub fn bar() -> () {}
+           |}
+    """.stripMargin
+      val compiled = Compiler.compileTxScript(script).rightValue
+      val bytecode = serialize(compiled)
+      val request = BuildExecuteScriptTx(
+        fromPublicKey.publicKey.bytes,
+        fromPublicKeyType = Some(BuildTxCommon.GLSecP256K1),
+        bytecode,
+        group = None
+      )
+      request.getLockPair().rightValue is (LockupScript.p2pk(
+        fromPublicKey,
+        contractAddress.groupIndex
+      ), UnlockScript.P2PK)
+    }
+
+    {
+      val groupIndex = LockupScript.p2pkh(fromPublicKey.publicKey).groupIndex
+      val request = BuildExecuteScriptTx(
+        fromPublicKey.publicKey.bytes,
+        fromPublicKeyType = None,
+        ByteString(0, 0),
+        group = Some(groupIndex)
+      )
+      request.getLockPair().rightValue is (LockupScript.p2pkh(fromPublicKey.publicKey), UnlockScript
+        .p2pkh(fromPublicKey.publicKey))
+      val invalidGroup = (groupIndex.value + 1) % groupConfig.groups
+      request
+        .copy(group = Some(GroupIndex.unsafe(invalidGroup)))
+        .getLockPair()
+        .leftValue
+        .detail is s"Mismatch between group in request ($invalidGroup) and SecP256K1 public key: ${Hex
+          .toHexString(fromPublicKey.publicKey.bytes)}"
+    }
+  }
+
+  it should "getLockPair for BuildDeployContractTx" in new GrouplessModelFixture {
+    {
+      val request = BuildDeployContractTx(
+        fromPublicKey.publicKey.bytes,
+        fromPublicKeyType = Some(BuildTxCommon.GLSecP256K1),
+        ByteString(0, 0),
+        group = None
+      )
+      request
+        .getLockPair()
+        .leftValue
+        .detail is s"Contract deployment using groupless address requires explicit group information"
+    }
+
+    {
+      val groupIndex = fromLockupScript.groupIndex
+      val request = BuildDeployContractTx(
+        fromPublicKey.publicKey.bytes,
+        fromPublicKeyType = Some(BuildTxCommon.GLSecP256K1),
+        ByteString(0, 0),
+        group = Some(groupIndex)
+      )
+      request.getLockPair().rightValue is (fromLockupScript, UnlockScript.P2PK)
+    }
+
+    {
+      val groupIndex = LockupScript.p2pkh(fromPublicKey.publicKey).groupIndex
+      val request = BuildDeployContractTx(
+        fromPublicKey.publicKey.bytes,
+        fromPublicKeyType = None,
+        ByteString(0, 0),
+        group = Some(groupIndex)
+      )
+      request.getLockPair().rightValue is (LockupScript.p2pkh(fromPublicKey.publicKey), UnlockScript
+        .p2pkh(fromPublicKey.publicKey))
+      val invalidGroup = (groupIndex.value + 1) % groupConfig.groups
+      request
+        .copy(group = Some(GroupIndex.unsafe(invalidGroup)))
+        .getLockPair()
+        .leftValue
+        .detail is s"Mismatch between group in request ($invalidGroup) and SecP256K1 public key: ${Hex
+          .toHexString(fromPublicKey.publicKey.bytes)}"
+    }
+  }
+
+  it should "encode/decode groupless address" in {
+    val publicKey = p2pkLockupGen(GroupIndex.unsafe(0)).sample.get.publicKey
+    (0 until groupConfig.groups).foreach { groupIndex =>
+      val lockupScript = LockupScript.p2pk(publicKey, GroupIndex.unsafe(groupIndex))
+      val address      = Address.Asset(lockupScript)
+      checkData[Val](
+        ValAddress(address),
+        s"""{"type": "Address", "value": "${address.toBase58}"}"""
+      )
+    }
+
+    val defaultGroupIndex = publicKey.defaultGroup
+    val address           = Address.Asset(LockupScript.p2pk(publicKey, defaultGroupIndex))
+    read[Val](
+      s"""{"type": "Address", "value": "${address.toBase58.dropRight(2)}"}"""
+    ) is ValAddress(address)
+    write(ValAddress(address)) is s"""{"type":"Address","value":"${address.toBase58}"}"""
+  }
+
+  it should "decode address from base58 string" in {
+    import api.Address._
+    import scala.reflect.ClassTag
+    def pass[T: ClassTag](str: String) = {
+      fromBase58(str).value.lockupScript is a[T]
+    }
+
+    def fail(str: String, error: String) = {
+      fromBase58(str).leftValue.startsWith(error) is true
+    }
+
+    pass[CompleteLockupScript]("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3")
+    pass[CompleteLockupScript]("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa")
+    pass[CompleteLockupScript]("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr")
+    fail("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1", "Invalid address")
+
+    pass[HalfDecodedP2PK]("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L")
+    pass[CompleteLockupScript]("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0")
+    fail("bMEQ1jQgijED5jmCgunSNs5G1W87VX33ueywrpqemY7KVCEaDys", "Invalid p2pk address")
+
+    pass[HalfDecodedP2HMPK]("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU")
+    pass[CompleteLockupScript]("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU:0")
+    fail("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85", "Invalid p2hmpk address")
+    fail("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU1:0", "Invalid groupless address")
   }
 }

@@ -52,6 +52,14 @@ class BootUp extends StrictLogging {
   implicit val apiConfig: ApiConfig   = ApiConfig.load(typesafeConfig, "alephium.api")
   val flowSystem: ActorSystem         = ActorSystem("flow", typesafeConfig)
 
+  // Enable this for new upgrades
+//  if (config.network.networkId == NetworkId.AlephiumMainNet) {
+//    logger.error(
+//      "This is a testnet release for Danube upgrade, please don't use it for mainnet"
+//    )
+//    System.exit(-1)
+//  }
+
   @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
   implicit val executionContext: ExecutionContext =
     ExecutionContext.fromExecutor(new java.util.concurrent.ForkJoinPool(4))

@@ -18,11 +18,16 @@ package org.alephium.ralph
 
 import org.alephium.protocol.vm.{StatelessContext, Val}
 import org.alephium.ralph.Compiler.{Error, VarInfo}
+import org.alephium.ralph.error.CompilerError
 
 trait Constants[Ctx <: StatelessContext] {
   def getConstant(ident: Ast.Ident): VarInfo.Constant[Ctx]
   def getConstantValue(ident: Ast.Ident): Val = getConstant(ident).value
-  protected def addConstant(ident: Ast.Ident, value: Val, constantDef: Ast.ConstantDefinition): Unit
+  protected def addConstant(
+      ident: Ast.Ident,
+      value: Val,
+      constantDef: Option[Ast.ConstantDefinition]
+  ): Unit
 
   def addConstants(constantVars: Seq[Ast.ConstantVarDef[Ctx]]): Seq[(Ast.Ident, Val)] = {
     Ast.UniqueDef.checkDuplicates(constantVars, "constant variables")
@@ -33,14 +38,14 @@ trait Constants[Ctx <: StatelessContext] {
     Ast.UniqueDef.checkDuplicates(enums, "enums")
     enums.foreach(e =>
       e.fields.foreach(field =>
-        addConstant(Ast.EnumDef.fieldIdent(e.id, field.ident), field.value.v, field)
+        addConstant(Ast.EnumDef.fieldIdent(e.id, field.ident), field.value.v, Some(field))
       )
     )
   }
 
   private def calcAndAddConstant(constantVarDef: Ast.ConstantVarDef[Ctx]): Val = {
     val value = calcConstant(constantVarDef.expr)
-    addConstant(constantVarDef.ident, value, constantVarDef)
+    addConstant(constantVarDef.ident, value, Some(constantVarDef))
     value
   }
 
@@ -64,6 +69,14 @@ trait Constants[Ctx <: StatelessContext] {
       case Val.U256(value) => value.toBigInt.intValue()
       case _ =>
         throw Compiler.Error("Invalid array size, expected a constant U256 value", expr.sourceIndex)
+    }
+  }
+
+  final private[ralph] def tryCalcConstant(expr: Ast.Expr[Ctx]): Option[Val] = {
+    try {
+      Some(calcConstant(expr))
+    } catch {
+      case _: CompilerError.FormattableError => None
     }
   }
 
@@ -92,7 +105,7 @@ trait Constants[Ctx <: StatelessContext] {
   }
 
   private def checkAndCalc(expr: Ast.Expr[Ctx], op: Operator, values: Seq[Val]): Val = {
-    expr.positionedError(op.getReturnType(values.map(v => Type.fromVal(v.tpe))))
+    expr.positionedError(op.getReturnType(values.map(v => Type.fromVal(v))))
     op.calc(values) match {
       case Right(value) => value
       case Left(error)  => throw Error(error, expr.sourceIndex)

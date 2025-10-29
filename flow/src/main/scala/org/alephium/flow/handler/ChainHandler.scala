@@ -33,9 +33,15 @@ import org.alephium.util.EventStream.Publisher
 object ChainHandler {
   trait Event
 
+  sealed trait FlowDataValidationEvent extends Event with EventStream.Event {
+    def data: FlowData
+    def origin: DataOrigin
+  }
+
   final case class FlowDataAdded(data: FlowData, origin: DataOrigin, addedAt: TimeStamp)
-      extends Event
-      with EventStream.Event
+      extends FlowDataValidationEvent
+  final case class InvalidFlowData(data: FlowData, origin: DataOrigin)
+      extends FlowDataValidationEvent
 
   val chainValidationFailed: Counter = Counter
     .build(
@@ -177,7 +183,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
             publishEvent(ChainHandler.FlowDataAdded(data, origin, TimeStamp.now()))
             notifyBroker(broker, data)
             log.info(show(data))
-            measure(data)
+            measure(data)(networkConfig)
         }
       case Left(error) => handleIOError(error)
     }
@@ -193,7 +199,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
 
   def show(data: T): String
 
-  def measure(data: T): Unit
+  def measure(data: T)(implicit networkConfig: NetworkConfig): Unit
 
   def showHeader(header: BlockHeader): String = {
     val total           = blockFlow.numHashes

@@ -94,7 +94,6 @@ class WalletApp(config: WalletConfig)(implicit
           .handler(
             CorsHandler
               .create()
-              .addRelativeOrigin(".*.")
               .allowedMethod(HttpMethod.GET)
               .allowedMethod(HttpMethod.POST)
               .allowedMethod(HttpMethod.PUT)

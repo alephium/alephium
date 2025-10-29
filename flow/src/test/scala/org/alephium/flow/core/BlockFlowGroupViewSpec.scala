@@ -23,28 +23,39 @@ import akka.util.ByteString
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.Generators.hashGen
-import org.alephium.protocol.model.{
-  AssetOutput,
-  ChainIndex,
-  ContractOutputRef,
-  GroupIndex,
-  Hint,
-  TxOutput,
-  TxOutputRef
-}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
 class BlockFlowGroupViewSpec extends AlephiumFlowSpec {
   it should "fetch getPreAssetOutputs and getPreOutputs" in new FlowFixture {
+    setHardForkSince(HardFork.Mainnet)
+
+    var now      = TimeStamp.now()
+    val hardFork = networkConfig.getHardFork(now)
+    def nextBlockTs: TimeStamp = {
+      val newTs = now.plusMillisUnsafe(1)
+      now = newTs
+      newTs
+    }
+
+    def addIntraBlock(blockFlow: BlockFlow): Unit = {
+      if (hardFork.isDanubeEnabled()) {
+        val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs)
+        addAndCheck(blockFlow, block)
+      }
+    }
+
     val blockFlow1 = isolatedBlockFlow()
-    val now        = TimeStamp.now()
-    val block0     = transfer(blockFlow1, ChainIndex.unsafe(0, 1), now)
+    val block0     = transfer(blockFlow1, ChainIndex.unsafe(0, 1), nextBlockTs)
     addAndCheck(blockFlow1, block0)
-    val block1 = transfer(blockFlow1, ChainIndex.unsafe(0, 2), now.plusMillisUnsafe(1))
+    addIntraBlock(blockFlow1)
+    val block1 = transfer(blockFlow1, ChainIndex.unsafe(0, 2), nextBlockTs)
     addAndCheck(blockFlow1, block1)
-    val block2 = transfer(blockFlow1, ChainIndex.unsafe(0, 1), now.plusMillisUnsafe(2))
+    addIntraBlock(blockFlow1)
+    val block2 = transfer(blockFlow1, ChainIndex.unsafe(0, 1), nextBlockTs)
     addAndCheck(blockFlow1, block2)
-    val block3 = transfer(blockFlow1, ChainIndex.unsafe(0, 0), now.plusMillisUnsafe(3))
+    addIntraBlock(blockFlow1)
+    val block3 = transfer(blockFlow1, ChainIndex.unsafe(0, 0), nextBlockTs)
     addAndCheck(blockFlow1, block3)
 
     addAndCheck(blockFlow, block0)

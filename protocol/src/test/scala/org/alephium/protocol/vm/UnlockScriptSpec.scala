@@ -18,6 +18,7 @@ package org.alephium.protocol.vm
 
 import org.scalacheck.Gen
 
+import org.alephium.crypto.{ED25519PublicKey, SecP256K1PublicKey, SecP256R1PublicKey}
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.NoIndexModelGenerators
 import org.alephium.serde._
@@ -25,11 +26,8 @@ import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
 class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   val keyGen = groupIndexGen.flatMap(publicKeyGen)
-  val dummyMethod = Method[StatelessContext](
+  val dummyMethod = Method.testDefault[StatelessContext](
     isPublic = true,
-    usePreapprovedAssets = false,
-    useContractAssets = false,
-    usePayToContractOnly = false,
     argsLength = 0,
     localsLength = 0,
     returnLength = 0,
@@ -60,6 +58,24 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
       val unlock = UnlockScript.polw(publicKey)
       deserialize[UnlockScript](serialize[UnlockScript](unlock)) isE unlock
     }
+
+    deserialize[UnlockScript](serialize[UnlockScript](UnlockScript.P2PK)) isE UnlockScript.P2PK
+
+    val pubKey0 = SecP256K1PublicKey.generate
+    val pubKey1 = SecP256R1PublicKey.generate
+    val pubKey2 = ED25519PublicKey.generate
+    val pubKey3 = SecP256R1PublicKey.generate
+
+    val publicKeys = AVector(
+      PublicKeyLike.SecP256K1(pubKey0),
+      PublicKeyLike.SecP256R1(pubKey1),
+      PublicKeyLike.ED25519(pubKey2),
+      PublicKeyLike.WebAuthn(pubKey3)
+    )
+    val publicKeyIndexes = AVector(0, 1, 2, 3)
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, publicKeyIndexes))
+    ) isE UnlockScript.P2HMPK(publicKeys, publicKeyIndexes)
   }
 
   it should "serialize examples" in {
@@ -82,6 +98,37 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     val encoded = Hex.unsafe(s"04${publicKey0.toHexString}")
     serialize[UnlockScript](unlock3) is encoded
     deserialize[UnlockScript](encoded).rightValue is unlock3
+
+    serialize[UnlockScript](UnlockScript.P2PK) is Hex.unsafe("05")
+
+    val publicKeys = AVector(
+      PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate),
+      PublicKeyLike.SecP256R1(SecP256R1PublicKey.generate)
+    )
+    val publicKeyIndexes     = AVector(0)
+    val serializedPublicKey0 = Hex.toHexString(serdeImpl[PublicKeyLike].serialize(publicKeys(0)))
+    val serializedPublicKey1 = Hex.toHexString(serdeImpl[PublicKeyLike].serialize(publicKeys(1)))
+    serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, publicKeyIndexes)) is
+      Hex.unsafe(s"0602${serializedPublicKey0}${serializedPublicKey1}0100")
+
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, AVector.empty))
+    ).leftValue.getMessage() is "Public key indexes can not be empty"
+
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, AVector(1, 0)))
+    ).leftValue
+      .getMessage() is "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
+
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, AVector(1, 3)))
+    ).leftValue
+      .getMessage() is "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
+
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.P2HMPK(publicKeys, AVector(0, 1, 2)))
+    ).leftValue
+      .getMessage() is "Public key indexes length can not be greater than public keys length"
   }
 
   it should "validate multisig" in {
@@ -96,5 +143,38 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     test("Key indexes are duplicated", false, (publicKey0, 1), (publicKey1, 1))
     test("Key indexes are decreasing", false, (publicKey0, 1), (publicKey1, 0))
     test("Positive case", true, (publicKey0, 0), (publicKey1, 3))
+  }
+
+  it should "validate p2hmpk unlock script" in {
+    def validate(p2hmpk: UnlockScript.P2HMPK, errorMsg: String) = {
+      UnlockScript.P2HMPK.validate(p2hmpk).leftValue.contains(errorMsg) is true
+      val bytes = serialize[UnlockScript](p2hmpk)
+      deserialize[UnlockScript](bytes).leftValue.toString.contains(errorMsg) is true
+    }
+
+    val publicKeys = AVector.fill(3)(publicKeyLikeGen().sample.get)
+    val p2hmpk     = UnlockScript.P2HMPK(AVector.empty, AVector.empty)
+    validate(p2hmpk, "Public keys can not be empty")
+    validate(p2hmpk.copy(publicKeys = publicKeys), "Public key indexes can not be empty")
+
+    validate(
+      p2hmpk.copy(publicKeyIndexes = AVector(0, 1, 2, 3), publicKeys = publicKeys),
+      "Public key indexes length can not be greater than public keys length"
+    )
+
+    Seq(AVector(-1), AVector(3), AVector(4), AVector(1, 0), AVector(0, 2, 1), AVector(0, 1, 3))
+      .foreach { invalidIndexes =>
+        validate(
+          p2hmpk.copy(publicKeyIndexes = invalidIndexes, publicKeys = publicKeys),
+          "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
+        )
+      }
+
+    Seq(AVector(0), AVector(1), AVector(0, 1), AVector(0, 2), AVector(0, 1, 2), AVector(1, 2))
+      .foreach { validIndexes =>
+        UnlockScript.P2HMPK.validate(
+          p2hmpk.copy(publicKeyIndexes = validIndexes, publicKeys = publicKeys)
+        ) isE ()
+      }
   }
 }

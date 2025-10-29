@@ -16,20 +16,21 @@
 
 package org.alephium.protocol.model
 
+import scala.util.Random
+
 import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.{Hash, PublicKey}
-import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm._
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, Base58, Hex}
 
-class AddressSpec extends AlephiumSpec {
+class AddressSpec extends AlephiumSpec with NoIndexModelGenerators {
 
-  it should "calculate group index" in new GroupConfigFixture.Default {
+  it should "calculate group index" in {
     def testP2pkh(pubKey: String, expectedGroup: Int) = {
       val publicKey = PublicKey.unsafe(Hex.unsafe(pubKey))
       Address.p2pkh(publicKey).groupIndex.value is expectedGroup
@@ -133,11 +134,8 @@ class AddressSpec extends AlephiumSpec {
 
     val script1 = StatelessScript.unsafe(
       AVector(
-        Method[StatelessContext](
+        Method.testDefault(
           isPublic = true,
-          usePreapprovedAssets = false,
-          useContractAssets = false,
-          usePayToContractOnly = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,
@@ -156,8 +154,16 @@ class AddressSpec extends AlephiumSpec {
   "Address.asset" should "parse asset address only" in {
     val lock    = LockupScript.P2C(ContractId.random)
     val address = Address.from(lock).toBase58
-    Address.asset(address) is None
-    Address.fromBase58(address).value.lockupScript is lock
+    Address.asset(address).isLeft is true
+    Address.fromBase58(address).rightValue.lockupScript is lock
+  }
+
+  it should "encode and decode between p2pk address and public key" in {
+    val publicKey = "00e10a76a87b3211ca2f05be47b9ef8d2c9acedf3dfa9ee0268bf3a42ea3e29af1e1"
+    (0 until groupConfig.groups).foreach { index =>
+      val address = s"3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:${index}"
+      AddressVerifyP2PK(address).publicKey(publicKey).group(index).success()
+    }
   }
 
   sealed trait AddressVerify {
@@ -166,13 +172,48 @@ class AddressSpec extends AlephiumSpec {
 
     def success(): Assertion = {
       Address.from(script).toBase58 is address
-      Address.fromBase58(address).value.lockupScript is script
+      Address.fromBase58(address).rightValue.lockupScript is script
     }
 
     def fail(): Assertion = {
       Address.from(script).toBase58 is address
-      Address.fromBase58(address) is None
+      Address.fromBase58(address).isLeft is true
     }
+  }
+
+  case class AddressVerifyP2PK(
+      address: String,
+      pubKey: Option[PublicKeyLike] = None,
+      groupIndex: Option[GroupIndex] = None
+  ) extends AddressVerify {
+    def publicKey(key: String) = {
+      copy(pubKey = Some(deserialize[PublicKeyLike](Hex.unsafe(key)).rightValue))
+    }
+
+    def group(index: Int) = copy(
+      groupIndex = Some(GroupIndex.unsafe(index))
+    )
+
+    override def success(): Assertion = {
+      groupIndex.foreach(g => script.groupIndex is g)
+      val bytes = serialize[LockupScript](script)
+      Base58.encode(bytes) isnot address
+      Address.from(script).toBase58 is address
+      Address.fromBase58(address) isE Address.from(script)
+      Address
+        .fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(1, 5)).sample.get))
+        .isLeft is true
+
+      val addressWithoutGroup = script.toBase58.dropRight(2)
+      Address.fromBase58(s"$addressWithoutGroup:${script.groupIndex.value}") isE Address.Asset(
+        script
+      )
+      Address
+        .fromBase58(Base58.encode(bytes ++ bytesGen(Random.between(1, 5)).sample.get))
+        .isLeft is true
+    }
+
+    def script: LockupScript.P2PK = LockupScript.p2pk(pubKey.get, groupIndex.get)
   }
 
   case class AddressVerifyP2PKH(

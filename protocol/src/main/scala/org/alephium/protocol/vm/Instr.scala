@@ -24,7 +24,7 @@ import scala.annotation.switch
 import akka.util.ByteString
 
 import org.alephium.crypto
-import org.alephium.crypto.SecP256K1
+import org.alephium.crypto.{Byte64, SecP256K1}
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.model
@@ -74,6 +74,17 @@ sealed trait RhoneInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
   def runWithRhone[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
+sealed trait DanubeInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
+  def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkDanubeHardFork(this)
+      _ <- runWithDanube(frame)
+    } yield ()
+  }
+
+  def runWithDanube[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+}
+
 sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] with GasSimple {
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -112,6 +123,20 @@ sealed trait RhoneInstrWithSimpleGas[-Ctx <: StatelessContext]
       _ <- frame.ctx.checkRhoneHardFork(this)
       _ <- frame.ctx.chargeGas(this)
       _ <- runWithRhone(frame)
+    } yield ()
+  }
+}
+
+sealed trait DanubeInstrWithSimpleGas[-Ctx <: StatelessContext]
+    extends DanubeInstr[Ctx]
+    with GasSimple {
+  def _runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = ???
+
+  override def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkDanubeHardFork(this)
+      _ <- frame.ctx.chargeGas(this)
+      _ <- runWithDanube(frame)
     } yield ()
   }
 }
@@ -166,7 +191,7 @@ object Instr {
     BoolNot, BoolAnd, BoolOr, BoolEq, BoolNeq, BoolToByteVec,
     I256Add, I256Sub, I256Mul, I256Div, I256Mod, I256Eq, I256Neq, I256Lt, I256Le, I256Gt, I256Ge,
     U256Add, U256Sub, U256Mul, U256Div, U256Mod, U256Eq, U256Neq, U256Lt, U256Le, U256Gt, U256Ge,
-    U256ModAdd, U256ModSub, U256ModMul, U256BitAnd, U256BitOr, U256Xor, U256SHL, U256SHR,
+    U256ModAdd, U256ModSub, U256ModMul, NumericBitAnd, NumericBitOr, NumericXor, NumericSHL, NumericSHR,
     I256ToU256, I256ToByteVec, U256ToI256, U256ToByteVec,
     ByteVecEq, ByteVecNeq, ByteVecSize, ByteVecConcat, AddressEq, AddressNeq, AddressToByteVec,
     IsAssetAddress, IsContractAddress,
@@ -189,7 +214,9 @@ object Instr {
     I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN,
     U256ToString, I256ToString, BoolToString,
     /* Below are instructions for Rhone hard fork */
-    GroupOfAddress
+    GroupOfAddress,
+    /* Below are instructions for Danube hard fork */
+    VerifySignature, GetSegregatedWebAuthnSignature, DevInstr, I256RoundInfinityDiv, U256RoundInfinityDiv
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -205,7 +232,9 @@ object Instr {
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
     LoadImmField, LoadImmFieldByIndex,
     /* Below are instructions for Rhone hard fork */
-    PayGasFee, MinimalContractDeposit, CreateMapEntry, MethodSelector, CallExternalBySelector
+    PayGasFee, MinimalContractDeposit, CreateMapEntry, MethodSelector, CallExternalBySelector,
+    /* Below are instructions for Danube hard fork */
+    ExternalCallerContractId, ExternalCallerAddress
   )
   // format: on
 
@@ -238,6 +267,14 @@ object Instr {
     AVector(Log1, Log2, Log3, Log4, Log5, Log6, Log7, Log8, Log9)
 
   val mockupCode: Byte = 0xff.toByte
+
+  @inline def checkSignedData(rawData: ByteString): ExeResult[Unit] = {
+    if (rawData.length == 32) {
+      okay
+    } else {
+      failed(SignedDataIsNot32Bytes(rawData.length))
+    }
+  }
 }
 
 sealed trait StatefulInstr  extends Instr[StatefulContext] with GasSchedule                     {}
@@ -661,6 +698,61 @@ sealed trait BinaryArithmeticInstr[T <: Val]
   }
 }
 
+sealed trait DanubeBinaryArithmeticInstr extends BinaryArithmeticInstr[Val] {
+  final override def op(x: Val, y: Val): ExeResult[Val]   = ???
+  @inline def popOpStack(frame: Frame[_]): ExeResult[Val] = frame.popOpStack()
+  protected def checkI256Op[T <: Val](
+      value1: Val.I256,
+      value2: T,
+      op: (Val.I256, T) => ExeResult[Val],
+      hardFork: HardFork
+  ): ExeResult[Val] = {
+    if (hardFork.isDanubeEnabled()) {
+      op(value1, value2)
+    } else {
+      failed(ArithmeticError(s"$this($value1, $value2) is not enabled before Danube"))
+    }
+  }
+}
+
+sealed trait DanubeShiftInstr extends DanubeBinaryArithmeticInstr {
+  protected def opU256(x: Val.U256, y: Val.U256, hardFork: HardFork): ExeResult[Val]
+  protected def opI256(x: Val.I256, y: Val.U256): ExeResult[Val]
+
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    val hardFork = frame.ctx.getHardFork()
+    for {
+      value2 <- popOpStack(frame)
+      value1 <- popOpStack(frame)
+      out <- (value1, value2) match {
+        case (value1: Val.U256, value2: Val.U256) => opU256(value1, value2, hardFork)
+        case (value1: Val.I256, value2: Val.U256) => checkI256Op(value1, value2, opI256, hardFork)
+        case _ => failed(BinaryArithmeticInstr.error(value1, value2, this))
+      }
+      _ <- frame.pushOpStack(out)
+    } yield ()
+  }
+}
+
+sealed trait DanubeBitwiseInstr extends DanubeBinaryArithmeticInstr {
+  protected def opU256(x: Val.U256, y: Val.U256): ExeResult[Val]
+  protected def opI256(x: Val.I256, y: Val.I256): ExeResult[Val]
+
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      value2 <- popOpStack(frame)
+      value1 <- popOpStack(frame)
+      out <- (value1, value2) match {
+        case (value1: Val.U256, value2: Val.U256) => opU256(value1, value2)
+        case (value1: Val.I256, value2: Val.I256) =>
+          checkI256Op(value1, value2, opI256, frame.ctx.getHardFork())
+        case _ => failed(BinaryArithmeticInstr.error(value1, value2, this))
+      }
+      _ <- frame.pushOpStack(out)
+    } yield ()
+  }
+}
+
 object BinaryArithmeticInstr {
   def error(a: Val, b: Val, op: ArithmeticInstr): ArithmeticError = {
     ArithmeticError(s"Arithmetic error: $op($a, $b)")
@@ -675,6 +767,17 @@ object BinaryArithmeticInstr {
       instr: ArithmeticInstr,
       op: (util.I256, util.I256) => Option[util.I256]
   )(x: Val.I256, y: Val.I256): ExeResult[Val.I256] =
+    op(x.v, y.v).map(Val.I256.apply).toRight(Right(BinaryArithmeticInstr.error(x, y, instr)))
+
+  @inline def i256ShiftOp(
+      op: (util.I256, util.U256) => util.I256
+  )(x: Val.I256, y: Val.U256): ExeResult[Val.I256] =
+    Right(Val.I256.apply(op(x.v, y.v)))
+
+  @inline def i256SafeShiftOp(
+      instr: ArithmeticInstr,
+      op: (util.I256, util.U256) => Option[util.I256]
+  )(x: Val.I256, y: Val.U256): ExeResult[Val.I256] =
     op(x.v, y.v).map(Val.I256.apply).toRight(Right(BinaryArithmeticInstr.error(x, y, instr)))
 
   @inline def u256Op(
@@ -743,6 +846,18 @@ object I256Ge extends BinaryArithmeticInstr[Val.I256] with I256StackOps with Gas
   protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
     BinaryArithmeticInstr.i256Comp(_.>=(_))(x, y)
 }
+object I256RoundInfinityDiv
+    extends BinaryArithmeticInstr[Val.I256]
+    with DanubeInstrWithSimpleGas[StatelessContext]
+    with I256StackOps
+    with GasLow {
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[DanubeInstrWithSimpleGas]._runWith(frame)
+  override def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[BinaryArithmeticInstr]._runWith(frame)
+  protected def op(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256SafeOp(this, _.roundInfinityDiv(_))(x, y)
+}
 object U256Add extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256SafeOp(this, _.add(_))(x, y)
@@ -775,25 +890,41 @@ object U256ModMul extends BinaryArithmeticInstr[Val.U256] with U256StackOps with
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.modMul(_))(x, y)
 }
-object U256BitAnd extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
-  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+object NumericBitAnd extends DanubeBitwiseInstr with GasLow {
+  protected def opU256(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.bitAnd(_))(x, y)
+  protected def opI256(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Op(_.bitAnd(_))(x, y)
 }
-object U256BitOr extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
-  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+object NumericBitOr extends DanubeBitwiseInstr with GasLow {
+  protected def opU256(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.bitOr(_))(x, y)
+  protected def opI256(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Op(_.bitOr(_))(x, y)
 }
-object U256Xor extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
-  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+object NumericXor extends DanubeBitwiseInstr with GasLow {
+  protected def opU256(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op(_.xor(_))(x, y)
+  protected def opI256(x: Val.I256, y: Val.I256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256Op(_.xor(_))(x, y)
 }
-object U256SHL extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
-  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
-    BinaryArithmeticInstr.u256Op((x, y) => x.shl(y))(x, y)
+object NumericSHL extends DanubeShiftInstr with GasLow {
+  def opU256(x: Val.U256, y: Val.U256, hardFork: HardFork): ExeResult[Val] = {
+    if (hardFork.isDanubeEnabled()) {
+      BinaryArithmeticInstr.u256SafeOp(this, (x, y) => x.shl(y))(x, y)
+    } else {
+      BinaryArithmeticInstr.u256Op((x, y) => x.shlDeprecated(y))(x, y)
+    }
+  }
+  def opI256(x: Val.I256, y: Val.U256): ExeResult[Val] = {
+    BinaryArithmeticInstr.i256SafeShiftOp(this, (x, y) => x.shl(y))(x, y)
+  }
 }
-object U256SHR extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasLow {
-  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+object NumericSHR extends DanubeShiftInstr with GasLow {
+  def opU256(x: Val.U256, y: Val.U256, hardFork: HardFork): ExeResult[Val] =
     BinaryArithmeticInstr.u256Op((x, y) => x.shr(y))(x, y)
+  def opI256(x: Val.I256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.i256ShiftOp((x, y) => x.shr(y))(x, y)
 }
 object U256Eq extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
@@ -818,6 +949,18 @@ object U256Gt extends BinaryArithmeticInstr[Val.U256] with U256StackOps with Gas
 object U256Ge extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(_.>=(_))(x, y)
+}
+object U256RoundInfinityDiv
+    extends BinaryArithmeticInstr[Val.U256]
+    with DanubeInstrWithSimpleGas[StatelessContext]
+    with U256StackOps
+    with GasLow {
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[DanubeInstrWithSimpleGas]._runWith(frame)
+  override def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[BinaryArithmeticInstr]._runWith(frame)
+  protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
+    BinaryArithmeticInstr.u256SafeOp(this, _.roundInfinityDiv(_))(x, y)
 }
 
 sealed trait ExpInstr[T <: Val]
@@ -1457,7 +1600,7 @@ case object VerifyTxSignature
         .toRight(Right(InvalidPublicKey(rawPublicKey.bytes)))
       signature <- signatures.pop()
       _ <- {
-        if (SignatureSchema.verify(rawData, signature, publicKey)) {
+        if (SignatureSchema.verify(rawData, signature.toSecP256K1Signature, publicKey)) {
           okay
         } else {
           failed(InvalidSignature(rawPublicKey.bytes, rawData, signature.bytes))
@@ -1504,12 +1647,7 @@ sealed trait GenericVerifySignature[PubKey, Sig]
       rawPublicKey <- frame.popOpStackByteVec()
       publicKey    <- buildPubKey(rawPublicKey).toRight(Right(InvalidPublicKey(rawPublicKey.bytes)))
       rawData      <- frame.popOpStackByteVec()
-      _ <-
-        if (rawData.bytes.length == 32) {
-          okay
-        } else {
-          failed(SignedDataIsNot32Bytes(rawData.bytes.length))
-        }
+      _            <- Instr.checkSignedData(rawData.bytes)
       _ <-
         if (verify(rawData.bytes, signature, publicKey)) {
           okay
@@ -1520,12 +1658,12 @@ sealed trait GenericVerifySignature[PubKey, Sig]
   }
 
   override def mockup(): Instr[StatelessContext] = {
-    assume(this.gas() == VerifySignatureMockup.gas())
-    VerifySignatureMockup
+    assume(this.gas() == GenericVerifySignatureMockup.gas())
+    GenericVerifySignatureMockup
   }
 }
 
-sealed trait GenericVerifySignatureMockup[PubKey, Sig]
+sealed trait GenericVerifySignatureMockupBase[PubKey, Sig]
     extends SignatureInstr
     with StatelessInstrCompanion0
     with GasSignature {
@@ -1538,8 +1676,8 @@ sealed trait GenericVerifySignatureMockup[PubKey, Sig]
   }
 }
 
-case object VerifySignatureMockup
-    extends GenericVerifySignatureMockup[crypto.SecP256K1PublicKey, crypto.SecP256K1Signature] {
+case object GenericVerifySignatureMockup
+    extends GenericVerifySignatureMockupBase[crypto.SecP256K1PublicKey, crypto.SecP256K1Signature] {
   override lazy val code: Byte = Instr.mockupCode
 }
 
@@ -1593,6 +1731,137 @@ case object VerifyBIP340Schnorr
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
     super[LemanInstrWithSimpleGas].runWith(frame)
+}
+
+case object VerifySignature
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasSignature
+    with DanubeInstrWithSimpleGas[StatelessContext] {
+  private def decodeSignature[Sig](
+      rawSignature: ByteString,
+      sig: RandomBytes.Companion[Sig]
+  ): ExeResult[Sig] = {
+    sig.from(rawSignature).toRight(Right(InvalidSignatureFormat(rawSignature)))
+  }
+  private def verify[C <: StatelessContext](
+      frame: Frame[C],
+      publicKey: PublicKeyLike,
+      rawSignature: ByteString,
+      rawData: ByteString
+  ): ExeResult[Boolean] = {
+    publicKey match {
+      case PublicKeyLike.SecP256K1(publicKey) =>
+        decodeSignature(rawSignature, crypto.SecP256K1Signature).map(
+          crypto.SecP256K1.verify(rawData, _, publicKey)
+        )
+      case PublicKeyLike.SecP256R1(publicKey) =>
+        decodeSignature(rawSignature, crypto.SecP256R1Signature).map(
+          crypto.SecP256R1.verify(rawData, _, publicKey)
+        )
+      case PublicKeyLike.ED25519(publicKey) =>
+        decodeSignature(rawSignature, crypto.ED25519Signature).map(
+          crypto.ED25519.verify(rawData, _, publicKey)
+        )
+      case PublicKeyLike.WebAuthn(publicKey) =>
+        for {
+          signature <-
+            if (rawSignature.length < Byte64.length) {
+              failed(InvalidSignatureFormat(rawSignature))
+            } else {
+              Right(crypto.SecP256R1Signature.unsafe(rawSignature.takeRight(Byte64.length)))
+            }
+          webauthn <- WebAuthn
+            .decode(rawSignature.dropRight(Byte64.length))
+            .left
+            .map(error => Right(InvalidWebAuthnPayload(error)))
+          _ <- frame.ctx.chargeGas(GasHash.gas(webauthn.bytesLength))
+        } yield webauthn.verify(rawData, signature, publicKey)
+    }
+  }
+
+  def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      publicKeyType <- frame.popOpStackByteVec()
+      _ <-
+        if (publicKeyType.bytes.length != 1) {
+          failed(InvalidPublicKeyType(publicKeyType.bytes))
+        } else {
+          okay
+        }
+      rawSignature <- frame.popOpStackByteVec()
+      rawPublicKey <- frame.popOpStackByteVec()
+      publicKeyBytes = publicKeyType.bytes ++ rawPublicKey.bytes
+      publicKey <- decode[PublicKeyLike](publicKeyBytes).left.map(_ =>
+        Right(InvalidPublicKey(publicKeyBytes))
+      )
+      rawData <- frame.popOpStackByteVec()
+      _       <- Instr.checkSignedData(rawData.bytes)
+      isValid <- verify(frame, publicKey, rawSignature.bytes, rawData.bytes)
+      _ <-
+        if (isValid) {
+          okay
+        } else {
+          failed(InvalidSignature(publicKeyBytes, rawData.bytes, rawSignature.bytes))
+        }
+    } yield ()
+  }
+
+  override def mockup(): Instr[StatelessContext] = {
+    assume(this.gas() == VerifySignatureMockup.gas())
+    VerifySignatureMockup
+  }
+}
+
+case object GetSegregatedWebAuthnSignature
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasMid
+    with DanubeInstrWithSimpleGas[StatelessContext] {
+  def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    val nextBytes = () => frame.ctx.signatures.pop().toOption
+    for {
+      payload <- WebAuthn
+        .tryDecodePayload(nextBytes)
+        .left
+        .map(error => Right(InvalidWebAuthnPayload(error)))
+      signature <- frame.ctx.signatures.pop()
+      _         <- frame.pushOpStack(Val.ByteVec(payload ++ signature.bytes))
+    } yield ()
+  }
+
+  override def mockup(): Instr[StatelessContext] = {
+    assume(this.gas() == GetSegregatedWebAuthnSignatureMockup.gas())
+    GetSegregatedWebAuthnSignatureMockup
+  }
+}
+
+case object GetSegregatedWebAuthnSignatureMockup
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasMid {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      payload <- frame.ctx.signatures.pop()
+      _       <- frame.pushOpStack(Val.ByteVec(payload.bytes))
+    } yield ()
+  }
+  override lazy val code: Byte = Instr.mockupCode
+}
+
+case object VerifySignatureMockup
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasSignature {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.popOpStackByteVec() // publicKeyType
+      _ <- frame.popOpStackByteVec() // rawSignature
+      _ <- frame.popOpStackByteVec() // rawPublicKey
+      _ <- frame.popOpStackByteVec() // rawData
+    } yield ()
+  }
+  override lazy val code: Byte = Instr.mockupCode
 }
 
 case object GetSegregatedSignature
@@ -1671,14 +1940,20 @@ sealed trait LockApprovedAssetsInstr extends LemanAssetInstr with StatefulInstrC
 
 object LockApprovedAssets extends LockApprovedAssetsInstr {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    val hardFork = frame.ctx.getHardFork()
     for {
       lockTime     <- popTimestamp(frame)
       lockupScript <- frame.popAssetAddress()
       balanceState <- frame.getBalanceState()
-      approved <- balanceState
-        .useAllApproved(lockupScript)
-        .toRight(Right(NoAssetsApproved(Address.Asset(lockupScript))))
-      outputs <- approved.toLockedTxOutput(lockupScript, lockTime, frame.ctx.getHardFork())
+      approved <-
+        if (hardFork.isDanubeEnabled()) {
+          balanceState.useAllApproved().toRight(Right(NoAssetsApproved(None)))
+        } else {
+          balanceState
+            .useAllApproved(lockupScript)
+            .toRight(Right(NoAssetsApproved(Some(Address.Asset(lockupScript)))))
+        }
+      outputs <- approved.toLockedTxOutput(lockupScript, lockTime, hardFork)
       _       <- outputs.foreachE(frame.ctx.generateOutput)
     } yield ()
   }
@@ -1902,12 +2177,14 @@ sealed trait Transfer extends AssetInstr {
   @inline def transferAlph[C <: StatefulContext](
       frame: Frame[C],
       fromThunk: => ExeResult[LockupScript],
-      toThunk: => ExeResult[LockupScript]
+      toThunk: => ExeResult[LockupScript],
+      checkAddress: (HardFork, LockupScript, LockupScript) => ExeResult[Unit]
   ): ExeResult[Unit] = {
     for {
       amount <- frame.popOpStackU256()
       to     <- toThunk
       from   <- fromThunk
+      _      <- checkAddress(frame.ctx.getHardFork(), from, to)
       _      <- transferAlph(frame, from, to, amount)
     } yield ()
   }
@@ -1946,7 +2223,8 @@ sealed trait Transfer extends AssetInstr {
   @inline def transferToken[C <: StatefulContext](
       frame: Frame[C],
       fromThunk: => ExeResult[LockupScript],
-      toThunk: => ExeResult[LockupScript]
+      toThunk: => ExeResult[LockupScript],
+      checkAddress: (HardFork, LockupScript, LockupScript) => ExeResult[Unit]
   ): ExeResult[Unit] = {
     for {
       amount     <- frame.popOpStackU256()
@@ -1954,6 +2232,7 @@ sealed trait Transfer extends AssetInstr {
       tokenId    <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId.from(tokenIdRaw)))
       to         <- toThunk
       from       <- fromThunk
+      _          <- checkAddress(frame.ctx.getHardFork(), from, to)
       _ <-
         if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
           transferAlph(frame, from, to, amount)
@@ -1964,12 +2243,27 @@ sealed trait Transfer extends AssetInstr {
   }
 }
 
+object Transfer {
+  def checkAddressForSelfTransfer(
+      hardFork: HardFork,
+      from: LockupScript,
+      to: LockupScript
+  ): ExeResult[Unit] = {
+    if (hardFork.isDanubeEnabled() && from == to) {
+      failed(InvalidSelfTransfer)
+    } else {
+      okay
+    }
+  }
+}
+
 object TransferAlph extends Transfer with StatefulInstrCompanion0 {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     transferAlph(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
-      getToAddressFromStack(frame)
+      getToAddressFromStack(frame),
+      (_, _, _) => okay
     )
   }
 }
@@ -1979,7 +2273,8 @@ object TransferAlphFromSelf extends Transfer with StatefulInstrCompanion0 {
     transferAlph(
       frame,
       getContractLockupScript(frame),
-      getToAddressFromStack(frame)
+      getToAddressFromStack(frame),
+      Transfer.checkAddressForSelfTransfer
     )
   }
 }
@@ -1989,7 +2284,8 @@ object TransferAlphToSelf extends Transfer with StatefulInstrCompanion0 {
     transferAlph(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
-      getContractLockupScript(frame)
+      getContractLockupScript(frame),
+      Transfer.checkAddressForSelfTransfer
     )
   }
 }
@@ -1999,7 +2295,8 @@ object TransferToken extends Transfer with StatefulInstrCompanion0 {
     transferToken(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
-      getToAddressFromStack(frame)
+      getToAddressFromStack(frame),
+      (_, _, _) => okay
     )
   }
 }
@@ -2009,7 +2306,8 @@ object TransferTokenFromSelf extends Transfer with StatefulInstrCompanion0 {
     transferToken(
       frame,
       getContractLockupScript(frame),
-      getToAddressFromStack(frame)
+      getToAddressFromStack(frame),
+      Transfer.checkAddressForSelfTransfer
     )
   }
 }
@@ -2019,7 +2317,8 @@ object TransferTokenToSelf extends Transfer with StatefulInstrCompanion0 {
     transferToken(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
-      getContractLockupScript(frame)
+      getContractLockupScript(frame),
+      Transfer.checkAddressForSelfTransfer
     )
   }
 }
@@ -2109,7 +2408,7 @@ sealed trait ContractFactory extends StatefulInstrSimpleGas with GasSimple {
       _                 <- frame.ctx.chargeFieldSize(immFields.toIterable ++ mutFields.toIterable)
       contractCode      <- prepareContractCode(frame)
       // Enable the check below for new network upgrades
-//      _                 <- checkInactiveInstructions(frame, contractCode)
+      _ <- checkInactiveInstructions(frame, contractCode)
       newContractId <- CreateContractAbstract.getContractId(
         frame,
         subContract,
@@ -2136,10 +2435,10 @@ sealed trait ContractFactory extends StatefulInstrSimpleGas with GasSimple {
       frame: Frame[C],
       contractCode: StatefulContract.HalfDecoded
   ): ExeResult[Unit] = {
-    if (!frame.ctx.getHardFork().isRhoneEnabled()) {
+    if (!frame.ctx.getHardFork().isDanubeEnabled()) {
       EitherF.foreachTry(0 until contractCode.methodsLength)(methodIndex => {
         contractCode.getMethod(methodIndex).flatMap { method =>
-          method.instrs.find(_.isInstanceOf[RhoneInstr[_]]) match {
+          method.instrs.find(_.isInstanceOf[DanubeInstr[_]]) match {
             case Some(inactiveInstr) => failed(InactiveInstr(inactiveInstr))
             case None                => okay
           }
@@ -2451,8 +2750,14 @@ object ContractExists
 object DestroySelf extends ContractInstr with GasDestroy {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      address <- frame.popOpStackAddress()
-      _       <- frame.destroyContract(address.lockupScript)
+      address0 <- frame.popOpStackAddress()
+      address <-
+        if (address0 == Val.NullContractAddress && frame.ctx.getHardFork().isDanubeEnabled()) {
+          frame.ctx.getFirstTxInputAddress()
+        } else {
+          Right(address0)
+        }
+      _ <- frame.destroyContract(address.lockupScript)
     } yield ()
   }
 }
@@ -2582,6 +2887,30 @@ object CallerAddress extends ContractInstr with GasLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       address <- frame.getCallerAddress()
+      _       <- frame.pushOpStack(address)
+    } yield ()
+  }
+}
+
+object ExternalCallerContractId
+    extends ContractInstr
+    with GasLow
+    with DanubeInstrWithSimpleGas[StatefulContext] {
+  def runWithDanube[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      callerContractId <- frame.getExternalCallerContractId()
+      _                <- frame.pushOpStack(callerContractId)
+    } yield ()
+  }
+}
+
+object ExternalCallerAddress
+    extends ContractInstr
+    with GasLow
+    with DanubeInstrWithSimpleGas[StatefulContext] {
+  def runWithDanube[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address <- frame.getExternalCallerAddress()
       _       <- frame.pushOpStack(address)
     } yield ()
   }
@@ -2885,3 +3214,118 @@ final case class DEBUG(stringParts: AVector[Val.ByteVec])
   }
 }
 object DEBUG extends StatelessInstrCompanion1[AVector[Val.ByteVec]]
+
+sealed trait DevInstrBase
+case object TestCheckStart        extends DevInstrBase
+case object TestErrorStart        extends DevInstrBase
+case object TestCheckEnd          extends DevInstrBase
+case object TestEqual             extends DevInstrBase
+case object RandomU256            extends DevInstrBase
+case object RandomI256            extends DevInstrBase
+case object RandomContractAddress extends DevInstrBase
+case object RandomAssetAddress    extends DevInstrBase
+object DevInstrBase {
+  implicit val serde: Serde[DevInstrBase] = new Serde[DevInstrBase] {
+    override def serialize(input: DevInstrBase): ByteString = {
+      input match {
+        case TestCheckStart        => ByteString(0)
+        case TestErrorStart        => ByteString(1)
+        case TestCheckEnd          => ByteString(2)
+        case TestEqual             => ByteString(3)
+        case RandomU256            => ByteString(4)
+        case RandomI256            => ByteString(5)
+        case RandomContractAddress => ByteString(6)
+        case RandomAssetAddress    => ByteString(7)
+      }
+    }
+
+    override def _deserialize(input: ByteString): SerdeResult[Staging[DevInstrBase]] = {
+      byteSerde._deserialize(input).flatMap {
+        case Staging(0, content) => Right(Staging(TestCheckStart, content))
+        case Staging(1, content) => Right(Staging(TestErrorStart, content))
+        case Staging(2, content) => Right(Staging(TestCheckEnd, content))
+        case Staging(3, content) => Right(Staging(TestEqual, content))
+        case Staging(4, content) => Right(Staging(RandomU256, content))
+        case Staging(5, content) => Right(Staging(RandomI256, content))
+        case Staging(6, content) => Right(Staging(RandomContractAddress, content))
+        case Staging(7, content) => Right(Staging(RandomAssetAddress, content))
+        case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid dev instr prefix $n"))
+      }
+    }
+  }
+}
+
+@ByteCode
+final case class DevInstr(instr: DevInstrBase)
+    extends DanubeInstrWithSimpleGas[StatelessContext]
+    with GasZero {
+  def serialize(): ByteString =
+    ByteString(code) ++ serdeImpl[DevInstrBase].serialize(instr)
+
+  private def popInt[C <: StatelessContext](frame: Frame[C]): ExeResult[Int] = {
+    for {
+      errorCodeU256 <- frame.popOpStackU256()
+      errorCode     <- errorCodeU256.v.toInt.toRight(Right(InvalidErrorCode(errorCodeU256.v)))
+    } yield errorCode
+  }
+
+  private def checkError(testEnv: TestEnv): ExeResult[Unit] = {
+    (testEnv.exeFailure, testEnv.expectedErrorCode) match {
+      case (None, _) => failed(ExpectedAnExeFailure(testEnv.sourcePosIndex))
+      case (_, None) => okay
+      case (Some(AssertionFailedWithErrorCode(_, errorCode)), Some(expectedErrorCode)) =>
+        if (errorCode == expectedErrorCode) {
+          okay
+        } else {
+          failed(NotExpectedErrorInTest(expectedErrorCode, Left(errorCode), testEnv.sourcePosIndex))
+        }
+      case (Some(error), Some(expectedErrorCode)) =>
+        failed(NotExpectedErrorInTest(expectedErrorCode, Right(error), testEnv.sourcePosIndex))
+    }
+  }
+
+  def runWithDanube[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    if (
+      frame.ctx.networkConfig.networkId == model.NetworkId.AlephiumMainNet ||
+      frame.ctx.networkConfig.networkId == model.NetworkId.AlephiumTestNet
+    ) {
+      failed(DevInstrIsOnlySupportedOnDevnet)
+    } else {
+      instr match {
+        case TestCheckStart =>
+          popInt(frame).map(sourcePosIndex => frame.ctx.initTestEnv(sourcePosIndex, None, frame))
+        case TestErrorStart =>
+          for {
+            sourcePosIndex    <- popInt(frame)
+            expectedErrorCode <- popInt(frame)
+          } yield frame.ctx.initTestEnv(sourcePosIndex, Some(expectedErrorCode), frame)
+        case TestCheckEnd =>
+          frame.ctx.testEnvOpt match {
+            case Some(testEnv) =>
+              frame.ctx.resetTestEnv()
+              checkError(testEnv)
+            case None => failed(InvalidTestCheckInstr)
+          }
+        case TestEqual =>
+          for {
+            errorCode <- popInt(frame)
+            right     <- frame.popOpStack()
+            left      <- frame.popOpStack()
+            _ <-
+              if (left == right) {
+                okay
+              } else {
+                failed(NotEqualInTest(left, right, errorCode))
+              }
+          } yield ()
+        case RandomU256 => frame.pushOpStack(Val.U256(util.UnsecureRandom.nextU256()))
+        case RandomI256 => frame.pushOpStack(Val.I256(util.UnsecureRandom.nextI256()))
+        case RandomContractAddress =>
+          frame.pushOpStack(Val.Address(LockupScript.p2c(ContractId.random)))
+        case RandomAssetAddress =>
+          frame.pushOpStack(Val.Address(LockupScript.p2pkh(PublicKey.generate)))
+      }
+    }
+  }
+}
+object DevInstr extends StatelessInstrCompanion1[DevInstrBase]

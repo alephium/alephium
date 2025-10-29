@@ -191,10 +191,16 @@ object CompilerError {
       address.length
   }
 
-  final case class `Invalid address`(address: String, position: Int, fileURI: Option[java.net.URI])
-      extends TypeError {
+  final case class `Invalid address`(
+      address: String,
+      position: Int,
+      fileURI: Option[java.net.URI],
+      detail: String
+  ) extends TypeError {
     override def foundLength: Int =
       address.length
+
+    override def message: String = detail
   }
 
   /** ****** Section: Default Error ****** This error is used when a specific error is not
@@ -221,4 +227,24 @@ object CompilerError {
       Default(message, sourceIndex, null)
     // scalastyle:on null
   }
+
+  // scalastyle:off null
+  final case class TestError(
+      override val message: String,
+      sourceIndex: Option[SourceIndex],
+      debugMessages: Option[String]
+  ) extends Exception(message, null)
+      with FormattableError {
+    def title: String =
+      "Testing error"
+    override val position: Int =
+      sourceIndex.map(_.index).getOrElse(0)
+    override val foundLength: Int =
+      sourceIndex.map(_.width).getOrElse(0)
+    override def fileURI: Option[java.net.URI] =
+      sourceIndex.flatMap(_.fileURI)
+    override def footer: Option[String] =
+      debugMessages.map(msg => s"Debug messages:\n$msg")
+  }
+  // scalastyle:on null
 }

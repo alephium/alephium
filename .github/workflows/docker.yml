@@ -28,5 +28,8 @@ jobs:
           java-version: 11
           cache: sbt
 
+      - name: Setup SBT
+        uses: sbt/setup-sbt@v1
+
       - run: sbt app/docker
         shell: bash

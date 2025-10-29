@@ -28,12 +28,20 @@ sealed trait UnlockScript
 
 object UnlockScript {
   implicit val serde: Serde[UnlockScript] = {
-    implicit val tuple: Serde[(PublicKey, Int)] = Serde.tuple2[PublicKey, Int]
+    implicit val indexedPublicKeySerde: Serde[(PublicKey, Int)] = Serde.tuple2[PublicKey, Int]
 
     val p2mpkhSerde: Serde[P2MPKH] =
       Serde
         .forProduct1[AVector[(PublicKey, Int)], P2MPKH](P2MPKH.apply, t => t.indexedPublicKeys)
     val p2shSerde: Serde[P2SH] = Serde.forProduct2(P2SH.apply, t => (t.script, t.params))
+    val p2hmpkSerde: Serde[P2HMPK] = {
+      val underlying = Serde.forProduct2[AVector[PublicKeyLike], AVector[Int], P2HMPK](
+        P2HMPK.apply,
+        t => (t.publicKeys, t.publicKeyIndexes)
+      )
+
+      underlying.validate(P2HMPK.validate)
+    }
 
     new Serde[UnlockScript] {
       override def serialize(input: UnlockScript): ByteString = {
@@ -43,6 +51,8 @@ object UnlockScript {
           case p2sh: P2SH     => ByteString(2) ++ p2shSerde.serialize(p2sh)
           case SameAsPrevious => ByteString(3)
           case polw: PoLW     => ByteString(4) ++ serdeImpl[PublicKey].serialize(polw.publicKey)
+          case P2PK           => ByteString(5)
+          case p2hmpk: P2HMPK => ByteString(6) ++ p2hmpkSerde.serialize(p2hmpk)
         }
       }
 
@@ -55,6 +65,8 @@ object UnlockScript {
           case Staging(3, content) => Right(Staging(SameAsPrevious, content))
           case Staging(4, content) =>
             serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(PoLW.apply))
+          case Staging(5, content) => Right(Staging(P2PK, content))
+          case Staging(6, content) => p2hmpkSerde._deserialize(content)
           case Staging(n, _) => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
         }
       }
@@ -85,6 +97,42 @@ object UnlockScript {
 
     def buildPreImage(from: LockupScript, to: LockupScript): ByteString = {
       Hash.hash(prefix ++ serialize(from) ++ serialize(to)).bytes
+    }
+  }
+  case object P2PK extends UnlockScript
+  final case class P2HMPK(
+      publicKeys: AVector[PublicKeyLike],
+      publicKeyIndexes: AVector[Int]
+  ) extends UnlockScript {
+    def calHash(): Hash = LockupScript.P2HMPK.calcHash(publicKeys, publicKeyIndexes.length)
+  }
+  object P2HMPK {
+    def validate(p2hmpk: P2HMPK): Either[String, Unit] = {
+      if (p2hmpk.publicKeys.isEmpty) {
+        Left("Public keys can not be empty")
+      } else if (p2hmpk.publicKeyIndexes.isEmpty) {
+        Left("Public key indexes can not be empty")
+      } else if (p2hmpk.publicKeyIndexes.length > p2hmpk.publicKeys.length) {
+        Left("Public key indexes length can not be greater than public keys length")
+      } else if (!validateP2hmpk(p2hmpk)) {
+        Left(
+          "Public key indexes should be sorted in ascending order, each index should be in range [0, publicKeys.length)"
+        )
+      } else {
+        Right(())
+      }
+    }
+  }
+
+  private def validateP2hmpk(unlock: UnlockScript.P2HMPK): Boolean = {
+    val publicKeysLength = unlock.publicKeys.length
+    (0 until unlock.publicKeyIndexes.length).forall { i =>
+      val index = unlock.publicKeyIndexes(i)
+      unlock.publicKeyIndexes.get(i + 1) match {
+        case Some(nextIndex) =>
+          index >= 0 && index < nextIndex && nextIndex < publicKeysLength
+        case None => index >= 0 && index < publicKeysLength
+      }
     }
   }
 }

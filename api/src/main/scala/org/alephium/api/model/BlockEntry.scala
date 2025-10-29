@@ -20,9 +20,18 @@ import akka.util.ByteString
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.model.{Block, BlockDeps, BlockHash, BlockHeader, Nonce, Target}
+import org.alephium.protocol.model.{
+  Block,
+  BlockDeps,
+  BlockHash,
+  BlockHeader,
+  Nonce,
+  Target,
+  TransactionId
+}
 import org.alephium.util.{AVector, TimeStamp}
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BlockEntry(
     hash: BlockHash,
     timestamp: TimeStamp,
@@ -36,7 +45,8 @@ final case class BlockEntry(
     depStateHash: Hash,
     txsHash: Hash,
     target: ByteString,
-    ghostUncles: AVector[GhostUncleBlockEntry]
+    ghostUncles: AVector[GhostUncleBlockEntry],
+    conflictedTxs: Option[AVector[TransactionId]] = None
 ) {
   def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, Block] = {
     for {
@@ -68,7 +78,7 @@ final case class BlockEntry(
 }
 
 object BlockEntry {
-  def from(block: Block, height: Int)(implicit
+  def from(block: Block, height: Int, conflictedTxs: Option[AVector[TransactionId]])(implicit
       networkConfig: NetworkConfig
   ): Either[String, BlockEntry] = {
     val ghostUncleBlockDataEither = {
@@ -95,7 +105,8 @@ object BlockEntry {
         depStateHash = block.header.depStateHash,
         txsHash = block.header.txsHash,
         target = block.header.target.bits,
-        ghostUncles = ghostUncleBlockData
+        ghostUncles = ghostUncleBlockData,
+        conflictedTxs = conflictedTxs
       )
     )
   }

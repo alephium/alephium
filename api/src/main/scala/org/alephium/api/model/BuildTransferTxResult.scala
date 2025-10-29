@@ -15,28 +15,40 @@
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 package org.alephium.api.model
 
+import org.alephium.api.{badRequest, Try}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{TransactionId, UnsignedTransaction}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
-import org.alephium.util.Hex
+import org.alephium.util.{AVector, Hex}
 
-final case class BuildTransferTxResult(
+sealed trait BuildTransferTxResult extends Product with Serializable {
+  def unsignedTx: String
+  def gasAmount: GasBox
+  def gasPrice: GasPrice
+  def txId: TransactionId
+  def fromGroup: Int
+  def toGroup: Int
+}
+
+@upickle.implicits.key("BuildSimpleTransferTxResult")
+final case class BuildSimpleTransferTxResult(
     unsignedTx: String,
     gasAmount: GasBox,
     gasPrice: GasPrice,
     txId: TransactionId,
     fromGroup: Int,
     toGroup: Int
-) extends GasInfo
+) extends BuildTransferTxResult
+    with GasInfo
     with ChainIndexInfo
     with TransactionInfo
 
-object BuildTransferTxResult {
+object BuildSimpleTransferTxResult {
   def from(
       unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildTransferTxResult =
-    BuildTransferTxResult(
+  )(implicit groupConfig: GroupConfig): BuildSimpleTransferTxResult =
+    BuildSimpleTransferTxResult(
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,
       unsignedTx.gasPrice,
@@ -44,4 +56,37 @@ object BuildTransferTxResult {
       unsignedTx.fromGroup.value,
       unsignedTx.toGroup.value
     )
+}
+
+@upickle.implicits.key("BuildGrouplessTransferTxResult")
+final case class BuildGrouplessTransferTxResult(
+    unsignedTx: String,
+    gasAmount: GasBox,
+    gasPrice: GasPrice,
+    txId: TransactionId,
+    fromGroup: Int,
+    toGroup: Int,
+    fundingTxs: Option[AVector[BuildSimpleTransferTxResult]]
+) extends BuildTransferTxResult
+object BuildGrouplessTransferTxResult {
+  def from(
+      transferTxs: AVector[BuildSimpleTransferTxResult]
+  ): Try[BuildGrouplessTransferTxResult] =
+    if (transferTxs.isEmpty) {
+      Left(badRequest("transferTxs is empty"))
+    } else {
+      val transferTx = transferTxs.last
+      val fundingTxs = transferTxs.init
+      Right(
+        BuildGrouplessTransferTxResult(
+          transferTx.unsignedTx,
+          transferTx.gasAmount,
+          transferTx.gasPrice,
+          transferTx.txId,
+          transferTx.fromGroup,
+          transferTx.toGroup,
+          Option.when(fundingTxs.nonEmpty)(fundingTxs)
+        )
+      )
+    }
 }

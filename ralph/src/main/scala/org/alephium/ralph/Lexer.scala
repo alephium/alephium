@@ -146,7 +146,7 @@ class Lexer(fileURI: Option[java.net.URI]) {
         case Some(bytes) => (ByteVec(bytes), string.length)
         case None =>
           Address.extractLockupScript(string) match {
-            case Some(LockupScript.P2C(contractId)) =>
+            case Right(LockupScript.P2C(contractId)) =>
               (ByteVec(contractId.bytes), string.length)
             case _ => throw CompilerError.`Invalid byteVec`(string, index, fileURI)
           }
@@ -170,12 +170,14 @@ class Lexer(fileURI: Option[java.net.URI]) {
     }
 
   def addressInternal[Unknown: P]: P[(Val.Address, Int, Int)] =
-    P(Index ~ CharsWhileIn("0-9a-zA-Z").!).map { case (index, input) =>
-      val lockupScriptOpt = Address.extractLockupScript(input)
-      lockupScriptOpt match {
-        case Some(lockupScript) => (Val.Address(lockupScript), index, input.length)
-        case None               => throw CompilerError.`Invalid address`(input, index, fileURI)
-      }
+    P(Index ~ CharsWhileIn("0-9a-zA-Z").! ~ (":" ~ digit.rep(1).!).?).map {
+      case (index, input0, groupIndexOpt) =>
+        val input = groupIndexOpt.map(groupIndex => s"$input0:${groupIndex}").getOrElse(input0)
+        val lockupScriptOpt = Address.extractLockupScript(input)
+        lockupScriptOpt match {
+          case Right(lockupScript) => (Val.Address(lockupScript), index, input.length)
+          case Left(error) => throw CompilerError.`Invalid address`(input, index, fileURI, error)
+        }
     }
   def address[Ctx <: StatelessContext, Unknown: P]: P[Ast.Const[Ctx]] =
     P(Index ~ "@" ~ addressInternal).map { case (index, (address, _, addressWidth)) =>
@@ -223,7 +225,8 @@ class Lexer(fileURI: Option[java.net.URI]) {
   def opMul[Unknown: P]: P[Operator]           = P("*").map(_ => Mul)
   def opExp[Unknown: P]: P[Operator]           = P("**").map(_ => Exp)
   def opModExp[Unknown: P]: P[Operator]        = P("|**|").map(_ => ModExp)
-  def opDiv[Unknown: P]: P[Operator]           = P("/").map(_ => Div)
+  def opDiv[Unknown: P]: P[Operator]           = P("/").map(_ => RoundDownDiv)
+  def opRoundUpDiv[Unknown: P]: P[Operator]    = P("\\").map(_ => RoundUpDiv)
   def opMod[Unknown: P]: P[Operator]           = P("%").map(_ => Mod)
   def opModAdd[Unknown: P]: P[Operator]        = P("⊕" | "|+|").map(_ => ModAdd)
   def opModSub[Unknown: P]: P[Operator]        = P("⊖" | "|-|").map(_ => ModSub)
@@ -243,6 +246,15 @@ class Lexer(fileURI: Option[java.net.URI]) {
   def opOr[Unknown: P]: P[LogicalOperator]     = P("||").map(_ => Or)
   def opNot[Unknown: P]: P[LogicalOperator]    = P("!").map(_ => Not)
   def opNegate[Unknown: P]: P[LogicalOperator] = P("-").map(_ => Negate)
+
+  def opAddAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("+=").map(_ => CompoundAssignmentOperator.AddAssign)
+  def opSubAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("-=").map(_ => CompoundAssignmentOperator.SubAssign)
+  def opMulAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("*=").map(_ => CompoundAssignmentOperator.MulAssign)
+  def opDivAssign[Unknown: P]: P[CompoundAssignmentOperator] =
+    P("/=").map(_ => CompoundAssignmentOperator.DivAssign)
 
   sealed trait FuncModifier
 

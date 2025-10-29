@@ -13,14 +13,15 @@ alephium {
     api-interface = "127.0.0.1"
     nonce-step = 400
     batch-delay = 0 milli
-    polling-interval = 2 seconds
+    polling-interval = 4 seconds
     job-cache-size-per-chain = 100
+    min-task-broadcast-interval = 250 milli
   }
 
   network {
     max-outbound-connections-per-group = 10
     max-inbound-connections-per-group = 40
-    max-clique-from-same-ip = 3
+    max-clique-from-same-ip = 10
 
     ping-frequency = 10 second
     retry-timeout = 10 second
@@ -34,7 +35,9 @@ alephium {
 
     fast-sync-frequency = 2 second
     stable-sync-frequency = 20 second
-    sync-peer-sample-size = 5
+    sync-peer-sample-size-v1 = 3
+    sync-peer-sample-size-v2 = 5
+    enable-p2p-v2 = true
     sync-cleanup-frequency = 10 second
     sync-expiry-period = 10 second
     dependency-expiry-period = 2 minute
@@ -126,13 +129,12 @@ akka {
   io.tcp.register-timeout = 1m
 
   actor {
-    mining-dispatcher {
+    pool-dispatcher {
       type = Dispatcher
-      executor = "fork-join-executor"
-      fork-join-executor {
-        parallelism-min = 1
-        parallelism-max = 4
-        parallelism-factor = 0.5
+      executor = "thread-pool-executor"
+      thread-pool-executor {
+        core-pool-size-min = 4
+        core-pool-size-max = 32
       }
       throughput = 1
     }

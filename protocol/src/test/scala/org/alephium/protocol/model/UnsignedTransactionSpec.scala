@@ -19,7 +19,7 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.protocol.{ALPH, PublicKey}
-import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
+import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, TimeStamp, U256}
 
@@ -144,53 +144,69 @@ class UnsignedTransactionSpec extends AlephiumSpec with NumericHelpers {
 
   it should "calculate total amount needed for ALPH" in new TotalAmountFixture {
     calculateTotalAmountNeeded(AVector(outputInfo(dustUtxoAmount - 1))) isE
-      ((dustUtxoAmount * 2, AVector.empty[(TokenId, U256)], 2))
+      TotalAmountNeeded(dustUtxoAmount * 2, AVector.empty[(TokenId, U256)], 2)
     calculateTotalAmountNeeded(AVector(outputInfo(dustUtxoAmount))) isE
-      ((dustUtxoAmount * 2, AVector.empty[(TokenId, U256)], 2))
+      TotalAmountNeeded(dustUtxoAmount * 2, AVector.empty[(TokenId, U256)], 2)
     calculateTotalAmountNeeded(AVector(outputInfo(dustUtxoAmount + 1))) isE
-      ((dustUtxoAmount * 2 + 1, AVector.empty[(TokenId, U256)], 2))
+      TotalAmountNeeded(dustUtxoAmount * 2 + 1, AVector.empty[(TokenId, U256)], 2)
   }
 
   it should "calculate total amount needed for token" in new TotalAmountFixture {
     calculateTotalAmountNeeded(AVector(outputInfo(dustUtxoAmount, AVector(tokenId0 -> 1)))) isE
-      ((dustUtxoAmount * 3, AVector(tokenId0 -> U256.One), 3))
+      TotalAmountNeeded(dustUtxoAmount * 3, AVector(tokenId0 -> U256.One), 3)
     calculateTotalAmountNeeded(
       AVector(outputInfo(dustUtxoAmount * 2, AVector(tokenId0 -> 1, tokenId1 -> 2)))
     ) isE
-      ((dustUtxoAmount * 5, AVector(tokenId0 -> U256.One, tokenId1 -> U256.Two), 5))
+      TotalAmountNeeded(dustUtxoAmount * 5, AVector(tokenId0 -> U256.One, tokenId1 -> U256.Two), 5)
     calculateTotalAmountNeeded(
       AVector(
         outputInfo(dustUtxoAmount, AVector(tokenId0 -> 1)),
         outputInfo(dustUtxoAmount, AVector(tokenId1 -> 2))
       )
-    ) isE ((dustUtxoAmount * 5, AVector(tokenId0 -> U256.One, tokenId1 -> U256.Two), 5))
+    ) isE TotalAmountNeeded(
+      dustUtxoAmount * 5,
+      AVector(tokenId0 -> U256.One, tokenId1 -> U256.Two),
+      5
+    )
     calculateTotalAmountNeeded(
       AVector(
         outputInfo(dustUtxoAmount * 2, AVector(tokenId0 -> 1, tokenId1 -> 2)),
         outputInfo(dustUtxoAmount * 2, AVector(tokenId0 -> 3, tokenId1 -> 4))
       )
-    ) isE ((dustUtxoAmount * 7, AVector(tokenId0 -> U256.unsafe(4), tokenId1 -> U256.unsafe(6)), 7))
+    ) isE TotalAmountNeeded(
+      dustUtxoAmount * 7,
+      AVector(tokenId0 -> U256.unsafe(4), tokenId1 -> U256.unsafe(6)),
+      7
+    )
   }
 
   it should "calculate total amount needed for ALPH and token" in new TotalAmountFixture {
     calculateTotalAmountNeeded(AVector(outputInfo(dustUtxoAmount + 1, AVector(tokenId0 -> 1)))) isE
-      ((dustUtxoAmount * 4, AVector(tokenId0 -> U256.One), 4))
+      TotalAmountNeeded(dustUtxoAmount * 4, AVector(tokenId0 -> U256.One), 4)
     calculateTotalAmountNeeded(
       AVector(outputInfo(dustUtxoAmount * 2 + 1, AVector(tokenId0 -> 1, tokenId1 -> 2)))
     ) isE
-      ((dustUtxoAmount * 6, AVector(tokenId0 -> U256.One, tokenId1 -> U256.Two), 6))
+      TotalAmountNeeded(dustUtxoAmount * 6, AVector(tokenId0 -> U256.One, tokenId1 -> U256.Two), 6)
     calculateTotalAmountNeeded(
       AVector(
         outputInfo(dustUtxoAmount + 1, AVector(tokenId0 -> 1)),
         outputInfo(dustUtxoAmount + 1, AVector(tokenId1 -> 2))
       )
-    ) isE ((dustUtxoAmount * 7, AVector(tokenId0 -> U256.One, tokenId1 -> U256.Two), 7))
+    ) isE TotalAmountNeeded(
+      dustUtxoAmount * 7,
+      AVector(tokenId0 -> U256.One, tokenId1 -> U256.Two),
+      7
+    )
     calculateTotalAmountNeeded(
       AVector(
         outputInfo(dustUtxoAmount * 2 + 1, AVector(tokenId0 -> 1, tokenId1 -> 2)),
         outputInfo(dustUtxoAmount * 2 + 1, AVector(tokenId0 -> 3, tokenId1 -> 4))
       )
-    ) isE ((dustUtxoAmount * 9, AVector(tokenId0 -> U256.unsafe(4), tokenId1 -> U256.unsafe(6)), 9))
+    ) isE TotalAmountNeeded(
+      dustUtxoAmount * 9,
+      AVector(tokenId0 -> U256.unsafe(4), tokenId1 -> U256.unsafe(6)),
+      9
+    )
   }
 
   trait Fixture {

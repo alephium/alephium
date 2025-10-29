@@ -136,13 +136,15 @@ trait FlowUtils
     }
   }
 
-  def getBestDeps(groupIndex: GroupIndex): BlockDeps
+  def getBestDeps(chainIndex: ChainIndex, hardFork: HardFork): BlockDeps
 
-  def updateBestDeps(): IOResult[Unit]
+  def calBestFlowPerChainIndexUnsafe(chainIndex: ChainIndex): BlockDeps
 
-  def updateBestDepsUnsafe(): Unit
+  def getBestFlowSkeleton(): BlockFlowSkeleton
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
+
+  def updateAccountView(block: Block): IOResult[Unit]
 
   def collectPooledTxs(chainIndex: ChainIndex, hardFork: HardFork): AVector[TransactionTemplate] = {
     val mempool = getMemPool(chainIndex)
@@ -183,7 +185,12 @@ trait FlowUtils
       // some tx inputs might from bestDeps, but not loosenDeps
       val candidates2 = filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork)
       // we don't want any tx that conflicts with bestDeps
-      val candidates3 = filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
+      val candidates3 = if (hardFork.isDanubeEnabled()) {
+        // For performance, conflicted TXs in parallel chains are fine since Danube upgrade
+        candidates2
+      } else {
+        filterConflicts(chainIndex.from, bestDeps, candidates2, getBlockUnsafe)
+      }
       FlowUtils.truncateTxs(
         candidates3,
         maximalTxsInOneBlock,
@@ -242,7 +249,11 @@ trait FlowUtils
       parentHeader: BlockHeader
   ): AVector[SelectedGhostUncle] = {
     if (hardFork.isRhoneEnabled()) {
-      getGhostUnclesUnsafe(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
+      getGhostUnclesUnsafe(
+        hardFork,
+        parentHeader,
+        uncle => isExtendingUnsafe(deps, uncle.blockDeps)
+      )
     } else {
       AVector.empty
     }
@@ -261,14 +272,15 @@ trait FlowUtils
       miner: LockupScript.Asset
   ): IOResult[(BlockFlowTemplate, AVector[SelectedGhostUncle])] = {
     assume(brokerConfig.contains(chainIndex.from))
-    val bestDeps = getBestDeps(chainIndex.from)
+    val hardForkGuess = networkConfig.getHardFork(TimeStamp.now())
+    val bestDeps      = getBestDeps(chainIndex, hardForkGuess)
     for {
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
       hardFork   = networkConfig.getHardFork(templateTs)
       loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs, hardFork)
       target       <- getNextHashTarget(chainIndex, loosenDeps, templateTs)
-      groupView    <- getMutableGroupView(chainIndex.from, loosenDeps)
+      groupView    <- getMutableGroupView(chainIndex, loosenDeps, hardFork, None)
       uncles       <- getGhostUncles(hardFork, loosenDeps, parentHeader)
       txCandidates <- collectTransactions(chainIndex, groupView, bestDeps, hardFork)
       template <- prepareBlockFlow(
@@ -667,6 +679,9 @@ trait SyncUtils {
   ): IOResult[AVector[AVector[BlockHash]]] =
     IOUtils.tryExecute(getSyncInventoriesUnsafe(locators, peerBrokerInfo))
 
+  def getChainTips(): IOResult[AVector[ChainTip]] =
+    IOUtils.tryExecute(getChainTipsUnsafe())
+
   protected def getIntraSyncInventoriesUnsafe(): AVector[AVector[BlockHash]]
 
   protected def getSyncLocatorsUnsafe(): AVector[(ChainIndex, AVector[BlockHash])]
@@ -675,4 +690,6 @@ trait SyncUtils {
       locators: AVector[AVector[BlockHash]],
       peerBrokerInfo: BrokerGroupInfo
   ): AVector[AVector[BlockHash]]
+
+  protected def getChainTipsUnsafe(): AVector[ChainTip]
 }

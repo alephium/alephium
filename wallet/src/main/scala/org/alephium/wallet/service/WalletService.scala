@@ -29,8 +29,15 @@ import scala.util.Try
 
 import sttp.model.StatusCode
 
+import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
-import org.alephium.api.model.{Amount, Destination, SweepAddressTransaction}
+import org.alephium.api.model.{
+  Amount,
+  BuildGrouplessTransferTxResult,
+  BuildSimpleTransferTxResult,
+  Destination,
+  SweepAddressTransaction
+}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
@@ -395,7 +402,7 @@ object WalletService {
           .prepareTransaction(pubKey, destinations, gas, gasPrice, utxosLimit)
           .flatMap {
             case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
-            case Right(buildTxResult) =>
+            case Right(buildTxResult: BuildSimpleTransferTxResult) =>
               val signature = SignatureSchema.sign(buildTxResult.txId.bytes, privateKey.privateKey)
               blockFlowClient
                 .postTransaction(buildTxResult.unsignedTx, signature, buildTxResult.fromGroup)
@@ -405,6 +412,8 @@ object WalletService {
                   )
                 )
                 .map(_.left.map(BlockFlowClientError.apply))
+            case Right(_: BuildGrouplessTransferTxResult) =>
+              Future.successful(Left(OtherError("Multiple transactions result not supported yet")))
           }
       }
     }
@@ -578,7 +587,7 @@ object WalletService {
         address: Address.Asset
     ): Future[Either[WalletError, (Address.Asset, Amount, Amount)]] = {
       blockFlowClient
-        .fetchBalance(address)
+        .fetchBalance(api.Address.fromProtocol(address))
         .map(
           _.map { case (amount, lockedAmount) =>
             (address, amount, lockedAmount)

@@ -29,11 +29,16 @@ import org.alephium.api.UtilJson._
 import org.alephium.api.model.{CompileContractResult, CompileProjectResult, CompileScriptResult}
 import org.alephium.crypto
 import org.alephium.json.Json._
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.ralph
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
 object Codec extends ApiModelCodec {
+  implicit def groupConfig: GroupConfig = new GroupConfig {
+    override def groups: Int = 4
+  }
+
   implicit val pathWriter: Writer[Path] = StringWriter.comap[Path](_.toString)
   implicit val pathReader: Reader[Path] = StringReader.map(Paths.get(_))
 
@@ -133,7 +138,7 @@ final case class Compiler(config: Config) {
             ),
             config.artifactPath.resolve(".project.json")
           )
-          CompileProjectResult.from(p._1, p._2, p._3, p._4)
+          CompileProjectResult.from(p._1, p._2, p._3, p._4, None)
         })
         .left
         .map(_.toString)

@@ -32,8 +32,12 @@ import org.alephium.protocol.{ALPH, PublicKey}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
-import org.alephium.protocol.model.UnsignedTransaction.{TxOutputInfo, UnlockScriptWithAssets}
-import org.alephium.protocol.vm.{GasBox, GasPrice, GasSchedule, LockupScript, UnlockScript}
+import org.alephium.protocol.model.UnsignedTransaction.{
+  TotalAmountNeeded,
+  TxOutputInfo,
+  UnlockScriptWithAssets
+}
+import org.alephium.protocol.vm._
 import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 
 // scalastyle:off number.of.methods
@@ -93,27 +97,24 @@ trait TxUtils { Self: FlowUtils =>
       targetBlockHashOpt: Option[BlockHash],
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
-      totalAmount: U256,
-      totalAmountPerToken: AVector[(TokenId, U256)],
+      totalAmount: TotalAmountNeeded,
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       utxosLimit: Int,
-      txOutputLength: Int,
       extraUtxosInfo: ExtraUtxosInfo
   ): IOResult[Either[String, UtxoSelectionAlgo.Selected]] = {
     getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit)
       .map { utxos =>
-        UtxoSelectionAlgo
-          .Build(ProvidedGas(gasOpt, gasPrice, None))
-          .select(
-            AssetAmounts(totalAmount, totalAmountPerToken),
-            fromUnlockScript,
-            extraUtxosInfo.merge(utxos),
-            txOutputLength,
-            txScriptOpt = None,
-            AssetScriptGasEstimator.Default(Self.blockFlow),
-            TxScriptEmulator.NotImplemented
-          )
+        selectUtxos(
+          fromLockupScript,
+          fromUnlockScript,
+          extraUtxosInfo.merge(utxos),
+          totalAmount,
+          None,
+          None,
+          gasOpt,
+          gasPrice
+        )
       }
   }
 
@@ -135,7 +136,7 @@ trait TxUtils { Self: FlowUtils =>
             case None =>
               for {
                 estimatedGas <- GasEstimation.estimateWithInputScript(
-                  fromUnlockScript,
+                  (fromLockupScript, fromUnlockScript),
                   utxoRefs.length,
                   outputScripts.length,
                   AssetScriptGasEstimator.NotImplemented // Not P2SH
@@ -157,23 +158,21 @@ trait TxUtils { Self: FlowUtils =>
       lockupScript: LockupScript,
       utxosLimit: Int,
       getMempoolUtxos: Boolean
-  ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
+  ): IOResult[Balance] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
-    getUTXOs(lockupScript, utxosLimit, getMempoolUtxos).map { utxos =>
-      val utxosNum = utxos.length
-
-      val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances) =
-        TxUtils.getBalance(utxos.map(_.output))
-      (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances, utxosNum)
+    getUTXOs(lockupScript, utxosLimit, getMempoolUtxos, errorIfExceedMaxUtxos = true).map { utxos =>
+      TxUtils.getBalance(utxos.map(_.output))
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def getUTXOs(
       lockupScript: LockupScript,
       utxosLimit: Int,
-      getMempoolUtxos: Boolean
+      getMempoolUtxos: Boolean,
+      errorIfExceedMaxUtxos: Boolean = true
   ): IOResult[AVector[OutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
@@ -186,7 +185,7 @@ trait TxUtils { Self: FlowUtils =>
           getImmutableGroupView(groupIndex)
         }
         blockFlowGroupView.flatMap(
-          _.getRelevantUtxos(ls, utxosLimit, errorIfExceedMaxUtxos = true).map(_.as[OutputInfo])
+          _.getRelevantUtxos(ls, utxosLimit, errorIfExceedMaxUtxos).map(_.as[OutputInfo])
         )
       case ls: LockupScript.P2C =>
         getBestPersistedWorldState(groupIndex).flatMap(
@@ -240,7 +239,7 @@ trait TxUtils { Self: FlowUtils =>
     )
   }
 
-  // scalastyle:off parameter.number
+  // scalastyle:off parameter.number method.length
   def polwCoinbase(
       chainIndex: ChainIndex,
       fromPublicKey: PublicKey,
@@ -260,22 +259,25 @@ trait TxUtils { Self: FlowUtils =>
       blockTs,
       minerData
     )
-    val totalAmount      = reward.burntAmount.addUnsafe(dustUtxoAmount)
+    val totalAmount = TotalAmountNeeded(
+      reward.burntAmount.addUnsafe(dustUtxoAmount),
+      AVector.empty,
+      rewardOutputs.length + 1
+    )
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.polw(fromPublicKey)
     getUsableUtxos(None, fromLockupScript, Int.MaxValue)
       .map { utxos =>
-        UtxoSelectionAlgo
-          .Build(ProvidedGas(None, coinbaseGasPrice, None))
-          .select(
-            AssetAmounts(totalAmount, AVector.empty),
-            fromUnlockScript,
-            utxos,
-            rewardOutputs.length + 1,
-            txScriptOpt = None,
-            AssetScriptGasEstimator.Default(Self.blockFlow),
-            TxScriptEmulator.NotImplemented
-          )
+        selectUtxos(
+          fromLockupScript,
+          fromUnlockScript,
+          utxos,
+          totalAmount,
+          gasEstimationMultiplier = None,
+          txScriptOpt = None,
+          gasOpt = None,
+          gasPrice = coinbaseGasPrice
+        )
       }
       .map(
         _.flatMap(selected =>
@@ -337,6 +339,88 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  private def preTransferCheck(
+      fromLockupScript: LockupScript.Asset,
+      outputInfos: AVector[TxOutputInfo],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): Either[String, Unit] = {
+    for {
+      _ <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
+      _ <- checkProvidedGas(gasOpt, gasPrice)
+      _ <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
+    } yield ()
+  }
+
+  def checkAndCalcTotalAmountNeeded(
+      fromLockupScript: LockupScript.Asset,
+      outputInfos: AVector[TxOutputInfo],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): Either[String, TotalAmountNeeded] = {
+    for {
+      _               <- preTransferCheck(fromLockupScript, outputInfos, gasOpt, gasPrice)
+      calculateResult <- UnsignedTransaction.calculateTotalAmountNeeded(outputInfos)
+    } yield calculateResult
+  }
+
+  def selectUtxos(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      utxos: AVector[FlowUtils.AssetOutputInfo],
+      totalAmount: TotalAmountNeeded,
+      gasEstimationMultiplier: Option[GasEstimationMultiplier],
+      txScriptOpt: Option[StatefulScript],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): Either[String, UtxoSelectionAlgo.Selected] = {
+    UtxoSelectionAlgo
+      .Build(ProvidedGas(gasOpt, gasPrice, gasEstimationMultiplier))
+      .select(
+        AssetAmounts(totalAmount.alphAmount, totalAmount.tokens),
+        fromLockupScript,
+        fromUnlockScript,
+        utxos,
+        totalAmount.outputLength,
+        txScriptOpt,
+        AssetScriptGasEstimator.Default(Self.blockFlow),
+        TxScriptEmulator.Default(Self.blockFlow)
+      )
+  }
+
+  def transfer(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      outputInfos: AVector[TxOutputInfo],
+      totalAmount: TotalAmountNeeded,
+      utxos: AVector[FlowUtils.AssetOutputInfo],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): Either[String, UnsignedTransaction] = {
+    for {
+      selected <- selectUtxos(
+        fromLockupScript,
+        fromUnlockScript,
+        utxos,
+        totalAmount,
+        None,
+        None,
+        gasOpt,
+        gasPrice
+      )
+      _ <- checkEstimatedGasAmount(selected.gas)
+      unsignedTx <- UnsignedTransaction
+        .buildTransferTx(
+          fromLockupScript,
+          fromUnlockScript,
+          selected.assets.map(asset => (asset.ref, asset.output)),
+          outputInfos,
+          selected.gas,
+          gasPrice
+        )
+    } yield unsignedTx
+  }
+
   // scalastyle:off method.length
   def transfer(
       targetBlockHashOpt: Option[BlockHash],
@@ -348,40 +432,20 @@ trait TxUtils { Self: FlowUtils =>
       utxosLimit: Int,
       extraUtxosInfo: ExtraUtxosInfo
   ): IOResult[Either[String, UnsignedTransaction]] = {
-    val totalAmountsE = for {
-      _               <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
-      _               <- checkProvidedGas(gasOpt, gasPrice)
-      _               <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
-      calculateResult <- UnsignedTransaction.calculateTotalAmountNeeded(outputInfos)
-    } yield calculateResult
-
+    val totalAmountsE =
+      checkAndCalcTotalAmountNeeded(fromLockupScript, outputInfos, gasOpt, gasPrice)
     totalAmountsE match {
-      case Right((totalAmount, totalAmountPerToken, txOutputLength)) =>
-        selectUTXOs(
-          targetBlockHashOpt,
-          fromLockupScript,
-          fromUnlockScript,
-          totalAmount,
-          totalAmountPerToken,
-          gasOpt,
-          gasPrice,
-          utxosLimit,
-          txOutputLength,
-          extraUtxosInfo
-        ).map { utxoSelectionResult =>
-          for {
-            selected <- utxoSelectionResult
-            _        <- checkEstimatedGasAmount(selected.gas)
-            unsignedTx <- UnsignedTransaction
-              .buildTransferTx(
-                fromLockupScript,
-                fromUnlockScript,
-                selected.assets.map(asset => (asset.ref, asset.output)),
-                outputInfos,
-                selected.gas,
-                gasPrice
-              )
-          } yield unsignedTx
+      case Right(totalAmount) =>
+        getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit).map { utxos =>
+          transfer(
+            fromLockupScript,
+            fromUnlockScript,
+            outputInfos,
+            totalAmount,
+            extraUtxosInfo.merge(utxos),
+            gasOpt,
+            gasPrice
+          )
         }
 
       case Left(e) =>
@@ -426,9 +490,7 @@ trait TxUtils { Self: FlowUtils =>
 
       val checkResult = for {
         _ <- checkUTXOsInSameGroup(utxoRefs)
-        _ <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
-        _ <- checkProvidedGas(gasOpt, gasPrice)
-        _ <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
+        _ <- preTransferCheck(fromLockupScript, outputInfos, gasOpt, gasPrice)
         _ <- UnsignedTransaction.calculateTotalAmountPerToken(
           outputInfos.flatMap(_.tokens)
         )
@@ -482,6 +544,7 @@ trait TxUtils { Self: FlowUtils =>
         )
       _ <- blockFlow
         .sanityCheckBalance(
+          fromLockupScript,
           fromUnlockScript,
           inputSelection,
           outputInfos,
@@ -528,17 +591,16 @@ trait TxUtils { Self: FlowUtils =>
         _                       <- checkOutputInfos(fromLockupScript.groupIndex, currentOutputs)
         _                       <- checkTotalAttoAlphAmount(currentOutputs.map(_.attoAlphAmount))
         amountTokensOutputCount <- UnsignedTransaction.calculateTotalAmountNeeded(currentOutputs)
-        selected <- UtxoSelectionAlgo
-          .Build(ProvidedGas(None, gasPrice, None))
-          .select(
-            AssetAmounts(amountTokensOutputCount._1, amountTokensOutputCount._2),
-            fromUnlockScript,
-            inputs,
-            amountTokensOutputCount._3,
-            txScriptOpt = None,
-            AssetScriptGasEstimator.Default(Self.blockFlow),
-            TxScriptEmulator.NotImplemented
-          )
+        selected <- selectUtxos(
+          fromLockupScript,
+          fromUnlockScript,
+          inputs,
+          amountTokensOutputCount,
+          None,
+          None,
+          None,
+          gasPrice
+        )
       } yield selected
 
       selectedResult match {
@@ -594,14 +656,16 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def sanityCheckBalance(
+      fromLockupScript: LockupScript,
       fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
       outputs: AVector[TxOutputInfo],
       gasPrice: GasPrice
   ): Either[String, Unit] =
-    getAssetRemainders(fromUnlockScript, inputs, outputs, gasPrice).map(_ => ())
+    getAssetRemainders(fromLockupScript, fromUnlockScript, inputs, outputs, gasPrice).map(_ => ())
 
   def getAssetRemainders(
+      fromLockupScript: LockupScript,
       fromUnlockScript: UnlockScript,
       inputs: AVector[AssetOutputInfo],
       outputs: AVector[TxOutputInfo],
@@ -612,7 +676,7 @@ trait TxUtils { Self: FlowUtils =>
     } else {
       for {
         gasBox <- GasEstimation.estimateWithInputScript(
-          fromUnlockScript,
+          (fromLockupScript, fromUnlockScript),
           inputs.length,
           countResultingTxOutputs(outputs),
           AssetScriptGasEstimator.Default(blockFlow)
@@ -724,12 +788,10 @@ trait TxUtils { Self: FlowUtils =>
           targetBlockHashOpt,
           input.fromLockupScript,
           input.fromUnlockScript,
-          amountWithDust,
-          input.tokens.getOrElse(AVector.empty),
+          TotalAmountNeeded(amountWithDust, input.tokens.getOrElse(AVector.empty), txOutputLength),
           input.gasOpt,
           gasPrice,
           utxosLimit,
-          txOutputLength,
           ExtraUtxosInfo.empty
         ).map(_.map { selected =>
           AssetOutputInfoWithGas(selected.assets, selected.gas)
@@ -924,26 +986,26 @@ trait TxUtils { Self: FlowUtils =>
     for {
       totalAmount     <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
       calculateResult <- UnsignedTransaction.calculateTotalAmountNeeded(outputInfos)
-      (totalAmountNeeded, _, txOutputLength) = calculateResult
-      dustAmount <- totalAmountNeeded.sub(totalAmount).toRight("ALPH underflow")
+      dustAmount      <- calculateResult.alphAmount.sub(totalAmount).toRight("ALPH underflow")
     } yield {
       // `calculateTotalAmountNeeded` is adding a +1 length for the sender's output
-      (dustAmount, txOutputLength)
+      (dustAmount, calculateResult.outputLength)
     }
   }
 
+  // scalastyle:off parameter.number
   def sweepAddress(
       targetBlockHashOpt: Option[BlockHash],
-      fromPublicKey: PublicKey,
+      fromLockPair: (LockupScript.Asset, UnlockScript),
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       maxAttoAlphPerUTXOOpt: Option[U256],
-      utxosLimit: Int
+      utxosLimit: Int,
+      sweepAlphOnly: Boolean
   ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
-    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
-    val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
+    val (fromLockupScript, fromUnlockScript) = fromLockPair
     sweepAddressFromScripts(
       targetBlockHashOpt,
       fromLockupScript,
@@ -953,7 +1015,8 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt,
       gasPrice,
       maxAttoAlphPerUTXOOpt,
-      utxosLimit
+      utxosLimit,
+      sweepAlphOnly
     )
   }
 
@@ -972,7 +1035,8 @@ trait TxUtils { Self: FlowUtils =>
       allTokenUtxos: AVector[AssetOutputInfo],
       allAlphUtxos: AVector[AssetOutputInfo],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      sweepAlphOnly: Boolean
   ): (AVector[UnsignedTransaction], AVector[AssetOutputInfo], Option[String]) = {
     assume(allTokenUtxos.forall(_.output.tokens.length == 1))
 
@@ -981,7 +1045,15 @@ trait TxUtils { Self: FlowUtils =>
       if (isConsolidation(fromLockupScript, toLockupScript) && lockTimeOpt.isEmpty) {
         utxosPerToken.filter(_._2.length > 1)
       } else {
-        utxosPerToken
+        if (sweepAlphOnly) {
+          utxosPerToken
+            .map { case (tokenId, utxos) =>
+              (tokenId, utxos.filter(_.output.amount > dustUtxoAmount))
+            }
+            .filter(_._2.length > 0)
+        } else {
+          utxosPerToken
+        }
       }
 
     // group based on token id, so that utxos with the same token can
@@ -1001,7 +1073,8 @@ trait TxUtils { Self: FlowUtils =>
           tokenUtxos,
           alphUtxos.sorted(UtxoSelectionAlgo.AssetAscendingOrder.byAlph),
           gasOpt,
-          gasPrice
+          gasPrice,
+          sweepAlphOnly
         ) match {
           case Right((unsignedTx, restAlphUtxos)) =>
             unsignedTxs.addOne(unsignedTx)
@@ -1020,7 +1093,8 @@ trait TxUtils { Self: FlowUtils =>
               tokenUtxos,
               alphUtxos.sorted(UtxoSelectionAlgo.AssetDescendingOrder.byAlph),
               gasOpt,
-              gasPrice
+              gasPrice,
+              sweepAlphOnly
             ).map { case (unsignedTx, restAlphUtxos) =>
               unsignedTxs.addOne(unsignedTx)
               alphUtxos = restAlphUtxos
@@ -1050,7 +1124,8 @@ trait TxUtils { Self: FlowUtils =>
       tokenUtxos: AVector[AssetOutputInfo],
       alphUtxos: AVector[AssetOutputInfo],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      sweepAlphOnly: Boolean
   ): Either[String, (UnsignedTransaction, AVector[AssetOutputInfo])] = {
     for {
       totalAlphAmount <- checkTotalAttoAlphAmount(tokenUtxos.map(_.output.amount))
@@ -1062,6 +1137,7 @@ trait TxUtils { Self: FlowUtils =>
       selected <- UtxoSelectionAlgo
         .SelectionWithGasEstimation(gasPrice)
         .select(
+          fromLockupScript,
           fromUnlockScript,
           totalNumOfOutputs,
           UtxoSelectionAlgo.SelectedSoFar(totalAlphAmount, tokenUtxos, alphUtxos),
@@ -1079,12 +1155,17 @@ trait TxUtils { Self: FlowUtils =>
         fromLockupScript,
         fromUnlockScript,
         (tokenUtxos ++ selectedSoFor.selected).map(asset => (asset.ref, asset.output)),
-        buildTokenOutputs(totalAmountPerToken, toLockupScript, lockTimeOpt) :+ changeOutput,
+        if (sweepAlphOnly) {
+          buildTokenOutputs(totalAmountPerToken, fromLockupScript, None) :+ changeOutput
+        } else {
+          buildTokenOutputs(totalAmountPerToken, toLockupScript, lockTimeOpt) :+ changeOutput
+        },
         gas,
         gasPrice
       )
     } yield (unsignedTx, selectedSoFor.rest)
   }
+  // scalastyle:on parameter.number
 
   private def checkEstimatedGas(
       gasOpt: Option[GasBox],
@@ -1108,7 +1189,7 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, UnsignedTransaction] = {
     for {
       estimatedGas <- GasEstimation.estimateWithInputScript(
-        fromUnlockScript,
+        (fromLockupScript, fromUnlockScript),
         alphUtxos.length,
         1,
         AssetScriptGasEstimator.Default(blockFlow)
@@ -1176,7 +1257,8 @@ trait TxUtils { Self: FlowUtils =>
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
       maxAttoAlphPerUTXOOpt: Option[U256],
-      utxosLimit: Int
+      utxosLimit: Int,
+      sweepAlphOnly: Boolean
   ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
     val checkResult = checkProvidedGas(gasOpt, gasPrice)
 
@@ -1197,7 +1279,8 @@ trait TxUtils { Self: FlowUtils =>
             allTokenUtxos,
             allAlphUtxos,
             gasOpt,
-            gasPrice
+            gasPrice,
+            sweepAlphOnly
           )
           val (sweepAlphTxs, error1) = buildSweepAlphTxs(
             fromLockupScript,
@@ -1224,10 +1307,31 @@ trait TxUtils { Self: FlowUtils =>
     chain.isTxConfirmed(txId)
   }
 
-  def getTxConfirmedStatus(
+  def getConflictedTxsFromBlock(blockHash: BlockHash): IOResult[Option[AVector[TransactionId]]] = {
+    IOUtils.tryExecute(getConflictedTxsFromBlockUnsafe(blockHash))
+  }
+
+  def getConflictedTxsFromBlockUnsafe(blockHash: BlockHash): Option[AVector[TransactionId]] = {
+    if (ChainIndex.from(blockHash).isIntraGroup) {
+      None
+    } else {
+      val storage = blockFlow.conflictedTxsStorage.conflictedTxsReversedIndex
+      storage.getOptUnsafe(blockHash) match {
+        case Some(sources) =>
+          if (sources.isEmpty) {
+            None
+          } else {
+            sources.find(source => blockFlow.isBlockInMainChainUnsafe(source.intraBlock)).map(_.txs)
+          }
+        case None => None
+      }
+    }
+  }
+
+  def getTxConfirmationStatus(
       txId: TransactionId,
       chainIndex: ChainIndex
-  ): IOResult[Option[Confirmed]] =
+  ): IOResult[Option[TxStatus]] =
     IOUtils.tryExecute {
       assume(brokerConfig.contains(chainIndex.from))
       val chain = getBlockChain(chainIndex)
@@ -1241,14 +1345,27 @@ trait TxUtils { Self: FlowUtils =>
             getFromGroupConfirmationsUnsafe(confirmHash, chainIndex)
           val toGroupConfirmations =
             getToGroupConfirmationsUnsafe(confirmHash, chainIndex)
-          Some(
-            Confirmed(
-              chainStatus.index,
-              confirmations,
-              fromGroupConfirmations,
-              toGroupConfirmations
+          val conflictedTxsOpt = getConflictedTxsFromBlockUnsafe(confirmHash)
+          val isConflictedTx   = conflictedTxsOpt.exists(_.contains(txId))
+          if (isConflictedTx) {
+            Some(
+              BlockFlowState.Conflicted(
+                chainStatus.index,
+                confirmations,
+                fromGroupConfirmations,
+                toGroupConfirmations
+              )
             )
-          )
+          } else {
+            Some(
+              Confirmed(
+                chainStatus.index,
+                confirmations,
+                fromGroupConfirmations,
+                toGroupConfirmations
+              )
+            )
+          }
         }
       }
     }
@@ -1340,7 +1457,7 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, Option[TxStatus]] = {
     if (brokerConfig.contains(chainIndex.from)) {
       for {
-        status <- getTxConfirmedStatus(txId, chainIndex)
+        status <- getTxConfirmationStatus(txId, chainIndex)
           .map[Option[TxStatus]] {
             case Some(status) => Some(status)
             case None         => if (isInMemPool(txId, chainIndex)) Some(MemPooled) else None
@@ -1381,7 +1498,7 @@ trait TxUtils { Self: FlowUtils =>
   def getTransaction(
       txId: TransactionId,
       chainIndex: ChainIndex
-  ): Either[String, Option[Transaction]] = {
+  ): Either[String, Option[(Transaction, BlockHash)]] = {
     if (brokerConfig.contains(chainIndex.from)) {
       val chain = Self.blockFlow.getBlockChain(chainIndex)
       chain.getTransaction(txId).left.map(_.toString)
@@ -1393,7 +1510,7 @@ trait TxUtils { Self: FlowUtils =>
   def searchTransaction(
       txId: TransactionId,
       chainIndexes: AVector[ChainIndex]
-  ): Either[String, Option[Transaction]] = {
+  ): Either[String, Option[(Transaction, BlockHash)]] = {
     searchByIndexes(txId, chainIndexes, getTransaction)
   }
 
@@ -1588,9 +1705,7 @@ object TxUtils {
     def getBalances(): AVector[(TokenId, U256)] = AVector.from(balances)
   }
 
-  def getBalance(
-      outputs: AVector[TxOutput]
-  ): (U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)]) = {
+  def getBalance(outputs: AVector[TxOutput]): Balance = {
     var attoAlphBalance: U256       = U256.Zero
     var attoAlphLockedBalance: U256 = U256.Zero
     val tokenBalances               = new TokenBalances(mutable.Map.empty)
@@ -1615,11 +1730,12 @@ object TxUtils {
       }
     }
 
-    (
+    Balance(
       attoAlphBalance,
       attoAlphLockedBalance,
       tokenBalances.getBalances(),
-      tokenLockedBalances.getBalances()
+      tokenLockedBalances.getBalances(),
+      outputs.length
     )
   }
 

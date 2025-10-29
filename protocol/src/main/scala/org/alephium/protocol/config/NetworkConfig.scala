@@ -39,9 +39,12 @@ trait NetworkConfig {
 
   def lemanHardForkTimestamp: TimeStamp
   def rhoneHardForkTimestamp: TimeStamp
+  def danubeHardForkTimestamp: TimeStamp
 
   def getHardFork(timeStamp: TimeStamp): HardFork = {
-    if (timeStamp >= rhoneHardForkTimestamp) {
+    if (timeStamp >= danubeHardForkTimestamp) {
+      HardFork.Danube
+    } else if (timeStamp >= rhoneHardForkTimestamp) {
       HardFork.Rhone
     } else if (timeStamp >= lemanHardForkTimestamp) {
       HardFork.Leman

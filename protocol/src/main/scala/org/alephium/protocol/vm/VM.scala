@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, EitherF, OptionF, U256}
+import org.alephium.util.{AVector, OptionF, U256}
 
 sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
@@ -71,10 +71,14 @@ sealed abstract class VM[Ctx <: StatelessContext](
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[Ctx]] = {
     ctx.getInitialBalances().flatMap { balances =>
+      // Store the transaction caller's balance to use later if needed to cover contract creation deposits
+      val txCallerBalance = MutBalanceState.from(balances)
+      ctx.setTxCallerBalance(txCallerBalance)
+
       startPayableFrame(
         obj,
         ctx,
-        MutBalanceState.from(balances),
+        txCallerBalance,
         method,
         args,
         operandStack,
@@ -288,17 +292,38 @@ final class StatefulVM(
       currentFrame: Frame[StatefulContext],
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
+    val useContractAssets = currentFrame.method.useContractAssets
     (currentFrame.balanceStateOpt, previousFrame.balanceStateOpt) match {
       case (None, _) => okay
       case (Some(currentBalances), None) =>
         wrap(for {
-          _ <- mergeBack(ctx.outputBalances, currentBalances.remaining, isApproved = false)
-          _ <- mergeBack(ctx.outputBalances, currentBalances.approved, isApproved = true)
+          _ <- mergeBack(
+            ctx.outputBalances,
+            currentBalances.remaining,
+            useContractAssets,
+            isApproved = false
+          )
+          _ <- mergeBack(
+            ctx.outputBalances,
+            currentBalances.approved,
+            useContractAssets,
+            isApproved = true
+          )
         } yield ())
       case (Some(currentBalances), Some(previousBalances)) =>
         wrap(for {
-          _ <- mergeBack(previousBalances.remaining, currentBalances.remaining, isApproved = false)
-          _ <- mergeBack(previousBalances.remaining, currentBalances.approved, isApproved = true)
+          _ <- mergeBack(
+            previousBalances.remaining,
+            currentBalances.remaining,
+            useContractAssets,
+            isApproved = false
+          )
+          _ <- mergeBack(
+            previousBalances.remaining,
+            currentBalances.approved,
+            useContractAssets,
+            isApproved = true
+          )
         } yield ())
     }
   }
@@ -308,11 +333,22 @@ final class StatefulVM(
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
     if (currentFrame.method.usesAssetsFromInputs()) {
+      val useContractAssets = currentFrame.method.useContractAssets
       wrap(for {
         currentBalances  <- currentFrame.balanceStateOpt
         previousBalances <- previousFrame.balanceStateOpt
-        _ <- mergeBack(previousBalances.remaining, currentBalances.remaining, isApproved = false)
-        _ <- mergeBack(previousBalances.remaining, currentBalances.approved, isApproved = true)
+        _ <- mergeBack(
+          previousBalances.remaining,
+          currentBalances.remaining,
+          useContractAssets,
+          isApproved = false
+        )
+        _ <- mergeBack(
+          previousBalances.remaining,
+          currentBalances.approved,
+          useContractAssets,
+          isApproved = true
+        )
       } yield ())
     } else {
       okay
@@ -331,20 +367,43 @@ final class StatefulVM(
   protected def mergeBack(
       previous: MutBalances,
       current: MutBalances,
+      useContractAssets: Boolean,
       isApproved: Boolean
   ): Option[Unit] = {
     val hardFork = ctx.getHardFork()
 
     OptionF.foreach(current.all) { case (lockupScript, balancesPerLockup) =>
-      if (balancesPerLockup.scopeDepth <= 0) {
-        if (shouldKeepContractBalances(hardFork, isApproved, lockupScript)) {
-          Some(())
+      val keepContractBalances = shouldKeepContractBalances(hardFork, isApproved, lockupScript)
+
+      if (hardFork.isDanubeEnabled()) {
+        if (balancesPerLockup.scopeDepth <= 0) {
+          mergeBackScopeDepthLessThanOne(keepContractBalances, lockupScript, balancesPerLockup)
         } else {
-          ctx.outputBalances.add(lockupScript, balancesPerLockup)
+          if (keepContractBalances && useContractAssets) {
+            Some(())
+          } else {
+            previous.add(lockupScript, balancesPerLockup)
+          }
         }
       } else {
-        previous.add(lockupScript, balancesPerLockup)
+        if (balancesPerLockup.scopeDepth <= 0) {
+          mergeBackScopeDepthLessThanOne(keepContractBalances, lockupScript, balancesPerLockup)
+        } else {
+          previous.add(lockupScript, balancesPerLockup)
+        }
       }
+    }
+  }
+
+  private def mergeBackScopeDepthLessThanOne(
+      keepContractBalances: Boolean,
+      lockupScript: LockupScript,
+      balancesPerLockup: MutBalancesPerLockup
+  ): Option[Unit] = {
+    if (keepContractBalances) {
+      Some(())
+    } else {
+      ctx.outputBalances.add(lockupScript, balancesPerLockup)
     }
   }
 
@@ -358,69 +417,11 @@ final class StatefulVM(
   }
 
   private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
-    val hardFork = ctx.getHardFork()
-    if (lastFrame.method.usesAssetsFromInputs()) {
-      val resultOpt = for {
-        balances <- lastFrame.balanceStateOpt
-        _        <- ctx.outputBalances.merge(balances.approved)
-        _        <- ctx.outputBalances.merge(balances.remaining)
-      } yield ()
-      for {
-        _ <- resultOpt match {
-          case Some(_) => okay
-          case None    => failed(InvalidBalances)
-        }
-        _ <- reimburseGas(hardFork)
-        _ <- outputGeneratedBalances(ctx.outputBalances)
-        _ <- ctx.checkAllAssetsFlushed()
-      } yield ()
-    } else {
-      if (ctx.getHardFork().isLemanEnabled()) {
-        for {
-          _ <- reimburseGas(hardFork)
-          _ <- outputGeneratedBalances(ctx.outputBalances)
-          _ <- ctx.checkAllAssetsFlushed()
-        } yield ()
-      } else {
-        Right(())
-      }
-    }
-  }
-
-  def reimburseGas(hardFork: HardFork): ExeResult[Unit] = {
-    if (hardFork.isRhoneEnabled() && ctx.gasFeePaid > U256.Zero) {
-      val totalGasFee = ctx.txEnv.gasFeeUnsafe
-      val gasFeePaid  = ctx.gasFeePaid
-
-      assume(totalGasFee >= gasFeePaid) // This should always be true, so we check with assume
-
-      ctx.txEnv.prevOutputs.headOption match {
-        case Some(firstInput) =>
-          ctx.outputBalances
-            .addAlph(firstInput.lockupScript, gasFeePaid)
-            .toRight(Right(InvalidBalances))
-        case None =>
-          okay
-      }
+    if (lastFrame.method.usesAssetsFromInputs() || ctx.getHardFork().isLemanEnabled()) {
+      ctx.cleanBalances()
     } else {
       okay
     }
-  }
-
-  private def outputGeneratedBalances(outputBalances: MutBalances): ExeResult[Unit] = {
-    for {
-      _ <- ctx.outputRemainingContractAssetsForRhone()
-      _ <- EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
-        lockupScript match {
-          case l: LockupScript.P2C if !ctx.assetStatus.contains(l.contractId) =>
-            failed(ContractAssetUnloaded(Address.contract(l.contractId)))
-          case _ =>
-            balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
-              outputs.foreachE(output => ctx.generateOutput(output))
-            }
-        }
-      }
-    } yield ()
   }
 }
 
@@ -474,7 +475,8 @@ object StatefulVM {
       gasBox: GasBox,
       contractInputs: AVector[ContractOutputRef],
       contractPrevOutputs: AVector[ContractOutput],
-      generatedOutputs: AVector[TxOutput]
+      generatedOutputs: AVector[TxOutput],
+      autoFundDustAmount: U256
   )
 
   // scalastyle:off parameter.number
@@ -538,7 +540,8 @@ object StatefulVM {
       context.gasRemaining,
       AVector.from(context.contractInputs.view.map(_._1)),
       AVector.from(context.contractInputs.view.map(_._2)),
-      AVector.from(context.generatedOutputs)
+      AVector.from(context.generatedOutputs),
+      context.totalAutoFundDustAmount
     )
   }
 
@@ -576,7 +579,8 @@ object StatefulVM {
         context.gasRemaining,
         AVector.from(context.contractInputs.view.map(_._1)),
         AVector.from(context.contractInputs.view.map(_._2)),
-        AVector.from(context.generatedOutputs)
+        AVector.from(context.generatedOutputs),
+        context.totalAutoFundDustAmount
       )
     }
   }

@@ -25,17 +25,17 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
 import io.vertx.core.eventbus.{EventBus => VertxEventBus}
-import io.vertx.core.http.{HttpServer, HttpServerOptions}
+import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model._
 import org.alephium.flow.client.Node
-import org.alephium.flow.handler.AllHandlers.BlockNotify
+import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.rpc.model.JsonRPC._
-import org.alephium.util.{AVector, BaseActor, EventBus, Service}
+import org.alephium.util.{discard, AVector, BaseActor, EventBus, Service}
 
 class WebSocketServer(node: Node, wsPort: Int)(implicit
     val system: ActorSystem,
@@ -64,14 +64,24 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
 
   node.eventBus.tell(EventBus.Subscribe, eventHandler)
 
-  server.webSocketHandler { webSocket =>
-    webSocket.closeHandler(_ => eventHandler ! EventHandler.Unsubscribe(webSocket.textHandlerID()))
-
-    if (!webSocket.path().equals("/events")) {
-      webSocket.reject();
-    } else {
-      eventHandler ! EventHandler.Subscribe(webSocket.textHandlerID())
+  server.webSocketHandshakeHandler { handshake =>
+    discard {
+      if (!handshake.path().equals("/events")) {
+        handshake.reject();
+      } else {
+        handshake.accept().map { (webSocket: ServerWebSocket) =>
+          eventHandler ! EventHandler.Subscribe(webSocket.textHandlerID())
+        }
+      }
     }
+  }
+
+  server.webSocketHandler { webSocket =>
+    discard(
+      webSocket.closeHandler(_ =>
+        eventHandler ! EventHandler.Unsubscribe(webSocket.textHandlerID())
+      )
+    )
   }
 
   private val wsBindingPromise: Promise[HttpServer] = Promise()
@@ -90,6 +100,8 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   protected def stopSelfOnce(): Future[Unit] = {
     for {
       _ <- wsBindingPromise.future.flatMap(_.close().asScala)
+      _ <- server.close().asScala
+      _ <- vertx.close().asScala
     } yield {
       logger.info(s"ws unbound")
       ()
@@ -111,7 +123,11 @@ object WebSocketServer {
   object EventHandler {
     def props(
         vertxEventBus: VertxEventBus
-    )(implicit networkConfig: NetworkConfig, apiConfig: ApiConfig): Props = {
+    )(implicit
+        networkConfig: NetworkConfig,
+        groupConfig: GroupConfig,
+        apiConfig: ApiConfig
+    ): Props = {
       Props(new EventHandler(vertxEventBus))
     }
 
@@ -121,6 +137,7 @@ object WebSocketServer {
   }
   class EventHandler(vertxEventBus: VertxEventBus)(implicit
       val networkConfig: NetworkConfig,
+      val groupConfig: GroupConfig,
       apiConfig: ApiConfig
   ) extends BaseActor
       with ApiModelCodec {
@@ -142,7 +159,7 @@ object WebSocketServer {
     private def handleEvent(event: EventBus.Event): Unit = {
       event match {
         case BlockNotify(block, height) =>
-          BlockEntry.from(block, height) match {
+          BlockEntry.from(block, height, None) match {
             case Right(blockEntry) =>
               val params       = writeJs(blockEntry)
               val notification = write(Notification("block_notify", params))
@@ -150,6 +167,7 @@ object WebSocketServer {
             case _ => // this should never happen
               log.error(s"Received invalid block $block")
           }
+        case _: TxNotify =>
       }
     }
   }

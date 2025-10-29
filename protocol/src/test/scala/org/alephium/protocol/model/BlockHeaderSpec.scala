@@ -155,4 +155,26 @@ class BlockHeaderSpec
 
     header2.verify("header2")
   }
+
+  it should "test fromSameTemplate" in new NoIndexModelGenerators {
+    val header0 = blockGen.sample.get.header
+    val header1 = blockGen.sample.get.header
+    BlockHeader.fromSameTemplate(header0, header1) is false
+    BlockHeader.fromSameTemplate(header0, header0.copy(txsHash = hashGen.sample.get)) is false
+    BlockHeader.fromSameTemplate(header0, header0) is true
+    BlockHeader.fromSameTemplate(header0, header0.copy(nonce = nonceGen.sample.get)) is true
+    BlockHeader.fromSameTemplate(
+      header0,
+      header0.copy(version = (header0.version + 1).toByte)
+    ) is true
+    BlockHeader.fromSameTemplate(header0, header0.copy(depStateHash = hashGen.sample.get)) is true
+    BlockHeader.fromSameTemplate(
+      header0,
+      header0.copy(timestamp = TimeStamp.unsafe(posLongGen.sample.get))
+    ) is true
+    BlockHeader.fromSameTemplate(
+      header0,
+      header0.copy(target = Target.unsafe(bytesGen(4).sample.get))
+    ) is true
+  }
 }

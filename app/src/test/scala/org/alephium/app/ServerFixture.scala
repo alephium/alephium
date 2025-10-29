@@ -26,7 +26,14 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.api.ApiModelCodec
-import org.alephium.api.model.{AssetOutput => _, ContractOutput => _, Transaction => _, _}
+import org.alephium.api.model.{
+  Address => _,
+  AssetOutput => _,
+  ContractOutput => _,
+  Transaction => _,
+  _
+}
+import org.alephium.api.model.BuildTxCommon.PublicKeyType
 import org.alephium.crypto.{Blake2b, Byte32}
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
@@ -43,7 +50,9 @@ import org.alephium.flow.setting.{AlephiumConfig, AlephiumConfigFixture}
 import org.alephium.io.IOResult
 import org.alephium.json.Json._
 import org.alephium.protocol._
-import org.alephium.protocol.model._
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model
+import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.ModelGenerators
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
@@ -65,7 +74,7 @@ trait ServerFixture
   lazy val dummyBlockHeader =
     blockGen.sample.get.header.copy(timestamp = (TimeStamp.now() - Duration.ofMinutes(5).get).get)
   lazy val dummyBlock      = blockGen.sample.get.copy(header = dummyBlockHeader)
-  lazy val dummyBlockEntry = BlockEntry.from(dummyBlock, 1).rightValue
+  lazy val dummyBlockEntry = BlockEntry.from(dummyBlock, 1, None).rightValue
   lazy val dummyFetchResponse = BlocksPerTimeStampRange(
     AVector(AVector(dummyBlockEntry))
   )
@@ -111,7 +120,11 @@ trait ServerFixture
     dummyTx.toGroup.value
   )
   def dummyBuildTransactionResult(tx: Transaction) =
-    BuildTransferTxResult.from(tx.unsigned)
+    BuildSimpleTransferTxResult.from(tx.unsigned)
+  def dummyBuildGrouplessTransactionResult(tx: Transaction) =
+    BuildGrouplessTransferTxResult
+      .from(AVector(BuildSimpleTransferTxResult.from(tx.unsigned)))
+      .rightValue
   def dummySweepAddressBuildTransactionsResult(
       tx: Transaction,
       fromGroup: GroupIndex,
@@ -139,30 +152,60 @@ object ServerFixture {
   def dummySweepAddressTx(
       tx: Transaction,
       toLockupScript: LockupScript.Asset,
-      lockTimeOpt: Option[TimeStamp]
+      lockTimeOpt: Option[TimeStamp],
+      sweepAlphOnly: Boolean = false
   ): Transaction = {
-    val output = TxOutput.asset(
-      U256.Ten,
-      toLockupScript,
-      AVector((TokenId.hash("token1"), U256.One), (TokenId.hash("token2"), U256.Two)),
-      lockTimeOpt
-    )
+    val output = if (sweepAlphOnly) {
+      TxOutput.asset(
+        U256.Ten,
+        toLockupScript,
+        AVector.empty,
+        lockTimeOpt
+      )
+    } else {
+      TxOutput.asset(
+        U256.Ten,
+        toLockupScript,
+        AVector((TokenId.hash("token1"), U256.One), (TokenId.hash("token2"), U256.Two)),
+        lockTimeOpt
+      )
+    }
+
     tx.copy(
       unsigned = tx.unsigned.copy(fixedOutputs = AVector(output))
     )
   }
 
-  def p2mpkhAddress(publicKeys: AVector[String], mrequired: Int): Address.Asset = {
-    Address.Asset(
-      LockupScript
-        .p2mpkh(
-          publicKeys.map { publicKey =>
-            PublicKey.from(Hex.from(publicKey).get).get
-          },
-          mrequired
-        )
-        .get
-    )
+  def p2mpkhAddress(publicKeys: AVector[String], mrequired: Int): String = {
+    Address
+      .Asset(
+        LockupScript
+          .p2mpkh(
+            publicKeys.map { publicKey =>
+              PublicKey.from(Hex.from(publicKey).get).get
+            },
+            mrequired
+          )
+          .get
+      )
+      .toBase58
+  }
+
+  def p2hmpkAddress(
+      publicKeys: AVector[String],
+      publicKeyTypes: AVector[PublicKeyType],
+      mrequired: Int
+  )(implicit groupConfig: GroupConfig): String = {
+    ServerUtils
+      .buildP2HMPKAddress(
+        publicKeys.map(Hex.from(_).get),
+        mrequired,
+        Some(publicKeyTypes)
+      )
+      .toOption
+      .get
+      .address
+      .toBase58
   }
 
   val dummyParentContractId      = ContractId.hash("parent")
@@ -275,16 +318,17 @@ object ServerFixture {
         lockupScript: LockupScript,
         utxosLimit: Int,
         getMempoolUtxos: Boolean
-    ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
+    ): IOResult[model.Balance] = {
       val tokens       = AVector((TokenId.hash("token1"), U256.One))
       val lockedTokens = AVector((TokenId.hash("token2"), U256.Two))
-      Right((U256.Zero, U256.Zero, tokens, lockedTokens, 0))
+      Right(model.Balance(U256.Zero, U256.Zero, tokens, lockedTokens, 0))
     }
 
     override def getUTXOs(
         lockupScript: LockupScript,
         utxosLimit: Int,
-        getMempoolUtxos: Boolean
+        getMempoolUtxos: Boolean,
+        errorIfExceedMaxUtxos: Boolean
     ): IOResult[AVector[OutputInfo]] = {
       val assetOutputInfos = AVector(U256.One, U256.Two).map { amount =>
         val tokens = AVector((TokenId.hash("token1"), U256.One))
@@ -326,20 +370,25 @@ object ServerFixture {
       Right(Right(dummyTransferTx(dummyTx, outputInfos).unsigned))
     }
 
+    // scalastyle:off parameter.number
     override def sweepAddress(
         targetBlockHashOpt: Option[BlockHash],
-        fromPublicKey: PublicKey,
+        fromLockPair: (LockupScript.Asset, UnlockScript),
         toLockupScript: LockupScript.Asset,
         lockTimeOpt: Option[TimeStamp],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
         maxAttoAlphPerUTXOOpt: Option[U256],
-        utxosLimit: Int
+        utxosLimit: Int,
+        sweepAlphOnly: Boolean
     ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
-      Right(Right(AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
+      Right(
+        Right(
+          AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt, sweepAlphOnly).unsigned)
+        )
+      )
     }
 
-    // scalastyle:off parameter.number
     override def sweepAddressFromScripts(
         targetBlockHashOpt: Option[BlockHash],
         fromLockupScript: LockupScript.Asset,
@@ -349,14 +398,20 @@ object ServerFixture {
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
         maxAttoAlphPerUTXOOpt: Option[U256],
-        utxosLimit: Int
+        utxosLimit: Int,
+        sweepAlphOnly: Boolean
     ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
-      Right(Right(AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
+      Right(
+        Right(
+          AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt, sweepAlphOnly).unsigned)
+        )
+      )
     }
+    // scalastyle:on parameter.number
 
     // scalastyle:off no.equal
     val blockChainIndex = ChainIndex.from(block.hash, config.broker.groups)
-    override def getTxConfirmedStatus(
+    override def getTxConfirmationStatus(
         txId: TransactionId,
         chainIndex: ChainIndex
     ): IOResult[Option[BlockFlowState.Confirmed]] = {
@@ -418,9 +473,9 @@ object ServerFixture {
     override def getTransaction(
         txId: TransactionId,
         chainIndex: ChainIndex
-    ): Either[String, Option[Transaction]] = {
+    ): Either[String, Option[(Transaction, BlockHash)]] = {
       if (brokerConfig.chainIndexes.contains(chainIndex) && txId == dummyTx.id) {
-        Right(Some(dummyTx))
+        Right(Some((dummyTx, block.hash)))
       } else {
         Right(None)
       }
@@ -429,9 +484,9 @@ object ServerFixture {
     override def searchTransaction(
         txId: TransactionId,
         chainIndexes: AVector[ChainIndex]
-    ): Either[String, Option[Transaction]] = {
+    ): Either[String, Option[(Transaction, BlockHash)]] = {
       if (chainIndexes.exists(brokerConfig.chainIndexes.contains) && txId == dummyTx.id) {
-        Right(Some(dummyTx))
+        Right(Some((dummyTx, block.hash)))
       } else {
         Right(None)
       }
@@ -442,8 +497,10 @@ object ServerFixture {
         start: Int,
         end: Int
     ): IOResult[(Int, AVector[LogStates])] = {
-      lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
-      lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
+      lazy val address1 =
+        Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").toOption.get
+      lazy val address2 =
+        Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").toOption.get
 
       val eventKeysWithoutEvents: Seq[ContractId] = Seq(
         ContractId.unsafe(

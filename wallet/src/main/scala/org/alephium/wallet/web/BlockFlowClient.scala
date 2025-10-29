@@ -20,6 +20,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import sttp.model.{StatusCode, Uri}
 
+import org.alephium.api.{model => api}
 import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.model._
 import org.alephium.http.EndpointSender
@@ -31,7 +32,7 @@ import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait BlockFlowClient {
   def fetchBalance(
-      address: Address.Asset
+      address: api.Address
   ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]]
   def prepareTransaction(
       fromPublicKey: PublicKey,
@@ -107,11 +108,31 @@ object BlockFlowClient {
     }
 
     def fetchBalance(
-        address: Address.Asset
+        address: api.Address
     ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]] =
-      requestFromGroup(address.groupIndex, getBalance, (address, Some(true))).map(
+      address.lockupScript match {
+        case api.Address.CompleteLockupScript(_: LockupScript.P2C) =>
+          Future.successful(
+            Left(
+              ApiError.BadRequest(s"Expect asset address, but was contract address: $address")
+            )
+          )
+        case api.Address.CompleteLockupScript(lockupScript) =>
+          getBalance(address, lockupScript.groupIndex)
+        case api.Address.HalfDecodedP2PK(publicKey) =>
+          getBalance(address, publicKey.defaultGroup)
+        case api.Address.HalfDecodedP2HMPK(hash) =>
+          getBalance(address, LockupScript.P2HMPK.defaultGroup(hash))
+      }
+
+    private def getBalance(
+        address: api.Address,
+        groupIndex: GroupIndex
+    ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]] = {
+      requestFromGroup(groupIndex, getBalance, (address, Some(true))).map(
         _.map(res => (res.balance, res.lockedBalance))
       )
+    }
 
     def prepareTransaction(
         fromPublicKey: PublicKey,
@@ -148,7 +169,8 @@ object BlockFlowClient {
         lockupScript.groupIndex,
         buildSweepAddressTransactions,
         BuildSweepAddressTransactions(
-          fromPublicKey,
+          fromPublicKey.bytes,
+          None,
           address,
           None,
           lockTime,

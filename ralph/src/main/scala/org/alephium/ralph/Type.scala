@@ -26,10 +26,8 @@ sealed trait Type extends Ast.Positioned {
   def signature: String = toVal.toString
 
   def isPrimitive: Boolean = this match {
-    case _: Type.FixedSizeArray | _: Type.Struct | _: Type.NamedType | _: Type.Contract |
-        _: Type.Map =>
-      false
-    case _ => true
+    case Type.Bool | Type.I256 | Type.U256 | Type.ByteVec | Type.Address => true
+    case _                                                               => false
   }
 
   def isArrayType: Boolean = this match {
@@ -42,6 +40,11 @@ sealed trait Type extends Ast.Positioned {
     case _              => false
   }
 
+  def isTupleType: Boolean = this match {
+    case _: Type.Tuple => true
+    case _             => false
+  }
+
   def isMapType: Boolean = this match {
     case _: Type.Map => true
     case _           => false
@@ -52,16 +55,13 @@ object Type {
   val primitives: AVector[Type] = AVector[Type](Bool, I256, U256, ByteVec, Address)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def fromVal(tpe: Val.Type): Type = {
-    tpe match {
-      case Val.Bool                           => Bool
-      case Val.I256                           => I256
-      case Val.U256                           => U256
-      case Val.ByteVec                        => ByteVec
-      case Val.Address                        => Address
-      case Val.FixedSizeArray(baseType, size) => FixedSizeArray(fromVal(baseType), Left(size))
-      case Val.Struct(name)                   => Struct(Ast.TypeId(name))
-      case Val.Map(key, value)                => Map(fromVal(key), fromVal(value))
+  def fromVal(value: Val): Type = {
+    value match {
+      case _: Val.Bool    => Bool
+      case _: Val.I256    => I256
+      case _: Val.U256    => U256
+      case _: Val.ByteVec => ByteVec
+      case _: Val.Address => Address
     }
   }
 
@@ -108,6 +108,12 @@ object Type {
     def toVal: Val.Type            = Val.Map(key.toVal, value.toVal)
     override def toString: String  = s"Map[$key,$value]"
     override def signature: String = s"Map[${key.signature},${value.signature}]"
+  }
+
+  final case class Tuple(types: Seq[Type]) extends Type {
+    def toVal: Val.Type            = ???
+    override def toString: String  = s"Tuple$signature"
+    override def signature: String = s"(${types.map(_.signature).mkString(",")})"
   }
 
   final case class Contract(id: Ast.TypeId) extends Type {

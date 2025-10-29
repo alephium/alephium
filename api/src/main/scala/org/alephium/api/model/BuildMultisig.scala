@@ -16,16 +16,22 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.Address
+import akka.util.ByteString
+
+import org.alephium.api.{model => api}
+import org.alephium.protocol.model.GroupIndex
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildMultisig(
-    fromAddress: Address.Asset,
-    fromPublicKeys: AVector[PublicKey],
+    fromAddress: api.Address,
+    fromPublicKeys: AVector[ByteString],
+    fromPublicKeyTypes: Option[AVector[BuildTxCommon.PublicKeyType]] = None,
+    fromPublicKeyIndexes: Option[AVector[Int]] = None,
     destinations: AVector[Destination],
     gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
-)
+    gasPrice: Option[GasPrice] = None,
+    group: Option[GroupIndex] = None,
+    multiSigType: Option[MultiSigType] = Some(MultiSigType.P2MPKH)
+) extends BuildMultisigCommon

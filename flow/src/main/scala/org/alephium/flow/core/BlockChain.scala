@@ -17,6 +17,7 @@
 package org.alephium.flow.core
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 import akka.util.ByteString
 
@@ -124,7 +125,31 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     IOUtils.tryExecute(getUsedGhostUnclesAndAncestorsUnsafe(parentHeader))
   }
 
+  private def selectGhostUncles(
+      hardFork: HardFork,
+      requiredSize: Int,
+      disallowedHeaders: AVector[BlockHeader],
+      uncleBlocks: AVector[Block],
+      isValidGhostUncle: BlockHeader => Boolean
+  ): AVector[Block] = {
+    var selected = AVector.ofCapacity[Block](uncleBlocks.length)
+    uncleBlocks.foreach { uncle =>
+      if ((selected.length < requiredSize) && isValidGhostUncle(uncle.header)) {
+        if (!hardFork.isDanubeEnabled()) {
+          selected = selected :+ uncle
+        } else if (
+          !selected.exists(b => BlockHeader.fromSameTemplate(b.header, uncle.header)) &&
+          !disallowedHeaders.exists(b => BlockHeader.fromSameTemplate(b, uncle.header))
+        ) {
+          selected = selected :+ uncle
+        }
+      }
+    }
+    AVector.from(selected)
+  }
+
   def selectGhostUnclesUnsafe(
+      hardFork: HardFork,
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
   ): AVector[SelectedGhostUncle] = {
@@ -141,18 +166,23 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       if (fromHeader.isGenesis || num == 0 || unclesAcc.length >= ALPH.MaxGhostUncleSize) {
         unclesAcc
       } else {
-        val uncleHeight = getHeightUnsafe(fromHeader.hash)
-        val uncleHashes = getHashesUnsafe(uncleHeight).filter(_ != fromHeader.hash)
-        val uncleBlocks = uncleHashes.map(getBlockUnsafe)
-        val selected = uncleBlocks
-          .filter(uncle =>
+        val uncleHeight       = getHeightUnsafe(fromHeader.hash)
+        val uncleHashes       = getHashesUnsafe(uncleHeight).filter(_ != fromHeader.hash)
+        val uncleBlocks       = uncleHashes.map(getBlockUnsafe)
+        val disallowedHeaders = usedUncles.map(getBlockHeaderUnsafe) :+ fromHeader
+        val selected = selectGhostUncles(
+          hardFork,
+          ALPH.MaxGhostUncleSize - unclesAcc.length,
+          disallowedHeaders,
+          uncleBlocks,
+          uncle => {
             !usedUncles.contains(uncle.hash) &&
-              ancestors.exists(_ == uncle.parentHash) &&
-              validator(uncle.header)
-          )
-          .map(block =>
-            SelectedGhostUncle(block.hash, block.minerLockupScript, blockHeight - uncleHeight)
-          )
+            ancestors.exists(_ == uncle.parentHash) &&
+            validator(uncle)
+          }
+        ).map(block =>
+          SelectedGhostUncle(block.hash, block.minerLockupScript, blockHeight - uncleHeight)
+        )
         val parentHeader = getBlockHeaderUnsafe(fromHeader.parentHash)
         iter(parentHeader, num - 1, unclesAcc ++ selected)
       }
@@ -163,10 +193,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def selectGhostUncles(
+      hardFork: HardFork,
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
   ): IOResult[AVector[SelectedGhostUncle]] = {
-    IOUtils.tryExecute(selectGhostUnclesUnsafe(parentHeader, validator))
+    IOUtils.tryExecute(selectGhostUnclesUnsafe(hardFork, parentHeader, validator))
   }
 
   def getMainChainBlockByHeight(height: Int): IOResult[Option[Block]] = {
@@ -352,10 +383,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
-  def getTransaction(txId: TransactionId): IOResult[Option[Transaction]] = {
+  def getTransaction(txId: TransactionId): IOResult[Option[(Transaction, BlockHash)]] = {
     IOUtils.tryExecute(getCanonicalTxIndex(txId)).flatMap {
-      case Some(index) => getBlock(index.hash).map(block => Some(block.transactions(index.index)))
-      case None        => Right(None)
+      case Some(index) =>
+        getBlock(index.hash).map(block => Some((block.transactions(index.index), index.hash)))
+      case None => Right(None)
     }
   }
 
@@ -399,6 +431,49 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   override def checkCompletenessUnsafe(hash: BlockHash): Boolean = {
     checkCompletenessHelper(hash, blockStorage.existsUnsafe, super.checkCompletenessUnsafe)
+  }
+
+  def getBlocksWithUnclesByHeights(heights: AVector[Int]): IOResult[AVector[Block]] = {
+    IOUtils.tryExecute(getBlocksWithUnclesByHeightsUnsafe(heights))
+  }
+
+  def getBlocksWithUnclesByHeightsUnsafe(heights: AVector[Int]): AVector[Block] = {
+    heights.flatMap(height => getHashesUnsafe(height).map(getBlockUnsafe))
+  }
+
+  def tryGetBlocksFromUnsafe(from: Block): AVector[Block] = {
+    val allTips = getAllTips
+    if (allTips.length == 1) {
+      tryGetBlocksBetweenUnsafe(from, allTips.head)
+    } else {
+      val allBlocks = mutable.ArrayBuffer.empty[Block]
+      getAllTips.foreach { tip =>
+        tryGetBlocksBetweenUnsafe(from, tip).foreach { block =>
+          if (!allBlocks.exists(_.hash == block.hash)) {
+            allBlocks.addOne(block)
+          }
+        }
+      }
+      AVector.from(allBlocks)
+    }
+  }
+
+  private def tryGetBlocksBetweenUnsafe(from: Block, tip: BlockHash): AVector[Block] = {
+    val fromHeight = getHeightUnsafe(from.hash)
+
+    @tailrec def iter(acc: mutable.ArrayBuffer[Block], hash: BlockHash): AVector[Block] = {
+      val height = getHeightUnsafe(hash)
+      if (height > fromHeight) {
+        val block = getBlockUnsafe(hash)
+        iter(acc.addOne(block), block.parentHash)
+      } else if (height == fromHeight) {
+        if (hash == from.hash) AVector.from(acc) else AVector.empty
+      } else {
+        AVector.empty
+      }
+    }
+
+    iter(mutable.ArrayBuffer.empty[Block], tip)
   }
 }
 

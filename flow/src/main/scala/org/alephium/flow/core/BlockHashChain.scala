@@ -25,7 +25,7 @@ import org.alephium.flow.model.BlockState
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BlockHash, ChainIndex, Weight}
+import org.alephium.protocol.model.{BlockHash, ChainIndex, ChainTip, Weight}
 import org.alephium.util.{AVector, Cache, EitherF, Math, TimeStamp}
 
 // scalastyle:off number.of.methods file.size.limit
@@ -111,17 +111,20 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     IOUtils.tryExecute(maxHeightByWeightUnsafe)
   }
 
-  def maxHeightByWeightUnsafe: Int = {
-    val (maxHeight, _) =
-      tips.keys().foldLeft((ALPH.GenesisHeight, ALPH.GenesisWeight)) {
-        case ((height, weight), tip) =>
-          getStateUnsafe(tip) match {
-            case BlockState(tipHeight, tipWeight) =>
-              if (tipWeight > weight) (tipHeight, tipWeight) else (height, weight)
-          }
-      }
+  def maxHeightByWeightUnsafe: Int = maxWeightTipUnsafe.height
 
-    maxHeight
+  def maxWeightTipUnsafe: ChainTip = {
+    tips.keys().foldLeft(ChainTip(genesisHash, ALPH.GenesisHeight, ALPH.GenesisWeight)) {
+      case (previousTip, tipHash) =>
+        getStateUnsafe(tipHash) match {
+          case BlockState(tipHeight, tipWeight) =>
+            if (tipWeight > previousTip.weight) {
+              ChainTip(tipHash, tipHeight, tipWeight)
+            } else {
+              previousTip
+            }
+        }
+    }
   }
 
   def maxHeight: IOResult[Int] = {
@@ -279,14 +282,16 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       oldHeight: Int
   ): IOResult[AVector[BlockHash]] = {
     assume(oldHeight >= ALPH.GenesisHeight)
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def iter(
+    @tailrec def iter(
         acc: AVector[BlockHash],
         currentHash: BlockHash,
         currentHeight: Int
     ): IOResult[AVector[BlockHash]] = {
       if (currentHeight > oldHeight) {
-        getParentHash(currentHash).flatMap(iter(acc :+ currentHash, _, currentHeight - 1))
+        getParentHash(currentHash) match {
+          case Right(parentHash) => iter(acc :+ currentHash, parentHash, currentHeight - 1)
+          case Left(error)       => Left(error)
+        }
       } else if (currentHeight == oldHeight && currentHash == oldHash) {
         Right(acc)
       } else {
@@ -321,6 +326,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def isBefore(hash1: BlockHash, hash2: BlockHash): IOResult[Boolean] = {
+    assume(ChainIndex.from(hash1) == ChainIndex.from(hash2))
     for {
       height1 <- getHeight(hash1)
       height2 <- getHeight(hash2)

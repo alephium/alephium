@@ -16,6 +16,7 @@
 
 package org.alephium.flow.network.broker
 
+import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.TestProbe
 
@@ -90,6 +91,9 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec {
 
     misbehaviorManager ! InvalidFlowData(peer)
     bannedProbe.expectMsg(PeerBanned(peer.getAddress))
+
+    misbehaviorManager ! ConfirmConnection(connected, connection.ref)
+    expectMsg(TcpController.ConnectionConfirmed(connected, connection.ref))
 
     eventually {
       misbehaviorManager ! GetPeers
@@ -199,8 +203,9 @@ class MisbehaviorManagerSpec extends AlephiumFlowActorSpec {
     val penaltyForgiveness = Duration.ofHoursUnsafe(1)
     val penaltyFrequency   = Duration.zero
 
-    lazy val misbehaviorManager =
-      system.actorOf(MisbehaviorManager.props(banDuration, penaltyForgiveness, penaltyFrequency))
+    lazy val misbehaviorManager = system.actorOf(
+      Props(new MisbehaviorManager(banDuration, penaltyForgiveness, penaltyFrequency))
+    )
 
     val peer       = socketAddressGen.sample.get
     val local      = socketAddressGen.sample.get

@@ -20,6 +20,7 @@ import scala.collection.mutable
 
 import akka.util.ByteString
 
+import org.alephium.crypto.{ED25519, ED25519PublicKey, SecP256R1, SecP256R1PublicKey}
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALPH, Hash, PublicKey, SignatureSchema}
@@ -188,9 +189,9 @@ trait TxValidation {
   ): TxValidationResult[Unit] = {
     for {
       chainIndex <- getChainIndex(tx)
-      bestDeps = flow.getBestDeps(chainIndex.from)
-      groupView <- from(flow.getMutableGroupView(chainIndex.from, bestDeps))
-      blockEnv  <- from(flow.getDryrunBlockEnv(chainIndex))
+      blockEnv   <- from(flow.getDryrunBlockEnv(chainIndex))
+      hardFork = hardForkOpt.getOrElse(blockEnv.hardFork)
+      groupView <- from(flow.getMutableGroupViewForTxHandling(chainIndex.from, hardFork))
       _ <- validateTx(
         tx,
         chainIndex,
@@ -243,7 +244,7 @@ trait TxValidation {
     }
   }
 
-  protected[validation] def checkBlockTx(
+  def checkBlockTx(
       chainIndex: ChainIndex,
       tx: Transaction,
       groupView: BlockFlowGroupView[WorldState.Cached],
@@ -532,6 +533,8 @@ object TxValidation {
       for {
         _ <- checkOutputAmount(output, hardFork)
         _ <- checkP2MPKStat(output, hardFork)
+        _ <- checkP2PKStat(output, hardFork)
+        _ <- checkP2HMPKStat(output, hardFork)
         _ <- checkOutputDataState(output)
       } yield ()
     }
@@ -567,6 +570,34 @@ object TxValidation {
         output.tokens.length <= deprecatedMaxTokenPerUtxo &&
         output.tokens.forall(_._2.nonZero)
       if (validated) Right(()) else invalidTx(InvalidOutputStats)
+    }
+
+    @inline private def checkP2PKStat(
+        output: TxOutput,
+        hardFork: HardFork
+    ): TxValidationResult[Unit] = {
+      if (hardFork.isDanubeEnabled()) {
+        Right(())
+      } else {
+        output.lockupScript match {
+          case _: LockupScript.P2PK => invalidTx(InvalidLockupScriptPreDanube)
+          case _                    => Right(())
+        }
+      }
+    }
+
+    @inline private def checkP2HMPKStat(
+        output: TxOutput,
+        hardFork: HardFork
+    ): TxValidationResult[Unit] = {
+      if (hardFork.isDanubeEnabled()) {
+        Right(())
+      } else {
+        output.lockupScript match {
+          case _: LockupScript.P2HMPK => invalidTx(InvalidLockupScriptPreDanube)
+          case _                      => Right(())
+        }
+      }
     }
 
     @inline private def checkP2MPKStat(
@@ -853,12 +884,121 @@ object TxValidation {
         case (lock: LockupScript.P2SH, unlock: UnlockScript.P2SH) =>
           checkP2SH(blockEnv, txEnv, gasRemaining, lock, unlock)
         case (lock: LockupScript.P2PKH, unlock: UnlockScript.PoLW) if isCoinbase =>
-          assume(blockEnv.getHardFork() == HardFork.Rhone)
+          assume(blockEnv.getHardFork() >= HardFork.Rhone)
           val addressTo = txEnv.fixedOutputs(0).lockupScript
           val preImage  = UnlockScript.PoLW.buildPreImage(lock, addressTo)
           checkP2pkh(txEnv, preImage, gasRemaining, lock, unlock.publicKey)
+        case (lock: LockupScript.P2PK, UnlockScript.P2PK)
+            if blockEnv.getHardFork().isDanubeEnabled() =>
+          checkP2pk(txEnv, txEnv.txId.bytes, gasRemaining, lock)
+        case (lock: LockupScript.P2HMPK, unlock: UnlockScript.P2HMPK)
+            if blockEnv.getHardFork().isDanubeEnabled() =>
+          checkP2hmpk(txEnv, txEnv.txId.bytes, gasRemaining, lock, unlock)
         case _ =>
           invalidTx(InvalidUnlockScriptType)
+      }
+    }
+
+    private def checkSignature(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        publicKey: PublicKeyLike
+    ): TxValidationResult[GasBox] = {
+      publicKey match {
+        case PublicKeyLike.SecP256K1(key) =>
+          checkSecP256K1Signature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.SecP256R1(key) =>
+          checkSecP256R1Signature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.ED25519(key) =>
+          checkED25519Signature(txEnv, preImage, gasRemaining, key)
+        case PublicKeyLike.WebAuthn(key) =>
+          checkWebAuthnSignature(txEnv, preImage, gasRemaining, key)
+      }
+    }
+
+    protected[validation] def checkP2pk(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        lock: LockupScript.P2PK
+    ): TxValidationResult[GasBox] = {
+      checkSignature(txEnv, preImage, gasRemaining, lock.publicKey)
+    }
+
+    protected[validation] def checkP2hmpk(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        lock: LockupScript.P2HMPK,
+        unlock: UnlockScript.P2HMPK
+    ): TxValidationResult[GasBox] = {
+      if (lock.p2hmpkHash != unlock.calHash()) {
+        invalidTx(InvalidP2hmpkHash)
+      } else if (unlock.publicKeys.length > ALPH.MaxKeysInP2HMPK) {
+        invalidTx(TooManyKeysInMultisig)
+      } else {
+        unlock.publicKeyIndexes.foldE(gasRemaining) { case (gasBox, index) =>
+          checkSignature(txEnv, preImage, gasBox, unlock.publicKeys(index))
+        }
+      }
+    }
+
+    protected[validation] def checkSecP256R1Signature(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        publicKey: SecP256R1PublicKey
+    ): TxValidationResult[GasBox] = {
+      txEnv.signatures.pop() match {
+        case Right(signature) =>
+          if (!SecP256R1.verify(preImage, signature.toSecP256R1Signature, publicKey)) {
+            invalidTx(InvalidSignature)
+          } else {
+            fromOption(gasRemaining.sub(GasSchedule.secp256R1UnlockGas), OutOfGas)
+          }
+        case Left(_) => invalidTx(NotEnoughSignature)
+      }
+    }
+
+    protected[validation] def checkED25519Signature(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        publicKey: ED25519PublicKey
+    ): TxValidationResult[GasBox] = {
+      txEnv.signatures.pop() match {
+        case Right(signature) =>
+          if (!ED25519.verify(preImage, signature.toED25519Signature, publicKey)) {
+            invalidTx(InvalidSignature)
+          } else {
+            fromOption(gasRemaining.sub(GasSchedule.ed25519UnlockGas), OutOfGas)
+          }
+        case Left(_) => invalidTx(NotEnoughSignature)
+      }
+    }
+
+    protected[validation] def checkWebAuthnSignature(
+        txEnv: TxEnv,
+        preImage: ByteString,
+        gasRemaining: GasBox,
+        publicKey: SecP256R1PublicKey
+    ): TxValidationResult[GasBox] = {
+      WebAuthn.tryDecode(() => txEnv.signatures.pop().toOption) match {
+        case Right(webauthn) =>
+          txEnv.signatures.pop() match {
+            case Right(signature) =>
+              if (!webauthn.verify(preImage, signature.toSecP256R1Signature, publicKey)) {
+                invalidTx(InvalidSignature)
+              } else {
+                fromOption(
+                  gasRemaining.sub(GasSchedule.webauthnUnlockGas(webauthn.bytesLength)),
+                  OutOfGas
+                )
+              }
+            case Left(_) => invalidTx(NotEnoughSignature)
+          }
+        case Left(error) => invalidTx(InvalidWebauthnPayload(error))
       }
     }
 
@@ -872,11 +1012,11 @@ object TxValidation {
       if (Hash.hash(publicKey.bytes) != lock.pkHash) {
         invalidTx(InvalidPublicKeyHash)
       } else {
-        checkSignature(txEnv, preImage, gasRemaining, publicKey)
+        checkSecP256K1Signature(txEnv, preImage, gasRemaining, publicKey)
       }
     }
 
-    private def checkSignature(
+    private def checkSecP256K1Signature(
         txEnv: TxEnv,
         preImage: ByteString,
         gasRemaining: GasBox,
@@ -884,10 +1024,10 @@ object TxValidation {
     ): TxValidationResult[GasBox] = {
       txEnv.signatures.pop() match {
         case Right(signature) =>
-          if (!SignatureSchema.verify(preImage, signature, publicKey)) {
+          if (!SignatureSchema.verify(preImage, signature.toSecP256K1Signature, publicKey)) {
             invalidTx(InvalidSignature)
           } else {
-            fromOption(gasRemaining.sub(GasSchedule.p2pkUnlockGas), OutOfGas)
+            fromOption(gasRemaining.sub(GasSchedule.secp256K1UnlockGas), OutOfGas)
           }
         case Left(_) => invalidTx(NotEnoughSignature)
       }
@@ -911,7 +1051,7 @@ object TxValidation {
                 if (Hash.hash(publicKey.bytes) != pkHash) {
                   invalidTx(InvalidPublicKeyHash)
                 } else {
-                  checkSignature(txEnv, txEnv.txId.bytes, gasBox, publicKey)
+                  checkSecP256K1Signature(txEnv, txEnv.txId.bytes, gasBox, publicKey)
                 }
               case None =>
                 invalidTx(InvalidP2mpkhUnlockScript)
@@ -981,7 +1121,7 @@ object TxValidation {
               blockEnv,
               txIndex
             ) match {
-              case Right(TxScriptExecution(remaining, contractInputs, _, generatedOutputs)) =>
+              case Right(TxScriptExecution(remaining, contractInputs, _, generatedOutputs, _)) =>
                 if (contractInputs != tx.contractInputs) {
                   invalidTx(InvalidContractInputs)
                 } else if (generatedOutputs != tx.generatedOutputs) {

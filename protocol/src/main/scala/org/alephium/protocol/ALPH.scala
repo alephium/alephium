@@ -47,6 +47,7 @@ object ALPH {
   val MaxOutputDataSize: Int = 256
   val MaxScriptSigNum: Int   = 32
   val MaxKeysInP2MPK: Int    = 16
+  val MaxKeysInP2HMPK: Int   = 16
 
   val MaxGhostUncleAge: Int  = 7
   val MaxGhostUncleSize: Int = 2
@@ -123,7 +124,7 @@ object ALPH {
   lazy val testnetWhitelistedMiners = {
     @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
     def miner(address: String) = {
-      Address.fromBase58(address).get.lockupScript
+      Address.fromBase58(address).toOption.get.lockupScript
     }
     Set(
       miner("1AuWeE5Cwt2ES3473qnpKFV96z57CYL6mbTY7hva9Xz3h"),

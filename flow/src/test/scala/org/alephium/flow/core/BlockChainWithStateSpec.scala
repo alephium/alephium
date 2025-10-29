@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Block, ChainIndex, NoIndexModelGeneratorsLike, Weight}
+import org.alephium.protocol.model.{Block, ChainIndex, ChainTip, NoIndexModelGeneratorsLike, Weight}
 import org.alephium.util.AVector
 
 class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -89,5 +89,17 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
     chain.maxWeight isE Weight(3)
     chain.maxHeightByWeight isE 2
     chain.maxHeightByWeightUnsafe is 2
+  }
+
+  it should "get best tip based on weight" in new Fixture {
+    val chain = buildGenesis()
+    val blocks = AVector.fill(5)(blockGen.sample.get).mapWithIndex { case (block, index) =>
+      (block, Weight(index))
+    }
+    val tip = blocks.last
+    blocks.shuffle().foreach { case (block, weight) =>
+      addAndCheck(chain, block, weight)
+    }
+    chain.maxWeightTipUnsafe is ChainTip(tip._1.hash, 1, tip._2)
   }
 }

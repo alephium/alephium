@@ -23,6 +23,7 @@ import scala.util.{Failure, Success, Try}
 import akka.util.ByteString
 import upickle.core.Abort
 
+import org.alephium.api.{model => api}
 import org.alephium.api.UtilJson._
 import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
@@ -57,6 +58,8 @@ object ApiModel {
 
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
 trait ApiModelCodec {
+
+  implicit def groupConfig: GroupConfig
 
   implicit val peerStatusBannedRW: RW[PeerStatus.Banned]   = macroRW
   implicit val peerStatusPenaltyRW: RW[PeerStatus.Penalty] = macroRW
@@ -136,36 +139,38 @@ trait ApiModelCodec {
   implicit val transactionIdReader: Reader[TransactionId] = hashReader.map(TransactionId.unsafe(_))
 
   implicit lazy val assetAddressWriter: Writer[Address.Asset] =
-    StringWriter.comap[Address.Asset](_.toBase58)
-  implicit lazy val assetAddressReader: Reader[Address.Asset] = StringReader.map { input =>
-    Address.fromBase58(input) match {
-      case Some(address: Address.Asset) => address
-      case Some(_: Address.Contract) =>
-        throw Abort(s"Expect asset address, but was contract address: $input")
-      case None =>
-        throw Abort(s"Unable to decode address from $input")
-    }
+    StringWriter.comap[Address.Asset](address => api.Address.fromProtocol(address).toBase58)
+  implicit lazy val assetAddressReader: Reader[Address.Asset] = protocolAddressReader.map {
+    case address: Address.Asset => address
+    case address: Address.Contract =>
+      throw Abort(s"Expect asset address, but was contract address: ${address.toBase58}")
   }
 
   implicit lazy val contractAddressRW: RW[Address.Contract] = readwriter[String].bimap(
     _.toBase58,
     input =>
-      Address.fromBase58(input) match {
-        case Some(address: Address.Contract) => address
-        case Some(_: Address.Asset) =>
-          throw Abort(s"Expect contract address, but was asset address: $input")
-        case None =>
-          throw Abort(s"Unable to decode address from $input")
+      Address.contract(input) match {
+        case Right(address) => address
+        case Left(error)    => throw Abort(error)
       }
   )
 
-  implicit lazy val addressWriter: Writer[Address] = StringWriter.comap[Address](_.toBase58)
-  implicit lazy val addressReader: Reader[Address] = StringReader.map { input =>
-    Address
-      .fromBase58(input)
-      .getOrElse(
-        throw new Abort(s"Unable to decode address from $input")
-      )
+  implicit lazy val protocolAddressWriter: Writer[Address] =
+    StringWriter.comap[Address](address => api.Address.fromProtocol(address).toBase58)
+  implicit lazy val protocolAddressReader: Reader[Address] = StringReader.map { input =>
+    api.Address.fromBase58(input) match {
+      case Right(address) => address.toProtocol()
+      case Left(error)    => throw Abort(error)
+    }
+  }
+
+  implicit lazy val addressWriter: Writer[api.Address] =
+    StringWriter.comap[api.Address](_.toBase58)
+  implicit lazy val addressReader: Reader[api.Address] = StringReader.map { input =>
+    api.Address.fromBase58(input) match {
+      case Right(address) => address
+      case Left(error)    => throw Abort(error)
+    }
   }
 
   implicit val cliqueIdWriter: Writer[CliqueId] = StringWriter.comap[CliqueId](_.toHexString)
@@ -271,10 +276,18 @@ trait ApiModelCodec {
     {
       case BuildTxCommon.Default       => "default"
       case BuildTxCommon.BIP340Schnorr => "bip340-schnorr"
+      case BuildTxCommon.GLSecP256K1   => "gl-secp256k1"
+      case BuildTxCommon.GLSecP256R1   => "gl-secp256r1"
+      case BuildTxCommon.GLED25519     => "gl-ed25519"
+      case BuildTxCommon.GLWebAuthn    => "gl-webauthn"
     },
     {
       case "default"        => BuildTxCommon.Default
       case "bip340-schnorr" => BuildTxCommon.BIP340Schnorr
+      case "gl-secp256k1"   => BuildTxCommon.GLSecP256K1
+      case "gl-secp256r1"   => BuildTxCommon.GLSecP256R1
+      case "gl-ed25519"     => BuildTxCommon.GLED25519
+      case "gl-webauthn"    => BuildTxCommon.GLWebAuthn
       case other            => throw Abort(s"Invalid public key type: $other")
     }
   )
@@ -299,20 +312,26 @@ trait ApiModelCodec {
   implicit val decodeTransactionResultRW: RW[DecodeUnsignedTxResult] = macroRW
 
   implicit val txStatusRW: RW[TxStatus] =
-    RW.merge(macroRW[Confirmed], macroRW[MemPooled], macroRW[TxNotFound])
+    RW.merge(macroRW[Confirmed], macroRW[Conflicted], macroRW[MemPooled], macroRW[TxNotFound])
 
-  implicit val buildTransferRW: RW[BuildTransferTx]                           = macroRW
-  implicit val buildDeployContractTxRW: RW[BuildDeployContractTx]             = macroRW
-  implicit val buildExecuteScriptTxRW: RW[BuildExecuteScriptTx]               = macroRW
-  implicit val buildTransferResultRW: RW[BuildTransferTxResult]               = macroRW
-  implicit val buildDeployContractTxResultRW: RW[BuildDeployContractTxResult] = macroRW
-  implicit val buildExecuteScriptTxResultRW: RW[BuildExecuteScriptTxResult]   = macroRW
+  implicit val buildTransferRW: RW[BuildTransferTx]                                       = macroRW
+  implicit val buildDeployContractTxRW: RW[BuildDeployContractTx]                         = macroRW
+  implicit val buildExecuteScriptTxRW: RW[BuildExecuteScriptTx]                           = macroRW
+  implicit val buildSimpleTransferResultRW: RW[BuildSimpleTransferTxResult]               = macroRW
+  implicit val buildSimpleDeployContractTxResultRW: RW[BuildSimpleDeployContractTxResult] = macroRW
+  implicit val buildSimpleExecuteScriptTxResultRW: RW[BuildSimpleExecuteScriptTxResult]   = macroRW
 
   implicit val buildTransactionTransferRW: RW[BuildChainedTransferTx] = macroRW
   implicit val buildTransactionDeployContractRW: RW[BuildChainedDeployContractTx] =
     macroRW
   implicit val buildTransactionExecuteScriptRW: RW[BuildChainedExecuteScriptTx] = macroRW
-  implicit val buildTransactionRW: RW[BuildChainedTx]                           = macroRW
+  implicit val buildTransactionRW: RW[BuildChainedTx] =
+    RW.merge(
+      buildTransactionTransferRW,
+      buildTransactionDeployContractRW,
+      buildTransactionExecuteScriptRW
+    )
+
   implicit val buildTransactionTransferResultRW: RW[BuildChainedTransferTxResult] =
     macroRW
   implicit val buildTransactionDeployContractResultRW: RW[BuildChainedDeployContractTxResult] =
@@ -320,6 +339,18 @@ trait ApiModelCodec {
   implicit val buildTransactionExecuteScriptResultRW: RW[BuildChainedExecuteScriptTxResult] =
     macroRW
   implicit val buildChainedTxResultRW: RW[BuildChainedTxResult] = macroRW
+
+  implicit val multiSigTypeRW: RW[MultiSigType] = readwriter[String].bimap(
+    {
+      case MultiSigType.P2MPKH => "P2MPKH"
+      case MultiSigType.P2HMPK => "P2HMPK"
+    },
+    {
+      case "P2MPKH" => MultiSigType.P2MPKH
+      case "P2HMPK" => MultiSigType.P2HMPK
+      case other    => throw Abort(s"Invalid multi-sig type: $other")
+    }
+  )
 
   implicit val buildMultisigAddressRW: RW[BuildMultisigAddress] = macroRW
 
@@ -497,6 +528,18 @@ trait ApiModelCodec {
   implicit val contractParentRW: RW[ContractParent]                     = macroRW
   implicit val subContractsRW: RW[SubContracts]                         = macroRW
 
+  implicit val addressAssetStateRW: RW[AddressAssetState] = macroRW
+  implicit val simulationResultRW: RW[SimulationResult]   = macroRW
+
+  implicit val buildGrouplessTransferResultRW: RW[BuildGrouplessTransferTxResult] = macroRW
+  implicit val buildGrouplessExecuteScriptTxResultRW: RW[BuildGrouplessExecuteScriptTxResult] =
+    macroRW
+  implicit val buildGrouplessDeployContractTxResultRW: RW[BuildGrouplessDeployContractTxResult] =
+    macroRW
+
+  implicit val buildTransferResultRW: RW[BuildTransferTxResult]               = macroRW
+  implicit val buildExecuteScriptTxResultRW: RW[BuildExecuteScriptTxResult]   = macroRW
+  implicit val buildDeployContractTxResultRW: RW[BuildDeployContractTxResult] = macroRW
   private def bytesWriter[T <: RandomBytes]: Writer[T] =
     StringWriter.comap[T](_.toHexString)
 

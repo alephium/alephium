@@ -28,6 +28,14 @@ final case class Confirmed(
     fromGroupConfirmations: Int,
     toGroupConfirmations: Int
 ) extends TxStatus
+@upickle.implicits.key("Conflicted")
+final case class Conflicted(
+    blockHash: BlockHash,
+    txIndex: Int,
+    chainConfirmations: Int,
+    fromGroupConfirmations: Int,
+    toGroupConfirmations: Int
+) extends TxStatus
 @upickle.implicits.key("MemPooled")
 final case class MemPooled() extends TxStatus
 @upickle.implicits.key("TxNotFound")

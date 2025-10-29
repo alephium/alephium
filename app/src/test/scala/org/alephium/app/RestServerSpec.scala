@@ -32,7 +32,7 @@ import sttp.model.StatusCode
 
 import org.alephium.api.{ApiError, ApiModel, OpenAPIWriters}
 import org.alephium.api.UtilJson.avectorReadWriter
-import org.alephium.api.model._
+import org.alephium.api.model.{Address => _, _}
 import org.alephium.app.ServerFixture.NodeDummy
 import org.alephium.crypto.Blake2b
 import org.alephium.flow.handler.{TestUtils, ViewHandler}
@@ -45,7 +45,7 @@ import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.mining.HashRate
-import org.alephium.protocol.model.{Transaction => _, _}
+import org.alephium.protocol.model.{Balance => _, Transaction => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.ralph.Compiler
@@ -184,6 +184,15 @@ abstract class RestServerSpec(
   it should "call GET /addresses/<address>/utxos" in {
     val group = LockupScript.p2pkh(dummyKey).groupIndex(brokerConfig)
     Get(s"/addresses/$dummyKeyAddress/utxos", getPort(group)) check { response =>
+      response.code is StatusCode.Ok
+      val utxos = response.as[UTXOs]
+      utxos.utxos.length is 2
+    }
+
+    Get(
+      s"/addresses/$dummyKeyAddress/utxos?error-if-exceed-max-utxos=false",
+      getPort(group)
+    ) check { response =>
       response.code is StatusCode.Ok
       val utxos = response.as[UTXOs]
       utxos.utxos.length is 2
@@ -381,6 +390,25 @@ abstract class RestServerSpec(
         Address.asset(dummyToAddress).value.groupIndex
       )
     }
+
+    Post(
+      s"/transactions/sweep-address/build",
+      body = s"""
+                |{
+                |  "fromPublicKey": "$dummyKeyHex",
+                |  "toAddress": "$dummyToAddress",
+                |  "sweepAlphOnly": true
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.Ok
+      response.as[BuildSweepAddressTransactionsResult] is dummySweepAddressBuildTransactionsResult(
+        ServerFixture.dummySweepAddressTx(dummyTx, dummyToLockupScript, None, true),
+        Address.asset(dummyKeyAddress).value.groupIndex,
+        Address.asset(dummyToAddress).value.groupIndex
+      )
+    }
+
     Post(
       s"/transactions/sweep-address/build",
       body = s"""
@@ -554,7 +582,7 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "call POST /multisig/address" in {
+  it should "call POST /multisig/address for P2MPKH" in {
     lazy val (_, dummyKey2, _) = addressStringGen(
       GroupIndex.unsafe(1)
     ).sample.get
@@ -578,42 +606,219 @@ abstract class RestServerSpec(
       val result   = response.as[BuildMultisigAddressResult]
       val expected = ServerFixture.p2mpkhAddress(AVector(dummyKeyHex, dummyKeyHex2), 1)
 
-      result.address is expected
+      result.address.toBase58 is expected
     }
   }
 
-  it should "call POST /multisig/build" in {
+  it should "call POST /multisig/address for P2HMPK" in {
     lazy val (_, dummyKey2, _) = addressStringGen(
       GroupIndex.unsafe(1)
     ).sample.get
 
     lazy val dummyKeyHex2 = dummyKey2.toHexString
 
-    val address = ServerFixture.p2mpkhAddress(AVector(dummyKeyHex, dummyKeyHex2), 1)
-
     Post(
-      s"/multisig/build",
+      s"/multisig/address",
       body = s"""
                 |{
-                |  "fromAddress": "${address.toBase58}",
-                |  "fromPublicKeys": ["$dummyKeyHex"],
-                |  "destinations": [
-                |    {
-                |      "address": "$dummyToAddress",
-                |      "attoAlphAmount": "1",
-                |      "tokens": []
-                |    }
-                |  ]
+                |  "keys": [
+                | "$dummyKeyHex",
+                | "$dummyKeyHex2"
+                |],
+                |  "keyTypes": [
+                |  "default",
+                |  "default"
+                |],
+                |  "multiSigType": "P2HMPK",
+                |  "mrequired": 1
                 |}
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
-      response.as[BuildTransferTxResult] is dummyBuildTransactionResult(
-        ServerFixture.dummyTransferTx(
-          dummyTx,
-          AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
-        )
+
+      val result = response.as[BuildMultisigAddressResult]
+      val expected = ServerFixture.p2hmpkAddress(
+        AVector(dummyKeyHex, dummyKeyHex2),
+        AVector(BuildTxCommon.Default, BuildTxCommon.Default),
+        1
       )
+
+      result.address.toBase58 is expected
+    }
+
+    Post(
+      s"/multisig/address",
+      body = s"""
+                |{
+                |  "keys": [
+                | "$dummyKeyHex",
+                | "$dummyKeyHex2"
+                |],
+                |  "keyTypes": [
+                |  "default",
+                |  "default"
+                |],
+                |  "multiSigType": "P2HMPK",
+                |  "mrequired": 3
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.BadRequest
+      response.as[ApiError.BadRequest] is ApiError.BadRequest(
+        "Invalid m in m-of-n multisig: m=3, n=2"
+      )
+    }
+
+    lazy val tooManyDummyKeys = AVector.fill(ALPH.MaxKeysInP2HMPK + 1)(
+      addressStringGen(
+        GroupIndex.unsafe(1)
+      ).sample.get._2.toHexString
+    )
+    Post(
+      s"/multisig/address",
+      body = s"""
+                |{
+                |  "keys": [
+                |    ${tooManyDummyKeys.map(k => s""""$k"""").mkString(",")}
+                |  ],
+                |  "multiSigType": "P2HMPK",
+                |  "mrequired": 3
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.BadRequest
+      response.as[ApiError.BadRequest] is ApiError.BadRequest(
+        s"Too many public keys in P2HMPK: ${tooManyDummyKeys.length}, max is ${ALPH.MaxKeysInP2HMPK}"
+      )
+    }
+
+    Post(
+      s"/multisig/address",
+      body = s"""
+                |{
+                |  "keys": [
+                | "$dummyKeyHex",
+                | "$dummyKeyHex2"
+                |],
+                |  "keyTypes": [
+                |  "default"
+                |],
+                |  "multiSigType": "P2HMPK",
+                |  "mrequired": 1
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.BadRequest
+      response.as[ApiError.BadRequest] is ApiError.BadRequest(
+        "`keyTypes` length should be the same as `keys` length"
+      )
+    }
+  }
+
+  it should "call POST /multisig/build" in {
+    {
+      info("P2MPKH")
+
+      lazy val (_, dummyKey2, _) = addressStringGen(
+        GroupIndex.unsafe(1)
+      ).sample.get
+
+      lazy val dummyKeyHex2 = dummyKey2.toHexString
+
+      val address = ServerFixture.p2mpkhAddress(AVector(dummyKeyHex, dummyKeyHex2), 1)
+
+      Post(
+        s"/multisig/build",
+        body = s"""
+                  |{
+                  |  "fromAddress": "${address}",
+                  |  "fromPublicKeys": ["$dummyKeyHex"],
+                  |  "destinations": [
+                  |    {
+                  |      "address": "$dummyToAddress",
+                  |      "attoAlphAmount": "1",
+                  |      "tokens": []
+                  |    }
+                  |  ]
+                  |}
+        """.stripMargin
+      ) check { response =>
+        response.code is StatusCode.Ok
+        response.as[BuildTransferTxResult] is dummyBuildTransactionResult(
+          ServerFixture.dummyTransferTx(
+            dummyTx,
+            AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
+          )
+        )
+      }
+    }
+
+    {
+      info("P2HMPK")
+
+      lazy val (_, dummyKey2, _) = addressStringGen(
+        GroupIndex.unsafe(1)
+      ).sample.get
+
+      lazy val dummyKeyHex2 = dummyKey2.toHexString
+
+      val address = ServerFixture.p2hmpkAddress(
+        AVector(dummyKeyHex, dummyKeyHex2),
+        AVector(BuildTxCommon.Default, BuildTxCommon.Default),
+        1
+      )
+
+      Post(
+        s"/multisig/build",
+        body = s"""
+                  |{
+                  |  "fromAddress": "${address}",
+                  |  "fromPublicKeys": ["$dummyKeyHex", "$dummyKeyHex2"],
+                  |  "destinations": [
+                  |    {
+                  |      "address": "$dummyToAddress",
+                  |      "attoAlphAmount": "1",
+                  |      "tokens": []
+                  |    }
+                  |  ],
+                  |  "group": 0,
+                  |  "multiSigType": "P2HMPK"
+                  |}
+        """.stripMargin
+      ) check { response =>
+        response.code is StatusCode.BadRequest
+        response.as[ApiError.BadRequest] is ApiError.BadRequest(
+          "fromPublicKeyIndexes is required for P2HMPK multisig"
+        )
+      }
+
+      Post(
+        s"/multisig/build",
+        body = s"""
+                  |{
+                  |  "fromAddress": "${address}",
+                  |  "fromPublicKeys": ["$dummyKeyHex", "$dummyKeyHex2"],
+                  |  "destinations": [
+                  |    {
+                  |      "address": "$dummyToAddress",
+                  |      "attoAlphAmount": "1",
+                  |      "tokens": []
+                  |    }
+                  |  ],
+                  |  "group": 0,
+                  |  "fromPublicKeyIndexes": [0],
+                  |  "multiSigType": "P2HMPK"
+                  |}
+        """.stripMargin
+      ) check { response =>
+        response.code is StatusCode.Ok
+        response.as[BuildTransferTxResult] is dummyBuildGrouplessTransactionResult(
+          ServerFixture.dummyTransferTx(
+            dummyTx,
+            AVector(TxOutputInfo(dummyToLockupScript, U256.One, AVector.empty, None))
+          )
+        )
+      }
     }
   }
 
@@ -641,7 +846,7 @@ abstract class RestServerSpec(
       s"/multisig/sweep",
       body = s"""
                 |{
-                |  "fromAddress": "${address.toBase58}",
+                |  "fromAddress": "${address}",
                 |  "fromPublicKeys": ["$dummyKeyHex"],
                 |  "toAddress": "$dummyToAddress"
                 |}
@@ -657,7 +862,7 @@ abstract class RestServerSpec(
   }
 
   it should "call POST /miners" in {
-    val address      = Address.asset(dummyKeyAddress).get
+    val address      = Address.asset(dummyKeyAddress).rightValue
     val lockupScript = address.lockupScript
     allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
       msg match {
@@ -746,7 +951,7 @@ abstract class RestServerSpec(
   }
 
   it should "call GET /miners/addresses" in {
-    val address      = Address.asset(dummyKeyAddress).get
+    val address      = Address.asset(dummyKeyAddress).rightValue
     val lockupScript = address.lockupScript
 
     allHandlersProbe.viewHandler.setAutoPilot((sender: ActorRef, msg: Any) =>
@@ -786,7 +991,7 @@ abstract class RestServerSpec(
     val body = s"""{"addresses":${writeJs(newAddresses)}}"""
 
     Put(s"/miners/addresses", body) check { response =>
-      val addresses = newAddresses.map(Address.asset(_).get)
+      val addresses = newAddresses.map(Address.asset(_).rightValue)
       allHandlersProbe.viewHandler.fishForSpecificMessage()(_ =>
         ViewHandler.UpdateMinerAddresses(addresses)
       )

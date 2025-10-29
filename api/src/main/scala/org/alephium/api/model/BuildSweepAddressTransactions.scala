@@ -16,19 +16,25 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, BlockHash}
+import akka.util.ByteString
+
+import org.alephium.protocol.model.{Address, BlockHash, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.TimeStamp
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildSweepAddressTransactions(
-    fromPublicKey: PublicKey,
+    fromPublicKey: ByteString,
+    fromPublicKeyType: Option[BuildTxCommon.PublicKeyType] = None,
     toAddress: Address.Asset,
     maxAttoAlphPerUTXO: Option[Amount] = None,
     lockTime: Option[TimeStamp] = None,
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None,
-    utxosLimit: Option[Int] = None
+    utxosLimit: Option[Int] = None,
+    group: Option[GroupIndex] = None,
+    sweepAlphOnly: Option[Boolean] = None
 ) extends BuildTxCommon
+    with BuildTxCommon.FromPublicKey
+    with BuildSweepCommon

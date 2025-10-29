@@ -29,7 +29,6 @@ import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.{Generators, Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.model.{Address, TxGenerators}
-import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumFutureSpec, AVector, Duration, Hex}
 import org.alephium.wallet.api.model.{Addresses, AddressInfo}
 import org.alephium.wallet.config.WalletConfigFixture
@@ -136,10 +135,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
 
     val wrongWalletName = "wallet"
     val notFound        = WalletNotFound(new File(tempSecretDir.toString, wrongWalletName))
-    val address =
-      Address.Asset(
-        LockupScript.asset("17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z").get
-      )
+    val address         = Address.asset("17B4ErFknfmCg381b52k8sKbsXS8RFD7piVpPBB1T2Y4Z").rightValue
 
     walletService.unlockWallet(wrongWalletName, "", None).leftValue is notFound
     walletService.getBalances(wrongWalletName).futureValue.leftValue is notFound
@@ -304,7 +300,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
         "okay teach order cycle slight angle battle enact problem ostrich wise faint office brush lava people walk arrive exit traffic thrive angle manual alley"
       )
       .get
-    val address = Address.asset("15L9J68punrrGAoXGQjLu9dX5k1kDKehqfG5tFVWqJbG9").get
+    val address = Address.asset("15L9J68punrrGAoXGQjLu9dX5k1kDKehqfG5tFVWqJbG9").rightValue
 
     val publicKey = PublicKey
       .from(Hex.unsafe("0362a56b41565582ec52c78f6adf76d7afdcf4b7584682011b0caa6846c3f44819"))

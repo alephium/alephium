@@ -20,8 +20,8 @@ import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.{LockupScript, StatelessScript, UnlockScript}
-import org.alephium.serde.{deserialize, serialize}
-import org.alephium.util.{AVector, Base58}
+import org.alephium.serde.deserialize
+import org.alephium.util.AVector
 import org.alephium.util.Hex.HexStringSyntax
 
 sealed trait Address {
@@ -29,7 +29,7 @@ sealed trait Address {
 
   def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
 
-  def toBase58: String = Base58.encode(serialize(lockupScript))
+  def toBase58: String = lockupScript.toBase58
 
   override def toString: String = toBase58
 }
@@ -51,23 +51,20 @@ object Address {
     Contract(LockupScript.p2c(contractId))
   }
 
-  def fromBase58(input: String): Option[Address] = {
-    for {
-      lockupScript <- LockupScript.fromBase58(input)
-    } yield from(lockupScript)
+  def contract(input: String): Either[String, Address.Contract] = {
+    LockupScript.p2c(input).map(Contract.apply)
   }
 
-  def asset(input: String): Option[Address.Asset] = {
-    fromBase58(input) match {
-      case Some(address: Asset) => Some(address)
-      case _                    => None
-    }
+  def fromBase58(input: String): Either[String, Address] = {
+    LockupScript.fromBase58(input).map(from)
   }
 
-  def extractLockupScript(address: String): Option[LockupScript] = {
-    for {
-      lockupScript <- LockupScript.fromBase58(address)
-    } yield lockupScript
+  def asset(input: String): Either[String, Address.Asset] = {
+    LockupScript.asset(input).map(Asset.apply)
+  }
+
+  def extractLockupScript(address: String): Either[String, LockupScript] = {
+    LockupScript.fromBase58(address)
   }
 
   def p2pkh(publicKey: PublicKey): Address.Asset =

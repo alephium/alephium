@@ -142,16 +142,102 @@ class U256Spec extends AlephiumSpec {
     test[Int, Int](_.compareTo(_), _.compareTo(_), identity)
   }
 
-  it should "test shift" in {
+  it should "test shift deprecated" in {
     for {
       x <- numGen
       n <- Seq(0, 1, 2, 8, 16, 64, 256, Int.MaxValue).map(U256.unsafe) ++ numGen.map(U256.unsafe)
     } {
       val xU256    = U256.unsafe(x)
       val nBounded = if (n > U256.unsafe(256)) 256 else n.toBigInt.intValue()
-      xU256.shl(n).toBigInt is x.shiftLeft(nBounded).mod(U256.upperBound)
+      xU256.shlDeprecated(n).toBigInt is x.shiftLeft(nBounded).mod(U256.upperBound)
       xU256.shr(n).toBigInt is x.shiftRight(nBounded).mod(U256.upperBound)
     }
+  }
+
+  it should "test shift" in {
+    for {
+      x <- numGen
+      n <- Seq(0, 1, 2, 8, 16, 64, 255, 256, Int.MaxValue).map(U256.unsafe) ++ numGen.map(
+        U256.unsafe
+      )
+    } {
+      val xU256    = U256.unsafe(x)
+      val nBounded = if (n > U256.unsafe(512)) 512 else n.toBigInt.intValue()
+
+      val expectedShl = x.multiply(BigInteger.TWO.pow(nBounded))
+      if (U256.validate(expectedShl)) {
+        xU256.shl(n).value.toBigInt is expectedShl
+      } else {
+        xU256.shl(n) is None
+      }
+
+      val expectedShr = x.divide(BigInteger.TWO.pow(nBounded))
+      xU256.shr(n).v is expectedShr
+    }
+  }
+
+  it should "test shift with edge cases" in {
+    // Test shl with zero shift amount
+    U256.Zero.shl(U256.Zero).value is U256.Zero
+    U256.One.shl(U256.Zero).value is U256.One
+    U256.Two.shl(U256.Zero).value is U256.Two
+    U256.MaxValue.shl(U256.Zero).value is U256.MaxValue
+
+    // Test shl with one shift amount
+    U256.Zero.shl(U256.One).value is U256.unsafe(0)
+    U256.One.shl(U256.One).value is U256.unsafe(2)
+    U256.Two.shl(U256.One).value is U256.unsafe(4)
+    U256.MaxValue.shl(U256.One) is None
+    U256.MaxValue.subUnsafe(U256.One).shl(U256.One) is None
+    U256.MaxValue.shr(U256.One).shl(U256.One).value is U256.MaxValue.subUnsafe(U256.One)
+
+    // Test shl with 255 shift amount
+    U256.Zero.shl(U256.unsafe(255)).value is U256.unsafe(0)
+    U256.One.shl(U256.unsafe(255)).value is U256.HalfMaxValue.addOneUnsafe()
+    U256.Two.shl(U256.unsafe(255)) is None
+    U256.MaxValue.shl(U256.unsafe(255)) is None
+
+    // Test shl with 256 shift amount
+    U256.Zero.shl(U256.unsafe(256)).value is U256.unsafe(0)
+    U256.One.shl(U256.unsafe(256)) is None
+    U256.Two.shl(U256.unsafe(256)) is None
+    U256.MaxValue.shl(U256.unsafe(256)) is None
+
+    // Test shl with max shift amount
+    U256.Zero.shl(U256.MaxValue).value is U256.Zero
+    U256.One.shl(U256.MaxValue) is None
+    U256.Two.shl(U256.MaxValue) is None
+    U256.MaxValue.shl(U256.MaxValue) is None
+
+    // Test shr with zero shift amount
+    U256.Zero.shr(U256.Zero) is U256.Zero
+    U256.One.shr(U256.Zero) is U256.One
+    U256.Two.shr(U256.Zero) is U256.Two
+    U256.MaxValue.shr(U256.Zero) is U256.MaxValue
+
+    // Test shr with one shift amount
+    U256.Zero.shr(U256.One) is U256.unsafe(0)
+    U256.One.shr(U256.One) is U256.unsafe(0)
+    U256.Two.shr(U256.One) is U256.unsafe(1)
+    U256.MaxValue.shr(U256.One) is U256.HalfMaxValue
+
+    // Test shr with 255 shift amount
+    U256.Zero.shr(U256.unsafe(255)) is U256.unsafe(0)
+    U256.One.shr(U256.unsafe(255)) is U256.unsafe(0)
+    U256.HalfMaxValue.addOneUnsafe().shr(U256.unsafe(255)) is U256.unsafe(1)
+    U256.MaxValue.shr(U256.unsafe(255)) is U256.unsafe(1)
+
+    // Test shr with 256 shift amount
+    U256.Zero.shr(U256.unsafe(256)) is U256.unsafe(0)
+    U256.One.shr(U256.unsafe(256)) is U256.unsafe(0)
+    U256.Two.shr(U256.unsafe(256)) is U256.unsafe(0)
+    U256.MaxValue.shr(U256.unsafe(256)) is U256.unsafe(0)
+
+    // Test shr with max shift amount
+    U256.Zero.shr(U256.MaxValue) is U256.Zero
+    U256.One.shr(U256.MaxValue) is U256.Zero
+    U256.Two.shr(U256.MaxValue) is U256.Zero
+    U256.MaxValue.shr(U256.MaxValue) is U256.Zero
   }
 
   it should "convert to/from bytes" in {
@@ -423,5 +509,24 @@ class U256Spec extends AlephiumSpec {
     forAll(u256Gen1, u256Gen1, u256Gen1) { case (x, y, n) =>
       x.addModN(y, n) is Some(U256.unsafe(x.v.add(y.v).remainder(n.v)))
     }
+  }
+
+  it should "test roundInfinityDiv" in {
+    test(
+      _.roundInfinityDiv(_),
+      _.roundInfinityDivUnsafe(_),
+      (a, b) => a.add(b).subtract(BigInteger.ONE).divide(b),
+      _ > BigInteger.ZERO
+    )
+
+    U256.One.roundInfinityDiv(U256.Zero) is None
+    U256.Zero.roundInfinityDiv(U256.One) is Some(U256.Zero)
+    U256.MaxValue.roundInfinityDiv(U256.One) is Some(U256.MaxValue)
+    U256.One.roundInfinityDiv(U256.MaxValue) is Some(U256.One)
+    U256.MaxValue.roundInfinityDiv(U256.HalfMaxValue) is Some(U256.unsafe(3))
+    U256.MaxValue.roundInfinityDiv(U256.HalfMaxValue.subOneUnsafe()) is Some(U256.unsafe(3))
+    U256.MaxValue.roundInfinityDiv(U256.HalfMaxValue.addOneUnsafe()) is Some(U256.unsafe(2))
+    U256.MaxValue.roundInfinityDiv(U256.MaxValue.subOneUnsafe()) is Some(U256.unsafe(2))
+    U256.MaxValue.roundInfinityDiv(U256.MaxValue) is Some(U256.One)
   }
 }

@@ -13,7 +13,6 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
-
 package org.alephium.app
 
 import java.net.InetSocketAddress
@@ -26,10 +25,10 @@ import org.scalatest.Assertion
 
 import org.alephium.api.{model => api}
 import org.alephium.api.{ApiError, Try}
-import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
+import org.alephium.api.model.{Address => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.api.model.BuildDeployContractTx.Code
-import org.alephium.crypto.{BIP340Schnorr, SecP256K1}
-import org.alephium.flow.FlowFixture
+import org.alephium.crypto.{BIP340Schnorr, SecP256K1, SecP256R1}
+import org.alephium.flow.{FlowFixture, GhostUncleFixture}
 import org.alephium.flow.core.{maxForkDepth, AMMContract, BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.setting.NetworkSetting
@@ -37,9 +36,21 @@ import org.alephium.flow.validation.TxScriptExeFailed
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => ModelContractOutput, _}
+import org.alephium.protocol.model.{
+  AssetOutput => _,
+  Balance => _,
+  ContractOutput => ModelContractOutput,
+  _
+}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
+import org.alephium.protocol.vm.{
+  GasBox,
+  GasPrice,
+  LockupScript,
+  PublicKeyLike,
+  TokenIssuance,
+  UnlockScript
+}
 import org.alephium.ralph.{Compiler, SourceIndex}
 import org.alephium.serde.{avectorSerde, deserialize, serialize}
 import org.alephium.util._
@@ -75,10 +86,21 @@ class ServerUtilsSpec extends AlephiumSpec {
     implicit def flowImplicit: BlockFlow = blockFlow
 
     def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
+
+    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
+      addAndCheck(blockFlow, block)
+      block
+    }
+
+    lazy val hardFork = networkConfig.getHardFork(TimeStamp.now())
   }
 
   trait TransferFromOneToManyGroupsFixture extends FlowFixtureWithApi with GetTxFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
+    val hardFork = networkConfig.getHardFork(TimeStamp.now())
 
     implicit val serverUtils: ServerUtils = new ServerUtils
 
@@ -126,6 +148,9 @@ class ServerUtilsSpec extends AlephiumSpec {
               chainIndex,
               fromPrivateKey
             )
+          if (hardFork.isDanubeEnabled()) {
+            addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+          }
           val block = mineFromMemPool(blockFlow, chainIndex)
           addAndCheck(blockFlow, block)
           if (!chainIndex.isIntraGroup) {
@@ -212,6 +237,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, AVector(destination))
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
+
     val unsignedTransaction =
       serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
 
@@ -241,6 +268,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -303,6 +331,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -479,6 +508,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "support Schnorr address" in new Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
 
     val chainIndex                        = ChainIndex.unsafe(0, 0)
     val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
@@ -511,6 +541,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
+
     val unsignedTransaction =
       serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
 
@@ -523,6 +555,9 @@ class ServerUtilsSpec extends AlephiumSpec {
         .rightValue
     blockFlow.getGrandPool().add(txTemplate.chainIndex, AVector(txTemplate), TimeStamp.now())
 
+    if (hardFork.isDanubeEnabled() && !txTemplate.chainIndex.isIntraGroup) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, txTemplate.chainIndex))
+    }
     val block1 = mineFromMemPool(blockFlow, txTemplate.chainIndex)
     block1.nonCoinbase.map(_.id).contains(txTemplate.id) is true
     addAndCheck(blockFlow, block1)
@@ -550,6 +585,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -574,7 +610,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildSweepAddressTransactionsRes = serverUtils
         .buildSweepAddressTransactions(
           blockFlow,
-          BuildSweepAddressTransactions(fromPublicKey, sweepAddressDestination)
+          BuildSweepAddressTransactions(fromPublicKey.bytes, None, sweepAddressDestination)
         )
         .rightValue
       val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
@@ -632,6 +668,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           BuildTransferTx(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
+        .asInstanceOf[BuildSimpleTransferTxResult]
 
       val txTemplate = signAndAddToMemPool(
         buildTransferTransaction.txId,
@@ -667,12 +704,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildSweepAddressTransactionsRes = serverUtils
         .buildSweepAddressTransactions(
           blockFlow,
-          BuildSweepAddressTransactions(toPublicKey, sweepAddressDestination)
+          BuildSweepAddressTransactions(toPublicKey.bytes, None, sweepAddressDestination)
         )
         .rightValue
       val sweepAddressTransaction = buildSweepAddressTransactionsRes.unsignedTxs.head
 
       val sweepAddressChainIndex = ChainIndex(chainIndex.to, chainIndex.to)
+      addAndCheck(blockFlow, emptyBlock(blockFlow, sweepAddressChainIndex))
       val sweepAddressTxTemplate = signAndAddToMemPool(
         sweepAddressTransaction.txId,
         sweepAddressTransaction.unsignedTx,
@@ -712,7 +750,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val result0 = serverUtils
       .buildSweepAddressTransactions(
         blockFlow,
-        BuildSweepAddressTransactions(fromPublicKey, Address.p2pkh(toPublicKey), None)
+        BuildSweepAddressTransactions(fromPublicKey.bytes, None, Address.p2pkh(toPublicKey), None)
       )
       .rightValue
     result0.unsignedTxs.length is 1
@@ -721,7 +759,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       .buildSweepAddressTransactions(
         blockFlow,
         BuildSweepAddressTransactions(
-          fromPublicKey,
+          fromPublicKey.bytes,
+          None,
           Address.p2pkh(toPublicKey),
           Some(Amount(U256.One))
         )
@@ -774,14 +813,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       val txs = serverUtils
         .prepareSweepAddressTransaction(
           blockFlow,
-          fromPublicKey,
-          destinations.head.address,
-          None,
-          None,
-          None,
-          nonCoinbaseMinGasPrice,
-          targetBlockHash,
-          None
+          getLockPair(fromPublicKey),
+          BuildSweepAddressTransactions(
+            fromPublicKey.bytes,
+            None,
+            destinations.head.address,
+            targetBlockHash = targetBlockHash
+          )
         )
         .rightValue
       txs.length is 1
@@ -809,19 +847,34 @@ class ServerUtilsSpec extends AlephiumSpec {
     blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 6
 
     val params0 =
-      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = Some(2))
+      BuildSweepAddressTransactions(
+        pubKey.bytes,
+        None,
+        Address.Asset(lockupScript),
+        utxosLimit = Some(2)
+      )
     val result0 = serverUtils.buildSweepAddressTransactions(blockFlow, params0).rightValue
     result0.unsignedTxs.length is 1
     checkInputSize(result0.unsignedTxs.head.unsignedTx, 2)
 
     val params1 =
-      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = None)
+      BuildSweepAddressTransactions(
+        pubKey.bytes,
+        None,
+        Address.Asset(lockupScript),
+        utxosLimit = None
+      )
     val result1 = serverUtils.buildSweepAddressTransactions(blockFlow, params1).rightValue
     result1.unsignedTxs.length is 1
     checkInputSize(result1.unsignedTxs.head.unsignedTx, utxosLimitInApiConfig)
 
     val params2 =
-      BuildSweepAddressTransactions(pubKey, Address.Asset(lockupScript), utxosLimit = Some(6))
+      BuildSweepAddressTransactions(
+        pubKey.bytes,
+        None,
+        Address.Asset(lockupScript),
+        utxosLimit = Some(6)
+      )
     val result2 = serverUtils.buildSweepAddressTransactions(blockFlow, params2).rightValue
     result2.unsignedTxs.length is 1
     checkInputSize(result2.unsignedTxs.head.unsignedTx, utxosLimitInApiConfig)
@@ -855,6 +908,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, destinations)
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
 
     val decodedUnsignedTx =
       serverUtils.decodeUnsignedTransaction(buildTransferTransaction.unsignedTx).rightValue
@@ -879,6 +933,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, selfDestinations)
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
+
     val txTemplate = signAndAddToMemPool(
       buildTransferTransaction.txId,
       buildTransferTransaction.unsignedTx,
@@ -889,7 +945,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(fromAddress, fromAddressBalance, 2)
 
     val utxos =
-      serverUtils.getUTXOsIncludePool(blockFlow, fromAddress).rightValue.utxos
+      serverUtils.getUTXOsIncludePool(blockFlow, fromAddress, true).rightValue.utxos
     val destination1 = generateDestination(chainIndex)
     val destination2 = generateDestination(chainIndex)
     val destinations = AVector(destination1, destination2)
@@ -1212,29 +1268,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Too many transaction outputs, maximal value: 256"
   }
 
-  it should "check the minimal amount deposit for contract creation" in new Fixture {
-    val serverUtils = new ServerUtils
-    serverUtils.getInitialAttoAlphAmount(None, HardFork.Leman) isE minimalAlphInContractPreRhone
-    serverUtils.getInitialAttoAlphAmount(
-      Some(minimalAlphInContractPreRhone),
-      HardFork.Leman
-    ) isE minimalAlphInContractPreRhone
-    serverUtils
-      .getInitialAttoAlphAmount(Some(minimalAlphInContractPreRhone - 1), HardFork.Leman)
-      .leftValue
-      .detail is "Expect 1 ALPH deposit to deploy a new contract"
-
-    serverUtils.getInitialAttoAlphAmount(None, HardFork.Rhone) isE minimalAlphInContract
-    serverUtils.getInitialAttoAlphAmount(
-      Some(minimalAlphInContract),
-      HardFork.Rhone
-    ) isE minimalAlphInContract
-    serverUtils
-      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1), HardFork.Rhone)
-      .leftValue
-      .detail is "Expect 0.1 ALPH deposit to deploy a new contract"
-  }
-
   it should "fail when outputs belong to different groups" in new FlowFixtureWithApi {
     val serverUtils = new ServerUtils
 
@@ -1275,6 +1308,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         BuildTransferTx(fromPublicKey.bytes, None, AVector(destination))
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
 
     val txSeenAt = TimeStamp.now()
     val txTemplate = signAndAddToMemPool(
@@ -1545,16 +1579,16 @@ class ServerUtilsSpec extends AlephiumSpec {
     outputs(2).additionalDataOpt.isDefined is true
   }
 
-  trait ContractFixture extends Fixture {
+  trait ContractFixtureBase extends Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", 4),
       ("alephium.broker.broker-num", 1),
       ("alephium.node.indexes.tx-output-ref-index", "true")
     )
 
-    val chainIndex                        = ChainIndex.unsafe(0, 0)
-    val lockupScript                      = getGenesisLockupScript(chainIndex)
-    implicit val serverUtils: ServerUtils = new ServerUtils()
+    lazy val chainIndex                        = ChainIndex.unsafe(0, 0)
+    lazy val lockupScript                      = getGenesisLockupScript(chainIndex)
+    implicit lazy val serverUtils: ServerUtils = new ServerUtils()
 
     def executeScript(
         script: vm.StatefulScript,
@@ -1592,6 +1626,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           )
         )
         .rightValue
+        .asInstanceOf[BuildSimpleDeployContractTxResult]
 
       val deployContractTx =
         deserialize[UnsignedTransaction](Hex.unsafe(deployContractTxResult.unsignedTx)).rightValue
@@ -1606,6 +1641,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       )(serverUtils, blockFlow)
 
       confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
+      if (hardFork.isDanubeEnabled()) {
+        confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+      }
       confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
       serverUtils.getTransaction(blockFlow, deployContractTxResult.txId, None, None).rightValue
 
@@ -1614,12 +1652,6 @@ class ServerUtilsSpec extends AlephiumSpec {
         deployContractTx.gasPrice * deployContractTx.gasAmount + initialAttoAlphAmount.value
       )
       deployContractTxResult.contractAddress
-    }
-
-    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
-      val block = mineFromMemPool(blockFlow, chainIndex)
-      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
-      addAndCheck(blockFlow, block)
     }
 
     def createContract(
@@ -1642,6 +1674,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       val contractId = ContractId.from(block.transactions.head.id, 0, chainIndex.from)
       (block, contractId)
     }
+  }
+
+  trait ContractFixture extends ContractFixtureBase {
+    setHardForkSince(HardFork.Rhone)
   }
 
   trait CallContractFixture extends ContractFixture {
@@ -1887,7 +1923,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       result0.contracts.head.asset.attoAlphAmount is minimalAlphInContract * 2
       result0.txOutputs
         .find(_.address == callerAddress)
-        .exists(_.attoAlphAmount.value == ALPH.cent(40)) is true
+        .exists(_.attoAlphAmount.value == ALPH.cent(90)) is true
       result0.txOutputs
         .find(_.address == fooAddress)
         .exists(_.attoAlphAmount.value == ALPH.cent(20)) is true
@@ -1901,7 +1937,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       result1.contracts.head.asset.attoAlphAmount is minimalAlphInContract * 3
       result1.txOutputs
         .find(_.address == callerAddress)
-        .exists(_.attoAlphAmount.value == ALPH.cent(40)) is true
+        .exists(_.attoAlphAmount.value == ALPH.cent(90)) is true
       result1.txOutputs
         .find(_.address == fooAddress)
         .exists(_.attoAlphAmount.value == ALPH.cent(30)) is true
@@ -1960,7 +1996,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "returns error if the number of contract calls exceeds the maximum limit" in new CallContractFixture {
-    override val serverUtils = new ServerUtils() {
+    override lazy val serverUtils = new ServerUtils() {
       override val maxCallsInMultipleCall = 3
     }
     val groupIndex = chainIndex.from.value
@@ -2053,9 +2089,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts(1).address is Address.contract(barContractId)
     val assetOutput = result.txOutputs(1)
     assetOutput.address is assetAddress
-    assetOutput.attoAlphAmount is Amount(
-      ALPH.alph(2).subUnsafe(nonCoinbaseMinGasPrice * maximalGasPerTx)
-    )
+    assetOutput.attoAlphAmount is Amount(ALPH.alph(2))
   }
 
   it should "test destroying self" in new Fixture {
@@ -2118,11 +2152,13 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val serverUtils = new ServerUtils()
 
-    def buildTestParam(callerAddressOpt: Option[Address.Contract]): TestContract.Complete = {
+    def buildTestParam(
+        callerContractAddressOpt: Option[Address.Contract]
+    ): TestContract.Complete = {
       TestContract(
         bytecode = childContract,
         address = Some(childAddress),
-        callerAddress = callerAddressOpt,
+        callerContractAddress = callerContractAddressOpt,
         initialImmFields = Option(
           AVector[Val](
             ValByteVec(parentContractId.bytes),
@@ -2236,8 +2272,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts(1).address is Address.contract(barContractId)
     val assetOutput = result.txOutputs(1)
     assetOutput.address is assetAddress
-    val totalGas = nonCoinbaseMinGasPrice * maximalGasPerTx
-    assetOutput.attoAlphAmount is Amount(ALPH.oneAlph.subUnsafe(totalGas))
+    assetOutput.attoAlphAmount is Amount(ALPH.oneAlph)
     val contractOutput = result.txOutputs(0)
     contractOutput.address is Address.contract(fooCallerContractId)
     contractOutput.attoAlphAmount.value is ALPH.alph(2)
@@ -2475,7 +2510,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
-      Amount(500000000000000000L),
+      Amount(1000000000000000000L),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2528,7 +2563,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
-      Amount(500000000000000000L),
+      Amount(1000000000000000000L),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2582,7 +2617,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(2) is AssetOutput(
       result0.txOutputs(2).hint,
       emptyKey(2),
-      Amount(ALPH.nanoAlph(90500000000L) - dustUtxoAmount),
+      Amount(ALPH.nanoAlph(91000000000L) - dustUtxoAmount),
       buyer,
       AVector.empty,
       TimeStamp.zero,
@@ -2631,7 +2666,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
-      Amount(ALPH.nanoAlph(110500000000L)),
+      Amount(ALPH.nanoAlph(111000000000L)),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2676,7 +2711,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
-      Amount(ALPH.nanoAlph(105500000000L)),
+      Amount(ALPH.nanoAlph(106000000000L)),
       buyer,
       AVector.empty,
       TimeStamp.zero,
@@ -2734,7 +2769,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(2) is AssetOutput(
       result1.txOutputs(2).hint,
       emptyKey(2),
-      Amount(ALPH.nanoAlph(95500000000L) - dustUtxoAmount),
+      Amount(ALPH.nanoAlph(96000000000L) - dustUtxoAmount),
       lp,
       AVector.empty,
       TimeStamp.zero,
@@ -2889,7 +2924,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (contracts, scripts, globalState, globalWarnings) =
       Compiler.compileProject(rawCode).rightValue
     val query  = Compile.Project(rawCode)
-    val result = serverUtils.compileProject(query).rightValue
+    val result = serverUtils.compileProject(blockFlow, query).rightValue
 
     result.contracts.length is 1
     contracts.length is 1
@@ -2997,7 +3032,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
 
     val query  = Compile.Project(rawCode)
-    val result = serverUtils.compileProject(query).rightValue
+    val result = serverUtils.compileProject(blockFlow, query).rightValue
     result.contracts.length is 1
     result.contracts.head.functions.length is 2
     result.scripts.length is 1
@@ -3073,6 +3108,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contract              = Compiler.compileContract(rawCode).rightValue
     val (_, fromPublicKey, _) = genesisKeys(0)
     val fromAddress           = Address.p2pkh(fromPublicKey)
+    val fromAddressStr        = fromAddress.toBase58
     val (_, toPublicKey, _)   = genesisKeys(1)
     val toAddress             = Address.p2pkh(toPublicKey)
 
@@ -3085,14 +3121,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContract!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00)
+           |  createContract!{@$fromAddressStr -> ALPH: 10}(#$codeRaw, #$stateRaw, #00)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),
@@ -3110,15 +3146,15 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50, @$toAddress)
-           |  transferToken!{@$fromAddress -> ALPH: dustAmount!()}(@$fromAddress, @$toAddress, ALPH, dustAmount!())
+           |  createContractWithToken!{@$fromAddressStr -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50, @$toAddress)
+           |  transferToken!{@$fromAddressStr -> ALPH: dustAmount!()}(@$fromAddressStr, @$toAddress, ALPH, dustAmount!())
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),
@@ -3138,14 +3174,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> ALPH: 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, #00, 50)
+           |  createContractWithToken!{@$fromAddressStr -> ALPH: 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, #00, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),
@@ -3163,14 +3199,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50)
+           |  createContractWithToken!{@$fromAddressStr -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
-          fromAddress,
+          fromAddressStr,
           initialImmFields = initialFields,
           initialMutFields = AVector.empty,
           U256.unsafe(10),
@@ -3252,6 +3288,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   trait ScriptTxFixture extends Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    setHardForkSince(HardFork.Rhone)
 
     implicit val serverUtils: ServerUtils = new ServerUtils
 
@@ -3281,6 +3318,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .asInstanceOf[BuildSimpleDeployContractTxResult]
 
     def deployContract() = {
       val deployContractTx =
@@ -3297,12 +3335,6 @@ class ServerUtilsSpec extends AlephiumSpec {
         chainIndex,
         testPriKey
       )
-    }
-
-    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
-      val block = mineFromMemPool(blockFlow, chainIndex)
-      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
-      addAndCheck(blockFlow, block)
     }
   }
 
@@ -3324,7 +3356,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     def executeTxScript(
         buildExecuteScript: BuildExecuteScriptTx
     ): BuildExecuteScriptTxResult = {
-      serverUtils.buildExecuteScriptTx(blockFlow, buildExecuteScript).rightValue
+      serverUtils
+        .buildExecuteScriptTx(blockFlow, buildExecuteScript)
+        .rightValue
+        .asInstanceOf[BuildSimpleExecuteScriptTxResult]
     }
 
     def failedExecuteTxScript(
@@ -3813,6 +3848,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    if (hardFork.isDanubeEnabled()) {
+      confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    }
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
   }
 
@@ -3825,15 +3863,19 @@ class ServerUtilsSpec extends AlephiumSpec {
       .add(block.chainIndex, blockTx, TimeStamp.now())
     checkAddressBalance(testAddress, ALPH.alph(2))
     deployContract()
+
     blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 0))
     blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
     // TODO: improve the calculation of bestDeps to get rid of the following line
     confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
-    blockFlow.getGrandPool().get(blockTx.id).isEmpty is true
+    blockFlow.getMemPool(GroupIndex.unsafe(1)).contains(blockTx.id) is false
 
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    if (hardFork.isDanubeEnabled()) {
+      confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    }
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
   }
 
@@ -3853,8 +3895,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     implicit val serverUtils: ServerUtils = new ServerUtils()
     def buildDeployContractTx(
         query: BuildDeployContractTx
-    ): BuildDeployContractTxResult = {
-      val result = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
+    ): BuildSimpleDeployContractTxResult = {
+      val result = serverUtils
+        .buildDeployContractTx(blockFlow, query)
+        .rightValue
+        .asInstanceOf[BuildSimpleDeployContractTxResult]
       signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
       val block = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block)
@@ -3867,10 +3912,10 @@ class ServerUtilsSpec extends AlephiumSpec {
         tokenId: TokenId,
         expectedTokenBalance: Option[U256]
     ) = {
-      val (alphAmount, _, tokens, _, _) =
+      val balance =
         blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-      expectedAlphBalance is alphAmount
-      tokens.find(_._1 == tokenId).map(_._2) is expectedTokenBalance
+      balance.totalAlph is expectedAlphBalance
+      balance.totalTokens.find(_._1 == tokenId).map(_._2) is expectedTokenBalance
     }
   }
 
@@ -3892,9 +3937,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     val tokenId = TokenId.from(createToken(10))
-    val (_, _, tokens0, _, _) =
+    val balance =
       blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-    tokens0.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(10))
+    balance.totalTokens.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(10))
 
     val query = BuildDeployContractTx(
       fromPublicKey = publicKey.bytes,
@@ -3961,9 +4006,9 @@ class ServerUtilsSpec extends AlephiumSpec {
         lockupScript: LockupScript,
         expectedAlphBalance: U256
     ) = {
-      val (alphAmount, _, _, _, _) =
+      val balance =
         blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-      expectedAlphBalance is alphAmount
+      expectedAlphBalance is balance.totalAlph
     }
 
     def checkTokenBalance(
@@ -3971,9 +4016,12 @@ class ServerUtilsSpec extends AlephiumSpec {
         tokenId: TokenId,
         expectedTokenBalance: U256
     ) = {
-      val (_, _, tokenAmounts, _, _) =
+      val balance =
         blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-      tokenAmounts.find(_._1 == tokenId).map(_._2).getOrElse(U256.Zero) is expectedTokenBalance
+      balance.totalTokens
+        .find(_._1 == tokenId)
+        .map(_._2)
+        .getOrElse(U256.Zero) is expectedTokenBalance
     }
 
     def signAndAndToMemPool(
@@ -4047,6 +4095,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     lazy val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(0)
+    lazy val genesisAddress                           = Address.p2pkh(genesisPublicKey)
 
     val groupInfo0 = groupInfo(0)
     val groupInfo1 = groupInfo(1)
@@ -4064,6 +4113,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .asInstanceOf[BuildSimpleTransferTxResult]
+
     signAndAndToMemPool(transferToAddress0, genesisPrivateKey)
     confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
     checkAlphBalance(groupInfo0.address.lockupScript, address0InitBalance)
@@ -4259,9 +4310,20 @@ class ServerUtilsSpec extends AlephiumSpec {
     signAndAndToMemPool(buildTransferTransaction.value, groupInfo0.privateKey)
     signAndAndToMemPool(buildExecuteScriptTransaction1.value, groupInfo1.privateKey)
     signAndAndToMemPool(buildExecuteScriptTransaction0.value, groupInfo0.privateKey)
-    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 1))
-    confirmNewBlock(blockFlow, buildExecuteScriptTransaction1.value.chainIndex().value)
-    confirmNewBlock(blockFlow, buildExecuteScriptTransaction0.value.chainIndex().value)
+    if (hardFork.isDanubeEnabled()) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 1)))
+    }
+    val block0 = confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 1))
+    block0.nonCoinbaseLength is 1
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0)))
+    if (hardFork.isDanubeEnabled()) {
+      addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(1, 1)))
+    }
+    val block1 = confirmNewBlock(blockFlow, buildExecuteScriptTransaction1.value.chainIndex().value)
+    val block2 = confirmNewBlock(blockFlow, buildExecuteScriptTransaction0.value.chainIndex().value)
+    block1.nonCoinbaseLength is 1
+    block2.nonCoinbaseLength is 1
 
     checkAlphBalance(
       groupInfo0.address.lockupScript,
@@ -4442,7 +4504,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       tokens = Some(AVector(Token(tokenId1, U256.unsafe(1))))
     )
 
-    val genesisAddress = Address.p2pkh(genesisPublicKey)
     failedExecuteTxScript(
       buildWithdrawToken2ExecuteScriptTx,
       errorDetails =
@@ -4500,6 +4561,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       keyPair = (genesisPrivateKey, genesisPublicKey),
       issueTokenAmount = Some(Amount(U256.unsafe(100)))
     )
+    val tokenId                   = TokenId.from(tokenContractAddress.contractId)
+    val tokenContractLockupScript = LockupScript.p2c(tokenContractAddress.contractId)
 
     val withdrawTokenScript =
       s"""
@@ -4516,7 +4579,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       bytecode = serialize(withdrawTokenScriptCode)
     )
 
-    val (unsignedTx, generatedOutputs) = serverUtils
+    val (unsignedTx, txScriptExecution) = serverUtils
       .buildExecuteScriptUnsignedTx(
         blockFlow,
         buildWithdrawTokenExecuteScriptTx,
@@ -4524,10 +4587,33 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue
 
-    val generatedAssetOutputs = generatedOutputs.map(_.toProtocol()).collect {
-      case output: model.AssetOutput => Some(output)
-      case _                         => None
-    }
+    val genesisAddressUtxos =
+      serverUtils.getUTXOsIncludePool(blockFlow, genesisAddress, true).rightValue.utxos
+    genesisAddressUtxos.length is 1
+    val genesisAddressUtxosAmount = genesisAddressUtxos.head.amount.value
+
+    val fixedOutputs = unsignedTx.fixedOutputs
+    fixedOutputs.length is 1
+    fixedOutputs.head.lockupScript is genesisAddress.lockupScript
+    fixedOutputs.head.amount is genesisAddressUtxosAmount - ALPH.alph(1) - unsignedTx.gasFee
+    fixedOutputs.head.tokens is AVector.empty[(TokenId, U256)]
+
+    val contractPrevOutputs = txScriptExecution.contractPrevOutputs
+    contractPrevOutputs.length is 1
+    contractPrevOutputs.head.amount is ALPH.alph(5)
+    contractPrevOutputs.head.tokens is AVector(tokenId -> U256.unsafe(100))
+
+    val simulatedGeneratedOutputs = txScriptExecution.generatedOutputs
+    simulatedGeneratedOutputs.length is 3
+    simulatedGeneratedOutputs(0).lockupScript is genesisAddress.lockupScript
+    simulatedGeneratedOutputs(0).amount is dustUtxoAmount
+    simulatedGeneratedOutputs(0).tokens is AVector(tokenId -> U256.unsafe(1))
+    simulatedGeneratedOutputs(1).lockupScript is genesisAddress.lockupScript
+    simulatedGeneratedOutputs(1).amount is 999000000000000000L
+    simulatedGeneratedOutputs(1).tokens is AVector.empty[(TokenId, U256)]
+    simulatedGeneratedOutputs(2).lockupScript is tokenContractLockupScript
+    simulatedGeneratedOutputs(2).amount is ALPH.alph(5)
+    simulatedGeneratedOutputs(2).tokens is AVector(tokenId -> U256.unsafe(99))
 
     val (_, extraUtxosInfo) = serverUtils
       .buildChainedTransaction(
@@ -4537,56 +4623,110 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue
 
-    unsignedTx.fixedOutputs.length is 1
-    generatedOutputs.length is 3
+    val generatedOutputs = Output.fromGeneratedOutputs(unsignedTx, simulatedGeneratedOutputs)
+    val generatedAssetOutputs = txScriptExecution.generatedOutputs.collect {
+      case output: model.AssetOutput => Some(output)
+      case _                         => None
+    }
+
     generatedAssetOutputs.length is 2
     extraUtxosInfo.newUtxos.map(_.output) is (unsignedTx.fixedOutputs ++ generatedAssetOutputs)
     extraUtxosInfo.newUtxos.tail.map(o => (o.ref.hint.value, o.ref.key.value)) is
       generatedOutputs.filter(_.toProtocol().isAsset).map(o => (o.hint, o.key))
   }
 
-  it should "get ghost uncles" in new Fixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block0     = emptyBlock(blockFlow, chainIndex)
-    val block1     = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block0, block1)
-    val block2 = mineBlockTemplate(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block2)
-    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 2
+  it should "should estimate the generated output correctly" in new ChainedTransactionsFixture {
+    val tokenContract =
+      s"""
+         |Contract TokenContract() {
+         |  @using(assetsInContract = true)
+         |  pub fn withdraw() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
 
-    val ghostUncleHash  = blockFlow.getHashes(chainIndex, 1).rightValue.last
+    val tokenContractAddress = deployContract(
+      tokenContract,
+      initialAttoAlphAmount = Amount(ALPH.alph(5)),
+      keyPair = (genesisPrivateKey, genesisPublicKey),
+      issueTokenAmount = None
+    )
+    val tokenContractLockupScript = LockupScript.p2c(tokenContractAddress.contractId)
+
+    val withdrawALPHScript =
+      s"""
+         |TxScript Main {
+         |  TokenContract(#${tokenContractAddress}).withdraw()
+         |}
+         |$tokenContract
+         |""".stripMargin
+
+    val withdrawALPHScriptCode = Compiler.compileTxScript(withdrawALPHScript).toOption.get
+
+    val (_, testPubKey)  = chainIndex.from.generateKey
+    val testLockupScript = LockupScript.p2pkh(testPubKey)
+    val block            = transfer(blockFlow, genesisKeys(1)._1, testPubKey, ALPH.alph(5))
+    addAndCheck(blockFlow, block)
+
+    val buildWithdrawALPHExecuteScriptTx = BuildExecuteScriptTx(
+      fromPublicKey = testPubKey.bytes,
+      bytecode = serialize(withdrawALPHScriptCode)
+    )
+
+    val (unsignedTx, txScriptExecution) = serverUtils
+      .buildExecuteScriptUnsignedTx(
+        blockFlow,
+        buildWithdrawALPHExecuteScriptTx,
+        ExtraUtxosInfo.empty
+      )
+      .rightValue
+
+    val fixedOutputs = unsignedTx.fixedOutputs
+    fixedOutputs.length is 1
+    fixedOutputs.head.lockupScript is testLockupScript
+    fixedOutputs.head.amount is ALPH.alph(5) - unsignedTx.gasFee
+
+    val contractPrevOutputs = txScriptExecution.contractPrevOutputs
+    contractPrevOutputs.length is 1
+    contractPrevOutputs.head.lockupScript is tokenContractLockupScript
+    contractPrevOutputs.head.amount is ALPH.alph(5)
+
+    val simulatedGeneratedOutputs = txScriptExecution.generatedOutputs
+    simulatedGeneratedOutputs.length is 2
+    simulatedGeneratedOutputs(0).lockupScript is testLockupScript
+    simulatedGeneratedOutputs(0).amount is U256.unsafe(1000000000000000000L)
+    simulatedGeneratedOutputs(1).lockupScript is tokenContractLockupScript
+    simulatedGeneratedOutputs(1).amount is ALPH.alph(4)
+  }
+
+  it should "get ghost uncles" in new Fixture with GhostUncleFixture {
+    val chainIndex      = ChainIndex.unsafe(0, 0)
+    val ghostUncleHash  = mineUncleBlocks(blockFlow, chainIndex, 1).head
     val ghostUncleBlock = blockFlow.getBlock(ghostUncleHash).rightValue
-    val serverUtils     = new ServerUtils()
-    serverUtils.getBlock(blockFlow, block2.hash).rightValue.ghostUncles is
+    val block           = mineBlockTemplate(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+
+    val serverUtils = new ServerUtils()
+    serverUtils.getBlock(blockFlow, block.hash).rightValue.ghostUncles is
       AVector(
         GhostUncleBlockEntry(ghostUncleHash, Address.Asset(ghostUncleBlock.minerLockupScript))
       )
   }
 
-  it should "get mainchain block by ghost uncle hash" in new Fixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block0     = emptyBlock(blockFlow, chainIndex)
-    val block1     = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block0, block1)
-    blockFlow.getMaxHeightByWeight(chainIndex).rightValue is 1
+  it should "get mainchain block by ghost uncle hash" in new Fixture with GhostUncleFixture {
+    val chainIndex     = ChainIndex.unsafe(0, 0)
+    val ghostUncleHash = mineUncleBlocks(blockFlow, chainIndex, 1).head
 
-    val serverUtils    = new ServerUtils()
-    val ghostUncleHash = blockFlow.getHashes(chainIndex, 1).rightValue.last
-    val blockNum       = Random.between(0, ALPH.MaxGhostUncleAge)
-    (0 until blockNum).foreach { _ =>
-      val block = emptyBlock(blockFlow, chainIndex)
-      block.ghostUncleHashes.rightValue.isEmpty is true
-      addAndCheck(blockFlow, block)
-    }
+    val serverUtils = new ServerUtils()
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).leftValue.detail is
       s"The mainchain block that references the ghost uncle block ${ghostUncleHash.toHexString} not found"
 
     val block = mineBlockTemplate(blockFlow, chainIndex)
     block.ghostUncleHashes.rightValue is AVector(ghostUncleHash)
     addAndCheck(blockFlow, block)
-    val blockHeight = blockNum + 2
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, ghostUncleHash).rightValue is
-      BlockEntry.from(block, blockHeight).rightValue
+      BlockEntry.from(block, blockFlow.getHeightUnsafe(block.hash), None).rightValue
 
     val invalidBlockHash = randomBlockHash(chainIndex)
     serverUtils.getMainChainBlockByGhostUncle(blockFlow, invalidBlockHash).leftValue.detail is
@@ -4601,7 +4741,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val invalidBlockHash = randomBlockHash(chainIndex)
     val block            = emptyBlock(blockFlow, chainIndex)
     addAndCheck(blockFlow, block)
-    serverUtils.getBlock(blockFlow, block.hash).rightValue is BlockEntry.from(block, 1).rightValue
+    serverUtils.getBlock(blockFlow, block.hash).rightValue is BlockEntry
+      .from(block, 1, None)
+      .rightValue
     serverUtils.getBlock(blockFlow, invalidBlockHash).leftValue.detail is
       s"The block ${invalidBlockHash.toHexString} does not exist, please check if your full node synced"
 
@@ -4611,7 +4753,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         .rightValue
     serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue is RichBlockAndEvents(
       RichBlockEntry
-        .from(block, 1, transactions)
+        .from(block, 1, transactions, None)
         .rightValue,
       AVector.empty
     )
@@ -4749,12 +4891,19 @@ class ServerUtilsSpec extends AlephiumSpec {
     def main4: Block
     def fork3: Block
 
+    // scalastyle:off method.length
     def verifyForkedChain(): Assertion = {
       main2.nonCoinbase.length is 1
       main2.nonCoinbase.head.inputsLength is 1
       val testKeyTxOutputRef = main2.nonCoinbase.head.unsigned.inputs(0).outputRef
-      val testKeyTxOutput    = main0.nonCoinbase.head.unsigned.fixedOutputs(0)
-      blockFlow.getTxOutput(testKeyTxOutputRef, main2.hash, maxForkDepth) isE Some(testKeyTxOutput)
+      val testKeyTx          = main0.nonCoinbase.head.unsigned
+      val testKeyTxOutput    = testKeyTx.fixedOutputs(0)
+      blockFlow.getTxOutput(testKeyTxOutputRef, main2.hash, maxForkDepth) isE Some(
+        (
+          testKeyTx.id,
+          testKeyTxOutput
+        )
+      )
 
       // Same tx in both main3 and fork2
       main3.nonCoinbase.head.id is fork2.nonCoinbase.head.id
@@ -4776,10 +4925,24 @@ class ServerUtilsSpec extends AlephiumSpec {
         lockupScript = LockupScript.p2c(contractId),
         tokens = AVector((TokenId.from(contractId), ALPH.alph(15)))
       )
-      blockFlow.getTxOutput(contractOutputRef, main4.hash, 0) isE Some(contractOutputMain3)
-      blockFlow.getTxOutput(contractOutputRef, main4.hash, 1) isE Some(contractOutputMain3)
+
+      blockFlow.getTxOutput(contractOutputRef, main4.hash, 0) isE Some(
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputMain3
+        )
+      )
+      blockFlow.getTxOutput(contractOutputRef, main4.hash, 1) isE Some(
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputMain3
+        )
+      )
       blockFlow.getTxOutput(contractOutputRef, main4.hash, maxForkDepth) isE Some(
-        contractOutputMain3
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputMain3
+        )
       )
 
       val contractOutputFork2 = ModelContractOutput(
@@ -4787,10 +4950,23 @@ class ServerUtilsSpec extends AlephiumSpec {
         lockupScript = LockupScript.p2c(contractId),
         tokens = AVector((TokenId.from(contractId), ALPH.alph(19)))
       )
-      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 0) isE Some(contractOutputMain3)
-      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 1) isE Some(contractOutputFork2)
+      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 0) isE Some(
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputMain3
+        )
+      )
+      blockFlow.getTxOutput(contractOutputRef, fork3.hash, 1) isE Some(
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputFork2
+        )
+      )
       blockFlow.getTxOutput(contractOutputRef, fork3.hash, maxForkDepth) isE Some(
-        contractOutputFork2
+        (
+          main3.nonCoinbase.head.id,
+          contractOutputFork2
+        )
       )
     }
   }
@@ -4857,22 +5033,59 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (fromPrivateKey, fromPublicKey) = chainIndex.to.generateKey
     val (_, toPublicKey)                = chainIndex.to.generateKey
     val lockupScript                    = LockupScript.p2pkh(fromPublicKey)
+    val blockTs = TimeStamp.now().minusUnsafe(networkConfig.coinbaseLockupPeriod)
     val block0 = mine(
       blockFlow,
       chainIndex,
       AVector.empty[Transaction],
       lockupScript,
-      Some(ALPH.LaunchTimestamp.plusMillisUnsafe(1))
+      Some(blockTs)
     )
     addAndCheck(blockFlow, block0)
-    val block1 = transfer(blockFlow, fromPrivateKey, toPublicKey, ALPH.oneAlph)
+    val block1 = transfer(blockFlow, fromPrivateKey, toPublicKey, dustUtxoAmount)
     addAndCheck(blockFlow, block1)
 
     block1.nonCoinbase.length is 1
     block1.nonCoinbase.head.inputsLength is 1
     val txOutputRef    = block1.nonCoinbase.head.unsigned.inputs(0).outputRef
-    val coinbaseOutput = block0.coinbase.unsigned.fixedOutputs(0)
-    blockFlow.getTxOutput(txOutputRef, block1.hash) isE Some(coinbaseOutput)
+    val coinbaseTx     = block0.coinbase.unsigned
+    val coinbaseOutput = coinbaseTx.fixedOutputs(0)
+    blockFlow.getTxOutput(txOutputRef, block1.hash) isE Some((coinbaseTx.id, coinbaseOutput))
+  }
+
+  it should "return correct tx output when original tx exists in forked blocks and the spending tx's block height is lower" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.node.indexes.tx-output-ref-index", "true")
+    )
+
+    val chainIndex00                  = ChainIndex.unsafe(0, 0)
+    val chainIndex01                  = ChainIndex.unsafe(0, 1)
+    val (toPrivateKey0, toPublicKey0) = chainIndex00.to.generateKey
+    val (_, toPublicKey1)             = chainIndex01.to.generateKey
+
+    val block00_1 = mineFromMemPool(blockFlow, chainIndex00)
+    addAndCheck(blockFlow, block00_1)
+
+    val block00_2 = mineFromMemPool(blockFlow, chainIndex00)
+    addAndCheck(blockFlow, block00_2)
+
+    val block00_31 = transfer(blockFlow, genesisKeys(0)._1, toPublicKey0, ALPH.alph(2))
+    val block00_32 = transfer(blockFlow, genesisKeys(0)._1, toPublicKey0, ALPH.alph(2))
+    addAndCheck(blockFlow, block00_31, block00_32)
+
+    val heightHashes00_3 = blockFlow.getHashes(chainIndex00, 3).rightValue
+    heightHashes00_3.toSet is Set(block00_31.hash, block00_32.hash)
+
+    val block01_1 = transfer(blockFlow, toPrivateKey0, toPublicKey1, ALPH.alph(1))
+    addAndCheck(blockFlow, block01_1)
+
+    val heightHashes01_1 = blockFlow.getHashes(chainIndex01, 1).rightValue
+    heightHashes01_1.toSet is Set(block01_1.hash)
+
+    val txOutputRef = block01_1.nonCoinbase.head.unsigned.inputs(0).outputRef
+    val outputTx    = block00_31.nonCoinbase.head.unsigned
+    val output      = outputTx.fixedOutputs(0)
+    blockFlow.getTxOutput(txOutputRef, block01_1.hash) isE Some((outputTx.id, output))
   }
 
   it should "return error if the BuildTransaction.ExecuteScript is invalid" in new Fixture {
@@ -4903,6 +5116,52 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .leftValue
       .detail is "Invalid gas estimation multiplier precision, maximum allowed precision is 2"
+  }
+
+  it should "build execute script tx with group derived from contract in TxScript" in new ContractFixture {
+    setHardForkSince(HardFork.Danube)
+    val (_, fromPublicKey) = SecP256R1.generatePriPub()
+    val publicKeyLike      = PublicKeyLike.SecP256R1(fromPublicKey)
+
+    val (genesisPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val block = transferWithGas(
+      blockFlow,
+      genesisPrivateKey,
+      LockupScript.p2pk(publicKeyLike, chainIndex.from),
+      AVector.empty[(TokenId, U256)],
+      ALPH.alph(10),
+      nonCoinbaseMinGasPrice
+    )
+    addAndCheck(blockFlow, block)
+
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    emit Debug(`foo`)
+         |  }
+         |}
+         |""".stripMargin
+
+    val (_, fooId) = createContract(foo, AVector.empty, AVector.empty)
+    val script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooId.toHexString}).foo()
+         |}
+         |$foo
+         |""".stripMargin
+
+    val scriptBytecode = serialize(Compiler.compileTxScript(script).rightValue)
+    val query = BuildExecuteScriptTx(
+      fromPublicKey.bytes,
+      fromPublicKeyType = Some(BuildTxCommon.GLSecP256R1),
+      scriptBytecode,
+      group = None
+    )
+
+    val result = serverUtils.buildExecuteScriptTx(blockFlow, query).rightValue
+    result.fromGroup is fooId.groupIndex.value
   }
 
   it should "estimate gas using gas estimation multiplier" in new ContractFixture {
@@ -4943,6 +5202,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .asInstanceOf[BuildSimpleExecuteScriptTxResult]
+
     val result1 = serverUtils
       .buildExecuteScriptTx(
         blockFlow,
@@ -4954,11 +5215,13 @@ class ServerUtilsSpec extends AlephiumSpec {
         )
       )
       .rightValue
+      .asInstanceOf[BuildSimpleExecuteScriptTxResult]
+
     result1.gasAmount.value > result0.gasAmount.value is true
 
     executeScript(script, Some((genesisPrivateKey, genesisPublicKey)))
 
-    def createTxTemplate(result: BuildExecuteScriptTxResult): TransactionTemplate = {
+    def createTxTemplate(result: BuildSimpleExecuteScriptTxResult): TransactionTemplate = {
       val signature = SecP256K1.sign(result.txId.bytes, privateKey)
       serverUtils.createTxTemplate(SubmitTransaction(result.unsignedTx, signature)).rightValue
     }
@@ -5027,7 +5290,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils
       .getRichBlockAndEvents(blockFlow, block.hash)
       .rightValue is RichBlockAndEvents(
-      RichBlockEntry.from(block, 1, transactions).rightValue,
+      RichBlockEntry.from(block, 1, transactions, None).rightValue,
       AVector.empty
     )
   }
@@ -5056,6 +5319,160 @@ class ServerUtilsSpec extends AlephiumSpec {
       ) is true
   }
 
+  trait ConflictedTxsFixture extends Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.node.indexes.tx-output-ref-index", "true")
+    )
+
+    var now = TimeStamp.now()
+    def nextBlockTs: TimeStamp = {
+      val newTs = now.plusMillisUnsafe(1)
+      now = newTs
+      newTs
+    }
+
+    val chainIndex0 = ChainIndex.unsafe(0, 1)
+    val chainIndex1 = ChainIndex.unsafe(0, 2)
+
+    val block0 = transfer(blockFlow, chainIndex0, nextBlockTs)
+    val block1 = transfer(blockFlow, chainIndex1, nextBlockTs)
+    addAndCheck(blockFlow, block1)
+
+    val block2 =
+      transfer(blockFlow, chainIndex1, nextBlockTs) // it uses the conflicted tx from block1
+    addAndCheck(blockFlow, block2)
+
+    addAndCheck(blockFlow, block0)
+    val block3 = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs)
+    addAndCheck(blockFlow, block3)
+    addAndCheck(
+      blockFlow,
+      emptyBlock(blockFlow, ChainIndex.unsafe(1, 1), nextBlockTs),
+      emptyBlock(blockFlow, ChainIndex.unsafe(2, 2), nextBlockTs)
+    )
+
+    val serverUtils = new ServerUtils()
+  }
+
+  it should "return conflicted tx status" in new ConflictedTxsFixture {
+    val tx0 = block0.transactions.head.id
+    val tx1 = block0.transactions.last.id
+    serverUtils.getTransactionStatus(blockFlow, tx0, block0.chainIndex).rightValue is a[Confirmed]
+    serverUtils.getTransactionStatus(blockFlow, tx1, block0.chainIndex).rightValue is a[Confirmed]
+    val tx2 = block1.transactions.head.id
+    val tx3 = block1.transactions.last.id
+    serverUtils.getTransactionStatus(blockFlow, tx2, block1.chainIndex).rightValue is Conflicted(
+      block1.hash,
+      txIndex = 0,
+      chainConfirmations = 2,
+      fromGroupConfirmations = 1,
+      toGroupConfirmations = 1
+    )
+    serverUtils.getTransactionStatus(blockFlow, tx3, block1.chainIndex).rightValue is a[Confirmed]
+
+    addAndCheck(blockFlow, emptyBlock(blockFlow, block1.chainIndex, nextBlockTs))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 0), nextBlockTs))
+    addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(2, 2), nextBlockTs))
+    serverUtils.getTransactionStatus(blockFlow, tx2, block1.chainIndex).rightValue is Conflicted(
+      block1.hash,
+      txIndex = 0,
+      chainConfirmations = 3,
+      fromGroupConfirmations = 2,
+      toGroupConfirmations = 2
+    )
+  }
+
+  it should "return conflicted txs in the block response" in new ConflictedTxsFixture {
+    private def checkBlockWithConflictedTxs(block: Block, conflictedTxs: AVector[TransactionId]) = {
+      assume(conflictedTxs.nonEmpty)
+      val result0 = serverUtils.getBlock(blockFlow, block.hash).rightValue
+      result0.conflictedTxs is Some(conflictedTxs)
+
+      val result1 = serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue
+      result1.block.conflictedTxs is Some(conflictedTxs)
+
+      val timeInterval = TimeInterval(block.timestamp, block.timestamp)
+      val result2      = serverUtils.getBlocks(blockFlow, timeInterval).rightValue
+      result2.blocks.flatMap(identity) is AVector(result0)
+
+      val result3 = serverUtils.getRichBlocksAndEvents(blockFlow, timeInterval).rightValue
+      result3.blocksAndEvents.flatMap(identity) is AVector(result1)
+    }
+
+    private def checkBlockWithoutConflictedTxs(block: Block) = {
+      val result0 = serverUtils.getBlock(blockFlow, block.hash).rightValue
+      result0.conflictedTxs.isEmpty is true
+
+      val result1 = serverUtils.getRichBlockAndEvents(blockFlow, block.hash).rightValue
+      result1.block.conflictedTxs.isEmpty is true
+
+      val timeInterval = TimeInterval(block.timestamp, block.timestamp)
+      val result2      = serverUtils.getBlocks(blockFlow, timeInterval).rightValue
+      result2.blocks.flatMap(identity) is AVector(result0)
+
+      val result3 = serverUtils.getRichBlocksAndEvents(blockFlow, timeInterval).rightValue
+      result3.blocksAndEvents.flatMap(identity) is AVector(result1)
+    }
+
+    checkBlockWithoutConflictedTxs(block0)
+    checkBlockWithConflictedTxs(block1, AVector(block1.nonCoinbase.head.id))
+    checkBlockWithConflictedTxs(block2, AVector(block2.nonCoinbase.head.id))
+    checkBlockWithoutConflictedTxs(block3)
+  }
+
+  it should "return correct status if the conflicted tx is only on the fork chain" in new ConflictedTxsFixture {
+    val blockFlow1 = isolatedBlockFlow()
+    addAndCheck(blockFlow1, block1, block2)
+
+    val blocks = (0 until 3).flatMap { _ =>
+      brokerConfig.chainIndexes.map { chainIndex =>
+        val block = emptyBlock(blockFlow1, chainIndex, nextBlockTs)
+        addAndCheck(blockFlow1, block)
+        block
+      }
+    }
+
+    blockFlow.isBlockInMainChainUnsafe(block0.hash) is true
+    blockFlow.isBlockInMainChainUnsafe(block1.hash) is true
+    blockFlow.isBlockInMainChainUnsafe(block2.hash) is true
+    val tx = block1.nonCoinbase.head.id
+    serverUtils.getTransactionStatus(blockFlow, tx, block1.chainIndex).rightValue is a[Conflicted]
+
+    addAndCheck(blockFlow, blocks: _*)
+    blockFlow.isBlockInMainChainUnsafe(block0.hash) is false
+    blockFlow.isBlockInMainChainUnsafe(block1.hash) is true
+    blockFlow.isBlockInMainChainUnsafe(block2.hash) is true
+    serverUtils.getTransactionStatus(blockFlow, tx, block1.chainIndex).rightValue is a[Confirmed]
+  }
+
+  it should "return empty rich inputs for conflicted txs" in new ConflictedTxsFixture {
+    private def checkTx(tx: Transaction) = {
+      val result = serverUtils.getTransaction(blockFlow, tx.id, None, None).rightValue
+      result.unsigned.inputs.isEmpty is false
+      result.unsigned.fixedOutputs.isEmpty is false
+      result is api.Transaction.fromProtocol(tx)
+    }
+
+    val tx0 = block0.nonCoinbase.head
+    val tx1 = block1.nonCoinbase.head
+    val tx2 = block2.nonCoinbase.head
+
+    checkTx(tx0)
+    checkTx(tx1)
+    checkTx(tx2)
+
+    val richTx0     = serverUtils.getRichTransaction(blockFlow, tx0.id, None, None).rightValue
+    val richInputs0 = serverUtils.getRichAssetInputs(blockFlow, tx0, block0.hash).rightValue
+    richTx0 is api.RichTransaction.from(tx0, richInputs0, AVector.empty)
+
+    val richTx1 = serverUtils.getRichTransaction(blockFlow, tx1.id, None, None).rightValue
+    richTx1 is api.RichTransaction.from(tx1, richInputs0, AVector.empty)
+
+    val richTx2 = serverUtils.getRichTransaction(blockFlow, tx2.id, None, None).rightValue
+    richTx2 is api.RichTransaction.from(tx2, AVector.empty, AVector.empty)
+  }
+
   it should "get rich transaction that spends asset output" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.node.indexes.tx-output-ref-index", "true")
@@ -5081,8 +5498,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val transaction = block1.nonCoinbase.head
     val richInput = {
       transaction.unsigned.inputs.length is 1
-      val input = transaction.unsigned.inputs.head
-      RichInput.from(input, outputToBeSpent.asInstanceOf[model.AssetOutput])
+      val input   = transaction.unsigned.inputs.head
+      val txIdRef = serverUtils.getTxIdFromOutputRef(blockFlow, input.outputRef).rightValue
+      RichInput.from(input, outputToBeSpent.asInstanceOf[model.AssetOutput], txIdRef)
     }
     val richTransaction = RichTransaction.from(transaction, AVector(richInput), AVector.empty)
 
@@ -5155,13 +5573,15 @@ class ServerUtilsSpec extends AlephiumSpec {
     val scriptTransaction = scriptBlock.nonCoinbase.head
     val richAssetInput = {
       scriptTransaction.unsigned.inputs.length is 1
-      val input = scriptTransaction.unsigned.inputs.head
-      RichInput.from(input, assetOutputToBeSpent.asInstanceOf[model.AssetOutput])
+      val input   = scriptTransaction.unsigned.inputs.head
+      val txIdRef = serverUtils.getTxIdFromOutputRef(blockFlow, input.outputRef).rightValue
+      RichInput.from(input, assetOutputToBeSpent.asInstanceOf[model.AssetOutput], txIdRef)
     }
     val richContractInput = {
       scriptTransaction.contractInputs.length is 1
-      val input = scriptTransaction.contractInputs.head
-      RichInput.from(input, contractOutputToBeSpent.asInstanceOf[model.ContractOutput])
+      val input   = scriptTransaction.contractInputs.head
+      val txIdRef = serverUtils.getTxIdFromOutputRef(blockFlow, input).rightValue
+      RichInput.from(input, contractOutputToBeSpent.asInstanceOf[model.ContractOutput], txIdRef)
     }
     val richTransaction =
       RichTransaction.from(scriptTransaction, AVector(richAssetInput), AVector(richContractInput))
@@ -5178,12 +5598,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
       .rightValue is richTransaction
 
+    val height = if (hardFork.isDanubeEnabled()) 4 else 3
     val richBlockAndEvents = {
       val richTxs = scriptBlock.transactions
         .mapE(tx => serverUtils.getRichTransaction(blockFlow, tx, scriptBlock.hash))
         .rightValue
       RichBlockAndEvents(
-        RichBlockEntry.from(scriptBlock, 3, richTxs).rightValue,
+        RichBlockEntry.from(scriptBlock, height, richTxs, None).rightValue,
         AVector(ContractEventByBlockHash(scriptTransaction.id, contractAddress, 0, AVector.empty))
       )
     }
@@ -5487,34 +5908,44 @@ class ServerUtilsSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block)
     }
     val lockupScript = LockupScript.p2pkh(publicKey)
+    val assetAddress = Address.from(lockupScript)
+    val apiAddress   = api.Address.from(lockupScript)
     blockFlow.getUTXOs(lockupScript, Int.MaxValue, true).rightValue.length is 10
 
     val serverUtils0 = createServerUtils(9)
-    serverUtils0.getBalance(blockFlow, Address.from(lockupScript), true).leftValue.detail is
+    serverUtils0.getBalance(blockFlow, apiAddress, true).leftValue.detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
-    serverUtils0.getUTXOsIncludePool(blockFlow, Address.from(lockupScript)).leftValue.detail is
+    serverUtils0
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript), true)
+      .leftValue
+      .detail is
       "Your address has too many UTXOs and exceeds the API limit. Please consolidate your UTXOs, or run your own full node with a higher API limit."
+    serverUtils0
+      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript), false)
+      .rightValue
+      .utxos
+      .length is 9
 
     val serverUtils1 = createServerUtils(10)
     serverUtils1
-      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .getBalance(blockFlow, apiAddress, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
     serverUtils1
-      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .getUTXOsIncludePool(blockFlow, assetAddress, true)
       .rightValue
       .utxos
       .length is 10
 
     val serverUtils2 = createServerUtils(11)
     serverUtils2
-      .getBalance(blockFlow, Address.from(lockupScript), true)
+      .getBalance(blockFlow, apiAddress, true)
       .rightValue
       .balance
       .value is ALPH.alph(10)
     serverUtils2
-      .getUTXOsIncludePool(blockFlow, Address.from(lockupScript))
+      .getUTXOsIncludePool(blockFlow, assetAddress, true)
       .rightValue
       .utxos
       .length is 10
@@ -5558,6 +5989,759 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"Contract code hash: ${codeHash.toHexString} not found"
     createContract(code, AVector.empty, AVector.empty)._2
     serverUtils.getContractCode(blockFlow, codeHash) is Right(statefulContract)
+  }
+
+  it should "run unit tests" in new Fixture {
+    val serverUtils = new ServerUtils
+
+    def test(code: String, compilerOptions: Option[CompilerOptions] = None): Option[String] = {
+      val project = api.Compile.Project(code, compilerOptions)
+      serverUtils.compileProject(blockFlow, project).rightValue.testError
+    }
+
+    {
+      val now = TimeStamp.now()
+
+      def code(blockTimeStamp: TimeStamp) =
+        s"""
+           |Contract Foo(@unused v: U256) {
+           |  pub fn foo() -> U256 {
+           |    return blockTimeStamp!()
+           |  }
+           |  test "foo"
+           |  with blockTimeStamp = ${now.millis}
+           |  before Self(0) {
+           |    testCheck!(foo() == ${blockTimeStamp.millis})
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code(now)).isEmpty is true
+      test(code(TimeStamp.zero)).value is
+        s"""|-- error (9:5): Testing error
+            |9 |    testCheck!(foo() == 0)
+            |  |    ^^^^^^^^^^^^^^^^^^^^^^
+            |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: left(U256(${now.millis})) is not equal to right(U256(0))
+            |""".stripMargin
+    }
+
+    {
+      def code(result: Int) =
+        s"""
+           |Contract Foo(bar0: Bar, bar1: Bar) {
+           |  pub fn add() -> U256 {
+           |    return bar0.value() + bar1.value()
+           |  }
+           |  test "add"
+           |  before Bar(10)@addr0, Bar(20)@addr1, Self(addr0, addr1)
+           |  {
+           |    testCheck!(add() == $result)
+           |  }
+           |}
+           |Contract Bar(v: U256) {
+           |  pub fn value() -> U256 {
+           |    return v
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code(30)).isEmpty is true
+      test(code(20)).value is
+        s"""|-- error (9:5): Testing error
+            |9 |    testCheck!(add() == 20)
+            |  |    ^^^^^^^^^^^^^^^^^^^^^^^
+            |  |    Test failed: Foo:add, detail: VM execution error: Assertion Failed: left(U256(30)) is not equal to right(U256(20))
+            |""".stripMargin
+    }
+
+    {
+      val fromAddress = generateAddress(ChainIndex.unsafe(0))
+
+      def code(result: String) =
+        s"""
+           |Contract Foo(mut balance: U256) {
+           |  @using(preapprovedAssets = true, assetsInContract = true, checkExternalCaller = false)
+           |  pub fn transfer(from: Address) -> U256 {
+           |    let amount = 1 alph
+           |    transferTokenToSelf!(from, ALPH, 1 alph)
+           |    balance = balance + amount
+           |    return balance
+           |  }
+           |
+           |  test "transfer"
+           |  before Self(0)
+           |  after Self{ALPH: 1.1 alph}(1 alph)
+           |  approve{@$fromAddress -> ALPH: 1 alph} {
+           |    emit Debug(`balance: $${balance}`)
+           |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == $result)
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code("1 alph")).isEmpty is true
+      test(code("2 alph")).value is
+        s"""|-- error (16:5): Testing error
+            |16 |    testCheck!(transfer{callerAddress!() -> ALPH: 1 alph}(callerAddress!()) == 2 alph)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:transfer, detail: VM execution error: Assertion Failed: left(U256(1000000000000000000)) is not equal to right(U256(2000000000000000000))
+            |   |-------------------------------------------------------------------------------------------------------------------------------------------------------------
+            |   |Debug messages:
+            |   |> Contract @ Foo - balance: 0
+            |""".stripMargin
+    }
+
+    {
+      def code(a: Int, b: Int) =
+        s"""
+           |Contract Foo(a: U256, b: U256) extends Base(a, b) {
+           |  pub fn foo() -> U256 { return base() }
+           |  fn base() -> U256 { return a + b }
+           |  fn isSum() -> Bool { return true }
+           |}
+           |Contract Bar(a: U256, b: U256) extends Base(a, b) {
+           |  pub fn bar() -> U256 { return base() }
+           |  fn base() -> U256 { return a - b }
+           |  fn isSum() -> Bool { return false }
+           |}
+           |Abstract Contract Base(a: U256, b: U256) {
+           |  fn isSum() -> Bool
+           |  fn base() -> U256
+           |  test "base" before Self(20, 10) {
+           |    let result = if (isSum()) $a else $b
+           |    testCheck!(base() == result)
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code(30, 10)).isEmpty is true
+      test(code(20, 10)).value is
+        s"""|-- error (17:5): Testing error
+            |17 |    testCheck!(base() == result)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed: left(U256(30)) is not equal to right(U256(20))
+            |""".stripMargin
+      test(code(30, 20)).value is
+        s"""|-- error (17:5): Testing error
+            |17 |    testCheck!(base() == result)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Base:base, detail: VM execution error: Assertion Failed: left(U256(10)) is not equal to right(U256(20))
+            |""".stripMargin
+    }
+
+    {
+      def code(value: String) =
+        s"""
+           |struct Bar {
+           |  mut a: U256,
+           |  mut b: [U256; 2],
+           |  c: [U256; 2]
+           |}
+           |Contract Foo(mut bar: Bar) {
+           |  pub fn foo() -> () {
+           |    bar.a = bar.a + 1
+           |    bar.b[0] = bar.b[0] + 1
+           |  }
+           |  test "foo"
+           |  before Self(Bar { a: 0, b: [0; 2], c: [0; 2] })
+           |  after Self($value) {
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+
+      val correct = "Bar { a: 1, b: [1, 0], c: [0; 2] }"
+      test(code(correct)).isEmpty is true
+      val invalid0 = "Bar { a: 0, b: [1, 0], c: [0; 2] }"
+      test(code(invalid0)).value is
+        s"""|-- error (14:9): Testing error
+            |14 |  after Self(Bar { a: 0, b: [1, 0], c: [0; 2] }) {
+            |   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |        Test failed: Foo:foo, detail: invalid field bar.a, expected U256(0), have: U256(1)
+            |""".stripMargin
+
+      val invalid1 = "Bar { a: 1, b: [1, 1], c: [0; 2] }"
+      test(code(invalid1)).value is
+        s"""|-- error (14:9): Testing error
+            |14 |  after Self(Bar { a: 1, b: [1, 1], c: [0; 2] }) {
+            |   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |        Test failed: Foo:foo, detail: invalid field bar.b[1], expected U256(1), have: U256(0)
+            |""".stripMargin
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo(bar: Bar) {
+           |  @using(checkExternalCaller = false, assetsInContract = enforced)
+           |  pub fn foo() -> () {
+           |    bar.bar()
+           |  }
+           |
+           |  test "foo"
+           |  before Bar{ALPH: 10 alph}(0)@barId, Self(barId)
+           |  after Bar{ALPH: 9 alph}(1)@barId, Self{ALPH: 1.1 alph}(barId)
+           |  {
+           |    foo()
+           |  }
+           |}
+           |Contract Bar(mut value: U256) {
+           |  @using(checkExternalCaller = false, assetsInContract = true)
+           |  pub fn bar() -> () {
+           |    value += 1
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+           |  }
+           |}
+           |""".stripMargin
+      test(code).isEmpty is true
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo" {
+           |    testCheck!(foo() == 1)
+           |  }
+           |}
+           |""".stripMargin
+      val options0 = CompilerOptions(skipTests = Some(true))
+      test(code, Some(options0)).isEmpty is true
+      val options1 = CompilerOptions(skipTests = Some(false))
+      test(code, Some(options1)).isEmpty is false
+    }
+
+    {
+      def code(str: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo0(v: U256) -> () {
+           |    let _ = v / 0
+           |  }
+           |  fn foo1() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo" {
+           |    testFail!($str)
+           |  }
+           |}
+           |""".stripMargin
+
+      Seq("foo0(1)", "1 / foo1()", "foo1() / foo1()").foreach { expr =>
+        test(code(expr)).isEmpty is true
+      }
+
+      test(code("foo1() / 1")).value is
+        s"""|-- error (10:5): Testing error
+            |10 |    testFail!(foo1() / 1)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: the test code did not throw an exception
+            |""".stripMargin
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo0() -> U256 {
+           |    return 0
+           |  }
+           |  pub fn foo1() -> I256 {
+           |    return i256Max!()
+           |  }
+           |  test "foo" {
+           |    testCheck!(randomU256!() >= foo0())
+           |    testCheck!(randomI256!() <= foo1())
+           |  }
+           |}
+           |""".stripMargin
+      test(code).isEmpty is true
+    }
+
+    {
+      def code(testCall: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    return 0
+           |  }
+           |  test "foo" {
+           |    $testCall
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code("testEqual!(foo(), 0)")).isEmpty is true
+      test(code("testEqual!(foo(), 1)")).value is
+        s"""|-- error (7:5): Testing error
+            |7 |    testEqual!(foo(), 1)
+            |  |    ^^^^^^^^^^^^^^^^^^^^
+            |  |    Test failed: Foo:foo, detail: VM execution error: Assertion Failed: left(U256(0)) is not equal to right(U256(1))
+            |""".stripMargin
+    }
+
+    {
+      def code(testCall: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(a: U256, b: U256) -> U256 {
+           |    if (a > b) {
+           |      assert!(a >= 5, 0)
+           |    } else {
+           |      assert!(b >= 5, 1)
+           |    }
+           |    return mulModN!(a, a, b)
+           |  }
+           |  test "foo" {
+           |    $testCall
+           |  }
+           |}
+           |""".stripMargin
+
+      Seq(
+        "testError!(foo(4, 3), 0)",
+        "testError!(foo(3, 4), 1)",
+        "testFail!(foo(9, 0))",
+        "testError!(foo(4, 3), 0)\ntestError!(foo(3, 4), 1)\ntestFail!(foo(9, 0))"
+      ).foreach { testCall =>
+        test(code(testCall)).isEmpty is true
+      }
+      test(code("testError!(foo(4, 3), 1)")).value is
+        s"""|-- error (12:5): Testing error
+            |12 |    testError!(foo(4, 3), 1)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected error code in test. Expected: 1, but got: 0.
+            |""".stripMargin
+      test(code("testError!(foo(3, 4), 0)")).value is
+        s"""|-- error (12:5): Testing error
+            |12 |    testError!(foo(3, 4), 0)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected error code in test. Expected: 0, but got: 1.
+            |""".stripMargin
+      test(code("testError!(foo(9, 0), 1)")).value is
+        s"""|-- error (12:5): Testing error
+            |12 |    testError!(foo(9, 0), 1)
+            |   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+            |   |    Test failed: Foo:foo, detail: VM execution error: Unexpected execution failure in test. Expected error code: 1, but got failure: ArithmeticError((U256(9) * U256(9)) % U256(0)).
+            |""".stripMargin
+    }
+
+    {
+      val code =
+        s"""
+           |Contract TokenVault() {
+           |    @using(preapprovedAssets = true, assetsInContract = true, checkExternalCaller = false)
+           |    pub fn deposit() -> () {
+           |        transferTokenToSelf!(externalCallerAddress!(), ALPH, 2 alph)
+           |    }
+           |
+           |    test "should increase contract balance on deposit"
+           |    before Self{ALPH: 1 alph}()
+           |    after Self{ALPH: 3 alph}()
+           |    approve{address -> ALPH: 2 alph}
+           |    {
+           |        deposit{callerAddress!() -> ALPH: 2 alph}()
+           |    }
+           |}
+           |""".stripMargin
+      test(code).isEmpty is true
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Bank(mut totalDeposits: U256) {
+           |    @using(preapprovedAssets = true, assetsInContract = true, checkExternalCaller = false)
+           |    pub fn deposit(depositor: Address) -> () {
+           |        totalDeposits = totalDeposits + 1 alph
+           |        transferTokenToSelf!(depositor, ALPH, 1 alph)
+           |    }
+           |}
+           |Contract Customer() {
+           |    @using(preapprovedAssets = true, checkExternalCaller = false)
+           |    pub fn makeDeposit(bank: Bank) -> () {
+           |        let depositor = externalCallerAddress!()
+           |        bank.deposit{depositor -> ALPH: 1 alph}(depositor)
+           |    }
+           |    test "customer should be able to make deposit to bank"
+           |    before Bank{ALPH: 0 alph}(0)@bank, Self()
+           |    after Bank{ALPH: 1 alph}(1 alph)@bank, Self()
+           |    approve{address -> ALPH: 1 alph}
+           |    {
+           |        makeDeposit{callerAddress!() -> ALPH: 1 alph}(bank)
+           |    }
+           |}
+           |""".stripMargin
+      test(code).isEmpty is true
+    }
+
+    {
+      def code(times: Int) =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false, updateFields = true)
+           |  pub fn foo(num: U256) -> () {
+           |    for (let mut i = 0; i < num; i += 1) {
+           |      map.insert!(i, i)
+           |    }
+           |  }
+           |
+           |  test "foo"
+           |  approve{address -> ALPH: 1 alph} {
+           |    foo($times)
+           |  }
+           |}
+           |""".stripMargin
+      test(code(1)).isEmpty is true
+      test(code(2)).isEmpty is true
+      test(code(3)).isEmpty is true
+      test(code(4)).value.contains("Insufficient funds to cover the minimum amount") is true
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |
+           |  test "random address" {
+           |    let address0 = randomContractAddress!()
+           |    testCheck!(!isAssetAddress!(address0))
+           |    testCheck!(isContractAddress!(address0))
+           |
+           |    let address1 = randomAssetAddress!()
+           |    testCheck!(isAssetAddress!(address1))
+           |    testCheck!(!isContractAddress!(address1))
+           |  }
+           |}
+           |""".stripMargin
+      test(code).isEmpty is true
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo(parent: Address, mut amount: U256) {
+           |  @using(updateFields = true)
+           |  pub fn foo() -> () {
+           |    checkCaller!(callerAddress!() == parent, 0)
+           |    amount += 1
+           |  }
+           |  test "foo" with updateImmFields = true {
+           |    testEqual!(amount, 0)
+           |    parent = randomContractAddress!()
+           |    testError!(foo(), 0)
+           |    testEqual!(amount, 0)
+           |
+           |    parent = selfAddress!()
+           |    foo()
+           |    testEqual!(amount, 1)
+           |  }
+           |}
+           |""".stripMargin
+      test(code).isEmpty is true
+    }
+  }
+
+  it should "handle test error properly" in new Fixture {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn f0() -> U256 {
+         |    return f1()
+         |  }
+         |
+         |  fn f1() -> U256 {
+         |    assert!(false, 0)
+         |    return 0
+         |  }
+         |
+         |  test "f0" {
+         |    testError!(f0(), 0)
+         |    testFail!(f0())
+         |  }
+         |}
+         |""".stripMargin
+    val serverUtils = new ServerUtils
+    serverUtils
+      .compileProject(blockFlow, api.Compile.Project(code))
+      .rightValue
+      .testError
+      .isEmpty is true
+  }
+
+  it should "support auto fund in test-contract endpoint" in {
+    new Fixture {
+      info("success if the dust amount is not specified")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+           |  pub fn foo() -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 0.1 alph)
+           |    map.insert!(0, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val testContractParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      serverUtils.runTestContract(blockFlow, testContractParams).isRight is true
+    }
+
+    new Fixture {
+      info("fail if the dust amount is not enough")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn foo() -> () {
+           |    map.insert!(0, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val testContractParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneNanoAlph)))),
+        dustAmount = Some(Amount(ALPH.oneNanoAlph))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      serverUtils
+        .runTestContract(blockFlow, testContractParams)
+        .leftValue
+        .detail
+        .contains(
+          "Insufficient funds to cover the minimum amount for contract UTXO"
+        ) is true
+    }
+
+    new Fixture {
+      info("fail if exceeds max retry times")
+      setHardForkSince(HardFork.Danube)
+      val contract =
+        s"""
+           |Contract Foo() {
+           |  mapping[U256, U256] map
+           |
+           |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+           |  pub fn foo(num: U256) -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 0.1 alph)
+           |    for (let mut i = 0; i < num; i += 1) {
+           |      map.insert!(i, i)
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      val assetAddress = Address.p2pkh(genesisKeys.head._2)
+      val code         = Compiler.compileContract(contract).toOption.get
+      val baseParams = TestContract(
+        bytecode = code,
+        inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.alph(2)))))
+      ).toComplete().rightValue
+      val serverUtils = new ServerUtils()
+      (0 to 3).map(v => AVector[Val](ValU256(U256.unsafe(v)))).foreach { args =>
+        val params = baseParams.copy(testArgs = args)
+        serverUtils.runTestContract(blockFlow, params).isRight is true
+      }
+      (4 to 6).map(v => AVector[Val](ValU256(U256.unsafe(v)))).foreach { args =>
+        val params = baseParams.copy(testArgs = args)
+        val errorString =
+          "Test failed due to insufficient funds to cover the dust amount. We tried increasing the dust amount to 0.3 ALPH, " +
+            "but at least 0.1 ALPH is still required. Please figure out the exact dust amount needed and specify it using the dustAmount parameter."
+        serverUtils
+          .runTestContract(blockFlow, params)
+          .leftValue
+          .detail
+          .contains(errorString) is true
+      }
+    }
+  }
+
+  trait AutoFundFixture extends ContractFixtureBase {
+    setHardForkSince(HardFork.Danube)
+    val contract =
+      s"""
+         |Contract AutoFundTest() {
+         |  mapping[U256, U256] map
+         |
+         |  @using(checkExternalCaller = false, preapprovedAssets = true, assetsInContract = true)
+         |  pub fn insert(num: U256) -> () {
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+         |    for (let mut i = 0; i < num; i += 1) {
+         |      map.insert!(i, i)
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    val contractId = createContract(contract, AVector.empty, AVector.empty)._2
+
+    val (privKey, pubKey) = chainIndex.from.generateKey
+    val fromAddress       = Address.p2pkh(pubKey)
+    def script(num: Int) =
+      s"""
+         |TxScript Main {
+         |  let autoFundTest = AutoFundTest(#${contractId.toHexString})
+         |  autoFundTest.insert{@${fromAddress.toBase58} -> ALPH: 1 alph}($num)
+         |}
+         |$contract
+         |""".stripMargin
+
+    val (genesisPrivKey, genesisPubKey, _) = genesisKeys(chainIndex.from.value)
+    val destinations = AVector.fill(30)(Destination(fromAddress, Some(Amount(ALPH.cent(10)))))
+    val buildTxQuery = BuildTransferTx(genesisPubKey.bytes, None, destinations)
+    val unsignedTx = serverUtils
+      .buildTransferUnsignedTransaction(blockFlow, buildTxQuery, ExtraUtxosInfo.empty)
+      .rightValue
+    val signedTx = Transaction.from(unsignedTx, genesisPrivKey)
+    addAndCheck(blockFlow, mineWithTxs(blockFlow, chainIndex, AVector(signedTx)))
+    getAlphBalance(blockFlow, fromAddress.lockupScript) is ALPH.alph(3)
+
+    def submitTx(unsignedTx: String): Unit = {
+      val unsigned   = deserialize[UnsignedTransaction](Hex.unsafe(unsignedTx)).rightValue
+      val txTemplate = TransactionTemplate.from(unsigned, privKey)
+      blockFlow.getGrandPool().add(chainIndex, AVector(txTemplate), TimeStamp.now())
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      block.nonCoinbase.head.id is unsigned.id
+      ()
+    }
+  }
+
+  it should "support auto fund in build-script-tx endpoint" in {
+    new AutoFundFixture {
+      info("success if the dust amount is not specified")
+      val code = Compiler.compileTxScript(script(nextInt(0, 3))).rightValue
+      val query = BuildExecuteScriptTx(
+        pubKey.bytes,
+        None,
+        serialize(code),
+        attoAlphAmount = Some(Amount(ALPH.oneAlph))
+      )
+      val result = serverUtils.buildExecuteScriptTx(blockFlow, query).rightValue.unsignedTx
+      submitTx(result)
+    }
+
+    new AutoFundFixture {
+      info("fail if the dust amount is not enough")
+      val code = Compiler.compileTxScript(script(nextInt(7, 9))).rightValue
+      val query0 = BuildExecuteScriptTx(
+        pubKey.bytes,
+        None,
+        serialize(code),
+        attoAlphAmount = Some(Amount(ALPH.oneAlph)),
+        dustAmount = Some(Amount(ALPH.cent(10)))
+      )
+      serverUtils
+        .buildExecuteScriptTx(blockFlow, query0)
+        .leftValue
+        .detail
+        .contains(
+          "Insufficient funds to cover the minimum amount"
+        ) is true
+
+      val query1 = query0.copy(dustAmount = Some(Amount(ALPH.cent(40))))
+      val result = serverUtils.buildExecuteScriptTx(blockFlow, query1).rightValue.unsignedTx
+      submitTx(result)
+    }
+  }
+
+  it should "return events from canonical chain" in new Fixture {
+    val chainIndex         = ChainIndex.unsafe(0, 0)
+    val canonicalBlockHash = randomBlockHash(chainIndex)
+    def contractAddress    = Address.contract(ContractId.random)
+
+    def isCanonical(hash: BlockHash) = Right(hash == canonicalBlockHash)
+    def events(num: Int, blockHash: BlockHash) = {
+      AVector.tabulate(num)(ContractEventByTxId(blockHash, contractAddress, _, AVector.empty))
+    }
+
+    // If empty, return directly
+    val emptyEvents = AVector.empty[ContractEventByTxId]
+    ServerUtils.eventsFromCanonicalChain(emptyEvents, isCanonical) isE emptyEvents
+
+    // If only one block hash, return directly
+    val blockHash = randomBlockHash(chainIndex)
+    forAll(Gen.choose(0, 10)) { num =>
+      val allEvents = events(num, blockHash)
+      ServerUtils.eventsFromCanonicalChain(allEvents, isCanonical) isE allEvents
+    }
+
+    // If not all block hashes are the same, check canonical block hash
+    forAll(Gen.choose(1, 10), Gen.choose(0, 10)) { (num1, num2) =>
+      val canonicalEvents    = events(num1, canonicalBlockHash)
+      val nonCanonicalEvents = events(num2, randomBlockHash(chainIndex))
+      val allEvents          = canonicalEvents ++ nonCanonicalEvents
+      ServerUtils.eventsFromCanonicalChain(allEvents, isCanonical) isE canonicalEvents
+    }
+  }
+
+  it should "create right tx when preapprovedAssets annotation is not on" in new ContractFixture {
+    val (genesisPrivateKey, genesisPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val tokenFaucetCode =
+      s"""
+         |Contract TokenFaucet() {
+         |  @using(assetsInContract = true)
+         |  pub fn withDrawAlph(caller: Address) -> () {
+         |    transferTokenFromSelf!(caller, ALPH, 10 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val tokenFaucetId = createContract(
+      tokenFaucetCode,
+      initialAttoAlphAmount = ALPH.alph(1000),
+      tokenIssuanceInfo = None
+    )._1
+
+    val withdrawCode =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let tokenFaucet = TokenFaucet(#${tokenFaucetId.toHexString})
+         |    tokenFaucet.withDrawAlph(callerAddress!())
+         |  }
+         |}
+         |$tokenFaucetCode
+         |""".stripMargin
+
+    val scriptBytecode = serialize(Compiler.compileTxScript(withdrawCode).rightValue)
+    val result = serverUtils
+      .buildExecuteScriptTx(
+        blockFlow,
+        BuildExecuteScriptTx(
+          fromPublicKey = genesisPublicKey.bytes,
+          bytecode = scriptBytecode,
+          attoAlphAmount = Some(Amount(ALPH.alph(10)))
+        )
+      )
+      .rightValue
+      .asInstanceOf[BuildSimpleExecuteScriptTxResult]
+
+    val signature = SecP256K1.sign(result.txId.bytes, genesisPrivateKey)
+    val submitTx  = SubmitTransaction(result.unsignedTx, signature)
+    val tx        = serverUtils.createTxTemplate(submitTx).rightValue
+    val validator = blockFlow.templateValidator.nonCoinbaseValidation
+
+    validator.validateMempoolTxTemplate(tx, blockFlow) isE ()
   }
 
   @scala.annotation.tailrec
@@ -5614,7 +6798,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    serverUtils.getBalance(blockFlow, address, true) isE Balance.from(
+    serverUtils
+      .getBalance(blockFlow, api.Address.from(address.lockupScript), true) isE Balance.from(
       Amount(amount),
       Amount.Zero,
       None,

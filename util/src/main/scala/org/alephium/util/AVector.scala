@@ -253,6 +253,20 @@ final class AVector[@sp A](
     slice(0, length - m)
   }
 
+  def remove(k: Int): AVector[A] = {
+    assume(k >= 0 && k < length)
+    if (k == 0) {
+      this.tail
+    } else if (k == length - 1) {
+      this.init
+    } else {
+      val arr = new Array[A](length - 1)
+      Array.copy(elems, 0, arr, 0, k)
+      Array.copy(elems, k + 1, arr, k, length - k - 1)
+      AVector.unsafe(arr)
+    }
+  }
+
   def reverse: AVector[A] = {
     if (length < 2) this else _reverse
   }
@@ -263,6 +277,13 @@ final class AVector[@sp A](
     val rightmost = end - 1
     cfor(0)(_ < length, _ + 1) { i => arr(i) = elems(rightmost - i) }
     AVector.unsafe(arr)
+  }
+
+  def foreachReversed[U](f: A => U): Unit = {
+    cfor(end - 1)(_ >= start, _ - 1) { i =>
+      f(elems(i))
+      ()
+    }
   }
 
   def foreach[U](f: A => U): Unit = {
@@ -541,6 +562,25 @@ final class AVector[@sp A](
     Right(None)
   }
 
+  def findReversed(f: A => Boolean): Option[A] = {
+    cfor(end - 1)(_ >= start, _ - 1) { i =>
+      val elem = elems(i)
+      if (f(elem)) return Some(elem)
+    }
+    None
+  }
+
+  def findReversedE[L](f: A => Either[L, Boolean]): Either[L, Option[A]] = {
+    cfor(end - 1)(_ >= start, _ - 1) { i =>
+      val elem = elems(i)
+      f(elem) match {
+        case Left(l)  => return Left(l)
+        case Right(b) => if (b) return Right(Some(elem))
+      }
+    }
+    Right(None)
+  }
+
   def indexWhere(f: A => Boolean): Int = {
     cfor(start)(_ < end, _ + 1) { i => if (f(elems(i))) return i - start }
     -1
@@ -555,6 +595,12 @@ final class AVector[@sp A](
   def sortBy[B](f: A => B)(implicit ord: Ordering[B]): AVector[A] = {
     val arr = toArray
     scala.util.Sorting.quickSort(arr)(ord.on(f))
+    AVector.unsafe(arr)
+  }
+
+  def stableSortBy[B](f: A => B)(implicit ord: Ordering[B]): AVector[A] = {
+    val arr = toArray
+    scala.util.Sorting.stableSort(arr)(ord.on(f))
     AVector.unsafe(arr)
   }
 
@@ -717,7 +763,31 @@ final class AVector[@sp A](
     ArraySeq.unsafeWrapArray(toArray)
   }
 
-  def iterator: Iterator[A] = elems.iterator.slice(start, end)
+  def iterator: Iterator[A] = new Iterator[A] {
+    private var index = start
+
+    def hasNext: Boolean = index < end
+
+    def next(): A = {
+      assume(hasNext)
+      val result = elems(index)
+      index += 1
+      result
+    }
+  }
+
+  def reverseIterator: Iterator[A] = new Iterator[A] {
+    private var index = end - 1
+
+    def hasNext: Boolean = index >= start
+
+    def next(): A = {
+      assume(hasNext)
+      val result = elems(index)
+      index -= 1
+      result
+    }
+  }
 
   def toIterable: Iterable[A] = {
     new Iterable[A] {
@@ -828,6 +898,10 @@ object AVector {
   }
 
   def from[@sp A: ClassTag](elems: IterableOnce[A]): AVector[A] = {
+    unsafe(elems.iterator.toArray)
+  }
+
+  def from[@sp A: ClassTag](elems: Iterable[A]): AVector[A] = {
     unsafe(elems.iterator.toArray)
   }
 

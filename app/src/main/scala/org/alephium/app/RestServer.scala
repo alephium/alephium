@@ -152,7 +152,7 @@ class RestServer(
 
   override def subServices: ArraySeq[Service] = ArraySeq(node, endpointSender)
 
-  private val vertx  = Vertx.vertx()
+  val vertx          = Vertx.vertx()
   private val router = Router.router(vertx)
   vertx
     .fileSystem()
@@ -172,7 +172,6 @@ class RestServer(
     .handler(
       CorsHandler
         .create()
-        .addRelativeOrigin(".*.")
         .allowedMethod(HttpMethod.GET)
         .allowedMethod(HttpMethod.POST)
         .allowedMethod(HttpMethod.PUT)
@@ -201,6 +200,8 @@ class RestServer(
     for {
       binding <- httpBindingPromise.future
       _       <- binding.close().asScala
+      _       <- server.close().asScala
+      _       <- vertx.close().asScala
     } yield {
       logger.info(s"http unbound")
       ()

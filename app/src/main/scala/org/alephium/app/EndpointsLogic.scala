@@ -18,6 +18,7 @@ package org.alephium.app
 
 import java.io.{StringWriter, Writer}
 import java.net.InetAddress
+import java.util.concurrent.Callable
 
 import scala.concurrent._
 
@@ -30,7 +31,7 @@ import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.metrics.prometheus.PrometheusMetrics.prometheusRegistryCodec
 
 import org.alephium.api.{badRequest, notFound, ApiError, Endpoints, Try}
-import org.alephium.api.model.{TransactionTemplate => _, _}
+import org.alephium.api.model.{Address => _, TransactionTemplate => _, _}
 import org.alephium.app.FutureTry
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo}
@@ -55,6 +56,7 @@ trait EndpointsLogic extends Endpoints {
   def miner: ActorRefT[Miner.Command]
   def blocksExporter: BlocksExporter
   def endpointSender: EndpointSender
+  def vertx: io.vertx.core.Vertx
 
   private lazy val blockFlow: BlockFlow                        = node.blockFlow
   private lazy val txHandler: ActorRefT[TxHandler.Command]     = node.allHandlers.txHandler
@@ -170,7 +172,9 @@ trait EndpointsLogic extends Endpoints {
   }
 
   val getRichBlocksAndEventsLogic = serverLogic(getRichBlocksAndEvents) { timeInterval =>
-    Future.successful(serverUtils.getRichBlocksAndEvents(blockFlow, timeInterval))
+    executeBlocking(() => {
+      serverUtils.getRichBlocksAndEvents(blockFlow, timeInterval)
+    })
   }
 
   val getBlockLogic = serverLogic(getBlock) { hash =>
@@ -206,8 +210,10 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.getBalance(blockFlow, address, getMempoolUtxos.getOrElse(true)))
   }
 
-  val getUTXOsLogic = serverLogic(getUTXOs) { address =>
-    Future.successful(serverUtils.getUTXOsIncludePool(blockFlow, address))
+  val getUTXOsLogic = serverLogic(getUTXOs) { case (address, errorIfExceedMaxUtxos) =>
+    Future.successful(
+      serverUtils.getUTXOsIncludePool(blockFlow, address, errorIfExceedMaxUtxos.getOrElse(true))
+    )
   }
 
   val getGroupLogic = serverLogic(getGroup) {
@@ -373,7 +379,9 @@ trait EndpointsLogic extends Endpoints {
       serverUtils
         .buildMultisigAddress(
           buildMultisig.keys,
-          buildMultisig.mrequired
+          buildMultisig.mrequired,
+          buildMultisig.keyTypes,
+          buildMultisig.multiSigType
         )
         .left
         .map(ApiError.BadRequest(_))
@@ -420,7 +428,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
+    bt => Right(Some(bt.fromAddress.toProtocol().groupIndex(brokerConfig)))
   )
 
   val buildSweepMultisigLogic = serverLogicRedirect(buildSweepMultisig)(
@@ -434,7 +442,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
+    bt => Right(Some(bt.fromAddress.toProtocol().groupIndex(brokerConfig)))
   )
 
   val buildMultiInputsTransactionLogic = serverLogicRedirect(buildMultiAddressesTransaction)(
@@ -465,7 +473,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bst => Right(Some(LockupScript.p2pkh(bst.fromPublicKey).groupIndex(brokerConfig)))
+    bst => bst.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
   )
 
   val submitTransactionLogic =
@@ -674,7 +682,7 @@ trait EndpointsLogic extends Endpoints {
   }
 
   val compileProjectLogic = serverLogic(compileProject) { query =>
-    Future.successful(serverUtils.compileProject(query))
+    Future.successful(serverUtils.compileProject(blockFlow, query))
   }
 
   val buildDeployContractTxLogic = serverLogic(buildDeployContractTx) { query =>
@@ -979,6 +987,24 @@ trait EndpointsLogic extends Endpoints {
       case (_, None) =>
         Left(ApiError.BadRequest("`group` parameter is required with multiple brokers"))
     }
+  }
+
+  private def executeBlocking[T](blockingCodeHandler: Callable[T]): Future[T] = {
+    val promise = Promise[T]()
+    vertx.executeBlocking(
+      blockingCodeHandler,
+      false,
+      new io.vertx.core.Handler[io.vertx.core.AsyncResult[T]] {
+        override def handle(ar: io.vertx.core.AsyncResult[T]): Unit = {
+          if (ar.succeeded()) {
+            promise.success(ar.result())
+          } else {
+            promise.failure(ar.cause())
+          }
+        }
+      }
+    )
+    promise.future
   }
 }
 

@@ -376,6 +376,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
           .Build(ProvidedGas(gasOpt, GasPrice(1), None))
           .select(
             AssetAmounts(alph, AVector.from(tokens)),
+            defaultLockupScript,
             defaultUnlockScript,
             utxos,
             outputs.length,
@@ -395,7 +396,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
         val gas = gasOpt.getOrElse(
           GasEstimation.estimateWithSameP2PKHInputs(selectedUtxos.length, outputs.length)
         )
-        valueWithGas isE Selected(selectedUtxos, gas)
+        valueWithGas isE Selected(selectedUtxos, gas, U256.Zero)
       }
 
       def verifyCanSelect(): Assertion = {

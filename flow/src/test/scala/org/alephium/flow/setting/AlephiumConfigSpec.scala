@@ -50,7 +50,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", "12"),
       ("alephium.consensus.mainnet.block-target-time", "11 seconds"),
-      ("alephium.consensus.rhone.block-target-time", "4 seconds")
+      ("alephium.consensus.rhone.block-target-time", "4 seconds"),
+      ("alephium.consensus.danube.block-target-time", "3 seconds")
     )
 
     config.broker.groups is 12
@@ -59,7 +60,11 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.networkId is NetworkId(2)
     config.consensus.mainnet.blockTargetTime is Duration.ofSecondsUnsafe(11)
     config.consensus.rhone.blockTargetTime is Duration.ofSecondsUnsafe(4)
+    config.consensus.danube.blockTargetTime is Duration.ofSecondsUnsafe(3)
     config.network.connectionBufferCapacityInByte is 100000000L
+    config.network.syncPeerSampleSizeV1 is 3
+    config.network.syncPeerSampleSizeV2 is 5
+    config.network.enableP2pV2 is true
   }
 
   it should "load mainnet config" in {
@@ -83,10 +88,13 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.lemanHardForkTimestamp is TimeStamp.unsafe(1680170400000L)
     config.genesisBlocks.flatMap(_.map(_.shortHex)).mkString("-") is
       "634cb950-2c637231-2a7b9072-077cd3d3-c9844184-ecb22a45-d63f3b36-d392ac97-2c9d4d28-08906609-ced88aaa-b7f0541b-5f78e23c-c7a2b25d-6b8cdade-6fedfc7f"
-    config.network.getHardFork(TimeStamp.now()) is HardFork.Rhone
+    config.network.getHardFork(TimeStamp.now()) is HardFork.Danube
+    config.network.enableP2pV2 is true
 
     config.node.assetTrieCacheMaxByteSize is 200_000_000
     config.node.contractTrieCacheMaxByteSize is 20_000_000
+
+    config.mining.minTaskBroadcastInterval is Duration.unsafe(250)
   }
 
   it should "load rhone config" in {
@@ -109,6 +117,26 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.rhoneHardForkTimestamp is TimeStamp.unsafe(1718186400000L)
   }
 
+  it should "load danube config" in {
+    val rootPath = Files.tmpDir
+    val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
+
+    config.broker.groups is 4
+    config.consensus.danube.numZerosAtLeastInHash is 37
+    config.consensus.danube.blockTargetTime is Duration.ofSecondsUnsafe(8)
+    config.consensus.danube.uncleDependencyGapTime is Duration.ofSecondsUnsafe(4)
+    val initialHashRate =
+      HashRate.from(
+        config.consensus.danube.maxMiningTarget,
+        config.consensus.danube.blockTargetTime
+      )(
+        config.broker
+      )
+    initialHashRate is HashRate.unsafe(new BigInteger("4398054899712"))
+    config.network.networkId is NetworkId.AlephiumMainNet
+    config.network.danubeHardForkTimestamp is TimeStamp.unsafe(1752573600000L)
+  }
+
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", 0),
@@ -126,6 +154,17 @@ class AlephiumConfigSpec extends AlephiumSpec {
       AlephiumConfig.load(buildNewConfig(), "alephium")
     ).getMessage is
       "Invalid timestamp for rhone hard fork"
+  }
+
+  it should "check danube hardfork timestamp" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-id", 0),
+      ("alephium.network.danube-hard-fork-timestamp", 0)
+    )
+    intercept[RuntimeException](
+      AlephiumConfig.load(buildNewConfig(), "alephium")
+    ).getMessage is
+      "Invalid timestamp for danube hard fork"
   }
 
   it should "load bootstrap config" in {
@@ -157,7 +196,11 @@ class AlephiumConfigSpec extends AlephiumSpec {
       "1HMSFdhPpvPybfWLZiHeBxVbnfTc2L6gkVPHfuJWoZrMA"
     )
     val genesisSetting = GenesisSetting(addresses.map { address =>
-      Allocation(Address.asset(address).get, Allocation.Amount(amount), Duration.ofDaysUnsafe(2))
+      Allocation(
+        Address.asset(address).rightValue,
+        Allocation.Amount(amount),
+        Duration.ofDaysUnsafe(2)
+      )
     })
 
     val configs =
@@ -232,7 +275,9 @@ class AlephiumConfigSpec extends AlephiumSpec {
   it should "load if miner's addresses are of correct indexes" in new MinerFixture(
     Seq(0, 1, 2)
   ) {
-    config.mining.minerAddresses.get.toSeq is minerAddresses.map(str => Address.asset(str).get)
+    config.mining.minerAddresses.get.toSeq is minerAddresses.map(str =>
+      Address.asset(str).rightValue
+    )
   }
 
   it should "check root path for mainnet" in {
@@ -387,6 +432,19 @@ class AlephiumConfigSpec extends AlephiumSpec {
     (11 until 18 * 3).foreach { gap =>
       consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Rhone) is
         Difficulty.unsafe(N * (100 + 3 * (gap - 8)) / 100)
+    }
+
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 17, HardFork.Danube) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 18, HardFork.Danube) is
+      Difficulty.unsafe(N * 103 / 100)
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 19, HardFork.Danube) is
+      Difficulty.unsafe(N * 106 / 100)
+    (20 until 18 * 3).foreach { gap =>
+      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap, HardFork.Danube) is
+        Difficulty.unsafe(N * (100 + 3 * (gap - 17)) / 100)
     }
   }
 }

@@ -82,6 +82,8 @@ final case class UnsignedTransaction(
     case (output, outputIndex) =>
       AssetOutputRef.from(output, TxOutputRef.key(id, outputIndex))
   }
+
+  lazy val gasFee: U256 = gasPrice * gasAmount
 }
 
 object UnsignedTransaction {
@@ -159,20 +161,25 @@ object UnsignedTransaction {
       fromUnlockScript: UnlockScript,
       inputs: AVector[(AssetOutputRef, AssetOutput)],
       approvedAttoAlphAmount: U256,
+      extraDustAmount: U256,
       approvedTokens: AVector[(TokenId, U256)],
       gasAmount: GasBox,
       gasPrice: GasPrice
   )(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
-    val approved =
-      TxOutputInfo(fromLockupScript, approvedAttoAlphAmount, approvedTokens, None, None)
-    val approvedAsOutput = buildOutputs(approved)
+    val approvedAsOutput = if (script.entryMethod.usePreapprovedAssets) {
+      val approved =
+        TxOutputInfo(fromLockupScript, approvedAttoAlphAmount, approvedTokens, None, None)
+      buildOutputs(approved)
+    } else {
+      AVector.empty[AssetOutput]
+    }
     for {
       gasFee <- preCheckBuildTx(inputs, gasAmount, gasPrice)
       fixedOutputs <- calculateChangeOutputs(
         fromLockupScript,
         inputs,
         approvedAsOutput,
-        gasFee
+        gasFee.addUnsafe(extraDustAmount)
       )
     } yield {
       UnsignedTransaction(
@@ -240,6 +247,7 @@ object UnsignedTransaction {
       _      <- checkTokenValuesNonZero(outputInfos)
       txOutputs = buildOutputs(outputInfos)
       changeOutputs <- calculateChangeOutputs(fromLockupScript, inputs, txOutputs, gasFee)
+      _             <- checkWithMaxTxOutputNum(txOutputs.length + changeOutputs.length)
     } yield txOutputs -> changeOutputs
   }
 
@@ -398,6 +406,13 @@ object UnsignedTransaction {
     )
   }
 
+  def checkWithMaxTxOutputNum(outputLength: Int): Either[String, Unit] = {
+    check(
+      failCondition = outputLength > ALPH.MaxTxOutputNum,
+      "Too many outputs for the transfer, consider to reduce the amount to send."
+    )
+  }
+
   private def calculateAlphRemainder(
       inputs: AVector[AssetOutput],
       outputs: AVector[AssetOutput],
@@ -503,7 +518,7 @@ object UnsignedTransaction {
   // Note: this would calculate excess dustAmount to cover the complicated cases
   def calculateTotalAmountNeeded(
       outputInfos: AVector[TxOutputInfo]
-  ): Either[String, (U256, AVector[(TokenId, U256)], Int)] = {
+  ): Either[String, TotalAmountNeeded] = {
     outputInfos
       .foldE((U256.Zero, ListMap.empty[TokenId, U256], 0)) {
         case ((totalAlphAmount, totalTokens, totalOutputLength), outputInfo) =>
@@ -522,7 +537,7 @@ object UnsignedTransaction {
         val alphAmountSender   = dustUtxoAmount.mulUnsafe(U256.unsafe(outputLengthSender))
         totalAlphAmount.add(alphAmountSender).toRight("ALPH amount overflow").map {
           finalAlphAmount =>
-            (
+            TotalAmountNeeded(
               finalAlphAmount,
               AVector.from(totalTokens.iterator),
               totalOutputLength + outputLengthSender
@@ -612,5 +627,11 @@ object UnsignedTransaction {
   final case class UnlockScriptWithAssets(
       fromUnlockScript: UnlockScript,
       assets: AVector[(AssetOutputRef, AssetOutput)]
+  )
+
+  final case class TotalAmountNeeded(
+      alphAmount: U256,
+      tokens: AVector[(TokenId, U256)],
+      outputLength: Int
   )
 }

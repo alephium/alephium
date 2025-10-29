@@ -25,11 +25,14 @@ class I256Spec extends AlephiumSpec {
   val numGen = (0L to 3L).flatMap { i =>
     val n = BigInteger.valueOf(i)
     List(
+      n,
       n.subtract(BigInteger.ONE),
       I256.MinValue.toBigInt.add(n),
       I256.MinValue.divUnsafe(I256.Two).toBigInt.add(n),
+      I256.MinValue.divUnsafe(I256.Two).toBigInt.subtract(n),
       I256.MaxValue.toBigInt.subtract(n),
       I256.MaxValue.divUnsafe(I256.Two).toBigInt.add(n),
+      I256.MaxValue.divUnsafe(I256.Two).toBigInt.subtract(n),
       SecureAndSlowRandom.nextI256().toBigInt,
       SecureAndSlowRandom.nextI256().toBigInt
     )
@@ -253,5 +256,211 @@ class I256Spec extends AlephiumSpec {
     forAll(Gen.choose(-10, -2), Gen.choose(256, 500)) { case (base, exp) =>
       I256.unsafe(base).pow(U256.unsafe(exp)) is None
     }
+  }
+
+  def testBitwise(
+      op: (I256, I256) => I256,
+      opExpected: (BigInteger, BigInteger) => BigInteger
+  ): Unit = {
+    for {
+      a <- numGen
+      b <- numGen
+    } {
+      val aI256 = I256.unsafe(a)
+      val bI256 = I256.unsafe(b)
+      op(aI256, bI256).toBigInt is opExpected(aI256.toBigInt, bI256.toBigInt)
+    }
+  }
+
+  it should "test bit_and" in {
+    testBitwise(_.bitAnd(_), _.and(_))
+  }
+
+  it should "test bit_or" in {
+    testBitwise(_.bitOr(_), _.or(_))
+  }
+
+  it should "test xor" in {
+    testBitwise(_.xor(_), _.xor(_))
+  }
+
+  it should "test shift" in {
+    for {
+      x <- numGen
+      n <- Seq(0, 1, 2, 8, 16, 64, 255, 256, Int.MaxValue).map(U256.unsafe) ++ numGen.map(n =>
+        U256.unsafe(n.max(BigInteger.ZERO))
+      )
+    } {
+      val xI256    = I256.unsafe(x)
+      val nBounded = if (n > U256.unsafe(512)) 512 else n.toBigInt.intValue()
+
+      // For left shift, we need to check if the result is valid
+      val expectedShl = x.multiply(BigInteger.TWO.pow(nBounded))
+      if (I256.validate(expectedShl)) {
+        xI256.shl(n).map(_.toBigInt) is Some(expectedShl)
+      } else {
+        xI256.shl(n) is None
+      }
+
+      // Right shift should always be valid
+      val expectedShr = x.divide(BigInteger.TWO.pow(nBounded))
+      xI256.shr(n).toBigInt is expectedShr
+    }
+  }
+
+  it should "test shift with edge cases" in {
+    // Test shl with zero shift amount
+    I256.Zero.shl(U256.Zero).value is I256.Zero
+    I256.One.shl(U256.Zero).value is I256.One
+    I256.NegOne.shl(U256.Zero).value is I256.NegOne
+    I256.MinValue.shl(U256.Zero).value is I256.MinValue
+    I256.MaxValue.shl(U256.Zero).value is I256.MaxValue
+
+    // Test shl with one shift amount
+    I256.Zero.shl(U256.One).value is I256.unsafe(0)
+    I256.One.shl(U256.One).value is I256.unsafe(2)
+    I256.NegOne.shl(U256.One).value is I256.unsafe(-2)
+    I256.MinValue.shl(U256.One) is None
+    I256.MaxValue.shl(U256.One) is None
+
+    // Test shl with 255 shift amount
+    I256.Zero.shl(U256.unsafe(255)).value is I256.unsafe(0)
+    I256.One.shl(U256.unsafe(255)) is None
+    I256.NegOne.shl(U256.unsafe(255)).value is I256.MinValue
+    I256.MinValue.shl(U256.unsafe(255)) is None
+    I256.MaxValue.shl(U256.unsafe(255)) is None
+
+    // Test shl with 254 shift amount
+    I256.Zero.shl(U256.unsafe(254)).value is I256.unsafe(0)
+    I256.One.shl(U256.unsafe(254)).value is I256.unsafe(BigInteger.ONE.shiftLeft(254))
+    I256.NegOne.shl(U256.unsafe(254)).value is I256.unsafe(BigInteger.ONE.shiftLeft(254).negate())
+    I256.MinValue.shl(U256.unsafe(254)) is None
+    I256.MaxValue.shl(U256.unsafe(254)) is None
+
+    // Test shl with 256 shift amount
+    I256.Zero.shl(U256.unsafe(256)).value is I256.unsafe(0)
+    I256.One.shl(U256.unsafe(256)) is None
+    I256.NegOne.shl(U256.unsafe(256)) is None
+    I256.MinValue.shl(U256.unsafe(256)) is None
+    I256.MaxValue.shl(U256.unsafe(256)) is None
+
+    // Test shl with max shift amount
+    I256.Zero.shl(U256.MaxValue).value is I256.Zero
+    I256.One.shl(U256.MaxValue) is None
+    I256.NegOne.shl(U256.MaxValue) is None
+    I256.MinValue.shl(U256.MaxValue) is None
+    I256.MaxValue.shl(U256.MaxValue) is None
+
+    // Test shr with zero shift amount
+    I256.Zero.shr(U256.Zero) is I256.Zero
+    I256.One.shr(U256.Zero) is I256.One
+    I256.NegOne.shr(U256.Zero) is I256.NegOne
+    I256.MinValue.shr(U256.Zero) is I256.MinValue
+    I256.MaxValue.shr(U256.Zero) is I256.MaxValue
+
+    // Test shr with one shift amount
+    I256.Zero.shr(U256.One) is I256.unsafe(0)
+    I256.One.shr(U256.One) is I256.unsafe(0)
+    I256.Two.shr(U256.One) is I256.unsafe(1)
+    I256.NegOne.shr(U256.One) is I256.unsafe(0)
+    I256.MinValue.shr(U256.One) is I256.unsafe(BigInteger.ONE.shiftLeft(254).negate())
+    I256.MaxValue.shr(U256.One) is I256.unsafe(
+      BigInteger.ONE.shiftLeft(254).subtract(BigInteger.ONE)
+    )
+
+    // Test shr with 255 shift amount
+    I256.Zero.shr(U256.unsafe(255)) is I256.unsafe(0)
+    I256.One.shr(U256.unsafe(255)) is I256.unsafe(0)
+    I256.NegOne.shr(U256.unsafe(255)) is I256.unsafe(0)
+    I256.MinValue.shr(U256.unsafe(255)) is I256.unsafe(-1)
+    I256.MaxValue.shr(U256.unsafe(255)) is I256.unsafe(0)
+
+    // Test shr with 254 shift amount
+    I256.Zero.shr(U256.unsafe(254)) is I256.unsafe(0)
+    I256.One.shr(U256.unsafe(254)) is I256.unsafe(0)
+    I256.NegOne.shr(U256.unsafe(254)) is I256.unsafe(0)
+    I256.MinValue.shr(U256.unsafe(254)) is I256.unsafe(-2)
+    I256.MaxValue.shr(U256.unsafe(254)) is I256.unsafe(1)
+
+    // Test shr with 256 shift amount
+    I256.Zero.shr(U256.unsafe(256)) is I256.unsafe(0)
+    I256.One.shr(U256.unsafe(256)) is I256.unsafe(0)
+    I256.NegOne.shr(U256.unsafe(256)) is I256.unsafe(0)
+    I256.MinValue.shr(U256.unsafe(256)) is I256.unsafe(0)
+    I256.MaxValue.shr(U256.unsafe(256)) is I256.unsafe(0)
+
+    // Test shr with max shift amount
+    I256.Zero.shr(U256.MaxValue) is I256.Zero
+    I256.One.shr(U256.MaxValue) is I256.Zero
+    I256.NegOne.shr(U256.MaxValue) is I256.Zero
+    I256.MinValue.shr(U256.MaxValue) is I256.Zero
+    I256.MaxValue.shr(U256.MaxValue) is I256.Zero
+
+    // Test shr rounding
+    I256.unsafe(-1).shr(U256.One) is I256.unsafe(0)
+    I256.unsafe(-2).shr(U256.One) is I256.unsafe(-1)
+    I256.unsafe(-3).shr(U256.One) is I256.unsafe(-1)
+    I256.unsafe(1).shr(U256.One) is I256.unsafe(0)
+    I256.unsafe(2).shr(U256.One) is I256.unsafe(1)
+    I256.unsafe(3).shr(U256.One) is I256.unsafe(1)
+  }
+
+  it should "test roundInfinityDiv" in {
+    test(
+      _.roundInfinityDiv(_),
+      _.roundInfinityDivUnsafe(_),
+      (a, b) => {
+        val sameSign = (a.signum() >= 0 && b.signum() > 0) || (a.signum() <= 0 && b.signum() < 0)
+        val absA     = a.abs()
+        val absB     = b.abs()
+        val res      = absA.add(absB).subtract(BigInteger.ONE).divide(absB)
+        if (sameSign) res else res.negate()
+      },
+      (a, b) =>
+        b != BigInteger.ZERO && !(a.equals(I256.lowerBound) && b.equals(I256.NegOne.toBigInt))
+    )
+
+    I256.One.roundInfinityDiv(I256.Zero) is None
+    I256.MinValue.roundInfinityDiv(I256.NegOne) is None
+
+    I256.Zero.roundInfinityDiv(I256.One) is Some(I256.Zero)
+    I256.MaxValue.roundInfinityDiv(I256.NegOne) is Some(I256.MinValue.addUnsafe(I256.One))
+
+    I256.One.roundInfinityDiv(I256.MaxValue) is Some(I256.One)
+    I256.One.roundInfinityDiv(I256.MinValue) is Some(I256.NegOne)
+    I256.NegOne.roundInfinityDiv(I256.MaxValue) is Some(I256.NegOne)
+    I256.NegOne.roundInfinityDiv(I256.MinValue) is Some(I256.One)
+
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue) is Some(I256.unsafe(3))
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.One)) is Some(I256.unsafe(2))
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.Two)) is Some(I256.unsafe(2))
+    I256.MaxValue.roundInfinityDiv(I256.MaxValue.subUnsafe(I256.One)) is Some(I256.unsafe(2))
+
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue.negateUnsafe()) is Some(I256.unsafe(-3))
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.One).negateUnsafe()) is Some(
+      I256.unsafe(-2)
+    )
+    I256.MaxValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.Two).negateUnsafe()) is Some(
+      I256.unsafe(-2)
+    )
+    I256.MaxValue.roundInfinityDiv(I256.MaxValue.subUnsafe(I256.One).negateUnsafe()) is Some(
+      I256.unsafe(-2)
+    )
+
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue) is Some(I256.unsafe(-3))
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.One)) is Some(I256.unsafe(-2))
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.Two)) is Some(I256.unsafe(-2))
+    I256.MinValue.roundInfinityDiv(I256.MinValue.addUnsafe(I256.One)) is Some(I256.unsafe(2))
+
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue.negateUnsafe()) is Some(I256.unsafe(3))
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.One).negateUnsafe()) is Some(
+      I256.unsafe(2)
+    )
+    I256.MinValue.roundInfinityDiv(I256.HalfMaxValue.addUnsafe(I256.Two).negateUnsafe()) is Some(
+      I256.unsafe(2)
+    )
+    I256.MinValue.roundInfinityDiv(I256.MinValue.addUnsafe(I256.One).negateUnsafe()) is Some(
+      I256.unsafe(-2)
+    )
   }
 }

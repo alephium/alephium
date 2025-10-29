@@ -38,7 +38,7 @@ import org.alephium.util.{AVector, Duration, U256}
 package object conf {
 
   implicit val nameMapper: NameMapper = new NameMapper {
-    private lazy val r = "((?<=[a-z0-9])[A-Z]|(?<=[a-zA-Z])[0-9]|(?!^)[A-Z](?=[a-z]))".r
+    private lazy val r = "((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))".r
 
     /** Maps from a camelCasedName to a hyphenated-name
       */
@@ -123,11 +123,9 @@ package object conf {
 
   implicit val contractAddressValueReader: ValueReader[Address.Contract] = {
     ValueReader[String].map { str =>
-      Address.fromBase58(str) match {
-        case Some(address: Address.Contract) =>
-          address
-        case _ =>
-          throw new ConfigException.BadValue("ContractAddress", "oops")
+      Address.contract(str) match {
+        case Right(address) => address
+        case Left(error)    => throw new ConfigException.BadValue("ContractAddress", error)
       }
     }
   }

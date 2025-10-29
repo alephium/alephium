@@ -44,7 +44,9 @@ trait FlowDifficultyAdjustment {
       nextTimeStamp: TimeStamp
   ): IOResult[Target] = {
     val hardFork = networkConfig.getHardFork(nextTimeStamp)
-    if (hardFork.isRhoneEnabled()) {
+    if (hardFork.isDanubeEnabled()) {
+      getNextHashTargetDanube(chainIndex, deps)
+    } else if (hardFork.isRhoneEnabled()) {
       getNextHashTargetRhone(chainIndex, deps)
     } else if (hardFork.isLemanEnabled()) {
       getNextHashTargetLeman(chainIndex, deps)
@@ -99,14 +101,24 @@ trait FlowDifficultyAdjustment {
   ): IOResult[Target] =
     getNextHashTargetSinceLeman(chainIndex, deps, HardFork.Rhone)(consensusConfigs.rhone)
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def getNextHashTargetDanube(
+      chainIndex: ChainIndex,
+      deps: BlockDeps
+  ): IOResult[Target] =
+    getNextHashTargetSinceLeman(chainIndex, deps, HardFork.Danube)(consensusConfigs.danube)
+
   final def calHeightDiffUnsafe(chainDep: BlockHash, oldTimeStamp: TimeStamp): Int = {
-    val header = getBlockHeaderUnsafe(chainDep)
-    if (header.timestamp <= oldTimeStamp) {
-      0
-    } else {
-      calHeightDiffUnsafe(header.parentHash, oldTimeStamp) + 1
+    @scala.annotation.tailrec
+    def loop(currentHash: BlockHash, acc: Int): Int = {
+      val header = getBlockHeaderUnsafe(currentHash)
+      if (header.timestamp <= oldTimeStamp) {
+        acc
+      } else {
+        loop(header.parentHash, acc + 1)
+      }
     }
+
+    loop(chainDep, 0)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))

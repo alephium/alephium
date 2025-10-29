@@ -16,10 +16,13 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{ContractId, NoIndexModelGenerators}
+import akka.util.ByteString
+
+import org.alephium.crypto.SecP256K1PublicKey
+import org.alephium.protocol.{Checksum, Hash}
+import org.alephium.protocol.model.{ContractId, GroupIndex, NoIndexModelGenerators, ScriptHint}
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, DjbHash, Hex}
 
 class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde correctly" in {
@@ -53,7 +56,7 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     serialize[LockupScript](lock3) is Hex.unsafe(s"03${hash0.toHexString}")
   }
 
-  it should "validate multisig" in {
+  it should "validate p2mpkh" in {
     val hash0 = Hash.random
     val hash1 = Hash.random
 
@@ -74,5 +77,146 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     val lock4 = Hex.unsafe(s"010000")
     deserialize[LockupScript](lock4).leftValue.getMessage
       .startsWith(s"Invalid m in m-of-n multisig") is true
+  }
+
+  it should "validate p2pk" in {
+    val lockupScript = p2pkLockupGen(GroupIndex.unsafe(1)).sample.get
+    lockupScript.groupIndex is lockupScript.scriptHint.groupIndex
+    val publicKeyBytes = serialize(lockupScript.publicKey)
+    val checksum       = Checksum.calcAndSerialize(publicKeyBytes)
+    val groupByte      = ByteString(lockupScript.groupIndex.value.toByte)
+    val bytes =
+      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ checksum ++ groupByte)}")
+    serialize[LockupScript](lockupScript) is bytes
+    deserialize[LockupScript](bytes) isE lockupScript
+
+    (0 until groupConfig.groups).foreach { value =>
+      val groupIndex = GroupIndex.unsafe(value)
+      val p2pk       = LockupScript.p2pk(lockupScript.publicKey, groupIndex)
+      p2pk.groupIndex is groupIndex
+    }
+
+    val invalidChecksum = bytesGen(Checksum.checksumLength).sample.get
+    val invalidBytes =
+      Hex.unsafe(s"04${Hex.toHexString(publicKeyBytes ++ invalidChecksum ++ groupByte)}")
+    deserialize[LockupScript](invalidBytes).leftValue.getMessage
+      .startsWith("Wrong checksum") is true
+  }
+
+  it should "validate p2hmpk" in {
+    val lockupScript = p2hmpkLockupGen(GroupIndex.unsafe(2)).sample.get
+    lockupScript.groupIndex is lockupScript.scriptHint.groupIndex
+    LockupScript.P2HMPK.defaultGroup(lockupScript.p2hmpkHash) is
+      GroupIndex.unsafe(Bytes.toPosInt(lockupScript.p2hmpkHash.bytes.last) % groups)
+
+    val checksum = Checksum.calcAndSerialize(lockupScript.p2hmpkHash.bytes)
+    val bytes = LockupScript.P2HMPKPrefix ++ lockupScript.p2hmpkHash.bytes ++
+      checksum ++ ByteString(lockupScript.groupByte)
+    serialize[LockupScript](lockupScript) is bytes
+    deserialize[LockupScript](bytes) isE lockupScript
+
+    (0 until groupConfig.groups).foreach { value =>
+      val groupIndex = GroupIndex.unsafe(value)
+      val p2hmpk     = LockupScript.p2hmpk(lockupScript.p2hmpkHash, groupIndex)
+      p2hmpk.scriptHint.groupIndex is groupIndex
+      p2hmpk.groupIndex is groupIndex
+    }
+  }
+
+  it should "calculate correct script hint for p2pk address" in {
+    forAll(groupIndexGen) { groupIndex =>
+      forAll(p2pkLockupGen(groupIndex)) { lockupScript0 =>
+        val publicKey = lockupScript0.publicKey
+        lockupScript0.groupIndex is groupIndex
+        lockupScript0.scriptHint.groupIndex is groupIndex
+        lockupScript0.scriptHint.groupIndex.value.toByte is lockupScript0.groupByte
+
+        val defaultGroupIndex = publicKey.defaultGroup
+        val lockupScript1     = LockupScript.p2pk(publicKey, defaultGroupIndex)
+        lockupScript1.scriptHint.groupIndex is defaultGroupIndex
+        lockupScript1.scriptHint.groupIndex.value.toByte is lockupScript1.groupByte
+      }
+    }
+  }
+
+  it should "calculate correct script hint for p2hmpk address" in {
+    forAll(groupIndexGen) { groupIndex =>
+      forAll(p2hmpkLockupGen(groupIndex)) { lockupScript0 =>
+        lockupScript0.groupIndex is groupIndex
+        lockupScript0.scriptHint.groupIndex is groupIndex
+        lockupScript0.scriptHint.groupIndex.value.toByte is lockupScript0.groupByte
+
+        val defaultGroupIndex = LockupScript.P2HMPK.defaultGroup(lockupScript0.p2hmpkHash)
+        val lockupScript1     = LockupScript.P2HMPK(lockupScript0.p2hmpkHash, defaultGroupIndex)
+        lockupScript1.scriptHint.groupIndex is defaultGroupIndex
+        lockupScript1.scriptHint.groupIndex.value.toByte is lockupScript1.groupByte
+      }
+    }
+  }
+
+  it should "only modify the MSB of the public key's script hint" in {
+    val publicKey   = PublicKeyLike.SecP256K1(SecP256K1PublicKey.generate)
+    val initialHint = ScriptHint.fromHash(DjbHash.intHash(publicKey.rawBytes))
+    (0 until groupConfig.groups).foreach { groupIndex =>
+      val lockupScript = LockupScript.p2pk(publicKey, GroupIndex.unsafe(groupIndex))
+      lockupScript.scriptHint.groupIndex.value is groupIndex
+      (lockupScript.scriptHint.value & 0x00ffffff) is (initialHint.value & 0x00ffffff)
+    }
+  }
+
+  it should "only modify the MSB of p2hmpk hash's script hint" in {
+    val p2hmpkHash  = Hash.random
+    val initialHint = ScriptHint.fromHash(DjbHash.intHash(p2hmpkHash.bytes))
+    (0 until groupConfig.groups).foreach { groupIndex =>
+      val lockupScript = LockupScript.p2hmpk(p2hmpkHash, GroupIndex.unsafe(groupIndex))
+      lockupScript.scriptHint.groupIndex.value is groupIndex
+      (lockupScript.scriptHint.value & 0x00ffffff) is (initialHint.value & 0x00ffffff)
+    }
+  }
+
+  it should "decode from base58 string" in {
+    import LockupScript.fromBase58
+    fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3").isRight is true
+    fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa").isRight is true
+    fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr").isRight is true
+    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L").leftValue.startsWith(
+      "Expected a grouped address, but got a groupless one"
+    ) is true
+    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3L:0").isRight is true
+    fromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85:0").leftValue.startsWith(
+      "Invalid grouped address"
+    ) is true
+    fromBase58("2iMUVF9XEf7TkCK1gAvfv9HrG4B7qWSDa93p5Xa8D6A85").leftValue.startsWith(
+      "Expected a grouped address, but got a groupless one"
+    ) is true
+    fromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU:2").isRight is true
+    fromBase58("Ce1C6bXL68C474bJY7DKYihKPAoM6GZaoCtSidBmMWCE4JGzdU").leftValue.startsWith(
+      "Expected a grouped address, but got a groupless one"
+    ) is true
+    fromBase58(":1").leftValue.startsWith("Invalid base58 string") is true
+    fromBase58("1C2:1").leftValue.startsWith("Invalid grouped address") is true
+    fromBase58("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3:0").leftValue.startsWith(
+      "Invalid grouped address"
+    ) is true
+    fromBase58("je9CrJD444xMSGDA2yr1XMvugoHuTc6pfYEaPYrKLuYa:0").leftValue.startsWith(
+      "Invalid grouped address"
+    ) is true
+    fromBase58("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr:0").leftValue.startsWith(
+      "Invalid grouped address"
+    ) is true
+    fromBase58("3ccJ8aEBYKBPJKuk6b9yZ1W1oFDYPesa3qQeM8v9jhaJtbSaueJ3").leftValue.startsWith(
+      "Invalid address"
+    ) is true
+
+    LockupScript.asset("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3").isRight is true
+    LockupScript
+      .asset("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr")
+      .leftValue
+      .startsWith("Expected an asset address, but got a contract address") is true
+    LockupScript.p2c("22sTaM5xer7h81LzaGA2JiajRwHwECpAv9bBuFUH5rrnr").isRight is true
+    LockupScript
+      .p2c("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3")
+      .leftValue
+      .startsWith("Expected a contract address, but got an asset address") is true
   }
 }

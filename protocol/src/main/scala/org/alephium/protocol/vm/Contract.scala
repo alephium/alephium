@@ -26,7 +26,7 @@ import akka.util.ByteString
 import org.alephium.io.IOError
 import org.alephium.macros.HashSerde
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{ContractId, HardFork}
+import org.alephium.protocol.model.{Address, ContractId, HardFork}
 import org.alephium.serde
 import org.alephium.serde._
 import org.alephium.util.{AVector, Bytes, EitherF, Hex}
@@ -201,6 +201,25 @@ object Method {
       case _ => None
     }
   }
+
+  def testDefault[Ctx <: StatelessContext](
+      isPublic: Boolean,
+      argsLength: Int,
+      localsLength: Int,
+      returnLength: Int,
+      instrs: AVector[Instr[Ctx]]
+  ): Method[Ctx] = {
+    Method[Ctx](
+      isPublic = isPublic,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
+      usePayToContractOnly = false,
+      argsLength = argsLength,
+      localsLength = localsLength,
+      returnLength = returnLength,
+      instrs = instrs
+    )
+  }
 }
 
 sealed trait Contract[Ctx <: StatelessContext] {
@@ -334,6 +353,26 @@ object StatefulScript {
         )
       )
     )
+
+  def deriveContractAddress(script: StatefulScript): Option[Address.Contract] = {
+    var prevInstr: Option[Instr[StatefulContext]] = None
+    script.methods.flatMap(_.instrs).collectFirst { instr =>
+      val isCallingExternal = instr match {
+        case CallExternalBySelector(_) | CallExternal(_) => true
+        case _                                           => false
+      }
+      if (isCallingExternal) {
+        prevInstr match {
+          case Some(BytesConst(Val.ByteVec(bytes))) =>
+            ContractId.from(bytes).map(Address.contract(_))
+          case _ => None
+        }
+      } else {
+        prevInstr = Some(instr)
+        None
+      }
+    }
+  }
 }
 
 @HashSerde
@@ -561,13 +600,13 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
     if (mutFields.isDefinedAt(index)) {
       Right(mutFields(index))
     } else {
-      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), immFields.length))
+      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), mutFields.length))
     }
   }
 
   def setMutField(index: Int, v: Val): ExeResult[Unit] = {
     if (!mutFields.isDefinedAt(index)) {
-      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), immFields.length))
+      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), mutFields.length))
     } else if (mutFields(index).tpe != v.tpe) {
       failed(InvalidMutFieldType)
     } else {

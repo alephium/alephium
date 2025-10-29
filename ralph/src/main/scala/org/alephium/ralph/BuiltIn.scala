@@ -16,7 +16,11 @@
 
 package org.alephium.ralph
 
+import java.util.Locale
+
 import scala.language.reflectiveCalls
+
+import akka.util.ByteString
 
 import org.alephium.protocol.model.dustUtxoAmount
 import org.alephium.protocol.vm._
@@ -55,6 +59,7 @@ object BuiltIn {
     case object Conversion   extends Category
     case object ByteVec      extends Category
     case object Cryptography extends Category
+    case object Test         extends Category
   }
 
   trait DocUtils {
@@ -171,6 +176,32 @@ object BuiltIn {
         )
     }
 
+    private def multipleInstr[Ctx <: StatelessContext](category: Category) = new {
+      def apply(
+          name: String,
+          argsType: Seq[Type],
+          returnType: Seq[Type],
+          instrs: Seq[Instr[Ctx]],
+          argsName: Seq[(String, String)],
+          retComment: String,
+          doc: String,
+          usePreapprovedAssets: Boolean = false,
+          useAssetsInContract: Ast.ContractAssetsAnnotation = Ast.NotUseContractAssets
+      ): SimpleBuiltIn[Ctx] =
+        SimpleBuiltIn(
+          name,
+          argsType,
+          returnType,
+          instrs,
+          usePreapprovedAssets,
+          UseContractAssetsInfo(useAssetsInContract, usePayToContractOnly = false),
+          category,
+          argsName,
+          retComment,
+          doc
+        )
+    }
+
     private def multipleInstrReturn[Ctx <: StatelessContext](category: Category) = new {
       def apply(
           name: String,
@@ -197,12 +228,14 @@ object BuiltIn {
     }
 
     private[ralph] val cryptography = tag[StatelessContext](Category.Cryptography)
-    private[ralph] val chain        = tag[StatelessContext](Category.Chain)
-    private[ralph] val conversion   = tag[StatelessContext](Category.Conversion)
-    private[ralph] val byteVec      = tag[StatelessContext](Category.ByteVec)
-    private[ralph] val asset        = tag[StatefulContext](Category.Asset)
-    private[ralph] val contract     = tag[StatefulContext](Category.Contract)
-    private[ralph] val subContract  = tag[StatefulContext](Category.SubContract)
+    private[ralph] val cryptographyMultipleInstr =
+      multipleInstr[StatelessContext](Category.Cryptography)
+    private[ralph] val chain       = tag[StatelessContext](Category.Chain)
+    private[ralph] val conversion  = tag[StatelessContext](Category.Conversion)
+    private[ralph] val byteVec     = tag[StatelessContext](Category.ByteVec)
+    private[ralph] val asset       = tag[StatefulContext](Category.Asset)
+    private[ralph] val contract    = tag[StatefulContext](Category.Contract)
+    private[ralph] val subContract = tag[StatefulContext](Category.SubContract)
 
     private[ralph] val chainSimple    = simpleReturn[StatelessContext](Category.Chain)
     private[ralph] val byteVecSimple  = simpleReturn[StatelessContext](Category.ByteVec)
@@ -325,19 +358,41 @@ object BuiltIn {
     SimpleBuiltIn.hash("sha256", Seq(Type.ByteVec), Seq(Type.ByteVec), Sha256)
   val sha3: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.hash("sha3", Seq(Type.ByteVec), Seq(Type.ByteVec), Sha3)
-  val assert: SimpleBuiltIn[StatelessContext] =
-    SimpleBuiltIn.utils(
-      "assert",
-      Seq[Type](Type.Bool, Type.U256),
-      Seq.empty,
-      AssertWithErrorCode,
-      argsName = Seq(
-        "condition" -> "the condition to be checked",
-        "errorCode" -> "the error code to throw if the check fails"
-      ),
-      retComment = "",
-      doc = "Tests the condition or checks invariants."
+  val assert: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] with DocUtils {
+    val name: String = "assert"
+
+    def category: Category            = Category.Utils
+    def usePreapprovedAssets: Boolean = false
+
+    def getReturnType[C <: StatelessContext](
+        inputType: Seq[Type],
+        state: Compiler.State[C]
+    ): Seq[Type] = {
+      if (state.isInTestContext) {
+        throw Compiler.Error("Please use `testCheck!` instead of `assert!` in unit tests", None)
+      }
+      val argsType = Seq[Type](Type.Bool, Type.U256)
+      if (inputType == argsType) {
+        Seq.empty
+      } else {
+        throw Error(
+          s"Invalid args type ${quote(inputType)} for builtin func $name, expected ${quote(argsType)}",
+          None
+        )
+      }
+    }
+    def returnType(selfContractType: Type): Seq[Type] = Seq.empty
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(AssertWithErrorCode)
+
+    def signature: String = s"fn $name!(condition:Bool, errorCode:U256) -> ()"
+    def argsCommentedName: Seq[(String, String)] = Seq(
+      "condition" -> "the condition to be checked",
+      "errorCode" -> "the error code to throw if the check fails"
     )
+    def retComment: String = ""
+    def doc: String        = "Tests the condition or checks invariants."
+  }
   val verifyTxSignature: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
       "verifyTxSignature",
@@ -443,7 +498,7 @@ object BuiltIn {
       Seq(Type.U256),
       BlockTimeStamp,
       Seq(),
-      retComment = "the block timestamp in milliseconds"
+      retComment = "the timestamp of the current block in milliseconds since the Unix epoch"
     )
   val blockTarget: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chainSimple(
@@ -991,7 +1046,7 @@ object BuiltIn {
     val instrs = Seq[Instr[StatelessContext]](
       U256Const1,
       U256Const(Val.U256(U256.unsafe(255))),
-      U256SHL,
+      NumericSHL,
       U256Const1,
       U256Sub,
       U256ToI256
@@ -1012,7 +1067,7 @@ object BuiltIn {
     val instrs = Seq[Instr[StatelessContext]](
       U256Const1,
       U256Const(Val.U256(U256.unsafe(255))),
-      U256SHL,
+      NumericSHL,
       U256Const1,
       U256Sub,
       U256ToI256,
@@ -1080,6 +1135,294 @@ object BuiltIn {
     def doc: String         = "Get the length of an array"
   }
 
+  val verifySignature: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.cryptography(
+      "verifySignature",
+      Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq.empty,
+      VerifySignature,
+      argsName = Seq(
+        "data"          -> "the data that was supposed to have been signed",
+        "publicKey"     -> "the public key of the signer",
+        "signature"     -> "the signature value",
+        "publicKeyType" -> "the type of the public key"
+      ),
+      retComment = "",
+      doc =
+        "(Deprecated) Verifies the signature of the input and public key. This function is deprecated, please use the other specific verify functions instead."
+    )
+
+  val verifySecP256R1: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.cryptographyMultipleInstr(
+      "verifySecP256R1",
+      Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq.empty,
+      Seq[Instr[StatelessContext]](BytesConst(Val.ByteVec(ByteString(1))), VerifySignature),
+      argsName = Seq(
+        "data"      -> "the data (32 bytes) that was supposed to have been signed",
+        "publicKey" -> "the public key (33 bytes) of the signer",
+        "signature" -> "the signature value (64 bytes)"
+      ),
+      retComment = "",
+      doc = "Verifies the SecP256R1 signature of the input data using the provided public key."
+    )
+
+  val verifyWebAuthn: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.cryptographyMultipleInstr(
+      "verifyWebAuthn",
+      Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq.empty,
+      Seq[Instr[StatelessContext]](BytesConst(Val.ByteVec(ByteString(3))), VerifySignature),
+      argsName = Seq(
+        "challenge" -> "The challenge (32 bytes) in the webauthn client data that was supposed to have been signed",
+        "publicKey" -> "the public key (33 bytes) of the signer",
+        "payload"   -> "the WebAuthn payload containing the signature and authenticator data"
+      ),
+      retComment = "",
+      doc = "Verifies a WebAuthn signature for the input challenge using the provided public key."
+    )
+
+  val getSegregatedWebAuthnSignature: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.cryptography(
+      "getSegregatedWebAuthnSignature",
+      Seq.empty,
+      Seq(Type.ByteVec),
+      GetSegregatedWebAuthnSignature,
+      argsName = Seq.empty,
+      retComment =
+        "the segregated WebAuthn payload containing the signature and authenticator data",
+      doc = "Retrieves the segregated WebAuthn signature payload from the current transaction"
+    )
+
+  def randomFunc[T <: Type](
+      funcName: String,
+      retType: T,
+      retTypeStr: String,
+      instr: DevInstr
+  ): BuiltIn[StatelessContext] = {
+    new BuiltIn[StatelessContext] with DocUtils {
+      val name: String = funcName
+
+      def category: Category            = Category.Test
+      def usePreapprovedAssets: Boolean = false
+
+      def getReturnType[C <: StatelessContext](
+          inputType: Seq[Type],
+          state: Compiler.State[C]
+      ): Seq[Type] = {
+        if (inputType.nonEmpty) {
+          throw Compiler.Error(s"Invalid args type for builtin func $funcName", None)
+        }
+        state.checkInTestContext(s"$funcName!", None)
+        Seq(retType)
+      }
+      def returnType(selfContractType: Type): Seq[Type] = Seq(retType)
+
+      def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(instr)
+      def signature: String                        = s"fn $funcName!() -> $retTypeStr"
+      def argsCommentedName: Seq[(String, String)] = Seq.empty
+      def retComment: String = s"a randomly generated $retTypeStr value for testing purposes"
+      def doc: String        = s"Generates a random $retTypeStr value"
+    }
+  }
+
+  sealed trait TestBuiltIn extends BuiltIn[StatelessContext] with DocUtils {
+    def category: Category                            = Category.Test
+    def usePreapprovedAssets: Boolean                 = false
+    def returnType(selfContractType: Type): Seq[Type] = Seq.empty
+
+    def getReturnType[C <: StatelessContext](
+        inputType: Seq[Type],
+        state: Compiler.State[C]
+    ): Seq[Type] = ???
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = ???
+
+    def checkArgs[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Unit
+    override def getReturnType[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Type] = {
+      state.checkInTestContext(s"$name!", None)
+      checkArgs(ast, args, state)
+      Seq.empty
+    }
+
+    protected def genSourcePosIndex[C <: StatelessContext](
+        ast: Ast.Positioned,
+        state: Compiler.State[C]
+    ): Val.U256 = {
+      val sourcePosIndex = state.addTestCheckCall(ast)
+      assume(sourcePosIndex >= 0)
+      Val.U256(U256.unsafe(sourcePosIndex))
+    }
+  }
+
+  val testCheck: BuiltIn[StatelessContext] = new TestBuiltIn {
+    val name: String = "testCheck"
+
+    def checkArgs[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Unit = {
+      val inputType = args.flatMap(_.getType(state))
+      if (inputType != Seq(Type.Bool)) {
+        throw Compiler.Error(
+          s"Invalid args type ${quote(inputType)} for builtin func testCheck",
+          ast.sourceIndex
+        )
+      }
+    }
+
+    override def genCode[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Instr[C]] = {
+      val sourcePosIndex = genSourcePosIndex(ast, state)
+      args match {
+        case Seq(Ast.Binop(TestOperator.Eq, left, right)) =>
+          left.genCode(state) ++ right.genCode(state) ++ Seq(
+            sourcePosIndex.toConstInstr,
+            DevInstr(TestEqual)
+          )
+        case _ =>
+          args.flatMap(_.genCode(state)) ++ Seq(sourcePosIndex.toConstInstr, AssertWithErrorCode)
+      }
+    }
+
+    def signature: String                        = s"fn $name!(condition:Bool) -> ()"
+    def argsCommentedName: Seq[(String, String)] = Seq("condition" -> "the condition to be checked")
+    def retComment: String                       = ""
+    def doc: String                              = "Tests the condition or checks invariants."
+  }
+
+  val testEqual: BuiltIn[StatelessContext] = new TestBuiltIn {
+    val name: String = "testEqual"
+
+    def checkArgs[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Unit = {
+      if (args.length != 2) {
+        throw Compiler.Error(s"Expected 2 arguments, but got ${args.length}", ast.sourceIndex)
+      }
+      val types = args.flatMap(_.getType(state))
+      if (types.length != 2 || types(0) != types(1)) {
+        throw Compiler.Error(
+          s"Invalid args type $types for builtin func testEqual",
+          ast.sourceIndex
+        )
+      }
+    }
+
+    override def genCode[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Instr[C]] = {
+      val sourcePosIndex = genSourcePosIndex(ast, state)
+      args.flatMap(_.genCode(state)) ++ Seq(sourcePosIndex.toConstInstr, DevInstr(TestEqual))
+    }
+
+    def signature: String =
+      s"fn $name!(left: <Bool | U256 | I256 | Address | ByteVec>, right: <Bool | U256 | I256 | Address | ByteVec>) -> ()"
+    def argsCommentedName: Seq[(String, String)] = Seq(
+      "left"  -> "the first value to compare",
+      "right" -> "the second value to compare; must be the same type as `left`"
+    )
+    def retComment: String = ""
+    def doc: String        = "Asserts that the given values are equal."
+  }
+
+  val testFail: BuiltIn[StatelessContext] = new TestBuiltIn {
+    val name: String = "testFail"
+
+    def checkArgs[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Unit = {
+      if (args.length != 1) {
+        throw Compiler.Error(s"Expected 1 arguments, but got ${args.length}", ast.sourceIndex)
+      }
+    }
+
+    override def genCode[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Instr[C]] = {
+      val sourcePosIndex = genSourcePosIndex(ast, state)
+      val testCode       = args.flatMap(_.genCode(state))
+      Seq(sourcePosIndex.toConstInstr, DevInstr(TestCheckStart)) ++ testCode :+ DevInstr(
+        TestCheckEnd
+      )
+    }
+
+    def signature: String                        = s"fn $name!(expr) -> ()"
+    def argsCommentedName: Seq[(String, String)] = Seq("expr" -> "the expression to be executed")
+    def retComment: String                       = ""
+    def doc: String = "Asserts that the given expression throws an exception during execution."
+  }
+
+  val testError: BuiltIn[StatelessContext] = new TestBuiltIn {
+    val name: String = "testError"
+
+    def checkArgs[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Unit = {
+      if (args.length != 2) {
+        throw Compiler.Error(s"Expected 2 arguments, but got ${args.length}", ast.sourceIndex)
+      }
+      val types = args.flatMap(_.getType(state))
+      if (types.lastOption.exists(_ != Type.U256)) {
+        throw Compiler.Error(
+          s"Invalid args type $types for builtin func testError",
+          ast.sourceIndex
+        )
+      }
+    }
+
+    override def genCode[C <: StatelessContext](
+        ast: Ast.Positioned,
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Instr[C]] = {
+      val sourcePosIndex    = genSourcePosIndex(ast, state)
+      val testCode          = args(0).genCode(state)
+      val expectedErrorCode = args(1).genCode(state)
+      expectedErrorCode ++ Seq(sourcePosIndex.toConstInstr, DevInstr(TestErrorStart)) ++
+        testCode :+ DevInstr(TestCheckEnd)
+    }
+
+    def signature: String = s"fn $name!(expr, errorCode: U256) -> ()"
+    def argsCommentedName: Seq[(String, String)] = Seq(
+      "expr"      -> "the expression to be executed",
+      "errorCode" -> "the expected error code"
+    )
+    def retComment: String = ""
+    def doc: String =
+      "Asserts that the given expression throws an exception with the expected error code."
+  }
+
+  val randomU256: BuiltIn[StatelessContext] =
+    randomFunc("randomU256", Type.U256, "U256", DevInstr(RandomU256))
+  val randomI256: BuiltIn[StatelessContext] =
+    randomFunc("randomI256", Type.I256, "I256", DevInstr(RandomI256))
+  val randomContractAddress: BuiltIn[StatelessContext] =
+    randomFunc("randomContractAddress", Type.Address, "Address", DevInstr(RandomContractAddress))
+  val randomAssetAddress: BuiltIn[StatelessContext] =
+    randomFunc("randomAssetAddress", Type.Address, "Address", DevInstr(RandomAssetAddress))
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -1139,7 +1482,19 @@ object BuiltIn {
     i256Max,
     i256Min,
     groupOfAddress,
-    len
+    len,
+    verifySignature,
+    verifySecP256R1,
+    verifyWebAuthn,
+    getSegregatedWebAuthnSignature,
+    testCheck,
+    testEqual,
+    testFail,
+    testError,
+    randomU256,
+    randomI256,
+    randomContractAddress,
+    randomAssetAddress
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap
@@ -1198,7 +1553,8 @@ object BuiltIn {
         "amount"    -> "the amount of token to be transferred"
       ),
       retComment = "",
-      doc = "Transfers the contract's token from the input assets of the function."
+      doc = "Transfers the contract's token from the input assets of the function. " +
+        "The toAddress must not be the same as the contract address."
     )
 
   val transferTokenToSelf: SimpleBuiltIn[StatefulContext] =
@@ -1214,7 +1570,8 @@ object BuiltIn {
         "amount"      -> "the amount of token to be transferred"
       ),
       retComment = "",
-      doc = "Transfers token to the contract from the input assets of the function."
+      doc = "Transfers token to the contract from the input assets of the function. " +
+        "The fromAddress must not be the same as the contract address."
     )
 
   val burnToken: SimpleBuiltIn[StatefulContext] =
@@ -1472,7 +1829,9 @@ object BuiltIn {
       argsName =
         Seq("refundAddress" -> "the address to receive the remaining assets in the contract"),
       retComment = "",
-      doc = "Destroys the contract and transfer the remaining assets to a designated address."
+      doc = "Destroys the contract and transfer the remaining assets to a designated address. " +
+        "The function will return immediately once the contract is destroyed. " +
+        "Returning value following the contract destruction is not supported."
     )
 
   val migrate: SimpleBuiltIn[StatefulContext] =
@@ -1549,7 +1908,18 @@ object BuiltIn {
       Seq(Type.ByteVec),
       CallerContractId,
       argsName = Seq(),
-      retComment = "the contract id of the caller"
+      retComment =
+        "the contract id of the immediate caller, which could be the current contract in case of recursive calls"
+    )
+  val externalCallerContractId: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.contractSimple(
+      "externalCallerContractId",
+      Seq.empty,
+      Seq(Type.ByteVec),
+      ExternalCallerContractId,
+      argsName = Seq(),
+      retComment =
+        "the contract id of the first external contract in the call stack (different from the current contract)"
     )
 
   // scalastyle:off line.size.limit
@@ -1562,7 +1932,26 @@ object BuiltIn {
       argsName = Seq(),
       retComment = "the address of the caller",
       doc =
-        "<ol><li>When used in a TxScript, returns the transaction caller, which is the first input address when all input addresses are the same. If not all input addresses are the same, `callAddress!()` function fails.</li><li>When used in a contract function called directly from TxScript, returns the transaction caller as explained in 1)</li><li>When used in a contract function called from another contract, returns the address of the calling contract.</li></ol>"
+        s"""<ol>
+           |<li>When used in a TxScript, returns the transaction caller's address. The transaction must have identical input addresses, otherwise the call fails.</li>
+           |<li>When used in a contract function called from a TxScript, returns the transaction caller's address.</li>
+           |<li>When used in a contract function called from another contract, returns the address of the calling contract.</li>
+           |</ol>""".stripMargin
+    )
+  val externalCallerAddress: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.contract(
+      "externalCallerAddress",
+      Seq.empty,
+      Seq(Type.Address),
+      ExternalCallerAddress,
+      argsName = Seq(),
+      retComment = "the address of the external caller",
+      doc =
+        s"""<ol>
+           |<li>When used in a TxScript, returns the transaction caller's address. The transaction must have identical input addresses, otherwise the call fails.</li>
+           |<li>When used in a contract function called from a TxScript, returns the transaction caller's address.</li>
+           |<li>When used in a contract function called from another contract, returns the address of the first external calling contract in the call stack (different from the current contract). If multiple calls come from the same contract, it skips intermediate frames to find the first external contract caller.</li>
+           |</ol>""".stripMargin
     )
   // scalastyle:on line.size.limit
 
@@ -1886,6 +2275,8 @@ object BuiltIn {
       contractAddress,
       callerContractId,
       callerAddress,
+      externalCallerContractId,
+      externalCallerAddress,
       contractInitialStateHash,
       contractCodeHash,
       callerInitialStateHash,
@@ -1906,6 +2297,12 @@ object BuiltIn {
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
+  val contractCreationFuncs: Seq[String] = statefulFuncs.keys.filter { name =>
+    val lowerCaseName = name.toLowerCase(Locale.US)
+    lowerCaseName.contains("createcontract") || lowerCaseName.contains("createsubcontract")
+  }.toSeq
+
+  def isContractCreationFunc(funcName: String): Boolean = contractCreationFuncs.contains(funcName)
 
   trait ContractBuiltIn[Ctx <: StatelessContext] extends Compiler.ContractFunc[Ctx] {
     val isPublic: Boolean             = true
@@ -1943,7 +2340,9 @@ object BuiltIn {
     }
   }
 
+  // scalastyle:off method.length
   def encodeFields[Ctx <: StatelessContext](
+      typeId: Ast.TypeId,
       stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
       fields: Seq[Ast.Argument],
       globalState: Ast.GlobalState[Ctx]
@@ -1955,9 +2354,9 @@ object BuiltIn {
     new ContractBuiltIn[Ctx] {
       val name: String          = "encodeFields"
       val argsType: Seq[Type]   = globalState.resolveTypes(fields.map(_.tpe))
-      val returnType: Seq[Type] = Seq(Type.ByteVec, Type.ByteVec)
+      val returnType: Seq[Type] = Seq(Type.Tuple(Seq(Type.ByteVec, Type.ByteVec)))
 
-      override def genCodeForArgs[C <: Ctx](
+      private def genProdCodeForArgs[C <: Ctx](
           args: Seq[Ast.Expr[C]],
           state: Compiler.State[C]
       ): Seq[Instr[C]] = {
@@ -1973,7 +2372,39 @@ object BuiltIn {
         immFieldInstrs ++ mutFieldInstrs
       }
 
+      private def genTestCodeForArgs[C <: Ctx](
+          args: Seq[Ast.Expr[C]],
+          state: Compiler.State[C]
+      ): Seq[Instr[C]] = {
+        val (immFields, mutFields) = state.genFieldsInitCodes(fieldsMutability, args)
+        val fields                 = mutFields ++ immFields
+        val (allMutFields, mutFieldsLength) = stdInterfaceIdOpt match {
+          case Some(id) =>
+            (fields :+ BytesConst(Val.ByteVec(id.bytes)), fieldsMutability.length + 1)
+          case _ => (fields, fieldsMutability.length)
+        }
+        val immFieldInstrs =
+          Seq[Instr[Ctx]](BytesConst(Val.ByteVec(ByteString(0)))) // encode(AVector.empty)
+        val mutFieldInstrs = allMutFields ++ Seq[Instr[Ctx]](
+          U256Const(Val.U256.unsafe(mutFieldsLength)),
+          Encode
+        )
+        immFieldInstrs ++ mutFieldInstrs
+      }
+
+      override def genCodeForArgs[C <: Ctx](
+          args: Seq[Ast.Expr[C]],
+          state: Compiler.State[C]
+      ): Seq[Instr[C]] = {
+        if (state.allowUpdateImmFields && state.typeId == typeId) {
+          genTestCodeForArgs(args, state)
+        } else {
+          genProdCodeForArgs(args, state)
+        }
+      }
+
       def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq.empty
     }
   }
+  // scalastyle:on method.length
 }

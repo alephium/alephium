@@ -18,9 +18,9 @@ import sbt._
 
 object Version {
   lazy val akka       = "2.6.20"
-  lazy val tapir      = "1.10.7"
-  lazy val sttp       = "3.9.6"
-  lazy val apispec    = "0.10.0"
+  lazy val tapir      = "1.11.43"
+  lazy val sttp       = "3.11.0"
+  lazy val apispec    = "0.11.10"
   lazy val prometheus = "0.16.0"
 }
 
@@ -29,14 +29,14 @@ object Dependencies {
   lazy val `akka-slf4j` = "com.typesafe.akka" %% "akka-slf4j"   % Version.akka
   lazy val `akka-test`  = "com.typesafe.akka" %% "akka-testkit" % Version.akka % Test
 
-  lazy val vertx = "io.vertx" % "vertx-core" % "4.5.7"
+  lazy val vertx = "io.vertx" % "vertx-core" % "4.5.20"
 
   lazy val `upickle` = "com.lihaoyi" %% "upickle" % "3.3.0"
 
   lazy val ficus           = "com.iheart"                 %% "ficus"           % "1.5.2"
   lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk18on"  % "1.78.1"
   lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "3.1.0"
-  lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.5.6"
+  lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.5.18"
   lazy val rocksdb         = "org.rocksdb"                 % "rocksdbjni"      % "8.11.4"
   lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.5"
   lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.18.0"  % Test
@@ -54,10 +54,9 @@ object Dependencies {
     "com.softwaremill.sttp.apispec" %% "openapi-model" % Version.apispec
   lazy val `tapir-swagger-ui` =
     "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui" % Version.tapir
-  lazy val `tapir-client` = "com.softwaremill.sttp.tapir" %% "tapir-sttp-client" % Version.tapir
-  lazy val `tapir-files`  = "com.softwaremill.sttp.tapir" %% "tapir-files"       % Version.tapir
-  lazy val `sttp-backend` =
-    "com.softwaremill.sttp.client3" %% "async-http-client-backend-future" % Version.sttp
+  lazy val `tapir-client` = "com.softwaremill.sttp.tapir"   %% "tapir-sttp-client" % Version.tapir
+  lazy val `tapir-files`  = "com.softwaremill.sttp.tapir"   %% "tapir-files"       % Version.tapir
+  lazy val `sttp-backend` = "com.softwaremill.sttp.client3" %% "core"              % Version.sttp
 
   lazy val `prometheus-simple-client` = "io.prometheus" % "simpleclient" % Version.prometheus
   lazy val `prometheus-simple-client-common` =

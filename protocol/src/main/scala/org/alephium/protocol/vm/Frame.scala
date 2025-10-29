@@ -20,13 +20,13 @@ import scala.annotation.{switch, tailrec}
 
 import akka.util.ByteString
 
-import org.alephium.protocol.model.{Address, ContractId, TokenId}
+import org.alephium.protocol.model.{minimalContractStorageDeposit, Address, ContractId, TokenId}
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.protocol.vm.TokenIssuance
 import org.alephium.serde.{avectorSerde, deserialize}
-import org.alephium.util.{AVector, Bytes}
+import org.alephium.util.{AVector, Bytes, U256}
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods file.size.limit
 abstract class Frame[Ctx <: StatelessContext] {
   var pc: Int
   def obj: ContractObj[Ctx]
@@ -39,6 +39,8 @@ abstract class Frame[Ctx <: StatelessContext] {
   def getCallerFrame(): ExeResult[Frame[Ctx]]
   def getCallerAddress(): ExeResult[Val.Address]
   def getCallAddress(): ExeResult[Val.Address]
+  def getExternalCallerContractId(): ExeResult[Val.ByteVec]
+  def getExternalCallerAddress(): ExeResult[Val.Address]
 
   def balanceStateOpt: Option[MutBalanceState]
 
@@ -188,21 +190,24 @@ abstract class Frame[Ctx <: StatelessContext] {
     if (pc < pcMax) {
       val instr = method.instrs(pc)
       (instr.code: @switch) match {
-        case 0   => callLocal(instr.asInstanceOf[CallLocal].index)
-        case 1   => callExternal(instr.asInstanceOf[CallExternal].index)
-        case 2   => runReturn()
-        case -44 => callExternalBySelector(instr.asInstanceOf[CallExternalBySelector].selector)
-        case _   =>
+        case 0 => checkExeResult(callLocal(instr.asInstanceOf[CallLocal].index))
+        case 1 => checkExeResult(callExternal(instr.asInstanceOf[CallExternal].index))
+        case 2 => checkExeResult(runReturn())
+        case -44 =>
+          checkExeResult(
+            callExternalBySelector(instr.asInstanceOf[CallExternalBySelector].selector)
+          )
+        case _ =>
           // No flatMap for tailrec
           instr.runWith(this) match {
             case Right(_) =>
               advancePC()
               execute()
-            case Left(e) => Left(e)
+            case Left(error) => handleError(error)
           }
       }
     } else if (pc == pcMax) {
-      runReturn()
+      checkExeResult(runReturn())
     } else {
       failed(PcOverflow)
     }
@@ -211,6 +216,42 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   protected def runReturn(): ExeResult[Option[Frame[Ctx]]] =
     Return.runWith(this).map(_ => None)
+
+  private def checkExeResult(result: ExeResult[Option[Frame[Ctx]]]) = {
+    if (ctx.testEnvOpt.isDefined) {
+      result match {
+        case Right(_)    => result
+        case Left(error) => handleError(error)
+      }
+    } else {
+      result
+    }
+  }
+
+  private[vm] def handleError(
+      exeError: Either[IOFailure, ExeFailure]
+  ): ExeResult[Option[Frame[Ctx]]] = {
+    exeError match {
+      case Left(ioError) => Left(Left(ioError))
+      case Right(exeFailure) =>
+        ctx.testEnvOpt match {
+          case None => failed(exeFailure)
+          case Some(testEnv) =>
+            ctx.setTestError(exeFailure)
+            if (testEnv.testFrame == this) {
+              val testEndIndex = method.instrs.view.indexOf(DevInstr(TestCheckEnd), pc)
+              if (testEndIndex == -1) {
+                failed(InvalidTestCheckInstr)
+              } else {
+                pc = testEndIndex
+                execute()
+              }
+            } else {
+              Right(None)
+            }
+        }
+    }
+  }
 }
 
 final class StatelessFrame(
@@ -247,9 +288,11 @@ final class StatelessFrame(
       newImmFieldsOpt: Option[AVector[Val]],
       newMutFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = StatelessFrame.notAllowed
-  def getCallerFrame(): ExeResult[Frame[StatelessContext]] = StatelessFrame.notAllowed
-  def getCallerAddress(): ExeResult[Val.Address]           = StatelessFrame.notAllowed
-  def getCallAddress(): ExeResult[Val.Address]             = StatelessFrame.notAllowed
+  def getCallerFrame(): ExeResult[Frame[StatelessContext]]  = StatelessFrame.notAllowed
+  def getCallerAddress(): ExeResult[Val.Address]            = StatelessFrame.notAllowed
+  def getCallAddress(): ExeResult[Val.Address]              = StatelessFrame.notAllowed
+  def getExternalCallerContractId(): ExeResult[Val.ByteVec] = StatelessFrame.notAllowed
+  def getExternalCallerAddress(): ExeResult[Val.Address]    = StatelessFrame.notAllowed
   def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] =
     StatelessFrame.notAllowed
   def callExternalBySelector(
@@ -290,6 +333,38 @@ final case class StatefulFrame(
         Right(Val.Address(LockupScript.p2c(contractId)))
       case None => // frame for script
         ctx.getUniqueTxInputAddress()
+    }
+  }
+
+  def getExternalCallerContractId(): ExeResult[Val.ByteVec] = {
+    getExternalCallerAddress().flatMap {
+      case Val.Address(LockupScript.P2C(contractId)) => Right(Val.ByteVec(contractId.bytes))
+      case _                                         => failed(ExternalCallerIsNotContract)
+    }
+  }
+
+  def getExternalCallerAddress(): ExeResult[Val.Address] = {
+    this.obj.contractIdOpt match {
+      case Some(contractId) => this.getExternalCallerFrame(contractId).flatMap(_.getCallAddress())
+      case None => // frame for script
+        ctx.getUniqueTxInputAddress()
+    }
+  }
+
+  @tailrec
+  private def getExternalCallerFrame(currentContractId: ContractId): ExeResult[StatefulFrame] = {
+    callerFrameOpt match {
+      case Some(callerFrame) =>
+        callerFrame.obj.contractIdOpt match {
+          case Some(contractId) if contractId == currentContractId =>
+            // Skip frames from the same contract to find the external caller
+            callerFrame.getExternalCallerFrame(currentContractId)
+          case _ =>
+            Right(callerFrame)
+        }
+      case None =>
+        // Dead branch, no caller frame exists, which should not happen for contract frames
+        failed(ExternalCallerNotAvailable)
     }
   }
 
@@ -415,9 +490,8 @@ final case class StatefulFrame(
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId] = {
     for {
-      _            <- checkContractId(contractId)
-      balanceState <- getBalanceState()
-      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
+      _        <- checkContractId(contractId)
+      balances <- getInitialBalancesForNewContract()
       _ <- ctx.createContract(contractId, code, immFields, balances, mutFields, tokenIssuanceInfo)
       _ <- ctx.writeLog(
         Some(createContractEventId(ctx.blockEnv.chainIndex.from.value)),
@@ -426,6 +500,55 @@ final case class StatefulFrame(
       )
       _ <- ctx.writeSubContractIndexes(parentContractId, contractId)
     } yield contractId
+  }
+
+  def getInitialBalancesForNewContract(): ExeResult[MutBalancesPerLockup] = {
+    if (ctx.getHardFork().isDanubeEnabled()) {
+      getInitialBalancesForNewContractSinceDanube()
+    } else {
+      getInitialBalancesForNewContractPreDanube()
+    }
+  }
+
+  def getInitialBalancesForNewContractPreDanube(): ExeResult[MutBalancesPerLockup] = {
+    for {
+      balanceState <- getBalanceState()
+      balances     <- balanceState.approved.useAll().toRight(Right(InvalidBalances))
+    } yield balances
+  }
+
+  def getInitialBalancesForNewContractSinceDanube(): ExeResult[MutBalancesPerLockup] = {
+    val minimalDeposit = minimalContractStorageDeposit(ctx.getHardFork())
+
+    for {
+      // Start with approved balances if available, otherwise empty balance
+      initialBalance <- getInitialContractBalance()
+
+      // Check if we need to add more deposit
+      _ <- ensureMinimalDeposit(initialBalance, minimalDeposit)
+    } yield initialBalance
+  }
+
+  private def getInitialContractBalance(): ExeResult[MutBalancesPerLockup] = {
+    if (balanceStateOpt.exists(_.approved.all.nonEmpty)) {
+      getInitialBalancesForNewContractPreDanube()
+    } else {
+      Right(MutBalancesPerLockup.empty)
+    }
+  }
+
+  private def ensureMinimalDeposit(
+      contractBalance: MutBalancesPerLockup,
+      minimalDeposit: U256
+  ): ExeResult[Unit] = {
+    minimalDeposit.sub(contractBalance.attoAlphAmount) match {
+      case Some(alphToCover) if alphToCover > U256.Zero =>
+        // Need to cover additional deposit
+        ctx.coverExtraAlphAmount(contractBalance, alphToCover)
+      case _ =>
+        // Contract already has sufficient deposit
+        Right(())
+    }
   }
 
   def contractCreationEventFields(
@@ -571,7 +694,19 @@ final case class StatefulFrame(
           contractObj,
           method,
           opStack,
-          opStack.push
+          returnVals =>
+            for {
+              _ <- opStack.push(returnVals)
+              _ <-
+                if (
+                  ctx.getHardFork().isDanubeEnabled() &&
+                  this.obj.isScript() && !contractObj.isScript()
+                ) {
+                  ctx.chainCallerOutputs(balanceStateOpt)
+                } else {
+                  okay
+                }
+            } yield ()
         )
     } yield frame
   }

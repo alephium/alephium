@@ -62,7 +62,8 @@ object BuiltInFunctions extends App {
         Chain,
         Conversion,
         ByteVec,
-        Cryptography
+        Cryptography,
+        Test
       ).map(_.toString)
       Ordering.by(f => orders.indexOf(f.category))
     }
@@ -77,15 +78,16 @@ object BuiltInFunctions extends App {
         "@returns two ByteVecs: the first one is the encoded immutable fields, and the second one is the encoded mutable fields"
     )
 
+    // scalastyle:off line.size.limit
     val mapInsert: FunctionInfo = FunctionInfo(
       name = "map.insert",
       category = BuiltIn.Category.Map.toString,
       signature =
-        "fn <map>.insert!(depositorAddress: Address, key: <Bool | U256 | I256 | Address | ByteVec>, value: Any) -> ()",
+        "fn <map>.insert!(depositorAddress?: Address, key: <Bool | U256 | I256 | Address | ByteVec>, value: Any) -> ()",
       doc =
         "Insert a key/value pair into the map. No brace syntax is required, as the minimal storage deposit will be deducted from the approved assets by the VM",
       params = Seq(
-        "@param depositorAddress the address to pay the minimal storage deposit (0.1 ALPH) for the new map entry",
+        "@param depositorAddress the address to pay the minimal storage deposit (0.1 ALPH) for the new map entry. If not provided, minimal storage deposit will be paid by the transaction caller",
         "@param key the key to insert",
         "@param value the value to insert"
       ),
@@ -96,14 +98,15 @@ object BuiltInFunctions extends App {
       name = "map.remove",
       category = BuiltIn.Category.Map.toString,
       signature =
-        "fn <map>.remove!(depositRecipient: Address, key: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
+        "fn <map>.remove!(refundRecipient?: Address, key: <Bool | U256 | I256 | Address | ByteVec>) -> ()",
       doc = "Remove a key from the map",
       params = Seq(
-        "@param depositRecipient the address to receive the redeemed minimal storage deposit",
+        "@param refundRecipient the address to receive the redeemed minimal storage deposit. If not provided, minimal storage deposit will be received by the transaction caller",
         "@param key the key to remove"
       ),
       returns = "@returns "
     )
+    // scalastyle:on line.size.limit
 
     val mapContains: FunctionInfo = FunctionInfo(
       name = "map.contains",
