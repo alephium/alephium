@@ -113,9 +113,12 @@ object RocksDBSource {
     RocksDB.loadLibrary()
 
     val readOptions: ReadOptions = (new ReadOptions).setVerifyChecksums(false)
+    // Check why is `noSlowdown` set to true? Because this disables backpressure.
     val writeOptions: WriteOptions =
       (new WriteOptions).setNoSlowdown(true).setIgnoreMissingColumnFamilies(true)
     val syncWrite: WriteOptions = (new WriteOptions).setNoSlowdown(true).setSync(true)
+
+    private val sharedCache = new LRUCache(2 * SizeUnit.GB)
 
     def databaseOptions(): DBOptions = {
       new DBOptions()
@@ -124,10 +127,10 @@ object RocksDBSource {
         .setMaxOpenFiles(1024)
         .setLogFileTimeToRoll(86_400L) // one day
         .setKeepLogFileNum(7)
-        .setDbWriteBufferSize(256 * SizeUnit.MB)
+        .setDbWriteBufferSize(512 * SizeUnit.MB)
         .setLogger(new StdErrLogger(InfoLogLevel.ERROR_LEVEL))
         .setEnv(Env.getDefault().setBackgroundThreads(6))
-        .setMaxTotalWalSize(1_073_741_824L) // 1GB
+        .setMaxTotalWalSize(256 * SizeUnit.MB)
         .setRecycleLogFileNum(16)
     }
 
@@ -139,13 +142,16 @@ object RocksDBSource {
         .setTableFormatConfig(
           new BlockBasedTableConfig()
             .setFormatVersion(5) // Since RocksDB 6.6
-            .setBlockCache(new LRUCache(32 * SizeUnit.MB))
+            .setBlockCache(sharedCache)
             .setFilterPolicy(new BloomFilter(10, false))
             .setPartitionFilters(true)
-            .setCacheIndexAndFilterBlocks(false)
-            .setBlockSize(32 * SizeUnit.KB)
+            .setCacheIndexAndFilterBlocks(true)
+            .setCacheIndexAndFilterBlocksWithHighPriority(true)
+            .setPinL0FilterAndIndexBlocksInCache(true)
+            .setPinTopLevelIndexAndFilter(true)
+            .setBlockSize(16 * SizeUnit.KB)
         )
-        .setWriteBufferSize(if (ioHeavy) 128 * SizeUnit.MB else 64 * SizeUnit.MB)
+        .setWriteBufferSize(if (ioHeavy) 32 * SizeUnit.MB else 16 * SizeUnit.MB)
     }
   }
 
