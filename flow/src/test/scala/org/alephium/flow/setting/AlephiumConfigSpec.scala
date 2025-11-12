@@ -447,4 +447,13 @@ class AlephiumConfigSpec extends AlephiumSpec {
         Difficulty.unsafe(N * (100 + 3 * (gap - 17)) / 100)
     }
   }
+
+  it should "adjust diff for height gap" in new AlephiumConfigFixture {
+    val N               = 123456
+    val diff            = Difficulty.unsafe(N)
+    val consensusConfig = consensusConfigs.danube
+    consensusConfig.penalizeDiffForHeightGapPatch(diff, 16) is diff
+    consensusConfig.penalizeDiffForHeightGapPatch(diff, 17) is diff
+    consensusConfig.penalizeDiffForHeightGapPatch(diff, 18) is Difficulty.unsafe(N * 105 / 100)
+  }
 }

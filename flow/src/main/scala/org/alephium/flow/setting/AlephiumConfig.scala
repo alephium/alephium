@@ -65,6 +65,14 @@ final case class ConsensusSetting(
   private val crossShardHeightGapThresholdRhone: Int    = powAveragingWindow / 2
   private val crossShardHeightGapThresholdDanube: Int   = powAveragingWindow
 
+  def penalizeDiffForHeightGapPatch(diff: Difficulty, gap: Int): Difficulty = {
+    if (gap > crossShardHeightGapThresholdDanube) {
+      diff.times(105).divide(100)
+    } else {
+      diff
+    }
+  }
+
   def penalizeDiffForHeightGapLeman(diff: Difficulty, gap: Int, hardFork: HardFork): Difficulty = {
     assume(hardFork.isLemanEnabled())
     val (threshold, factor) = if (hardFork.isDanubeEnabled()) {

@@ -46,7 +46,7 @@ final case class BlockDeps private (deps: AVector[BlockHash]) extends AnyVal {
   )(implicit groupConfig: GroupConfig): AVector[BlockHash] = {
     val intraUncleHash = uncleHash(groupOfTheDeps)
     assume(ChainIndex.from(intraUncleHash).isIntraGroup)
-    inDeps :+ uncleHash(groupOfTheDeps)
+    inDeps :+ intraUncleHash
   }
 }
 
