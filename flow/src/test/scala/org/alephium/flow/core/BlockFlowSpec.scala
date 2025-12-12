@@ -506,7 +506,7 @@ class BlockFlowSpec extends AlephiumSpec {
       consensusConfig.emission.lowHashRateInitialRewardPerChain,
       consensusConfig.emission.stableMaxRewardPerChain
     ).min
-    (block.coinbase.attoAlphAmountInOutputs.get > minimalReward.subUnsafe(
+    (block.coinbase.attoAlphAmountInOutputs.get < minimalReward.subUnsafe(
       nonCoinbaseMinGasFee
     )) is true
   }
