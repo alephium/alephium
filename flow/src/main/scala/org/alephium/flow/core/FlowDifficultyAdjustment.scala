@@ -39,8 +39,14 @@ trait FlowDifficultyAdjustment {
   def getHeaderChain(hash: BlockHash): BlockHeaderChain
   def getHashChain(hash: BlockHash): BlockHashChain
 
-  val penaltyDiffPatchConfig = new PenaltyDiffPatchConfig {
-    def enabledTimeStamp: TimeStamp = ALPH.PenaltyDiffPatchEnabledTimeStamp
+  val penaltyDiffPatchConfig = if (networkConfig.networkId == NetworkId.AlephiumTestNet) {
+    new PenaltyDiffPatchConfig {
+      def enabledTimeStamp: TimeStamp = ALPH.PenaltyDiffPatchEnabledTimeStampTestnet
+    }
+  } else {
+    new PenaltyDiffPatchConfig {
+      def enabledTimeStamp: TimeStamp = ALPH.PenaltyDiffPatchEnabledTimeStampMainnet
+    }
   }
 
   def getNextHashTarget(
