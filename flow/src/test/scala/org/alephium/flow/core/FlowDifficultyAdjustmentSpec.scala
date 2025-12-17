@@ -16,12 +16,14 @@
 
 package org.alephium.flow.core
 
+import java.math.BigInteger
+
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.{ChainIndex, HardFork, NetworkId, Target}
+import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AlephiumSpec, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
 
@@ -336,6 +338,100 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
           .rightValue
           .value
           .timestamp
+      }
+    }
+  }
+
+  def diff(value: Long) = Difficulty.unsafe(BigInteger.valueOf(value))
+
+  it should "get adjusted difficulty" in {
+    import FlowDifficultyAdjustment.getAdjustedDiff
+
+    getAdjustedDiff(diff(1000), diff(1500)) is diff(1000)
+    getAdjustedDiff(diff(1000), diff(1499)) is diff(1000)
+    getAdjustedDiff(diff(1000), diff(1000)) is diff(1000)
+    getAdjustedDiff(diff(1000), diff(751)) is diff(1000)
+    getAdjustedDiff(diff(1000), diff(750)) is diff(1000)
+
+    getAdjustedDiff(diff(1000), diff(1600)) is diff(1047)
+    getAdjustedDiff(diff(1000), diff(700)) is diff(984)
+  }
+
+  it should "clip the difficulty" in {
+    import FlowDifficultyAdjustment.clip
+    clip(diff(1000), diff(980)) is diff(980)
+    clip(diff(1000), diff(981)) is diff(981)
+    clip(diff(1000), diff(979)) is diff(980)
+    clip(diff(1000), diff(900)) is diff(980)
+
+    clip(diff(1000), diff(1100)) is diff(1040)
+    clip(diff(1000), diff(1040)) is diff(1040)
+    clip(diff(1000), diff(1041)) is diff(1040)
+    clip(diff(1000), diff(1039)) is diff(1039)
+  }
+
+  it should "cal the next difficulty based on the penalty diff patch" in new FlowFixture {
+    import FlowDifficultyAdjustment._
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.consensus.num-zeros-at-least-in-hash", 40)
+    )
+    setHardFork(HardFork.Danube)
+    implicit val consensusConfig: ConsensusSetting = consensusConfigs.danube
+
+    val patch = new PenaltyDiffPatchConfig {
+      override def enabledTimeStamp: TimeStamp = TimeStamp.zero
+    }
+
+    @scala.annotation.tailrec
+    private def dummyHeader(
+        chainIndex: ChainIndex,
+        deps: BlockDeps,
+        depStateHash: Hash,
+        blockTs: TimeStamp,
+        target: Target
+    ): BlockHeader = {
+      val nonce = Nonce.unsecureRandom()
+      val header =
+        BlockHeader(nonce, DefaultBlockVersion, deps, depStateHash, Hash.random, blockTs, target)
+      if (header.chainIndex == chainIndex) {
+        header
+      } else {
+        dummyHeader(chainIndex, deps, depStateHash, blockTs, target)
+      }
+    }
+
+    private def mineNewBlock(chainIndex: ChainIndex) = {
+      val deps   = blockFlow.getBestDeps(chainIndex, HardFork.Danube)
+      val parent = blockFlow.getBlockUnsafe(deps.parentHash(chainIndex))
+      val nextTs = parent.timestamp.plusUnsafe(consensusConfig.blockTargetTime)
+      val worldState = if (chainIndex.isIntraGroup) {
+        Some(blockFlow.getBestCachedWorldState(chainIndex.from).rightValue)
+      } else {
+        None
+      }
+      val depStateHash = blockFlow.getDepStateHash(deps, chainIndex.from).rightValue
+      val target   = blockFlow.getNextHashTargetDanube(chainIndex, deps, nextTs, patch).rightValue
+      val header   = dummyHeader(chainIndex, deps, depStateHash, nextTs, target)
+      val miner    = getGenesisLockupScript(chainIndex.to)
+      val coinbase = Transaction.powCoinbase(chainIndex, ALPH.oneAlph, miner, nextTs, AVector.empty)
+      val block    = Block(header, AVector(coinbase))
+      blockFlow.add(block, worldState) isE ()
+      val _ = blockFlow.updateViewPerChainIndexDanube(chainIndex).rightValue
+      block
+    }
+
+    (0 until consensusConfig.powAveragingWindow + 2).foreach { _ =>
+      brokerConfig.chainIndexes.foreach(mineNewBlock)
+    }
+
+    val initialDiff = consensusConfig.minMiningDiff.value
+    (0 until consensusConfig.powAveragingWindow * 4).foreach { _ =>
+      brokerConfig.chainIndexes.tail.foreach { chainIndex =>
+        val block     = mineNewBlock(chainIndex)
+        val blockDiff = block.target.getDifficulty().value
+        blockDiff.compareTo(initialDiff) >= 0 is true
+        blockDiff.compareTo(initialDiff.multiply(106).divide(100)) < 0 is true
       }
     }
   }

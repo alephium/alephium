@@ -42,6 +42,11 @@ object ALPH {
     TimeStamp.unsafe(1670612400000L) // Dec 09 2022 19:00:00 GMT+0000
   val DifficultyBombPatchHeightDiff: Int = 2700 // around 2 days
 
+  val PenaltyDiffPatchEnabledTimeStampMainnet: TimeStamp =
+    TimeStamp.unsafe(1768384800000L) // Jan 14 2026 10:00:00 GMT+0000
+  val PenaltyDiffPatchEnabledTimeStampTestnet: TimeStamp =
+    TimeStamp.unsafe(1766052000000L) // Dec 18 2025 10:00:00 GMT+0000
+
   val MaxTxInputNum: Int     = 256
   val MaxTxOutputNum: Int    = 256
   val MaxOutputDataSize: Int = 256

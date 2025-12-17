@@ -19,6 +19,7 @@ package org.alephium.flow.core
 import java.math.BigInteger
 
 import org.alephium.flow.Utils
+import org.alephium.flow.core.FlowDifficultyAdjustment.PenaltyDiffPatchConfig
 import org.alephium.flow.setting.{ConsensusSetting, ConsensusSettings}
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.ALPH
@@ -38,6 +39,16 @@ trait FlowDifficultyAdjustment {
   def getHeaderChain(hash: BlockHash): BlockHeaderChain
   def getHashChain(hash: BlockHash): BlockHashChain
 
+  val penaltyDiffPatchConfig = if (networkConfig.networkId == NetworkId.AlephiumTestNet) {
+    new PenaltyDiffPatchConfig {
+      def enabledTimeStamp: TimeStamp = ALPH.PenaltyDiffPatchEnabledTimeStampTestnet
+    }
+  } else {
+    new PenaltyDiffPatchConfig {
+      def enabledTimeStamp: TimeStamp = ALPH.PenaltyDiffPatchEnabledTimeStampMainnet
+    }
+  }
+
   def getNextHashTarget(
       chainIndex: ChainIndex,
       deps: BlockDeps,
@@ -45,7 +56,7 @@ trait FlowDifficultyAdjustment {
   ): IOResult[Target] = {
     val hardFork = networkConfig.getHardFork(nextTimeStamp)
     if (hardFork.isDanubeEnabled()) {
-      getNextHashTargetDanube(chainIndex, deps)
+      getNextHashTargetDanube(chainIndex, deps, nextTimeStamp, penaltyDiffPatchConfig)
     } else if (hardFork.isRhoneEnabled()) {
       getNextHashTargetRhone(chainIndex, deps)
     } else if (hardFork.isLemanEnabled()) {
@@ -101,11 +112,41 @@ trait FlowDifficultyAdjustment {
   ): IOResult[Target] =
     getNextHashTargetSinceLeman(chainIndex, deps, HardFork.Rhone)(consensusConfigs.rhone)
 
-  def getNextHashTargetDanube(
+  private def getNextHashTargetDanubeUnsafe(
       chainIndex: ChainIndex,
       deps: BlockDeps
-  ): IOResult[Target] =
-    getNextHashTargetSinceLeman(chainIndex, deps, HardFork.Danube)(consensusConfigs.danube)
+  )(implicit consensusConfig: ConsensusSetting): Target = {
+    val commonIntraGroupDeps             = calCommonIntraGroupDepsUnsafe(deps, chainIndex.from)
+    val (diffSum, timeSpanSum, oldestTs) = getDiffAndTimeSpanUnsafe(commonIntraGroupDeps)
+    val averageDiff                      = diffSum.divide(brokerConfig.chainNum)
+    val timeSpanAverage                  = timeSpanSum.divUnsafe(brokerConfig.chainNum.toLong)
+    val adjustedAverageDiff = ChainDifficultyAdjustment
+      .calNextHashTargetRaw(averageDiff.getTarget(), timeSpanAverage)
+      .getDifficulty()
+
+    val chainDep         = deps.getOutDep(chainIndex.to)
+    val (diff, timeSpan) = getDiffAndTimeSpanUnsafe(chainDep)
+    val chainDiff =
+      ChainDifficultyAdjustment.reTarget(diff.getTarget(), timeSpan.millis).getDifficulty()
+    val adjustedDiff = FlowDifficultyAdjustment.getAdjustedDiff(adjustedAverageDiff, chainDiff)
+
+    val heightGap        = calHeightDiffUnsafe(chainDep, oldestTs)
+    val penaltyChainDiff = consensusConfig.penalizeDiffForHeightGapPatch(adjustedDiff, heightGap)
+    FlowDifficultyAdjustment.clip(diff, penaltyChainDiff).getTarget()
+  }
+
+  def getNextHashTargetDanube(
+      chainIndex: ChainIndex,
+      deps: BlockDeps,
+      nextTimeStamp: TimeStamp,
+      penaltyDiffPatchConfig: PenaltyDiffPatchConfig
+  ): IOResult[Target] = {
+    if (penaltyDiffPatchConfig.isEnabled(nextTimeStamp)) {
+      IOUtils.tryExecute(getNextHashTargetDanubeUnsafe(chainIndex, deps)(consensusConfigs.danube))
+    } else {
+      getNextHashTargetSinceLeman(chainIndex, deps, HardFork.Danube)(consensusConfigs.danube)
+    }
+  }
 
   final def calHeightDiffUnsafe(chainDep: BlockHash, oldTimeStamp: TimeStamp): Int = {
     @scala.annotation.tailrec
@@ -231,5 +272,83 @@ trait FlowDifficultyAdjustment {
       }
     }
     (Difficulty.unsafe(diffSum), timeSpanSum, oldestTs)
+  }
+}
+
+object FlowDifficultyAdjustment {
+  // scalastyle:off magic.number
+  private lazy val ScalingFactor = BigInteger.valueOf(1000_000)
+  private lazy val Alpha =
+    ScalingFactor.multiply(BigInteger.valueOf(5)).divide(BigInteger.valueOf(10))
+  private lazy val LowerGammaBound = // 1 - 0.5 * alpha
+    ScalingFactor.subtract(Alpha.multiply(BigInteger.valueOf(5)).divide(BigInteger.valueOf(10)))
+  private lazy val UpperGammaBound = ScalingFactor.add(Alpha) // 1 + alpha
+
+  trait PenaltyDiffPatchConfig {
+    def enabledTimeStamp: TimeStamp
+
+    @inline final def isEnabled(ts: TimeStamp): Boolean = {
+      ts > enabledTimeStamp
+    }
+  }
+
+  implicit private class RichBigInteger(val x: BigInteger) extends AnyVal {
+    def <(y: BigInteger): Boolean  = x.compareTo(y) < 0
+    def >(y: BigInteger): Boolean  = x.compareTo(y) > 0
+    def <=(y: BigInteger): Boolean = x.compareTo(y) <= 0
+    def >=(y: BigInteger): Boolean = x.compareTo(y) >= 0
+  }
+
+  private[core] def getAdjustedDiff(averageDiff: Difficulty, chainDiff: Difficulty): Difficulty = {
+    val numerator   = BigInteger.valueOf(11)
+    val denominator = BigInteger.valueOf(10)
+    val gamma       = chainDiff.value.multiply(ScalingFactor).divide(averageDiff.value)
+    if (gamma >= LowerGammaBound && gamma <= UpperGammaBound) {
+      averageDiff
+    } else if (gamma > UpperGammaBound) {
+      // beta = UpperGammaBound / gamma
+      // beta * average_diff + 1.1 * (1 - beta) * chain_diff =>
+      // ((UpperGammaBound * average_diff) + (gamma - UpperGammaBound) * 1.1 * chain_diff) / gamma
+      val diffValue = averageDiff.value
+        .multiply(UpperGammaBound)
+        .add(
+          gamma
+            .subtract(UpperGammaBound)
+            .multiply(numerator)
+            .multiply(chainDiff.value)
+            .divide(denominator)
+        )
+        .divide(gamma)
+      Difficulty.unsafe(diffValue)
+    } else { // gamma < LowerGammaBound
+      // beta = gamma / LowerGammaBound
+      // beta * average_diff + 1.1 * (1 - beta) * chain_diff =>
+      // ((gamma * average_diff) + (LowerGammaBound - gamma) * 1.1 * chain_diff) / LowerGammaBound
+      val diffValue = gamma
+        .multiply(averageDiff.value)
+        .add(
+          LowerGammaBound
+            .subtract(gamma)
+            .multiply(numerator)
+            .multiply(chainDiff.value)
+            .divide(denominator)
+        )
+        .divide(LowerGammaBound)
+      Difficulty.unsafe(diffValue)
+    }
+  }
+
+  private[core] def clip(parentDiff: Difficulty, nextDiff: Difficulty): Difficulty = {
+    val lowerBound =
+      parentDiff.value.multiply(BigInteger.valueOf(98)).divide(BigInteger.valueOf(100))
+    val upperBound =
+      parentDiff.value.multiply(BigInteger.valueOf(104)).divide(BigInteger.valueOf(100))
+    if (nextDiff.value < lowerBound) {
+      Difficulty.unsafe(lowerBound)
+    } else if (nextDiff.value > upperBound) {
+      Difficulty.unsafe(upperBound)
+    } else {
+      nextDiff
+    }
   }
 }
