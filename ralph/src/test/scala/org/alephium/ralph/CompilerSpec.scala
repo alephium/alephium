@@ -6294,6 +6294,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
       ).rightValue.warnings.map(_.message) is noUpdateFieldsWarning
       compileContractFull(
         code(
+          s"if true { $statement }",
+          "@using(preapprovedAssets = true, checkExternalCaller = false)"
+        )
+      ).rightValue.warnings.map(_.message) is noUpdateFieldsWarning
+      compileContractFull(
+        code(
           statement,
           "@using(preapprovedAssets = true, checkExternalCaller = false, updateFields = true)"
         )
