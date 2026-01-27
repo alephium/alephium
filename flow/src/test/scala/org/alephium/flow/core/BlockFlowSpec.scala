@@ -32,7 +32,7 @@ import org.alephium.protocol.{ALPH, Generators}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, TokenIssuance}
-import org.alephium.util.{AlephiumSpec, AVector, Bytes, TimeStamp, U256, UnsecureRandom}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp, U256, UnsecureRandom}
 
 // scalastyle:off file.size.limit
 class BlockFlowSpec extends AlephiumSpec {
@@ -512,35 +512,43 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "reduce target gradually and reach a stable target eventually" in new FlowFixture {
-    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.consensus.num-zeros-at-least-in-hash", "10")
+    )
 
     def step() = {
       val blocks = brokerConfig.chainIndexes.map(emptyBlock(blockFlow, _))
       blocks.foreach(addAndCheck(blockFlow, _))
-      val targets = blocks.map(_.target).toSet
-      targets.size is 1
-      targets.head
     }
 
-    var lastTarget = consensusConfigs.getConsensusConfig(TimeStamp.now()).maxMiningTarget
-    while ({
-      val newTarget = step()
-      if (lastTarget != Target.Max) {
-        if (newTarget < lastTarget) {
-          lastTarget = newTarget
-          true
-        } else if (newTarget equals lastTarget) {
-          false
-        } else {
-          // the target is increasing, which is wrong
-          assert(false)
-          true
-        }
-      } else {
-        lastTarget = newTarget
-        true
+    val fromTs          = TimeStamp.now()
+    val consensusConfig = consensusConfigs.getConsensusConfig(fromTs)
+
+    (0 until consensusConfig.powAveragingWindow + 1).foreach(_ => step())
+
+    def getAverageBlockTs(): Duration = {
+      val chainIndex           = ChainIndex.unsafe(0, 0)
+      val bestDeps             = blockFlow.calBestFlowPerChainIndexUnsafe(chainIndex)
+      val commonIntraGroupDeps = blockFlow.calCommonIntraGroupDepsUnsafe(bestDeps, chainIndex.from)
+      val (_, timeSpanSum, _) =
+        blockFlow.getDiffAndTimeSpanUnsafe(commonIntraGroupDeps)(consensusConfig)
+      val timeSpanAverage = timeSpanSum.divUnsafe(brokerConfig.chainNum.toLong)
+      (timeSpanAverage / consensusConfig.powAveragingWindow.toLong).get
+    }
+
+    val maxBlockTs = consensusConfig.blockTargetTime.millis * 11 / 10
+    val minBlockTs = consensusConfig.blockTargetTime.millis * 9 / 10
+    var continue   = true
+    while (continue) {
+      step()
+      val averageBlockTs = getAverageBlockTs()
+      if (averageBlockTs.millis >= minBlockTs && averageBlockTs.millis <= maxBlockTs) {
+        continue = false
+      } else if (TimeStamp.now().deltaUnsafe(fromTs) > Duration.ofMinutesUnsafe(6)) {
+        assert(false, "failed to adjust the target within 6 minutes")
       }
-    }) {}
+    }
   }
 
   behavior of "Balance"

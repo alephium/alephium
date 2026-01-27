@@ -28,7 +28,8 @@ import org.alephium.flow.setting.{ConsensusSetting, ConsensusSettings}
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config._
-import org.alephium.protocol.model.{BlockHash, HardFork, NetworkId, Target}
+import org.alephium.protocol.mining.Emission
+import org.alephium.protocol.model.{BlockHash, Difficulty, HardFork, NetworkId, Target}
 import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
 
 class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
@@ -399,5 +400,24 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       ) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
+  }
+
+  it should "get next hash target with respect to max allowed target" in {
+    def diff(value: Long): Target = {
+      Difficulty.unsafe(BigInteger.valueOf(value)).getTarget()
+    }
+
+    val config = new ConsensusConfig {
+      def maxMiningTarget: Target          = diff(100)
+      def blockTargetTime: Duration        = ???
+      def uncleDependencyGapTime: Duration = ???
+      def emission: Emission               = ???
+    }
+
+    ChainDifficultyAdjustment.getNextHashTarget(config.maxMiningTarget)(
+      config
+    ) is config.maxMiningTarget
+    ChainDifficultyAdjustment.getNextHashTarget(diff(99))(config) is config.maxMiningTarget
+    ChainDifficultyAdjustment.getNextHashTarget(diff(101))(config) is diff(101)
   }
 }
