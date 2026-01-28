@@ -1146,6 +1146,7 @@ object Ast {
       args: Seq[Expr[StatefulContext]]
   ) extends MapFuncCall {
     def check(state: Compiler.State[StatefulContext]): Unit = {
+      state.setUpdatesMap(state.currentScope)
       val mapType = getMapType(state)
       if (args.length == 2) {
         checkArgTypes(state, Seq(mapType.key, mapType.value))
@@ -1198,6 +1199,7 @@ object Ast {
   final case class RemoveFromMap(ident: Ident, args: Seq[Expr[StatefulContext]])
       extends MapFuncCall {
     def check(state: Compiler.State[StatefulContext]): Unit = {
+      state.setUpdatesMap(state.currentScope)
       val mapType = getMapType(state)
       if (args.length == 1) {
         checkArgTypes(state, Seq(mapType.key))
@@ -1371,30 +1373,9 @@ object Ast {
       }
     }
 
-    private var _updatesMap: Option[Boolean] = None
-
-    @inline private[ralph] def updatesMap(state: Compiler.State[Ctx]): Boolean = {
-      _updatesMap match {
-        case Some(value) => value
-        case None =>
-          val funcUpdatesMap = body.exists {
-            case _: InsertToMap | _: RemoveFromMap => true
-            case Assign(targets, _) =>
-              targets.exists {
-                case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
-                case _                                  => false
-              }
-            case CompoundAssign(target, _, _) =>
-              target match {
-                case AssignmentSelectedTarget(ident, _) => state.hasMapVar(ident)
-                case _                                  => false
-              }
-            case _ => false
-          }
-          _updatesMap = Some(funcUpdatesMap)
-          funcUpdatesMap
-      }
-    }
+    private var _updatesMap: Boolean                 = false
+    @inline private[ralph] def updatesMap: Boolean   = _updatesMap
+    @inline private[ralph] def setUpdatesMap(): Unit = _updatesMap = true
 
     def isSimpleViewFunc(state: Compiler.State[Ctx]): Boolean = {
       val hasInterfaceFuncCall = state.hasInterfaceFuncCallSet.contains(id)
@@ -1407,7 +1388,7 @@ object Ast {
         || useAssetsInContract != Ast.NotUseContractAssets
         || hasInterfaceFuncCall
         || hasMigrateSimple
-        || updatesMap(state))
+        || updatesMap)
     }
 
     lazy val signature: FuncSignature = FuncSignature(
@@ -1642,6 +1623,7 @@ object Ast {
         selectors: Seq[DataSelector[Ctx]],
         sourceIndex: Option[SourceIndex]
     ): Unit = {
+      state.setUpdatesMap(state.currentScope)
       if (selectors.isEmpty) {
         if (!state.isTypeMutable(mapType.value)) {
           throw Compiler.Error(

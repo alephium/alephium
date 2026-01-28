@@ -1404,6 +1404,11 @@ object Compiler {
         )
       }
     }
+
+    def setUpdatesMap(funcId: Ast.FuncId): Unit = {
+      val contract = getContractInfo(typeId).ast
+      contract.funcs.find(f => f.id == funcId).foreach(_.setUpdatesMap())
+    }
   }
   // scalastyle:on number.of.methods
 

@@ -21,7 +21,7 @@ import java.math.BigInteger
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.config.{ConsensusConfig, NetworkConfig}
 import org.alephium.protocol.model.{BlockHash, Target}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
@@ -157,8 +157,14 @@ object ChainDifficultyAdjustment {
     val nextTarget = currentTarget.value
       .multiply(BigInteger.valueOf(timeSpanMs))
       .divide(BigInteger.valueOf(consensusConfig.expectedWindowTimeSpan.millis))
-    if (nextTarget.compareTo(consensusConfig.maxMiningTarget.value) <= 0) {
-      Target.unsafe(nextTarget)
+    getNextHashTarget(Target.unsafe(nextTarget))
+  }
+
+  @inline def getNextHashTarget(
+      nextTarget: Target
+  )(implicit consensusConfig: ConsensusConfig): Target = {
+    if (nextTarget <= consensusConfig.maxMiningTarget) {
+      nextTarget
     } else {
       consensusConfig.maxMiningTarget
     }
