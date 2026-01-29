@@ -80,7 +80,8 @@ trait ChainedTxUtils { self: ServerUtils =>
       gasEstimationMultiplier: Option[Double],
       gasAmount: Option[GasBox],
       gasPrice: Option[GasPrice],
-      targetBlockHash: Option[BlockHash]
+      targetBlockHash: Option[BlockHash],
+      extraDustAmount: U256
   ): Try[BuildGrouplessExecuteScriptTxResult] = {
     for {
       multiplier <- GasEstimationMultiplier.from(gasEstimationMultiplier).left.map(badRequest)
@@ -98,7 +99,8 @@ trait ChainedTxUtils { self: ServerUtils =>
         multiplier,
         gasAmount,
         gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-        targetBlockHash
+        targetBlockHash,
+        extraDustAmount
       )
     } yield {
       val (transferTxs, executeScriptTx, txScriptExecution) = result
@@ -146,7 +148,8 @@ trait ChainedTxUtils { self: ServerUtils =>
         None,
         gasAmount,
         gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-        targetBlockHash
+        targetBlockHash,
+        U256.Zero
       )
     } yield {
       val (transferTxs, deployContractTx, _) = result
@@ -180,7 +183,8 @@ trait ChainedTxUtils { self: ServerUtils =>
               totalAmount,
               utxos,
               gasPrice,
-              targetBlockHash
+              targetBlockHash,
+              U256.Zero
             )
           tx <- blockFlow
             .transfer(
@@ -209,7 +213,8 @@ trait ChainedTxUtils { self: ServerUtils =>
       multiplier: Option[GasEstimationMultiplier],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
-      targetBlockHash: Option[BlockHash]
+      targetBlockHash: Option[BlockHash],
+      extraDustAmount: U256
   ): Try[(AVector[UnsignedTransaction], UnsignedTransaction, TxScriptExecution)] = {
     buildExecuteScriptTx(
       blockFlow,
@@ -234,7 +239,8 @@ trait ChainedTxUtils { self: ServerUtils =>
               totalAmount,
               utxos,
               gasPrice,
-              targetBlockHash
+              targetBlockHash,
+              extraDustAmount
             )
           result <- buildExecuteScriptTx(
             blockFlow,
@@ -258,12 +264,17 @@ trait ChainedTxUtils { self: ServerUtils =>
       totalAmountNeeded: TotalAmountNeeded,
       utxos: AVector[FlowUtils.AssetOutputInfo],
       gasPrice: GasPrice,
-      targetBlockHash: Option[BlockHash]
+      targetBlockHash: Option[BlockHash],
+      extraDustAmount: U256
   ): Try[(AVector[UnsignedTransaction], U256, AVector[(TokenId, U256)])] = {
     val (alphBalance, tokenBalances) = getAvailableBalances(utxos)
     val maxGasFee                    = gasPrice * getMaximalGasPerTx()
     val remainAlph =
-      maxGasFee.addUnsafe(totalAmountNeeded.alphAmount).sub(alphBalance).getOrElse(U256.Zero)
+      maxGasFee
+        .addUnsafe(totalAmountNeeded.alphAmount)
+        .addUnsafe(extraDustAmount)
+        .sub(alphBalance)
+        .getOrElse(U256.Zero)
     val (remainTokens, _) = calcTokenAmount(tokenBalances, totalAmountNeeded.tokens)
     val result = transferFromFallbackAddresses(
       blockFlow,

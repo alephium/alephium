@@ -833,7 +833,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
          |""".stripMargin
     val compiledScript = Compiler.compileTxScript(script).rightValue
 
-    val errWithDust = serverUtils
+    val result = serverUtils
       .buildExecuteScriptTx(
         blockFlow,
         BuildExecuteScriptTx(
@@ -845,9 +845,9 @@ class GrouplessUtilsSpec extends AlephiumSpec {
           dustAmount = Some(Amount(ALPH.alph(5)))
         )
       )
-      .leftValue
-      .detail
-    errWithDust.contains("Not enough balance") is true
+      .rightValue
+      .asInstanceOf[BuildGrouplessExecuteScriptTxResult]
+    result.fundingTxs.nonEmpty is true
   }
 
   trait BuildDeployContractTxFixture extends BuildExecuteScriptTxFixture {
