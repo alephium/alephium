@@ -414,10 +414,10 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       def emission: Emission               = ???
     }
 
-    ChainDifficultyAdjustment.getNextHashTarget(config.maxMiningTarget)(
+    ChainDifficultyAdjustment.getNextHashTarget(config.maxMiningTarget.value)(
       config
     ) is config.maxMiningTarget
-    ChainDifficultyAdjustment.getNextHashTarget(diff(99))(config) is config.maxMiningTarget
-    ChainDifficultyAdjustment.getNextHashTarget(diff(101))(config) is diff(101)
+    ChainDifficultyAdjustment.getNextHashTarget(diff(99).value)(config) is config.maxMiningTarget
+    ChainDifficultyAdjustment.getNextHashTarget(diff(101).value)(config) is diff(101)
   }
 }

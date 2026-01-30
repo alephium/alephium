@@ -157,14 +157,14 @@ object ChainDifficultyAdjustment {
     val nextTarget = currentTarget.value
       .multiply(BigInteger.valueOf(timeSpanMs))
       .divide(BigInteger.valueOf(consensusConfig.expectedWindowTimeSpan.millis))
-    getNextHashTarget(Target.unsafe(nextTarget))
+    getNextHashTarget(nextTarget)
   }
 
   @inline def getNextHashTarget(
-      nextTarget: Target
+      nextTargetValue: BigInteger
   )(implicit consensusConfig: ConsensusConfig): Target = {
-    if (nextTarget <= consensusConfig.maxMiningTarget) {
-      nextTarget
+    if (nextTargetValue.compareTo(consensusConfig.maxMiningTarget.value) <= 0) {
+      Target.unsafe(nextTargetValue)
     } else {
       consensusConfig.maxMiningTarget
     }
