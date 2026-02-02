@@ -202,7 +202,7 @@ trait ChainedTxUtils { self: ServerUtils =>
     }
   }
 
-  // scalastyle:off parameter.number
+  // scalastyle:off parameter.number method.length
   def buildExecuteScriptTxWithFallbackAddresses(
       blockFlow: BlockFlow,
       amounts: BuildTxCommon.ScriptTxAmounts,
@@ -255,7 +255,7 @@ trait ChainedTxUtils { self: ServerUtils =>
         } yield (crossGroupTxs._1, result._1, result._2)
     }
   }
-  // scalastyle:on parameter.number
+  // scalastyle:on parameter.number method.length
 
   private def buildTransferTxsFromFallbackAddresses(
       blockFlow: BlockFlow,
