@@ -94,7 +94,29 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         lockTime: Option[TimeStamp] = None
     ) = {
       assume(alphAmount >= dustUtxoAmount)
-      val outputInfos = if (tokenAmount.isZero) {
+      val outputInfos = buildPrepareOutputInfos(alphAmount, tokenAmount, toLockupScript, lockTime)
+      val unsignedTx = blockFlow
+        .transfer(
+          genesisPublicKey,
+          outputInfos,
+          None,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          ExtraUtxosInfo.empty
+        )
+        .rightValue
+        .rightValue
+      mineWithTx(Transaction.from(unsignedTx, genesisPrivateKey))
+      assertPreparedBalances(toLockupScript, alphAmount, tokenAmount)
+    }
+
+    private def buildPrepareOutputInfos(
+        alphAmount: U256,
+        tokenAmount: U256,
+        toLockupScript: LockupScript.Asset,
+        lockTime: Option[TimeStamp]
+    ): AVector[UnsignedTransaction.TxOutputInfo] = {
+      if (tokenAmount.isZero) {
         AVector(
           UnsignedTransaction.TxOutputInfo(toLockupScript, alphAmount, AVector.empty, lockTime)
         )
@@ -111,29 +133,23 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         } else {
           assume(alphRemain >= dustUtxoAmount)
           AVector(
-            UnsignedTransaction
-              .TxOutputInfo(
-                toLockupScript,
-                alphAmount.subUnsafe(dustUtxoAmount),
-                AVector.empty,
-                lockTime
-              ),
+            UnsignedTransaction.TxOutputInfo(
+              toLockupScript,
+              alphAmount.subUnsafe(dustUtxoAmount),
+              AVector.empty,
+              lockTime
+            ),
             tokenOutputInfo
           )
         }
       }
-      val unsignedTx = blockFlow
-        .transfer(
-          genesisPublicKey,
-          outputInfos,
-          None,
-          nonCoinbaseMinGasPrice,
-          Int.MaxValue,
-          ExtraUtxosInfo.empty
-        )
-        .rightValue
-        .rightValue
-      mineWithTx(Transaction.from(unsignedTx, genesisPrivateKey))
+    }
+
+    private def assertPreparedBalances(
+        toLockupScript: LockupScript.Asset,
+        alphAmount: U256,
+        tokenAmount: U256
+    ) = {
       val balances = blockFlow.getBalance(toLockupScript, Int.MaxValue, false).rightValue
       balances.totalAlph is alphAmount
       if (tokenAmount.isZero) {
@@ -203,13 +219,13 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
     def testTransfer(
         alphTransferAmount: U256,
-        tokenTransferAmount: U256,
+        tokenTransferAmount: Option[U256],
         group: Option[GroupIndex],
         expectedTxSize: Int,
-        destinationSize: Int = 1
+        destinationSize: Int
     ): Unit = {
       val destinations =
-        prepareDestinations(alphTransferAmount, Some(tokenTransferAmount), destinationSize)
+        prepareDestinations(alphTransferAmount, tokenTransferAmount, destinationSize)
       val txs = buildTxs(destinations, group, expectedTxSize)
 
       val fromBalance0 = getBalance(fromAddressWithoutGroup)
@@ -218,15 +234,31 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
       val gasFee                   = txs.fold(U256.Zero)((acc, tx) => acc.addUnsafe(tx.gasFee))
       val totalAlphTransferAmount  = alphTransferAmount * destinationSize
-      val totalTokenTransferAmount = tokenTransferAmount * destinationSize
+      val totalTokenTransferAmount = tokenTransferAmount.getOrElse(U256.Zero) * destinationSize
       fromBalance0._1 is fromBalance1._1.addUnsafe(totalAlphTransferAmount).addUnsafe(gasFee)
       fromBalance0._2 is fromBalance1._2.addUnsafe(totalTokenTransferAmount)
 
       destinations.foreach { destination =>
         val toBalance = getBalance(api.Address.from(destination.address.lockupScript))
         toBalance._1 is alphTransferAmount
-        toBalance._2 is tokenTransferAmount
+        toBalance._2 is tokenTransferAmount.getOrElse(U256.Zero)
       }
+    }
+
+    def testTransfer(
+        alphTransferAmount: U256,
+        tokenTransferAmount: U256,
+        group: Option[GroupIndex],
+        expectedTxSize: Int,
+        destinationSize: Int = 1
+    ): Unit = {
+      testTransfer(
+        alphTransferAmount,
+        Some(tokenTransferAmount),
+        group,
+        expectedTxSize,
+        destinationSize
+      )
     }
 
     def getAllUnsignedTxs(result: BuildGrouplessTransferTxResult) = {
@@ -526,7 +558,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(ALPH.alph(7)),
         None,
         3,
-        s"Not enough balance: 7.502 ALPH, ${tokenId.toHexString}: 15000000000000000000"
+        s"Not enough balance: 6.0662296 ALPH, ${tokenId.toHexString}: 15000000000000000000"
       )
     }
 
@@ -542,7 +574,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         Some(ALPH.alph(7)),
         None,
         3,
-        s"Not enough balance: 7.502 ALPH, ${tokenId.toHexString}: 15000000000000000000"
+        s"Not enough balance: 6.0680476 ALPH, ${tokenId.toHexString}: 15000000000000000000"
       )
     }
   }
@@ -562,10 +594,10 @@ class GrouplessUtilsSpec extends AlephiumSpec {
   it should "fail if the from address does not have enough balance when building transfer txs" in {
     new P2PKFixture {
       prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
-      failTransfer(ALPH.alph(2), Some(ALPH.alph(2)), None, 1, "Not enough balance: 0.502 ALPH")
+      failTransfer(ALPH.alph(2), ALPH.alph(2), None, 1, "Not enough balance: 0.0553432 ALPH")
       failTransfer(
         ALPH.oneAlph,
-        Some(ALPH.alph(3)),
+        ALPH.alph(3),
         None,
         1,
         s"Not enough balance: ${tokenId.toHexString}: 1000000000000000000"
@@ -574,10 +606,10 @@ class GrouplessUtilsSpec extends AlephiumSpec {
 
     new P2HMPKFixture {
       prepare(ALPH.alph(2), ALPH.alph(2), fromLockupScript)
-      failTransfer(ALPH.alph(2), Some(ALPH.alph(2)), None, 1, "Not enough balance: 0.502 ALPH")
+      failTransfer(ALPH.alph(2), ALPH.alph(2), None, 1, "Not enough balance: 0.0559492 ALPH")
       failTransfer(
         ALPH.oneAlph,
-        Some(ALPH.alph(3)),
+        ALPH.alph(3),
         None,
         1,
         s"Not enough balance: ${tokenId.toHexString}: 1000000000000000000"
@@ -593,15 +625,15 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         fromLockupScript,
         Some(TimeStamp.now().plusHoursUnsafe(1))
       )
-      failTransfer(ALPH.alph(2), ALPH.alph(0), None, 1, "Not enough balance: 2.502 ALPH")
+      failTransfer(ALPH.alph(2), ALPH.alph(0), None, 1, "Not enough balance: 2.0553432 ALPH")
 
       prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts.head)
       failTransfer(
         ALPH.alph(2),
-        Some(ALPH.alph(2)),
+        ALPH.alph(2),
         None,
         1,
-        s"Not enough balance: 0.502 ALPH, ${tokenId.toHexString}: 1000000000000000000"
+        s"Not enough balance: 0.0553432 ALPH, ${tokenId.toHexString}: 1000000000000000000"
       )
     }
 
@@ -612,15 +644,15 @@ class GrouplessUtilsSpec extends AlephiumSpec {
         fromLockupScript,
         Some(TimeStamp.now().plusHoursUnsafe(1))
       )
-      failTransfer(ALPH.alph(2), ALPH.alph(0), None, 1, "Not enough balance: 2.502 ALPH")
+      failTransfer(ALPH.alph(2), ALPH.alph(0), None, 1, "Not enough balance: 2.0559492 ALPH")
 
       prepare(ALPH.alph(2), ALPH.alph(1), allLockupScripts.head)
       failTransfer(
         ALPH.alph(2),
-        Some(ALPH.alph(2)),
+        ALPH.alph(2),
         None,
         1,
-        s"Not enough balance: 0.502 ALPH, ${tokenId.toHexString}: 1000000000000000000"
+        s"Not enough balance: 0.0559492 ALPH, ${tokenId.toHexString}: 1000000000000000000"
       )
     }
   }
@@ -1087,7 +1119,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       val buildingGrouplessTransferTx = transferWithoutEnoughBalance(ALPH.alph(3), ALPH.alph(3))
 
       buildingGrouplessTransferTx.from is allLockupScripts(1)
-      buildingGrouplessTransferTx.remainingAmounts._1 is ALPH.alphFromString("1.501 ALPH").get
+      buildingGrouplessTransferTx.remainingAmounts._1 is U256.unsafe(BigInt("1054343200000000000"))
       buildingGrouplessTransferTx.remainingAmounts._2 is AVector((tokenId, ALPH.alph(1)))
       buildingGrouplessTransferTx.remainingLockupScripts is AVector(
         allLockupScripts(2),
@@ -1418,13 +1450,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     getBalance(fromAddressWithoutGroup)._1 is ALPH.alph(66) / 100
 
     val alphTransferAmount = ALPH.alph(55) / 100
-    failTransfer(
-      alphTransferAmount,
-      None,
-      None,
-      1,
-      "Not enough balance: 0.551 ALPH"
-    )
+    testTransfer(alphTransferAmount, None, None, 2, 1)
   }
 
   it should "return the correct error message if building the transfer tx fails" in new P2PKFixture {
