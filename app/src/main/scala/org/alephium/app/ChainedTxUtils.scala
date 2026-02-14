@@ -33,43 +33,6 @@ import org.alephium.util.{AVector, Math, TimeStamp, U256}
 
 trait ChainedTxUtils { self: ServerUtils =>
 
-  def buildTransferTxWithFallbackAddresses(
-      blockFlow: BlockFlow,
-      lockPair: (LockupScript.Asset, UnlockScript),
-      otherLockPairs: AVector[(LockupScript.Asset, UnlockScript)],
-      destinations: AVector[Destination],
-      gasPriceOpt: Option[GasPrice],
-      targetBlockHashOpt: Option[BlockHash]
-  ): Try[AVector[BuildSimpleTransferTxResult]] = {
-    val outputInfos = prepareOutputInfos(destinations)
-    val gasPrice    = gasPriceOpt.getOrElse(nonCoinbaseMinGasPrice)
-    for {
-      totalAmount <- blockFlow
-        .checkAndCalcTotalAmountNeeded(
-          lockPair._1,
-          outputInfos,
-          None,
-          gasPrice
-        )
-        .left
-        .map(badRequest)
-      utxos <- blockFlow
-        .getUsableUtxos(targetBlockHashOpt, lockPair._1, self.apiConfig.defaultUtxosLimit)
-        .left
-        .map(failedInIO)
-      txs <- buildTransferTxWithFallbackAddresses(
-        blockFlow,
-        lockPair,
-        otherLockPairs,
-        totalAmount,
-        utxos,
-        outputInfos,
-        gasPrice,
-        targetBlockHashOpt
-      )
-    } yield txs.map(BuildSimpleTransferTxResult.from)
-  }
-
   // scalastyle:off parameter.number
   def buildExecuteScriptTxWithFallbackAddresses(
       blockFlow: BlockFlow,
@@ -157,48 +120,6 @@ trait ChainedTxUtils { self: ServerUtils =>
         BuildSimpleDeployContractTxResult.from(deployContractTx),
         transferTxs.map(BuildSimpleTransferTxResult.from)
       )
-    }
-  }
-
-  private def buildTransferTxWithFallbackAddresses(
-      blockFlow: BlockFlow,
-      lockPair: (LockupScript.Asset, UnlockScript),
-      otherLockupPairs: AVector[(LockupScript.Asset, UnlockScript)],
-      totalAmount: UnsignedTransaction.TotalAmountNeeded,
-      utxos: AVector[FlowUtils.AssetOutputInfo],
-      outputInfos: AVector[UnsignedTransaction.TxOutputInfo],
-      gasPrice: GasPrice,
-      targetBlockHash: Option[BlockHash]
-  ): Try[AVector[UnsignedTransaction]] = {
-    val (lockup, unlock) = lockPair
-    blockFlow.transfer(lockup, unlock, outputInfos, totalAmount, utxos, None, gasPrice) match {
-      case Right(unsignedTx) => Right(AVector(unsignedTx))
-      case Left(_) =>
-        for {
-          crossGroupTxs <-
-            buildTransferTxsFromFallbackAddresses(
-              blockFlow,
-              lockup,
-              otherLockupPairs,
-              totalAmount,
-              utxos,
-              gasPrice,
-              targetBlockHash,
-              U256.Zero
-            )
-          tx <- blockFlow
-            .transfer(
-              lockup,
-              unlock,
-              outputInfos,
-              totalAmount,
-              utxos ++ getExtraUtxos(lockup, crossGroupTxs._1),
-              None,
-              gasPrice
-            )
-            .left
-            .map(err => notEnoughAlph(crossGroupTxs._2, badRequest(err)))
-        } yield crossGroupTxs._1 :+ tx
     }
   }
 
