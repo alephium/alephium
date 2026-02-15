@@ -740,17 +740,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       if (ALPH.isSequentialTxSupported(chainIndex, hardFork)) {
         blockEnv.addOutputRefFromTx(tx.unsigned)
       }
-      txValidationResult match {
-        case Right(_) => Right(())
-        case Left(Right(TxScriptExeFailed(_))) =>
-          if (tx.contractInputs.isEmpty) {
-            Right(())
-          } else {
-            convert(tx, invalidTx(ContractInputsShouldBeEmptyForFailedTxScripts))
-          }
-        case Left(Right(e)) => convert(tx, invalidTx(e))
-        case Left(Left(e))  => Left(Left(e))
-      }
+      convert(tx, txValidationResult)
     }
   }
 

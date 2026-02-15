@@ -17,9 +17,12 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.io.IOError
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfig, ConsensusConfigs}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.*
+import org.alephium.protocol.vm.StackOverflow
 import org.alephium.util.{AVector, Duration}
 
 class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -50,5 +53,26 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
     val invalidBlock = invalidNonceBlock(blockFlow, ChainIndex.unsafe(0, 0))
     invalidBlock.target is consensusConfigs.getConsensusConfig(block.timestamp).maxMiningTarget
     Validation.preValidate(AVector(invalidBlock)) is false
+  }
+
+  it should "convert tx validation status to block validation status" in {
+    val tx0 = transactionGen().sample.get
+    tx0.contractInputs.isEmpty is true
+    val ioError = IOError.keyNotFound("Input A")
+    ValidationStatus.convert(tx0, Left(Left(ioError))) is Left(
+      Right(ExistInvalidTx(tx0, InvalidTxDueToIOError(ioError)))
+    )
+    ValidationStatus.convert(tx0, Left(Right(TxScriptExeFailed(StackOverflow)))) is Right(())
+    ValidationStatus.convert(tx0, Left(Right(OutOfGas))) is Left(
+      Right(ExistInvalidTx(tx0, OutOfGas))
+    )
+    ValidationStatus.convert(tx0, Right(())) is Right(())
+
+    val tx1 = tx0.copy(contractInputs =
+      AVector(ContractOutputRef(Hint.unsafe(0), TxOutputRef.unsafeKey(Hash.random)))
+    )
+    ValidationStatus.convert(tx1, Left(Right(TxScriptExeFailed(StackOverflow)))) is Left(
+      Right(ExistInvalidTx(tx1, ContractInputsShouldBeEmptyForFailedTxScripts))
+    )
   }
 }
