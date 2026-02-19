@@ -133,7 +133,7 @@ trait FlowDifficultyAdjustment {
     val heightGap        = calHeightDiffUnsafe(chainDep, oldestTs)
     val penaltyChainDiff = consensusConfig.penalizeDiffForHeightGapPatch(adjustedDiff, heightGap)
     val nextTarget       = FlowDifficultyAdjustment.clip(diff, penaltyChainDiff).getTarget()
-    ChainDifficultyAdjustment.getNextHashTarget(nextTarget)
+    ChainDifficultyAdjustment.getNextHashTarget(nextTarget.value)
   }
 
   def getNextHashTargetDanube(
