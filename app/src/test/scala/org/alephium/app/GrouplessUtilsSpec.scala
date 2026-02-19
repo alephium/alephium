@@ -806,6 +806,50 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
   }
 
+  it should "use dustAmount as a funding buffer for auto-funded execute script txs" in new BuildExecuteScriptTxFixture {
+    prepare(ALPH.alph(20), ALPH.alph(1), allLockupScripts.head)
+    val targetBalance = blockFlow.getBalance(fromLockupScript, Int.MaxValue, false).rightValue
+    targetBalance.totalAlph is U256.Zero
+    targetBalance.totalTokens.isEmpty is true
+
+    val simpleContract =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val bytecode    = Compiler.compileContract(simpleContract).rightValue
+    val bytecodeHex = Hex.toHexString(serialize(bytecode))
+
+    val script =
+      s"""
+         |@using(preapprovedAssets = true)
+         |TxScript Main {
+         |  // Create enough contracts so auto-fund dust exceeds max gas buffer.
+         |  for (let mut i = 0; i < 20; i += 1) {
+         |    let _ = createContract!(#$bytecodeHex, #00, #00)
+         |  }
+         |}
+         |""".stripMargin
+    val compiledScript = Compiler.compileTxScript(script).rightValue
+
+    val result = serverUtils
+      .buildExecuteScriptTx(
+        blockFlow,
+        BuildExecuteScriptTx(
+          fromPublicKey.bytes,
+          fromPublicKeyType = Some(BuildTxCommon.GLWebAuthn),
+          serialize(compiledScript),
+          attoAlphAmount = None,
+          group = Some(chainIndex.from),
+          dustAmount = Some(Amount(ALPH.alph(5)))
+        )
+      )
+      .rightValue
+      .asInstanceOf[BuildGrouplessExecuteScriptTxResult]
+    result.fundingTxs.nonEmpty is true
+  }
+
   trait BuildDeployContractTxFixture extends BuildExecuteScriptTxFixture {
     def buildDeployContractQuery(
         alphAmount: U256,

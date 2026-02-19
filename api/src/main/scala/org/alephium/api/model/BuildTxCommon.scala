@@ -249,16 +249,18 @@ object BuildTxCommon {
     def gasEstimationMultiplier: Option[Double]
     def dustAmount: Option[Amount]
 
-    def getAmounts: Either[String, ScriptTxAmounts] = {
+    private def getAmountsWithExtraDust(extraDustAmount: U256): Either[String, ScriptTxAmounts] = {
       BuildTxCommon.getAlphAndTokenAmounts(attoAlphAmount, tokens).flatMap {
         case (alphAmount, tokens) =>
-          ScriptTxAmounts.from(
-            alphAmount.getOrElse(U256.Zero),
-            dustAmount.map(_.value).getOrElse(U256.Zero),
-            tokens
-          )
+          ScriptTxAmounts.from(alphAmount.getOrElse(U256.Zero), extraDustAmount, tokens)
       }
     }
+
+    def getAmounts: Either[String, ScriptTxAmounts] =
+      getAmountsWithExtraDust(dustAmount.map(_.value).getOrElse(U256.Zero))
+
+    def getAmountsWithoutDust: Either[String, ScriptTxAmounts] =
+      getAmountsWithExtraDust(U256.Zero)
 
     var statefulScript: Option[StatefulScript] = None
     @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))

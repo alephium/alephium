@@ -1656,8 +1656,9 @@ class ServerUtils(implicit
       lockupPair <- query.getLockPair()
       result <- lockupPair._1 match {
         case lockupScript: LockupScript.P2PK =>
+          val extraDustAmount = query.dustAmount.map(_.value).getOrElse(U256.Zero)
           for {
-            amounts <- query.getAmounts.left.map(badRequest)
+            amounts <- query.getAmountsWithoutDust.left.map(badRequest)
             script  <- query.decodeStatefulScript().left.map(badRequest)
             result <- buildExecuteScriptTxWithFallbackAddresses(
               blockFlow,
@@ -1668,7 +1669,8 @@ class ServerUtils(implicit
               query.gasEstimationMultiplier,
               query.gasAmount,
               query.gasPrice,
-              query.targetBlockHash
+              query.targetBlockHash,
+              extraDustAmount
             )
           } yield result
         case _ =>
