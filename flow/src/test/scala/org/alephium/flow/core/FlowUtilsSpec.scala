@@ -995,7 +995,8 @@ class FlowUtilsSpec extends AlephiumSpec {
         from: PrivateKey,
         to: PublicKey,
         amount: U256,
-        gasPrice: GasPrice = nonCoinbaseMinGasPrice
+        gasPrice: GasPrice = nonCoinbaseMinGasPrice,
+        timestampOpt: Option[TimeStamp] = None
     ): TransactionTemplate = {
       val output =
         UnsignedTransaction.TxOutputInfo(LockupScript.p2pkh(to), amount, AVector.empty, None)
@@ -1011,8 +1012,11 @@ class FlowUtilsSpec extends AlephiumSpec {
         .rightValue
         .rightValue
       val tx = Transaction.from(unsignedTx, from).toTemplate
-      timestamp = timestamp.plusMillisUnsafe(1)
-      blockFlow.grandPool.add(chainIndex, tx, timestamp)
+      val txTimestamp = timestampOpt.getOrElse {
+        timestamp = timestamp.plusMillisUnsafe(1)
+        timestamp
+      }
+      blockFlow.grandPool.add(chainIndex, tx, txTimestamp)
       tx
     }
 
@@ -1109,6 +1113,39 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block)
 
     blockFlow.getMemPool(chainIndex.from).contains(tx1.id) is true
+    blockFlow.getMemPool(chainIndex.from).contains(tx2.id) is true
+  }
+
+  it should "remove missing input txs from mempool after one minute" in new SequentialTxsFixture {
+    val higherGasPrice    = GasPrice(nonCoinbaseMinGasPrice.value.addOneUnsafe())
+    val oneMinuteAgo      = TimeStamp.now().minusUnsafe(Duration.ofMinutesUnsafe(1))
+    val (_, toPublicKey0) = chainIndex.to.generateKey
+    val tx0               = transferTx(fromPrivateKey0, toPublicKey0, ALPH.alph(5))
+    val (_, toPublicKey1) = chainIndex.to.generateKey
+
+    val tx1 =
+      transferTx(fromPrivateKey0, toPublicKey1, ALPH.alph(5), higherGasPrice, Some(oneMinuteAgo))
+    val tx2 = transferTx(
+      fromPrivateKey0,
+      toPublicKey1,
+      ALPH.oneAlph,
+      nonCoinbaseMinGasPrice,
+      Some(oneMinuteAgo.plusMillisUnsafe(1))
+    )
+
+    tx1.unsigned.inputs.forall(input => tx0.fixedOutputRefs.contains(input.outputRef)) is true
+    tx2.unsigned.inputs.forall(input => tx1.fixedOutputRefs.contains(input.outputRef)) is true
+
+    val mempool = blockFlow.getMemPool(chainIndex.from)
+    mempool.contains(tx0.id) is true
+    mempool.contains(tx1.id) is true
+    mempool.contains(tx2.id) is true
+
+    collectTxs() is AVector(tx0)
+
+    mempool.contains(tx0.id) is true
+    mempool.contains(tx1.id) is false
+    mempool.contains(tx2.id) is false
   }
 
   it should "not collect sequential txs for inter group blocks" in new SequentialTxsFixture {

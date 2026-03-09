@@ -58,6 +58,8 @@ class MemPool private (
 
   def get(txId: TransactionId): Option[TransactionTemplate] = readOnly(flow.get(txId).map(_.tx))
 
+  def getTimestamp(txId: TransactionId): Option[TimeStamp] = readOnly(timestamps.get(txId))
+
   private def _contains(txId: TransactionId): Boolean = {
     timestamps.contains(txId)
   }

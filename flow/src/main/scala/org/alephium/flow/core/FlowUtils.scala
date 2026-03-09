@@ -35,7 +35,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, Hex, TimeStamp, U256}
+import org.alephium.util.{AVector, Duration, Hex, TimeStamp, U256}
 
 // scalastyle:off number.of.methods
 trait FlowUtils
@@ -160,15 +160,38 @@ trait FlowUtils
       groupView: BlockFlowGroupView[WorldState.Cached],
       chainIndex: ChainIndex,
       hardFork: HardFork
-  ): AVector[TransactionTemplate] = {
+  ): (AVector[TransactionTemplate], AVector[TransactionTemplate]) = {
     val newOutputRefs           = mutable.HashSet.empty[AssetOutputRef]
     val isSequentialTxSupported = ALPH.isSequentialTxSupported(chainIndex, hardFork)
-    txs.filter { tx =>
+    var validTxs                = AVector.ofCapacity[TransactionTemplate](txs.length)
+    var missingInputTxs         = AVector.empty[TransactionTemplate]
+    txs.foreach { tx =>
       val isExists = Utils.unsafe(groupView.exists(tx.unsigned.inputs, newOutputRefs))
       if (isExists && isSequentialTxSupported) {
         tx.fixedOutputRefs.foreach(newOutputRefs += _)
       }
-      isExists
+      if (isExists) {
+        validTxs = validTxs :+ tx
+      } else {
+        missingInputTxs = missingInputTxs :+ tx
+      }
+    }
+    (validTxs, missingInputTxs)
+  }
+
+  def removeStaleMissingInputTxs(
+      mempool: MemPool,
+      missingInputTxs: AVector[TransactionTemplate]
+  ): Unit = {
+    if (missingInputTxs.nonEmpty) {
+      // One minute stale threshold
+      val staleThreshold = TimeStamp.now().minusUnsafe(Duration.ofMinutesUnsafe(1))
+      val staleMissingTxs =
+        missingInputTxs.filter(tx => mempool.getTimestamp(tx.id).exists(_ <= staleThreshold))
+      if (staleMissingTxs.nonEmpty) {
+        mempool.removeUnusedTxs(staleMissingTxs)
+        ()
+      }
     }
   }
 
@@ -180,13 +203,17 @@ trait FlowUtils
       hardFork: HardFork
   ): IOResult[AVector[TransactionTemplate]] = {
     IOUtils.tryExecute {
+      val mempool                          = getMemPool(chainIndex)
       val candidates0                      = collectPooledTxs(chainIndex, hardFork)
       val (candidates1, doubleSpendingTxs) = FlowUtils.filterDoubleSpending(candidates0)
       if (doubleSpendingTxs.nonEmpty) {
-        getMemPool(chainIndex).removeUnusedTxs(doubleSpendingTxs)
+        mempool.removeUnusedTxs(doubleSpendingTxs)
       }
       // some tx inputs might from bestDeps, but not loosenDeps
-      val candidates2 = filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork)
+      val (candidates2, missingInputTxs) =
+        filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork)
+      removeStaleMissingInputTxs(mempool, missingInputTxs)
+
       // we don't want any tx that conflicts with bestDeps
       val candidates3 = if (hardFork.isDanubeEnabled()) {
         // For performance, conflicted TXs in parallel chains are fine since Danube upgrade
