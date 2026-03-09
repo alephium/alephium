@@ -180,8 +180,11 @@ trait FlowUtils
       hardFork: HardFork
   ): IOResult[AVector[TransactionTemplate]] = {
     IOUtils.tryExecute {
-      val candidates0 = collectPooledTxs(chainIndex, hardFork)
-      val candidates1 = FlowUtils.filterDoubleSpending(candidates0)
+      val candidates0                      = collectPooledTxs(chainIndex, hardFork)
+      val (candidates1, doubleSpendingTxs) = FlowUtils.filterDoubleSpending(candidates0)
+      if (doubleSpendingTxs.nonEmpty) {
+        getMemPool(chainIndex).removeUnusedTxs(doubleSpendingTxs)
+      }
       // some tx inputs might from bestDeps, but not loosenDeps
       val candidates2 = filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork)
       // we don't want any tx that conflicts with bestDeps
@@ -561,16 +564,21 @@ object FlowUtils {
     val cachedLevel = 2
   }
 
-  def filterDoubleSpending[T <: TransactionAbstract: ClassTag](txs: AVector[T]): AVector[T] = {
+  def filterDoubleSpending[T <: TransactionAbstract: ClassTag](
+      txs: AVector[T]
+  ): (AVector[T], AVector[T]) = {
     var output   = AVector.ofCapacity[T](txs.length)
+    var rejected = AVector.empty[T]
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     txs.foreach { tx =>
       if (tx.unsigned.inputs.forall(input => !utxoUsed.contains(input.outputRef))) {
         utxoUsed.addAll(tx.unsigned.inputs.toIterable.view.map(_.outputRef))
         output = output :+ tx
+      } else {
+        rejected = rejected :+ tx
       }
     }
-    output
+    (output, rejected)
   }
 
   def convertNonScriptTx(txTemplate: TransactionTemplate): Transaction = {

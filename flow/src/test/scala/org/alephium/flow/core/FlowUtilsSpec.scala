@@ -24,11 +24,12 @@ import org.scalacheck.Gen
 import org.alephium.crypto.Byte64
 import org.alephium.flow.{FlowFixture, GhostUncleFixture}
 import org.alephium.flow.core.ExtraUtxosInfo
-import org.alephium.flow.mempool.{Normal, Reorg}
+import org.alephium.flow.mempool.{MemPool, Normal, Reorg}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.protocol.{ALPH, Generators, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.model._
+import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
 import org.alephium.util._
@@ -115,10 +116,14 @@ class FlowUtilsSpec extends AlephiumSpec {
     val tx0 = transactionGen(Gen.const(2)).sample.get
     val tx1 = transactionGen(Gen.const(2)).sample.get
     val tx2 = transactionGen(Gen.const(2)).sample.get
-    FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx2)) is AVector(tx0, tx1, tx2)
-    FlowUtils.filterDoubleSpending(AVector(tx0, tx0, tx2)) is AVector(tx0, tx2)
-    FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx0)) is AVector(tx0, tx1)
-    FlowUtils.filterDoubleSpending(AVector(tx0, tx2, tx2)) is AVector(tx0, tx2)
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx2)) is
+      (AVector(tx0, tx1, tx2), AVector.empty[Transaction])
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx0, tx2)) is
+      (AVector(tx0, tx2), AVector(tx0))
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx0)) is
+      (AVector(tx0, tx1), AVector(tx0))
+    FlowUtils.filterDoubleSpending(AVector(tx0, tx2, tx2)) is
+      (AVector(tx0, tx2), AVector(tx2))
   }
 
   trait TxConflictsFixture extends FlowFixture {
@@ -389,6 +394,74 @@ class FlowUtilsSpec extends AlephiumSpec {
     val txs4 = prepareTxs(maximalGasPerBlock.subUnsafe(minimalGas).value / 5)
     test(HardFork.Leman, txs4)
     test(HardFork.Rhone, txs4.take(5))
+  }
+
+  it should "remove double spending txs from mempool when collecting transactions" in new FlowFixture {
+    setHardFork(HardFork.Danube)
+
+    val chainIndex                = ChainIndex.unsafe(0, 0)
+    val (fromPrivateKey, fromPub) = chainIndex.from.generateKey
+    val fromLockupScript          = LockupScript.p2pkh(fromPub)
+    val fundingBlock              = transfer(blockFlow, genesisKeys(0)._1, fromPub, ALPH.alph(20))
+    addAndCheck(blockFlow, fundingBlock)
+
+    val fundedUtxos = blockFlow.getUsableUtxos(fromLockupScript, Int.MaxValue).rightValue
+    fundedUtxos.length is 1
+    val fundedRefs = fundedUtxos.map(_.ref)
+
+    def buildTransferTx(to: PublicKey, amount: U256, gasPrice: GasPrice): TransactionTemplate = {
+      val output = TxOutputInfo(LockupScript.p2pkh(to), amount, AVector.empty, None)
+      val unsignedTx = blockFlow
+        .transfer(fromPub, fundedRefs, AVector(output), None, gasPrice)
+        .rightValue
+        .rightValue
+      Transaction.from(unsignedTx, fromPrivateKey).toTemplate
+    }
+
+    val higherGasPrice = GasPrice(nonCoinbaseMinGasPrice.value.addOneUnsafe())
+    val tx0            = buildTransferTx(chainIndex.to.generateKey._2, ALPH.alph(5), higherGasPrice)
+    val tx1 = buildTransferTx(chainIndex.to.generateKey._2, ALPH.alph(6), nonCoinbaseMinGasPrice)
+    tx0.unsigned.inputs.map(_.outputRef) is tx1.unsigned.inputs.map(_.outputRef)
+
+    val mempool = blockFlow.getMemPool(chainIndex)
+    val now     = TimeStamp.now()
+    blockFlow.grandPool.add(chainIndex, tx1, now) is MemPool.AddedToMemPool
+    val tx2 = { // build tx2 which depends on tx1
+      val to     = chainIndex.to.generateKey._2
+      val output = TxOutputInfo(LockupScript.p2pkh(to), ALPH.oneAlph, AVector.empty, None)
+      val unsignedTx = blockFlow
+        .transfer(
+          fromPub,
+          AVector(output),
+          None,
+          nonCoinbaseMinGasPrice,
+          defaultUtxoLimit,
+          ExtraUtxosInfo.empty
+        )
+        .rightValue
+        .rightValue
+      Transaction.from(unsignedTx, fromPrivateKey).toTemplate
+    }
+    tx2.unsigned.inputs.forall(input => tx1.fixedOutputRefs.contains(input.outputRef)) is true
+    blockFlow.grandPool.add(chainIndex, tx2, now.plusMillisUnsafe(1)) is MemPool.AddedToMemPool
+
+    tx1.unsigned.inputs.foreach(input => mempool.sharedTxIndexes.inputIndex.remove(input.outputRef))
+    blockFlow.grandPool.add(chainIndex, tx0, now.plusMillisUnsafe(2)) is MemPool.AddedToMemPool
+
+    val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
+    val bestDeps  = blockFlow.getBestDeps(chainIndex, HardFork.Danube)
+
+    blockFlow.collectPooledTxs(chainIndex, HardFork.Danube).head is tx0
+    mempool.contains(tx0.id) is true
+    mempool.contains(tx1.id) is true
+    mempool.contains(tx2.id) is true
+
+    blockFlow.collectTransactions(chainIndex, groupView, bestDeps, HardFork.Danube).rightValue is
+      AVector(tx0)
+
+    mempool.contains(tx0.id) is true
+    mempool.contains(tx1.id) is false
+    mempool.contains(tx2.id) is false
   }
 
   trait CoinbaseRewardFixture extends FlowFixture {
