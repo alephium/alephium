@@ -23,7 +23,11 @@ import org.alephium.api.{badRequest, failedInIO, ApiError, Try}
 import org.alephium.api.model._
 import org.alephium.api.model.BuildTxCommon.ScriptTxAmounts
 import org.alephium.flow.core.{BlockFlow, FlowUtils, TxUtils}
-import org.alephium.flow.gasestimation.GasEstimationMultiplier
+import org.alephium.flow.gasestimation.{
+  AssetScriptGasEstimator,
+  GasEstimation,
+  GasEstimationMultiplier
+}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.TotalAmountNeeded
@@ -32,44 +36,6 @@ import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util.{AVector, Math, TimeStamp, U256}
 
 trait ChainedTxUtils { self: ServerUtils =>
-
-  def buildTransferTxWithFallbackAddresses(
-      blockFlow: BlockFlow,
-      lockPair: (LockupScript.Asset, UnlockScript),
-      otherLockPairs: AVector[(LockupScript.Asset, UnlockScript)],
-      destinations: AVector[Destination],
-      gasPriceOpt: Option[GasPrice],
-      targetBlockHashOpt: Option[BlockHash]
-  ): Try[AVector[BuildSimpleTransferTxResult]] = {
-    val outputInfos = prepareOutputInfos(destinations)
-    val gasPrice    = gasPriceOpt.getOrElse(nonCoinbaseMinGasPrice)
-    for {
-      totalAmount <- blockFlow
-        .checkAndCalcTotalAmountNeeded(
-          lockPair._1,
-          outputInfos,
-          None,
-          gasPrice
-        )
-        .left
-        .map(badRequest)
-      utxos <- blockFlow
-        .getUsableUtxos(targetBlockHashOpt, lockPair._1, self.apiConfig.defaultUtxosLimit)
-        .left
-        .map(failedInIO)
-      txs <- buildTransferTxWithFallbackAddresses(
-        blockFlow,
-        lockPair,
-        otherLockPairs,
-        totalAmount,
-        utxos,
-        outputInfos,
-        gasPrice,
-        targetBlockHashOpt
-      )
-    } yield txs.map(BuildSimpleTransferTxResult.from)
-  }
-
   // scalastyle:off parameter.number
   def buildExecuteScriptTxWithFallbackAddresses(
       blockFlow: BlockFlow,
@@ -159,49 +125,6 @@ trait ChainedTxUtils { self: ServerUtils =>
       )
     }
   }
-
-  private def buildTransferTxWithFallbackAddresses(
-      blockFlow: BlockFlow,
-      lockPair: (LockupScript.Asset, UnlockScript),
-      otherLockupPairs: AVector[(LockupScript.Asset, UnlockScript)],
-      totalAmount: UnsignedTransaction.TotalAmountNeeded,
-      utxos: AVector[FlowUtils.AssetOutputInfo],
-      outputInfos: AVector[UnsignedTransaction.TxOutputInfo],
-      gasPrice: GasPrice,
-      targetBlockHash: Option[BlockHash]
-  ): Try[AVector[UnsignedTransaction]] = {
-    val (lockup, unlock) = lockPair
-    blockFlow.transfer(lockup, unlock, outputInfos, totalAmount, utxos, None, gasPrice) match {
-      case Right(unsignedTx) => Right(AVector(unsignedTx))
-      case Left(_) =>
-        for {
-          crossGroupTxs <-
-            buildTransferTxsFromFallbackAddresses(
-              blockFlow,
-              lockup,
-              otherLockupPairs,
-              totalAmount,
-              utxos,
-              gasPrice,
-              targetBlockHash,
-              U256.Zero
-            )
-          tx <- blockFlow
-            .transfer(
-              lockup,
-              unlock,
-              outputInfos,
-              totalAmount,
-              utxos ++ getExtraUtxos(lockup, crossGroupTxs._1),
-              None,
-              gasPrice
-            )
-            .left
-            .map(err => notEnoughAlph(crossGroupTxs._2, badRequest(err)))
-        } yield crossGroupTxs._1 :+ tx
-    }
-  }
-
   // scalastyle:off parameter.number method.length
   def buildExecuteScriptTxWithFallbackAddresses(
       blockFlow: BlockFlow,
@@ -343,7 +266,15 @@ trait ChainedTxUtils { self: ServerUtils =>
       .flatMap { utxos =>
         val (alphBalance, tokenBalances)   = getAvailableBalances(utxos)
         val (remainTokens, transferTokens) = calcTokenAmount(tokenBalances, tokenAmounts)
-        val transferAlph = calcAlphAmount(alphBalance, alphAmount, transferTokens.length, gasPrice)
+        val transferAlph =
+          calcAlphAmount(
+            fromLockupPair,
+            alphBalance,
+            alphAmount,
+            transferTokens.length,
+            utxos.length,
+            gasPrice
+          )
         val outputInfos = AVector(
           UnsignedTransaction.TxOutputInfo(toLockup, transferAlph, transferTokens, None)
         )
@@ -360,16 +291,23 @@ trait ChainedTxUtils { self: ServerUtils =>
   }
 
   protected def calcAlphAmount(
+      lockPair: (LockupScript.Asset, UnlockScript),
       alphBalance: U256,
       alphNeeded: U256,
       tokenSize: Int,
+      numOfInputs: Int,
       gasPrice: GasPrice
   ): U256 = {
-    val tokenDustAmount = U256.unsafe(tokenSize).mulUnsafe(dustUtxoAmount)
+    val tokenDustAmount  = U256.unsafe(tokenSize).mulUnsafe(dustUtxoAmount)
+    val changeDustAmount = U256.unsafe(tokenSize + 1).mulUnsafe(dustUtxoAmount)
     if (alphNeeded <= tokenDustAmount) {
       tokenDustAmount
     } else {
-      val extraAmount = tokenDustAmount.addUnsafe(gasPrice * getMaximalGasPerTx())
+      // The funding tx outputs: destination (tokenSize + 1) + sender change (tokenSize + 1)
+      val numOutputs = 2 * (tokenSize + 1)
+      val maxGasFee =
+        estimateMaxTransferGasFee(lockPair._1, lockPair._2, numOfInputs, numOutputs, gasPrice)
+      val extraAmount = tokenDustAmount.addUnsafe(changeDustAmount).addUnsafe(maxGasFee)
       if (alphBalance > extraAmount) {
         val available    = alphBalance.subUnsafe(extraAmount)
         val remainNeeded = alphNeeded.subUnsafe(tokenDustAmount)
@@ -467,5 +405,24 @@ trait ChainedTxUtils { self: ServerUtils =>
       }
     )
     AVector.from(extraUtxos)
+  }
+
+  protected def estimateMaxTransferGasFee(
+      lockupScript: LockupScript,
+      unlockScript: UnlockScript,
+      numOfInputs: Int,
+      numOutputs: Int,
+      gasPrice: GasPrice
+  ): U256 = {
+    GasEstimation
+      .estimateWithInputScript(
+        (lockupScript, unlockScript),
+        numOfInputs,
+        numOutputs,
+        AssetScriptGasEstimator.NotImplemented
+      ) match {
+      case Right(gas) => gasPrice * gas
+      case Left(_)    => gasPrice * getMaximalGasPerTx()
+    }
   }
 }

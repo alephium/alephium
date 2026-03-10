@@ -28,6 +28,7 @@ import org.alephium.crypto.{ED25519PublicKey, SecP256K1PublicKey, SecP256R1Publi
 import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo}
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.io.IOResult
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{Balance => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
@@ -430,7 +431,13 @@ trait GrouplessUtils extends ChainedTxUtils { self: ServerUtils =>
 
           case Left(errorMessage) =>
             val (alphBalance, tokenBalances) = getAvailableBalances(utxos)
-            val maxGasFee                    = gasPrice * getMaximalGasPerTx()
+            val maxGasFee = estimateMaxTransferGasFee(
+              lockup,
+              unlockScript,
+              ALPH.MaxTxInputNum,
+              totalAmountNeeded.outputLength,
+              gasPrice
+            )
             val remainAlph = maxGasFee
               .addUnsafe(totalAmountNeeded.alphAmount)
               .sub(alphBalance)
