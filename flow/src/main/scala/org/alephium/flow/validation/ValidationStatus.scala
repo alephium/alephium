@@ -141,21 +141,21 @@ object ValidationStatus {
     result.toRight(Right(error))
   }
 
-  private[validation] def convert[T](x: Either[Either[IOError, T], Unit], default: T): IOResult[T] =
-    x match {
-      case Left(Left(error)) => Left(error)
-      case Left(Right(t))    => Right(t)
-      case Right(())         => Right(default)
-    }
-
-  private[validation] def convert[T](
+  @scala.annotation.tailrec
+  private[validation] def convert(
       t: Transaction,
-      x: TxValidationResult[T]
-  ): BlockValidationResult[T] =
+      x: TxValidationResult[Unit]
+  ): BlockValidationResult[Unit] =
     x match {
-      case Left(Left(error)) => Left(Left(error))
-      case Left(Right(e))    => Left(Right(ExistInvalidTx(t, e)))
-      case Right(t)          => Right(t)
+      case Left(Left(error)) => convert(t, invalidTx(InvalidTxDueToIOError(error)))
+      case Left(Right(TxScriptExeFailed(_))) =>
+        if (t.contractInputs.isEmpty) {
+          Right(())
+        } else {
+          convert(t, invalidTx(ContractInputsShouldBeEmptyForFailedTxScripts))
+        }
+      case Left(Right(e)) => Left(Right(ExistInvalidTx(t, e)))
+      case Right(t)       => Right(t)
     }
 }
 
@@ -209,3 +209,4 @@ final case object UsingBreakingInstrs                           extends InvalidT
 case object InvalidLockupScriptPreDanube                        extends InvalidTxStatus
 final case class InvalidWebauthnPayload(error: SerdeError)      extends InvalidTxStatus
 final case object InvalidP2hmpkHash                             extends InvalidTxStatus
+final case class InvalidTxDueToIOError(error: IOError)          extends InvalidTxStatus

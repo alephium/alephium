@@ -35,7 +35,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, Hex, TimeStamp, U256}
+import org.alephium.util.{AVector, Duration, Hex, TimeStamp, U256}
 
 // scalastyle:off number.of.methods
 trait FlowUtils
@@ -159,17 +159,25 @@ trait FlowUtils
       txs: AVector[TransactionTemplate],
       groupView: BlockFlowGroupView[WorldState.Cached],
       chainIndex: ChainIndex,
-      hardFork: HardFork
+      hardFork: HardFork,
+      mempool: MemPool
   ): AVector[TransactionTemplate] = {
     val newOutputRefs           = mutable.HashSet.empty[AssetOutputRef]
     val isSequentialTxSupported = ALPH.isSequentialTxSupported(chainIndex, hardFork)
-    txs.filter { tx =>
+    val staleThreshold          = TimeStamp.now().minusUnsafe(Duration.ofMinutesUnsafe(1))
+    var validTxs                = AVector.ofCapacity[TransactionTemplate](txs.length)
+    txs.foreach { tx =>
       val isExists = Utils.unsafe(groupView.exists(tx.unsigned.inputs, newOutputRefs))
       if (isExists && isSequentialTxSupported) {
         tx.fixedOutputRefs.foreach(newOutputRefs += _)
       }
-      isExists
+      if (isExists) {
+        validTxs = validTxs :+ tx
+      } else if (mempool.getTimestamp(tx.id).exists(_ <= staleThreshold)) {
+        mempool.removeUnusedTx(tx)
+      }
     }
+    validTxs
   }
 
   // TODO: truncate txs in advance for efficiency
@@ -180,10 +188,13 @@ trait FlowUtils
       hardFork: HardFork
   ): IOResult[AVector[TransactionTemplate]] = {
     IOUtils.tryExecute {
+      val mempool     = getMemPool(chainIndex)
       val candidates0 = collectPooledTxs(chainIndex, hardFork)
-      val candidates1 = FlowUtils.filterDoubleSpending(candidates0)
+      val candidates1 = FlowUtils.filterDoubleSpending(candidates0, mempool.removeUnusedTx)
       // some tx inputs might from bestDeps, but not loosenDeps
-      val candidates2 = filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork)
+      val candidates2 =
+        filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork, mempool)
+
       // we don't want any tx that conflicts with bestDeps
       val candidates3 = if (hardFork.isDanubeEnabled()) {
         // For performance, conflicted TXs in parallel chains are fine since Danube upgrade
@@ -402,7 +413,9 @@ trait FlowUtils
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
     templateValidator.validateTemplate(chainIndex, template, this) match {
-      case Left(Left(error)) => Left(error)
+      case Left(Left(error)) =>
+        logger.error(s"Failed to assemble block due to error: $error, template: $template")
+        Left(error)
       case Left(Right(error)) =>
         error match {
           case _: InvalidGhostUncleStatus =>
@@ -559,13 +572,18 @@ object FlowUtils {
     val cachedLevel = 2
   }
 
-  def filterDoubleSpending[T <: TransactionAbstract: ClassTag](txs: AVector[T]): AVector[T] = {
+  def filterDoubleSpending[T <: TransactionAbstract: ClassTag](
+      txs: AVector[T],
+      onDoubleSpending: T => Unit
+  ): AVector[T] = {
     var output   = AVector.ofCapacity[T](txs.length)
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     txs.foreach { tx =>
       if (tx.unsigned.inputs.forall(input => !utxoUsed.contains(input.outputRef))) {
         utxoUsed.addAll(tx.unsigned.inputs.toIterable.view.map(_.outputRef))
         output = output :+ tx
+      } else {
+        onDoubleSpending(tx)
       }
     }
     output
