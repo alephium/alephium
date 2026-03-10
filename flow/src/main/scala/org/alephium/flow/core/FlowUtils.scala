@@ -159,12 +159,13 @@ trait FlowUtils
       txs: AVector[TransactionTemplate],
       groupView: BlockFlowGroupView[WorldState.Cached],
       chainIndex: ChainIndex,
-      hardFork: HardFork
-  ): (AVector[TransactionTemplate], AVector[TransactionTemplate]) = {
+      hardFork: HardFork,
+      mempool: MemPool
+  ): AVector[TransactionTemplate] = {
     val newOutputRefs           = mutable.HashSet.empty[AssetOutputRef]
     val isSequentialTxSupported = ALPH.isSequentialTxSupported(chainIndex, hardFork)
+    val staleThreshold          = TimeStamp.now().minusUnsafe(Duration.ofMinutesUnsafe(1))
     var validTxs                = AVector.ofCapacity[TransactionTemplate](txs.length)
-    var missingInputTxs         = AVector.empty[TransactionTemplate]
     txs.foreach { tx =>
       val isExists = Utils.unsafe(groupView.exists(tx.unsigned.inputs, newOutputRefs))
       if (isExists && isSequentialTxSupported) {
@@ -172,27 +173,11 @@ trait FlowUtils
       }
       if (isExists) {
         validTxs = validTxs :+ tx
-      } else {
-        missingInputTxs = missingInputTxs :+ tx
+      } else if (mempool.getTimestamp(tx.id).exists(_ <= staleThreshold)) {
+        mempool.removeUnusedTx(tx)
       }
     }
-    (validTxs, missingInputTxs)
-  }
-
-  def removeStaleMissingInputTxs(
-      mempool: MemPool,
-      missingInputTxs: AVector[TransactionTemplate]
-  ): Unit = {
-    if (missingInputTxs.nonEmpty) {
-      // One minute stale threshold
-      val staleThreshold = TimeStamp.now().minusUnsafe(Duration.ofMinutesUnsafe(1))
-      val staleMissingTxs =
-        missingInputTxs.filter(tx => mempool.getTimestamp(tx.id).exists(_ <= staleThreshold))
-      if (staleMissingTxs.nonEmpty) {
-        mempool.removeUnusedTxs(staleMissingTxs)
-        ()
-      }
-    }
+    validTxs
   }
 
   // TODO: truncate txs in advance for efficiency
@@ -203,16 +188,12 @@ trait FlowUtils
       hardFork: HardFork
   ): IOResult[AVector[TransactionTemplate]] = {
     IOUtils.tryExecute {
-      val mempool                          = getMemPool(chainIndex)
-      val candidates0                      = collectPooledTxs(chainIndex, hardFork)
-      val (candidates1, doubleSpendingTxs) = FlowUtils.filterDoubleSpending(candidates0)
-      if (doubleSpendingTxs.nonEmpty) {
-        mempool.removeUnusedTxs(doubleSpendingTxs)
-      }
+      val mempool     = getMemPool(chainIndex)
+      val candidates0 = collectPooledTxs(chainIndex, hardFork)
+      val candidates1 = FlowUtils.filterDoubleSpending(candidates0, mempool.removeUnusedTx)
       // some tx inputs might from bestDeps, but not loosenDeps
-      val (candidates2, missingInputTxs) =
-        filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork)
-      removeStaleMissingInputTxs(mempool, missingInputTxs)
+      val candidates2 =
+        filterValidInputsUnsafe(candidates1, groupView, chainIndex, hardFork, mempool)
 
       // we don't want any tx that conflicts with bestDeps
       val candidates3 = if (hardFork.isDanubeEnabled()) {
@@ -592,20 +573,20 @@ object FlowUtils {
   }
 
   def filterDoubleSpending[T <: TransactionAbstract: ClassTag](
-      txs: AVector[T]
-  ): (AVector[T], AVector[T]) = {
+      txs: AVector[T],
+      onDoubleSpending: T => Unit
+  ): AVector[T] = {
     var output   = AVector.ofCapacity[T](txs.length)
-    var rejected = AVector.empty[T]
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     txs.foreach { tx =>
       if (tx.unsigned.inputs.forall(input => !utxoUsed.contains(input.outputRef))) {
         utxoUsed.addAll(tx.unsigned.inputs.toIterable.view.map(_.outputRef))
         output = output :+ tx
       } else {
-        rejected = rejected :+ tx
+        onDoubleSpending(tx)
       }
     }
-    (output, rejected)
+    output
   }
 
   def convertNonScriptTx(txTemplate: TransactionTemplate): Transaction = {

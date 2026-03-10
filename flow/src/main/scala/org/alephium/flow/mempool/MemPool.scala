@@ -188,6 +188,12 @@ class MemPool private (
   def removeUsedTxs(transactions: AVector[TransactionTemplate]): Int =
     remove(transactions, _removeUsedTx)
 
+  def removeUnusedTx(transaction: TransactionTemplate): Unit = writeOnly {
+    if (_contains(transaction.id)) {
+      _removeUnusedTx(transaction.id)
+    }
+  }
+
   def removeUnusedTxs(transactions: AVector[TransactionTemplate]): Int =
     remove(transactions, _removeUnusedTx)
 

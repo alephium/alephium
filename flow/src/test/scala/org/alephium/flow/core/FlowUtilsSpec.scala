@@ -116,14 +116,14 @@ class FlowUtilsSpec extends AlephiumSpec {
     val tx0 = transactionGen(Gen.const(2)).sample.get
     val tx1 = transactionGen(Gen.const(2)).sample.get
     val tx2 = transactionGen(Gen.const(2)).sample.get
-    FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx2)) is
-      (AVector(tx0, tx1, tx2), AVector.empty[Transaction])
-    FlowUtils.filterDoubleSpending(AVector(tx0, tx0, tx2)) is
-      (AVector(tx0, tx2), AVector(tx0))
-    FlowUtils.filterDoubleSpending(AVector(tx0, tx1, tx0)) is
-      (AVector(tx0, tx1), AVector(tx0))
-    FlowUtils.filterDoubleSpending(AVector(tx0, tx2, tx2)) is
-      (AVector(tx0, tx2), AVector(tx2))
+
+    val filterDoubleSpending =
+      (txs: AVector[Transaction]) => FlowUtils.filterDoubleSpending(txs, (_: Transaction) => ())
+
+    filterDoubleSpending(AVector(tx0, tx1, tx2)) is AVector(tx0, tx1, tx2)
+    filterDoubleSpending(AVector(tx0, tx0, tx2)) is AVector(tx0, tx2)
+    filterDoubleSpending(AVector(tx0, tx1, tx0)) is AVector(tx0, tx1)
+    filterDoubleSpending(AVector(tx0, tx2, tx2)) is AVector(tx0, tx2)
   }
 
   trait TxConflictsFixture extends FlowFixture {
