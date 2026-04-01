@@ -239,6 +239,7 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val eventByBlockHash = ContractEventByBlockHash(
     txId,
+    timestamp = ts,
     Address.contract(contractId),
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
@@ -272,12 +273,14 @@ trait EndpointsExamples extends ErrorExamples {
   private val event = ContractEvent(
     blockHash,
     txId,
+    timestamp = ts,
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
 
   private val eventByTxId = ContractEventByTxId(
     blockHash,
+    timestamp = ts,
     Address.contract(contractId),
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))

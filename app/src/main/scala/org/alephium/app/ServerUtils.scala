@@ -862,8 +862,16 @@ class ServerUtils(implicit
   ): Try[ContractEventsByTxId] = {
     wrapResult(
       for {
-        events <- blockFlow.getEventsByHash(Byte32.unsafe(txId.bytes)).map { logs =>
-          logs.map(p => ContractEventByTxId.from(p._1, p._2, p._3))
+        events <- blockFlow.getEventsByHash(Byte32.unsafe(txId.bytes)).flatMap { logs =>
+          logs.headOption match {
+            case Some((blockHash, _, _)) =>
+              // Logs have the same block, so same timestamp for all
+              blockFlow.getBlockHeader(blockHash).map { blockHeader =>
+                logs.map(p => ContractEventByTxId.from(p._1, p._2, p._3, blockHeader.timestamp))
+              }
+            case None =>
+              Right(AVector.empty[ContractEventByTxId])
+          }
         }
         filteredEvents <- eventsFromCanonicalChain(
           events,
@@ -880,8 +888,11 @@ class ServerUtils(implicit
       blockHash: BlockHash
   ): Try[ContractEventsByBlockHash] = {
     wrapResult(
-      blockFlow.getEventsByHash(Byte32.unsafe(blockHash.bytes)).map { logs =>
-        val events = logs.map(p => ContractEventByBlockHash.from(p._2, p._3))
+      for {
+        logs   <- blockFlow.getEventsByHash(Byte32.unsafe(blockHash.bytes))
+        header <- blockFlow.getBlockHeader(blockHash)
+      } yield {
+        val events = logs.map(p => ContractEventByBlockHash.from(p._2, p._3, header.timestamp))
         ContractEventsByBlockHash(events)
       }
     )
@@ -910,7 +921,17 @@ class ServerUtils(implicit
                 )
             }
           } else {
-            Right(ContractEvents.from(logStatesVec, nextStart))
+            logStatesVec
+              .mapE { logStates =>
+                blockFlow.getBlockHeader(logStates.blockHash).map { blockHeader =>
+                  (logStates, blockHeader.timestamp)
+                }
+              }
+              .map { logStatesTs =>
+                ContractEvents.from(logStatesTs, nextStart)
+              }
+              .left
+              .map(failedInIO)
           }
         }
       }
@@ -1851,7 +1872,7 @@ class ServerUtils(implicit
       contractsState <- params.allContractAddresses.mapE(address =>
         fetchContractState(worldState, address.contractId)
       )
-      events = fetchContractEvents(worldState)
+      events      <- fetchContractEvents(blockFlow, worldState)
       eventsSplit <- extractDebugMessages(events)
     } yield (returns, exeResult, contractsState, eventsSplit._1, eventsSplit._2)
   }
@@ -1896,7 +1917,7 @@ class ServerUtils(implicit
 
   def callContract(blockFlow: BlockFlow, params: CallContract): CallContractResult = {
     val txId = params.txId.getOrElse(TransactionId.random)
-    val result = call(blockFlow, params, callContract(params, _, _, _, txId)).map {
+    val result = call(blockFlow, params, callContract(blockFlow, params, _, _, _, txId)).map {
       case (returns, exeResult, contractsState, events, debugMessages) =>
         CallContractSucceeded(
           returns.map(Val.from),
@@ -1917,6 +1938,7 @@ class ServerUtils(implicit
   }
 
   private def callContract(
+      blockFlow: BlockFlow,
       params: CallContract,
       worldState: WorldState.Staging,
       groupIndex: GroupIndex,
@@ -1933,6 +1955,7 @@ class ServerUtils(implicit
       prevOutputs = inputAssets.map(_.toAssetOutput)
       txEnv       = TxEnv.mockup(txId, prevOutputs)
       result <- fromExeResult(
+        blockFlow,
         worldState,
         executeContractMethod(
           worldState,
@@ -2013,7 +2036,9 @@ class ServerUtils(implicit
         method,
         testContract.dustAmount.value.nonZero
       )
-    } yield result
+    } yield {
+      result
+    }
   }
 
   private def tryRunTestContract(
@@ -2063,7 +2088,7 @@ class ServerUtils(implicit
         testContract.dustAmount.value
       ) match {
         case Right(result) =>
-          fromRunTestContractResult(worldState, testContract, result._1, result._2)
+          fromRunTestContractResult(blockFlow, worldState, testContract, result._1, result._2)
         case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
         case Left(Right(error: InsufficientFundsForUTXODustAmount)) =>
           if (!dustAmountProvided) {
@@ -2072,23 +2097,27 @@ class ServerUtils(implicit
             val errorString =
               s"Test failed due to insufficient funds to cover the dust amount. We tried increasing the dust amount to $dustAmount, " +
                 s"but at least $required is still required. Please figure out the exact dust amount needed and specify it using the dustAmount parameter."
-            fromErrorString(worldState, errorString)
+            fromErrorString(blockFlow, worldState, errorString, simulate = true)
           } else {
-            fromExeFailure(worldState, error)
+            fromExeFailure(blockFlow, worldState, error, simulate = true)
           }
-        case Left(Right(exeFailure)) => fromExeFailure(worldState, exeFailure)
+        case Left(Right(exeFailure)) =>
+          fromExeFailure(blockFlow, worldState, exeFailure, simulate = true)
       }
-    } yield result
+    } yield {
+      result
+    }
   }
 
   private def fromRunTestContractResult(
+      blockFlow: BlockFlow,
       worldState: WorldState.Staging,
       testContract: TestContract.Complete,
       executionOutputs: AVector[vm.Val],
       executionResult: StatefulVM.TxScriptExecution
   ): Try[TestContractResult] = {
-    val events = fetchContractEvents(worldState)
     for {
+      events      <- fetchContractEvents(blockFlow, worldState, simulate = true)
       contractIds <- getCreatedAndDestroyedContractIds(events)
       postState   <- fetchContractsState(worldState, testContract, contractIds._1, contractIds._2)
       eventsSplit <- extractDebugMessages(events)
@@ -2182,20 +2211,35 @@ class ServerUtils(implicit
     }
   }
 
-  private def fetchContractEvents(worldState: WorldState.Staging): AVector[ContractEventByTxId] = {
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  private def fetchContractEvents(
+      blockFlow: BlockFlow,
+      worldState: WorldState.Staging,
+      simulate: Boolean = false
+  ): Try[AVector[ContractEventByTxId]] = {
     val allLogStates = worldState.nodeIndexesState.logState.getNewLogs()
-    allLogStates.flatMap(logStates =>
-      logStates.states.flatMap(state =>
-        AVector(
-          ContractEventByTxId(
-            logStates.blockHash,
-            Address.contract(logStates.contractId),
-            state.index.toInt,
-            state.fields.map(Val.from)
+    allLogStates.flatMapE { logStates =>
+      val timestampResult =
+        if (simulate) {
+          Right(TimeStamp.zero)
+        } else {
+          blockFlow.getBlockHeader(logStates.blockHash).map(_.timestamp).left.map(failedInIO)
+        }
+
+      timestampResult.map { ts =>
+        logStates.states.flatMap { state =>
+          AVector(
+            ContractEventByTxId(
+              logStates.blockHash,
+              timestamp = ts,
+              Address.contract(logStates.contractId),
+              state.index.toInt,
+              state.fields.map(Val.from)
+            )
           )
-        )
-      )
-    )
+        }
+      }
+    }
   }
 
   private def fetchContractState(
@@ -2248,25 +2292,49 @@ class ServerUtils(implicit
   }
   // scalastyle:on parameter.number
 
-  private def fromExeResult[T](worldState: WorldState.Staging, exeResult: ExeResult[T]): Try[T] = {
+  private def fromExeResult[T](
+      blockFlow: BlockFlow,
+      worldState: WorldState.Staging,
+      exeResult: ExeResult[T]
+  ): Try[T] = {
     exeResult match {
-      case Right(result)           => Right(result)
-      case Left(Left(ioFailure))   => Left(failedInIO(ioFailure.error))
-      case Left(Right(exeFailure)) => fromExeFailure(worldState, exeFailure)
+      case Right(result)         => Right(result)
+      case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
+      case Left(Right(exeFailure)) =>
+        fromExeFailure(blockFlow, worldState, exeFailure, simulate = false)
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  private def fromExeFailure[T](worldState: WorldState.Staging, exeFailure: ExeFailure): Try[T] = {
-    fromErrorString(worldState, s"VM execution error: ${exeFailure.toString()}")
+  @SuppressWarnings(
+    Array("org.wartremover.warts.ToString", "org.wartremover.warts.DefaultArguments")
+  )
+  private def fromExeFailure[T](
+      blockFlow: BlockFlow,
+      worldState: WorldState.Staging,
+      exeFailure: ExeFailure,
+      simulate: Boolean
+  ): Try[T] = {
+    fromErrorString(
+      blockFlow,
+      worldState,
+      s"VM execution error: ${exeFailure.toString()}",
+      simulate
+    )
   }
 
-  private def fromErrorString[T](worldState: WorldState.Staging, errorString: String): Try[T] = {
-    val events = fetchContractEvents(worldState)
-    extractDebugMessages(events).flatMap { case (_, debugMessages) =>
-      val detail = showDebugMessages(debugMessages) ++ errorString
-      Left(failed(detail))
-    }
+  private def fromErrorString[T](
+      blockFlow: BlockFlow,
+      worldState: WorldState.Staging,
+      errorString: String,
+      simulate: Boolean
+  ): Try[T] = {
+    for {
+      events <- fetchContractEvents(blockFlow, worldState, simulate)
+      result <- extractDebugMessages(events).flatMap { case (_, debugMessages) =>
+        val detail = showDebugMessages(debugMessages) ++ errorString
+        Left(failed(detail))
+      }: Try[T]
+    } yield result
   }
 
   private def checkArgs(args: AVector[Val], method: Method[StatefulContext]): Try[Unit] = {
