@@ -2097,12 +2097,12 @@ class ServerUtils(implicit
             val errorString =
               s"Test failed due to insufficient funds to cover the dust amount. We tried increasing the dust amount to $dustAmount, " +
                 s"but at least $required is still required. Please figure out the exact dust amount needed and specify it using the dustAmount parameter."
-            fromErrorString(blockFlow, worldState, errorString, simulate = true)
+            fromErrorString(blockFlow, worldState, errorString, testing = true)
           } else {
-            fromExeFailure(blockFlow, worldState, error, simulate = true)
+            fromExeFailure(blockFlow, worldState, error, testing = true)
           }
         case Left(Right(exeFailure)) =>
-          fromExeFailure(blockFlow, worldState, exeFailure, simulate = true)
+          fromExeFailure(blockFlow, worldState, exeFailure, testing = true)
       }
     } yield {
       result
@@ -2117,7 +2117,7 @@ class ServerUtils(implicit
       executionResult: StatefulVM.TxScriptExecution
   ): Try[TestContractResult] = {
     for {
-      events      <- fetchContractEvents(blockFlow, worldState, simulate = true)
+      events      <- fetchContractEvents(blockFlow, worldState, testing = true)
       contractIds <- getCreatedAndDestroyedContractIds(events)
       postState   <- fetchContractsState(worldState, testContract, contractIds._1, contractIds._2)
       eventsSplit <- extractDebugMessages(events)
@@ -2215,12 +2215,12 @@ class ServerUtils(implicit
   private def fetchContractEvents(
       blockFlow: BlockFlow,
       worldState: WorldState.Staging,
-      simulate: Boolean = false
+      testing: Boolean = false
   ): Try[AVector[ContractEventByTxId]] = {
     val allLogStates = worldState.nodeIndexesState.logState.getNewLogs()
     allLogStates.flatMapE { logStates =>
       val timestampResult =
-        if (simulate) {
+        if (testing) {
           Right(TimeStamp.zero)
         } else {
           blockFlow.getBlockHeader(logStates.blockHash).map(_.timestamp).left.map(failedInIO)
@@ -2301,7 +2301,7 @@ class ServerUtils(implicit
       case Right(result)         => Right(result)
       case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
       case Left(Right(exeFailure)) =>
-        fromExeFailure(blockFlow, worldState, exeFailure, simulate = false)
+        fromExeFailure(blockFlow, worldState, exeFailure, testing = false)
     }
   }
 
@@ -2312,13 +2312,13 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       worldState: WorldState.Staging,
       exeFailure: ExeFailure,
-      simulate: Boolean
+      testing: Boolean
   ): Try[T] = {
     fromErrorString(
       blockFlow,
       worldState,
       s"VM execution error: ${exeFailure.toString()}",
-      simulate
+      testing
     )
   }
 
@@ -2326,10 +2326,10 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       worldState: WorldState.Staging,
       errorString: String,
-      simulate: Boolean
+      testing: Boolean
   ): Try[T] = {
     for {
-      events <- fetchContractEvents(blockFlow, worldState, simulate)
+      events <- fetchContractEvents(blockFlow, worldState, testing)
       result <- extractDebugMessages(events).flatMap { case (_, debugMessages) =>
         val detail = showDebugMessages(debugMessages) ++ errorString
         Left(failed(detail))
