@@ -21,6 +21,7 @@ import org.alephium.util.Duration
 
 trait ConsensusConfig extends EmissionConfig {
   def maxMiningTarget: Target
+  def postGenesisMaxMiningTarget: Target = maxMiningTarget
   def blockTargetTime: Duration
   def uncleDependencyGapTime: Duration
 }

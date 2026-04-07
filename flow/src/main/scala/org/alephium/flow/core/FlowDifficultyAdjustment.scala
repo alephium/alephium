@@ -197,7 +197,7 @@ trait FlowDifficultyAdjustment {
     diffAndTimeSpanCache.get(hash).getOrElse {
       if (hash == BlockHash.zero) {
         (
-          consensusConfig.maxMiningTarget.getDifficulty(),
+          consensusConfig.minMiningDiff,
           consensusConfig.expectedWindowTimeSpan
         )
       } else {
@@ -224,7 +224,7 @@ trait FlowDifficultyAdjustment {
     diffAndTimeSpanForIntraDepCache.get(intraDep).getOrElse {
       if (intraDep == BlockHash.zero) {
         (
-          consensusConfig.maxMiningTarget.getDifficulty().times(brokerConfig.groups),
+          consensusConfig.minMiningDiff.times(brokerConfig.groups),
           consensusConfig.expectedWindowTimeSpan.timesUnsafe(brokerConfig.groups.toLong),
           ALPH.GenesisTimestamp
         )

@@ -50,12 +50,19 @@ final case class ConsensusSetting(
     blockTargetTime: Duration,
     uncleDependencyGapTime: Duration,
     numZerosAtLeastInHash: Int,
+    private val postGenesisNumZerosAtLeastInHash: Int,
     emission: Emission
 ) extends ConsensusConfig {
   val maxMiningTarget: Target =
     Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
-  val minMiningDiff: Difficulty = maxMiningTarget.getDifficulty()
-  val minBlockWeight: Weight    = Weight.from(maxMiningTarget)
+  override val postGenesisMaxMiningTarget: Target =
+    Target.unsafe(
+      BigInteger.ONE
+        .shiftLeft(256 - postGenesisNumZerosAtLeastInHash)
+        .subtract(BigInteger.ONE)
+    )
+  val minMiningDiff: Difficulty = postGenesisMaxMiningTarget.getDifficulty()
+  val minBlockWeight: Weight    = Weight.from(postGenesisMaxMiningTarget)
 
   val expectedTimeSpan: Duration       = blockTargetTime
   val powAveragingWindow: Int          = 17
@@ -281,18 +288,40 @@ object AlephiumConfig {
       rhone: TempConsensusSetting,
       danube: TempConsensusSetting,
       blockCacheCapacityPerChain: Int,
-      numZerosAtLeastInHash: Int
+      numZerosAtLeastInHash: Int,
+      postGenesisNumZerosAtLeastInHash: Option[Int]
   ) {
-    def toConsensusSettings(groupConfig: GroupConfig): ConsensusSettings = {
+    def toConsensusSettings(groupConfig: GroupConfig, networkId: NetworkId): ConsensusSettings = {
       val mainnetEmission = Emission.mainnet(groupConfig, mainnet.blockTargetTime)
       val rhoneEmission =
         Emission.rhone(groupConfig, mainnet.blockTargetTime, rhone.blockTargetTime)
       val danubeEmission =
         Emission.danube(groupConfig, mainnet.blockTargetTime, danube.blockTargetTime)
+      val effectivePostGenesisNumZerosAtLeastInHash =
+        postGenesisNumZerosAtLeastInHash match {
+          case Some(value) if networkId != NetworkId.AlephiumTestNet =>
+            throw new IllegalArgumentException(
+              "alephium.consensus.post-genesis-num-zeros-at-least-in-hash is only supported on testnet."
+            )
+          case Some(value) => value
+          case None        => numZerosAtLeastInHash
+        }
       ConsensusSettings(
-        mainnet.toConsensusSetting(mainnetEmission, numZerosAtLeastInHash),
-        rhone.toConsensusSetting(rhoneEmission, numZerosAtLeastInHash),
-        danube.toConsensusSetting(danubeEmission, numZerosAtLeastInHash),
+        mainnet.toConsensusSetting(
+          mainnetEmission,
+          numZerosAtLeastInHash,
+          effectivePostGenesisNumZerosAtLeastInHash
+        ),
+        rhone.toConsensusSetting(
+          rhoneEmission,
+          numZerosAtLeastInHash,
+          effectivePostGenesisNumZerosAtLeastInHash
+        ),
+        danube.toConsensusSetting(
+          danubeEmission,
+          numZerosAtLeastInHash,
+          effectivePostGenesisNumZerosAtLeastInHash
+        ),
         blockCacheCapacityPerChain
       )
     }
@@ -301,11 +330,16 @@ object AlephiumConfig {
       blockTargetTime: Duration,
       uncleDependencyGapTime: Duration
   ) {
-    def toConsensusSetting(emission: Emission, numZerosAtLeastInHash: Int): ConsensusSetting = {
+    def toConsensusSetting(
+        emission: Emission,
+        numZerosAtLeastInHash: Int,
+        postGenesisNumZerosAtLeastInHash: Int
+    ): ConsensusSetting = {
       ConsensusSetting(
         blockTargetTime,
         uncleDependencyGapTime,
         numZerosAtLeastInHash,
+        postGenesisNumZerosAtLeastInHash,
         emission
       )
     }
@@ -426,7 +460,7 @@ object AlephiumConfig {
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
       parseMiners(mining.minerAddresses)(broker).map { minerAddresses =>
-        val consensusExtracted = consensus.toConsensusSettings(broker)
+        val consensusExtracted = consensus.toConsensusSettings(broker, network.networkId)
         val networkExtracted   = network.toNetworkSetting(ActorRefT.apply)
         val discoveryRefined = if (network.networkId == NetworkId.AlephiumTestNet) {
           if (discovery.bootstrap.isEmpty) {

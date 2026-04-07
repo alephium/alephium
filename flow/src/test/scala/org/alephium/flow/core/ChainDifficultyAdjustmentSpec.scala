@@ -37,7 +37,13 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
   trait MockFixture extends ChainDifficultyAdjustment with NumericHelpers {
     def toConsensusSetting(config: ConsensusConfig): ConsensusSetting =
-      ConsensusSetting(config.blockTargetTime, config.uncleDependencyGapTime, 18, config.emission)
+      ConsensusSetting(
+        config.blockTargetTime,
+        config.uncleDependencyGapTime,
+        18,
+        18,
+        config.emission
+      )
     val consensusConfigs: ConsensusSettings = {
       val configFixture = (new ConsensusConfigsFixture.Default {}).consensusConfigs
       val mainnet       = toConsensusSetting(configFixture.mainnet)
@@ -408,16 +414,18 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     }
 
     val config = new ConsensusConfig {
-      def maxMiningTarget: Target          = diff(100)
-      def blockTargetTime: Duration        = ???
-      def uncleDependencyGapTime: Duration = ???
-      def emission: Emission               = ???
+      def maxMiningTarget: Target                     = diff(100)
+      override def postGenesisMaxMiningTarget: Target = diff(400)
+      def blockTargetTime: Duration                   = ???
+      def uncleDependencyGapTime: Duration            = ???
+      def emission: Emission                          = ???
     }
 
-    ChainDifficultyAdjustment.getNextHashTarget(config.maxMiningTarget.value)(
+    ChainDifficultyAdjustment.getNextHashTarget(config.postGenesisMaxMiningTarget.value)(
       config
-    ) is config.maxMiningTarget
-    ChainDifficultyAdjustment.getNextHashTarget(diff(99).value)(config) is config.maxMiningTarget
-    ChainDifficultyAdjustment.getNextHashTarget(diff(101).value)(config) is diff(101)
+    ) is config.postGenesisMaxMiningTarget
+    ChainDifficultyAdjustment.getNextHashTarget(diff(399).value)(config) is
+      config.postGenesisMaxMiningTarget
+    ChainDifficultyAdjustment.getNextHashTarget(diff(401).value)(config) is diff(401)
   }
 }
