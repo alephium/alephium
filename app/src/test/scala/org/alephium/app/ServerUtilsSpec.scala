@@ -2350,7 +2350,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils     = new ServerUtils()
     val contractAddress = Address.contract(ContractId.random)
     def buildEvent(fields: Val*): ContractEventByTxId = {
-      ContractEventByTxId(BlockHash.random, contractAddress, 0, AVector.from(fields))
+      ContractEventByTxId(
+        BlockHash.random,
+        TimeStamp.zero,
+        contractAddress,
+        0,
+        AVector.from(fields)
+      )
     }
 
     serverUtils
@@ -5605,7 +5611,15 @@ class ServerUtilsSpec extends AlephiumSpec {
         .rightValue
       RichBlockAndEvents(
         RichBlockEntry.from(scriptBlock, height, richTxs, None).rightValue,
-        AVector(ContractEventByBlockHash(scriptTransaction.id, contractAddress, 0, AVector.empty))
+        AVector(
+          ContractEventByBlockHash(
+            scriptTransaction.id,
+            scriptBlock.timestamp,
+            contractAddress,
+            0,
+            AVector.empty
+          )
+        )
       )
     }
     serverUtils.getRichBlockAndEvents(blockFlow, scriptBlock.hash).rightValue is richBlockAndEvents
@@ -5710,11 +5724,15 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     serverUtils.getEventsForContractCurrentCount(blockFlow, contractAddress) isE 1
     serverUtils.getEventsByContractAddress(blockFlow, 0, 1, contractAddress) isE ContractEvents(
-      AVector(ContractEvent(block.hash, txId, 0, AVector(ValU256(U256.unsafe(5))))),
+      AVector(
+        ContractEvent(block.hash, txId, block.timestamp, 0, AVector(ValU256(U256.unsafe(5))))
+      ),
       1
     )
     serverUtils.getEventsByContractAddress(blockFlow, 0, 10, contractAddress) isE ContractEvents(
-      AVector(ContractEvent(block.hash, txId, 0, AVector(ValU256(U256.unsafe(5))))),
+      AVector(
+        ContractEvent(block.hash, txId, block.timestamp, 0, AVector(ValU256(U256.unsafe(5))))
+      ),
       1
     )
     serverUtils.getEventsByContractAddress(blockFlow, 2, 10, contractAddress).leftValue.detail is
@@ -6671,7 +6689,9 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     def isCanonical(hash: BlockHash) = Right(hash == canonicalBlockHash)
     def events(num: Int, blockHash: BlockHash) = {
-      AVector.tabulate(num)(ContractEventByTxId(blockHash, contractAddress, _, AVector.empty))
+      AVector.tabulate(num)(
+        ContractEventByTxId(blockHash, TimeStamp.zero, contractAddress, _, AVector.empty)
+      )
     }
 
     // If empty, return directly

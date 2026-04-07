@@ -18,7 +18,7 @@ package org.alephium.api.model
 
 import org.alephium.protocol.model.{Address, BlockHash, ContractId, TransactionId}
 import org.alephium.protocol.vm.{debugEventIndex, LockupScript, LogState, LogStateRef, LogStates}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 final case class ContractEvents(
     events: AVector[ContractEvent],
@@ -36,12 +36,14 @@ final case class ContractEventsByBlockHash(
 final case class ContractEvent(
     blockHash: BlockHash,
     txId: TransactionId,
+    timestamp: TimeStamp,
     eventIndex: Int,
     fields: AVector[Val]
 )
 
 final case class ContractEventByTxId(
     blockHash: BlockHash,
+    timestamp: TimeStamp,
     contractAddress: Address.Contract,
     eventIndex: Int,
     fields: AVector[Val]
@@ -55,9 +57,15 @@ final case class ContractEventByTxId(
 }
 
 object ContractEventByTxId {
-  def from(blockHash: BlockHash, ref: LogStateRef, logState: LogState): ContractEventByTxId = {
+  def from(
+      blockHash: BlockHash,
+      ref: LogStateRef,
+      logState: LogState,
+      timestamp: TimeStamp
+  ): ContractEventByTxId = {
     ContractEventByTxId(
       blockHash,
+      timestamp,
       Address.contract(ref.id.contractId),
       logState.index.toInt,
       logState.fields.map(Val.from)
@@ -67,15 +75,17 @@ object ContractEventByTxId {
 
 final case class ContractEventByBlockHash(
     txId: TransactionId,
+    timestamp: TimeStamp,
     contractAddress: Address.Contract,
     eventIndex: Int,
     fields: AVector[Val]
 )
 
 object ContractEventByBlockHash {
-  def from(ref: LogStateRef, logState: LogState): ContractEventByBlockHash = {
+  def from(ref: LogStateRef, logState: LogState, timestamp: TimeStamp): ContractEventByBlockHash = {
     ContractEventByBlockHash(
       logState.txId,
+      timestamp,
       Address.contract(ref.id.contractId),
       logState.index.toInt,
       logState.fields.map(Val.from)
@@ -84,13 +94,14 @@ object ContractEventByBlockHash {
 }
 
 object ContractEvents {
-  def from(logStates: LogStates): AVector[ContractEvent] = {
+  def from(logStates: LogStates, timestamp: TimeStamp): AVector[ContractEvent] = {
     logStates.states.flatMap { logState =>
       if (logState.index != debugEventIndex.v.v.intValue().toByte) {
         AVector(
           ContractEvent(
             logStates.blockHash,
             logState.txId,
+            timestamp,
             logState.index.toInt,
             logState.fields.map(Val.from)
           )
@@ -101,9 +112,11 @@ object ContractEvents {
     }
   }
 
-  def from(logStatesVec: AVector[LogStates], nextStart: Int): ContractEvents = {
+  def from(logStatesVec: AVector[(LogStates, TimeStamp)], nextStart: Int): ContractEvents = {
     ContractEvents(
-      logStatesVec.flatMap(ContractEvents.from),
+      logStatesVec.flatMap { case (logStates, timestamp) =>
+        ContractEvents.from(logStates, timestamp)
+      },
       nextStart
     )
   }

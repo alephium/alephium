@@ -1290,6 +1290,7 @@ abstract class RestServerSpec(
                    |    {
                    |      "blockHash": "${blockHash.toHexString}",
                    |      "txId": "${dummyTx.id.toHexString}",
+                   |      "timestamp": ${dummyBlock.timestamp.millis},
                    |      "eventIndex": 0,
                    |      "fields": [
                    |        {
@@ -1385,6 +1386,7 @@ abstract class RestServerSpec(
                      |  "events": [
                      |    {
                      |      "blockHash": "${blockHash.toHexString}",
+                     |      "timestamp": ${dummyBlock.timestamp.millis},
                      |      "contractAddress": "${Address.contract(contractId).toBase58}",
                      |      "eventIndex": 0,
                      |      "fields": [
@@ -1461,6 +1463,7 @@ abstract class RestServerSpec(
                      |  "events": [
                      |    {
                      |      "txId": "${dummyTx.id.toHexString}",
+                     |      "timestamp": ${dummyBlock.timestamp.millis},
                      |      "contractAddress": "${Address.contract(contractId).toBase58}",
                      |      "eventIndex": 0,
                      |      "fields": [
