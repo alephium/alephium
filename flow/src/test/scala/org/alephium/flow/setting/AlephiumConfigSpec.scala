@@ -149,11 +149,13 @@ class AlephiumConfigSpec extends AlephiumSpec {
     val overrideConfig = AlephiumConfig.load(fixture.buildNewConfig())
 
     overrideConfig.consensus.danube.numZerosAtLeastInHash is 24
-    (overrideConfig.consensus.danube.postGenesisMaxMiningTarget !=
+    (overrideConfig.consensus.danube.genesisMaxMiningTarget !=
       overrideConfig.consensus.danube.maxMiningTarget) is true
     overrideConfig.consensus.danube.minMiningDiff is
-      overrideConfig.consensus.danube.postGenesisMaxMiningTarget.getDifficulty()
-    overrideConfig.genesisBlocks.forall(_.forall(_.header.target == overrideConfig.consensus.mainnet.maxMiningTarget)) is true
+      overrideConfig.consensus.danube.maxMiningTarget.getDifficulty()
+    overrideConfig.genesisBlocks.forall(
+      _.forall(_.header.target == overrideConfig.consensus.mainnet.genesisMaxMiningTarget)
+    ) is true
   }
 
   it should "reject the post-genesis mining floor override on mainnet" in {

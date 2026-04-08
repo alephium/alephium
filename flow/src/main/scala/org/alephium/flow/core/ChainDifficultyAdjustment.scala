@@ -163,10 +163,10 @@ object ChainDifficultyAdjustment {
   @inline def getNextHashTarget(
       nextTargetValue: BigInteger
   )(implicit consensusConfig: ConsensusConfig): Target = {
-    if (nextTargetValue.compareTo(consensusConfig.postGenesisMaxMiningTarget.value) <= 0) {
+    if (nextTargetValue.compareTo(consensusConfig.maxMiningTarget.value) <= 0) {
       Target.unsafe(nextTargetValue)
     } else {
-      consensusConfig.postGenesisMaxMiningTarget
+      consensusConfig.maxMiningTarget
     }
   }
 }

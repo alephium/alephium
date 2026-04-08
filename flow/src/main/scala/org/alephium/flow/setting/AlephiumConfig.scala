@@ -53,16 +53,16 @@ final case class ConsensusSetting(
     private val postGenesisNumZerosAtLeastInHash: Int,
     emission: Emission
 ) extends ConsensusConfig {
-  val maxMiningTarget: Target =
+  override val genesisMaxMiningTarget: Target =
     Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
-  override val postGenesisMaxMiningTarget: Target =
+  val maxMiningTarget: Target =
     Target.unsafe(
       BigInteger.ONE
         .shiftLeft(256 - postGenesisNumZerosAtLeastInHash)
         .subtract(BigInteger.ONE)
     )
-  val minMiningDiff: Difficulty = postGenesisMaxMiningTarget.getDifficulty()
-  val minBlockWeight: Weight    = Weight.from(postGenesisMaxMiningTarget)
+  val minMiningDiff: Difficulty = maxMiningTarget.getDifficulty()
+  val minBlockWeight: Weight    = Weight.from(maxMiningTarget)
 
   val expectedTimeSpan: Duration       = blockTargetTime
   val powAveragingWindow: Int          = 17
