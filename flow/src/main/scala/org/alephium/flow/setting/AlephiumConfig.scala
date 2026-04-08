@@ -289,7 +289,7 @@ object AlephiumConfig {
       danube: TempConsensusSetting,
       blockCacheCapacityPerChain: Int,
       numZerosAtLeastInHash: Int,
-      postGenesisNumZerosAtLeastInHash: Option[Int]
+      numZerosAtLeastInHashTestnetPatch: Option[Int]
   ) {
     def toConsensusSettings(groupConfig: GroupConfig, networkId: NetworkId): ConsensusSettings = {
       val mainnetEmission = Emission.mainnet(groupConfig, mainnet.blockTargetTime)
@@ -298,10 +298,10 @@ object AlephiumConfig {
       val danubeEmission =
         Emission.danube(groupConfig, mainnet.blockTargetTime, danube.blockTargetTime)
       val effectivePostGenesisNumZerosAtLeastInHash =
-        postGenesisNumZerosAtLeastInHash match {
+        numZerosAtLeastInHashTestnetPatch match {
           case Some(value) if networkId != NetworkId.AlephiumTestNet =>
             throw new IllegalArgumentException(
-              "alephium.consensus.post-genesis-num-zeros-at-least-in-hash is only supported on testnet."
+              "alephium.consensus.num-zeros-at-least-in-hash-testnet-patch is only supported on testnet."
             )
           case Some(value) => value
           case None        => numZerosAtLeastInHash

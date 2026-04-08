@@ -142,7 +142,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
       override val configValues: Map[String, Any] = Map(
         ("alephium.network.network-id", 1),
         ("alephium.consensus.num-zeros-at-least-in-hash", 24),
-        ("alephium.consensus.post-genesis-num-zeros-at-least-in-hash", 19)
+        ("alephium.consensus.num-zeros-at-least-in-hash-testnet-patch", 19)
       )
     }
 
@@ -163,12 +163,12 @@ class AlephiumConfigSpec extends AlephiumSpec {
       override val configValues: Map[String, Any] = Map(
         ("alephium.network.network-id", 0),
         ("alephium.consensus.num-zeros-at-least-in-hash", 37),
-        ("alephium.consensus.post-genesis-num-zeros-at-least-in-hash", 19)
+        ("alephium.consensus.num-zeros-at-least-in-hash-testnet-patch", 19)
       )
     }
 
     intercept[IllegalArgumentException](AlephiumConfig.load(fixture.buildNewConfig())).getMessage is
-      "alephium.consensus.post-genesis-num-zeros-at-least-in-hash is only supported on testnet."
+      "alephium.consensus.num-zeros-at-least-in-hash-testnet-patch is only supported on testnet."
   }
 
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
