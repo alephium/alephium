@@ -301,7 +301,7 @@ object AlephiumConfig {
         Emission.danube(groupConfig, mainnet.blockTargetTime, danube.blockTargetTime)
       val effectiveNumZerosAtLeastInHash =
         numZerosAtLeastInHashTestnetPatch match {
-          case Some(value) if networkId != NetworkId.AlephiumTestNet =>
+          case Some(value) if networkId.networkType != NetworkId.TestNet =>
             throw new IllegalArgumentException(
               "alephium.consensus.num-zeros-at-least-in-hash-testnet-patch is only supported on testnet."
             )
