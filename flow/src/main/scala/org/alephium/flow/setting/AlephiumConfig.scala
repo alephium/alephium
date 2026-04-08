@@ -49,16 +49,18 @@ final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) exten
 final case class ConsensusSetting(
     blockTargetTime: Duration,
     uncleDependencyGapTime: Duration,
+    genesisNumZerosAtLeastInHash: Int,
     numZerosAtLeastInHash: Int,
-    private val postGenesisNumZerosAtLeastInHash: Int,
     emission: Emission
 ) extends ConsensusConfig {
   override val genesisMaxMiningTarget: Target =
-    Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
+    Target.unsafe(
+      BigInteger.ONE.shiftLeft(256 - genesisNumZerosAtLeastInHash).subtract(BigInteger.ONE)
+    )
   val maxMiningTarget: Target =
     Target.unsafe(
       BigInteger.ONE
-        .shiftLeft(256 - postGenesisNumZerosAtLeastInHash)
+        .shiftLeft(256 - numZerosAtLeastInHash)
         .subtract(BigInteger.ONE)
     )
   val minMiningDiff: Difficulty = maxMiningTarget.getDifficulty()
@@ -297,7 +299,7 @@ object AlephiumConfig {
         Emission.rhone(groupConfig, mainnet.blockTargetTime, rhone.blockTargetTime)
       val danubeEmission =
         Emission.danube(groupConfig, mainnet.blockTargetTime, danube.blockTargetTime)
-      val effectivePostGenesisNumZerosAtLeastInHash =
+      val effectiveNumZerosAtLeastInHash =
         numZerosAtLeastInHashTestnetPatch match {
           case Some(value) if networkId != NetworkId.AlephiumTestNet =>
             throw new IllegalArgumentException(
@@ -310,17 +312,17 @@ object AlephiumConfig {
         mainnet.toConsensusSetting(
           mainnetEmission,
           numZerosAtLeastInHash,
-          effectivePostGenesisNumZerosAtLeastInHash
+          effectiveNumZerosAtLeastInHash
         ),
         rhone.toConsensusSetting(
           rhoneEmission,
           numZerosAtLeastInHash,
-          effectivePostGenesisNumZerosAtLeastInHash
+          effectiveNumZerosAtLeastInHash
         ),
         danube.toConsensusSetting(
           danubeEmission,
           numZerosAtLeastInHash,
-          effectivePostGenesisNumZerosAtLeastInHash
+          effectiveNumZerosAtLeastInHash
         ),
         blockCacheCapacityPerChain
       )
@@ -332,14 +334,14 @@ object AlephiumConfig {
   ) {
     def toConsensusSetting(
         emission: Emission,
-        numZerosAtLeastInHash: Int,
-        postGenesisNumZerosAtLeastInHash: Int
+        genesisNumZerosAtLeastInHash: Int,
+        numZerosAtLeastInHash: Int
     ): ConsensusSetting = {
       ConsensusSetting(
         blockTargetTime,
         uncleDependencyGapTime,
+        genesisNumZerosAtLeastInHash,
         numZerosAtLeastInHash,
-        postGenesisNumZerosAtLeastInHash,
         emission
       )
     }

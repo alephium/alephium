@@ -148,7 +148,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
 
     val overrideConfig = AlephiumConfig.load(fixture.buildNewConfig())
 
-    overrideConfig.consensus.danube.numZerosAtLeastInHash is 24
+    overrideConfig.consensus.danube.genesisNumZerosAtLeastInHash is 24
+    overrideConfig.consensus.danube.numZerosAtLeastInHash is 19
     (overrideConfig.consensus.danube.genesisMaxMiningTarget !=
       overrideConfig.consensus.danube.maxMiningTarget) is true
     overrideConfig.consensus.danube.minMiningDiff is

@@ -414,11 +414,10 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     }
 
     val config = new ConsensusConfig {
-      def maxMiningTarget: Target                 = diff(400)
-      override def genesisMaxMiningTarget: Target = diff(100)
-      def blockTargetTime: Duration               = ???
-      def uncleDependencyGapTime: Duration        = ???
-      def emission: Emission                      = ???
+      def maxMiningTarget: Target          = diff(400)
+      def blockTargetTime: Duration        = ???
+      def uncleDependencyGapTime: Duration = ???
+      def emission: Emission               = ???
     }
 
     ChainDifficultyAdjustment.getNextHashTarget(config.maxMiningTarget.value)(
