@@ -127,7 +127,7 @@ object BlockHeader {
     @tailrec
     def iter(count: U256): BlockHeader = {
       val nonce  = Nonce.unsafe(count.toBytes.takeRight(Nonce.byteLength))
-      val header = BlockHeader.genesis(txsHash, consensusConfig.maxMiningTarget, nonce)
+      val header = BlockHeader.genesis(txsHash, consensusConfig.genesisMaxMiningTarget, nonce)
       // Note: we do not validate difficulty target here
       if (header.chainIndex == chainIndex) header else iter(count.addOneUnsafe())
     }

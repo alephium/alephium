@@ -185,7 +185,7 @@ object HeaderValidation {
         header: BlockHeader
     ): HeaderValidationResult[Unit] = {
       val consensusConfig = consensusConfigs.getConsensusConfig(header.timestamp)
-      if (header.target != consensusConfig.maxMiningTarget) {
+      if (header.target != consensusConfig.genesisMaxMiningTarget) {
         invalidHeader(InvalidGenesisWorkTarget)
       } else {
         validHeader(())

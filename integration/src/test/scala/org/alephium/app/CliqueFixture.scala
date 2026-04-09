@@ -295,6 +295,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         ("alephium.consensus.danube.block-target-time", "1 seconds"),
         ("alephium.consensus.danube.uncle-dependency-gap-time", "1 seconds"),
         ("alephium.consensus.num-zeros-at-least-in-hash", "8"),
+        ("alephium.consensus.num-zeros-at-least-in-hash-testnet-patch", "8"),
         ("alephium.mining.batch-delay", "200 milli"),
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
