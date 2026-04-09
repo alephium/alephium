@@ -2,13 +2,13 @@
 # on:
 #   schedule:
 #     - cron: '0 0 * * 0'
-# 
+#
 # name: Launch Scala Steward
-# 
+#
 # jobs:
 #   scala-steward:
 #     runs-on: ubuntu-latest
 #     name: Launch Scala Steward
 #     steps:
 #       - name: Launch Scala Steward
-#         uses: scala-steward-org/scala-steward-action@v2
+#         uses: scala-steward-org/scala-steward-action@f60ccd18bc9d8083e6809d9dc3db4a69a71d856c  # v2.78.0 (2025-11-27T02:57:35Z)
