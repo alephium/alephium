@@ -848,6 +848,34 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
   }
 
+  it should "return the current token-balance error when ALPH and token balances are split across grouped sub-addresses" in new BuildExecuteScriptTxFixture {
+    val tokenAmount             = U256.unsafe(10101)
+    val tokenHolderLockupScript = allLockupScripts.head
+
+    prepare(ALPH.alph(2), U256.Zero, fromLockupScript)
+    prepare(dustUtxoAmount, tokenAmount, tokenHolderLockupScript)
+
+    val targetBalance = blockFlow.getBalance(fromLockupScript, Int.MaxValue, false).rightValue
+    targetBalance.totalAlph is ALPH.alph(2)
+    targetBalance.totalTokens.isEmpty is true
+
+    val tokenHolderBalance =
+      blockFlow.getBalance(tokenHolderLockupScript, Int.MaxValue, false).rightValue
+    tokenHolderBalance.totalAlph is dustUtxoAmount
+    tokenHolderBalance.totalTokens is AVector(tokenId -> tokenAmount)
+
+    val aggregatedBalance =
+      serverUtils.getBalance(blockFlow, fromAddressWithoutGroup, false).rightValue
+    aggregatedBalance.balance.value is ALPH.alph(2).addUnsafe(dustUtxoAmount)
+    aggregatedBalance.tokenBalances is Some(AVector(Token(tokenId, tokenAmount)))
+
+    val query = buildExecuteScriptQuery(U256.Zero, tokenAmount)
+    serverUtils
+      .buildExecuteScriptTx(blockFlow, query)
+      .leftValue
+      .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: $tokenAmount"
+  }
+
   it should "use dustAmount as a funding buffer for auto-funded execute script txs" in new BuildExecuteScriptTxFixture {
     prepare(ALPH.alph(20), ALPH.alph(1), allLockupScripts.head)
     val targetBalance = blockFlow.getBalance(fromLockupScript, Int.MaxValue, false).rightValue
