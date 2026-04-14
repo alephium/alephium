@@ -848,7 +848,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
       .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: ${ALPH.oneAlph}"
   }
 
-  it should "return the current token-balance error when ALPH and token balances are split across grouped sub-addresses" in new BuildExecuteScriptTxFixture {
+  it should "build an execute script tx when ALPH and token balances are split across grouped sub-addresses" in new BuildExecuteScriptTxFixture {
     val tokenAmount             = U256.unsafe(10101)
     val tokenHolderLockupScript = allLockupScripts.head
 
@@ -869,11 +869,7 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     aggregatedBalance.balance.value is ALPH.alph(2).addUnsafe(dustUtxoAmount)
     aggregatedBalance.tokenBalances is Some(AVector(Token(tokenId, tokenAmount)))
 
-    val query = buildExecuteScriptQuery(U256.Zero, tokenAmount)
-    serverUtils
-      .buildExecuteScriptTx(blockFlow, query)
-      .leftValue
-      .detail is s"Not enough token balances, requires additional ${tokenId.toHexString}: $tokenAmount"
+    testExecuteScript(U256.Zero, tokenAmount, 3)
   }
 
   it should "use dustAmount as a funding buffer for auto-funded execute script txs" in new BuildExecuteScriptTxFixture {
