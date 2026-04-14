@@ -872,6 +872,40 @@ class GrouplessUtilsSpec extends AlephiumSpec {
     testExecuteScript(U256.Zero, tokenAmount, 3)
   }
 
+  it should "build an execute script tx when another grouped address funds the token source group" in new BuildExecuteScriptTxFixture {
+    val tokenAmount             = U256.unsafe(10101)
+    val tokenHolderLockupScript = allLockupScripts.head
+    val alphHolderLockupScript  = allLockupScripts(1)
+
+    prepare(dustUtxoAmount, U256.Zero, fromLockupScript)
+    prepare(dustUtxoAmount, tokenAmount, tokenHolderLockupScript)
+    prepare(ALPH.alph(2), U256.Zero, alphHolderLockupScript)
+
+    val targetBalance = blockFlow.getBalance(fromLockupScript, Int.MaxValue, false).rightValue
+    targetBalance.totalAlph is dustUtxoAmount
+    targetBalance.totalTokens.isEmpty is true
+
+    val tokenHolderBalance =
+      blockFlow.getBalance(tokenHolderLockupScript, Int.MaxValue, false).rightValue
+    tokenHolderBalance.totalAlph is dustUtxoAmount
+    tokenHolderBalance.totalTokens is AVector(tokenId -> tokenAmount)
+
+    val alphHolderBalance =
+      blockFlow.getBalance(alphHolderLockupScript, Int.MaxValue, false).rightValue
+    alphHolderBalance.totalAlph is ALPH.alph(2)
+    alphHolderBalance.totalTokens.isEmpty is true
+
+    val aggregatedBalance =
+      serverUtils.getBalance(blockFlow, fromAddressWithoutGroup, false).rightValue
+    aggregatedBalance.balance.value is ALPH
+      .alph(2)
+      .addUnsafe(dustUtxoAmount)
+      .addUnsafe(dustUtxoAmount)
+    aggregatedBalance.tokenBalances is Some(AVector(Token(tokenId, tokenAmount)))
+
+    testExecuteScript(U256.Zero, tokenAmount, 4)
+  }
+
   it should "use dustAmount as a funding buffer for auto-funded execute script txs" in new BuildExecuteScriptTxFixture {
     prepare(ALPH.alph(20), ALPH.alph(1), allLockupScripts.head)
     val targetBalance = blockFlow.getBalance(fromLockupScript, Int.MaxValue, false).rightValue
