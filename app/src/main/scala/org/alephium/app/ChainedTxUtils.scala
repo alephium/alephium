@@ -372,7 +372,7 @@ trait ChainedTxUtils { self: ServerUtils =>
       Left("No additional ALPH funding is required")
     } else {
       val fundingLockupPairs =
-        AVector(toLockupPair) ++ otherLockupPairs.filter(_._1 != fromLockup)
+        otherLockupPairs.filter(_._1 != fromLockup) :+ toLockupPair
       buildAlphFundingTx(
         blockFlow,
         toLockupPair,
