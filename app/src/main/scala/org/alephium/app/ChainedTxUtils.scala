@@ -22,7 +22,7 @@ import sttp.model.StatusCode
 import org.alephium.api.{badRequest, failedInIO, ApiError, Try}
 import org.alephium.api.model._
 import org.alephium.api.model.BuildTxCommon.ScriptTxAmounts
-import org.alephium.flow.core.{BlockFlow, FlowUtils, TxUtils}
+import org.alephium.flow.core.{BlockFlow, ExtraUtxosInfo, FlowUtils, TxUtils}
 import org.alephium.flow.gasestimation.{
   AssetScriptGasEstimator,
   GasEstimation,
@@ -157,7 +157,7 @@ trait ChainedTxUtils { self: ServerUtils =>
           crossGroupTxs <-
             buildTransferTxsFromFallbackAddresses(
               blockFlow,
-              lockPair._1,
+              lockPair,
               otherLockupPairs,
               totalAmount,
               utxos,
@@ -170,7 +170,7 @@ trait ChainedTxUtils { self: ServerUtils =>
             amounts,
             lockPair,
             script,
-            utxos ++ getExtraUtxos(lockPair._1, crossGroupTxs._1),
+            getAvailableUtxos(lockPair._1, utxos, crossGroupTxs._1),
             multiplier,
             gasOpt,
             Some(gasPrice)
@@ -182,7 +182,7 @@ trait ChainedTxUtils { self: ServerUtils =>
 
   private def buildTransferTxsFromFallbackAddresses(
       blockFlow: BlockFlow,
-      lockup: LockupScript.Asset,
+      lockPair: (LockupScript.Asset, UnlockScript),
       otherLockupPairs: AVector[(LockupScript.Asset, UnlockScript)],
       totalAmountNeeded: TotalAmountNeeded,
       utxos: AVector[FlowUtils.AssetOutputInfo],
@@ -201,8 +201,9 @@ trait ChainedTxUtils { self: ServerUtils =>
     val (remainTokens, _) = calcTokenAmount(tokenBalances, totalAmountNeeded.tokens)
     val result = transferFromFallbackAddresses(
       blockFlow,
-      lockup,
+      lockPair,
       otherLockupPairs,
+      utxos,
       remainAlph,
       remainTokens,
       gasPrice,
@@ -218,10 +219,12 @@ trait ChainedTxUtils { self: ServerUtils =>
     }
   }
 
+  // scalastyle:off method.length
   private def transferFromFallbackAddresses(
       blockFlow: BlockFlow,
-      toLockupScript: LockupScript.Asset,
+      toLockupPair: (LockupScript.Asset, UnlockScript),
       otherLockupPairs: AVector[(LockupScript.Asset, UnlockScript)],
+      toUtxos: AVector[FlowUtils.AssetOutputInfo],
       alphAmount: U256,
       tokenAmounts: AVector[(TokenId, U256)],
       gasPrice: GasPrice,
@@ -233,21 +236,50 @@ trait ChainedTxUtils { self: ServerUtils =>
           if (remainAlph.isZero && remainTokens.isEmpty) {
             (txs, remainAlph, remainTokens)
           } else {
-            transferFromFallbackAddress(
-              blockFlow,
-              (fromLockup, fromUnlock),
-              toLockupScript,
-              remainAlph,
-              remainTokens,
-              gasPrice,
-              targetBlockHash
-            ) match {
-              case Right(result) => (txs :+ result._1, result._2, result._3)
-              case Left(_)       => (txs, remainAlph, remainTokens)
+            getAvailableUtxos(blockFlow, fromLockup, txs, targetBlockHash) match {
+              case Right(fromUtxos) =>
+                transferFromFallbackAddress(
+                  blockFlow,
+                  (fromLockup, fromUnlock),
+                  toLockupPair._1,
+                  remainAlph,
+                  remainTokens,
+                  gasPrice,
+                  fromUtxos
+                ) match {
+                  case Right(result) => (txs :+ result._1, result._2, result._3)
+                  case Left(_) =>
+                    val (sourceAlphBalance, sourceTokenBalances) = getAvailableBalances(fromUtxos)
+                    val (_, transferTokens) = calcTokenAmount(sourceTokenBalances, remainTokens)
+                    if (transferTokens.isEmpty) {
+                      (txs, remainAlph, remainTokens)
+                    } else {
+                      fundSourceWithAlphAndRetryTransfer(
+                        blockFlow,
+                        toLockupPair,
+                        otherLockupPairs,
+                        toUtxos,
+                        txs,
+                        (fromLockup, fromUnlock),
+                        fromUtxos,
+                        sourceAlphBalance,
+                        transferTokens,
+                        remainAlph,
+                        remainTokens,
+                        gasPrice,
+                        targetBlockHash
+                      ) match {
+                        case Right(result) => (txs ++ result._1, result._2, result._3)
+                        case Left(_)       => (txs, remainAlph, remainTokens)
+                      }
+                    }
+                }
+              case Left(_) => (txs, remainAlph, remainTokens)
             }
           }
       }
   }
+  // scalastyle:on method.length
 
   protected def transferFromFallbackAddress(
       blockFlow: BlockFlow,
@@ -263,32 +295,162 @@ trait ChainedTxUtils { self: ServerUtils =>
       .getUsableUtxos(targetBlockHash, fromLockup, self.apiConfig.defaultUtxosLimit)
       .left
       .map(_.getMessage)
-      .flatMap { utxos =>
-        val (alphBalance, tokenBalances)   = getAvailableBalances(utxos)
-        val (remainTokens, transferTokens) = calcTokenAmount(tokenBalances, tokenAmounts)
-        val transferAlph =
-          calcAlphAmount(
-            fromLockupPair,
-            alphBalance,
-            alphAmount,
-            transferTokens.length,
-            utxos.length,
-            gasPrice
-          )
-        val outputInfos = AVector(
-          UnsignedTransaction.TxOutputInfo(toLockup, transferAlph, transferTokens, None)
+      .flatMap(
+        transferFromFallbackAddress(
+          blockFlow,
+          fromLockupPair,
+          toLockup,
+          alphAmount,
+          tokenAmounts,
+          gasPrice,
+          _
         )
-        val fromUnlock = fromLockupPair._2
-        buildTransferTx(blockFlow, fromLockup, fromUnlock, utxos, outputInfos, gasPrice)
-          .map { tx =>
-            val transferredAlph =
-              tx.fixedOutputs.filter(_.lockupScript == toLockup).fold(U256.Zero) {
-                case (acc, output) => acc.addUnsafe(output.amount)
-              }
-            (tx, alphAmount.sub(transferredAlph).getOrElse(U256.Zero), remainTokens)
+      )
+  }
+
+  private def transferFromFallbackAddress(
+      blockFlow: BlockFlow,
+      fromLockupPair: (LockupScript.Asset, UnlockScript),
+      toLockup: LockupScript.Asset,
+      alphAmount: U256,
+      tokenAmounts: AVector[(TokenId, U256)],
+      gasPrice: GasPrice,
+      utxos: AVector[FlowUtils.AssetOutputInfo]
+  ): Either[String, (UnsignedTransaction, U256, AVector[(TokenId, U256)])] = {
+    val fromLockup                     = fromLockupPair._1
+    val (alphBalance, tokenBalances)   = getAvailableBalances(utxos)
+    val (remainTokens, transferTokens) = calcTokenAmount(tokenBalances, tokenAmounts)
+    val transferAlph =
+      calcAlphAmount(
+        fromLockupPair,
+        alphBalance,
+        alphAmount,
+        transferTokens.length,
+        utxos.length,
+        gasPrice
+      )
+    val outputInfos = AVector(
+      UnsignedTransaction.TxOutputInfo(toLockup, transferAlph, transferTokens, None)
+    )
+    val fromUnlock = fromLockupPair._2
+    buildTransferTx(blockFlow, fromLockup, fromUnlock, utxos, outputInfos, gasPrice)
+      .map { tx =>
+        val transferredAlph =
+          tx.fixedOutputs.filter(_.lockupScript == toLockup).fold(U256.Zero) { case (acc, output) =>
+            acc.addUnsafe(output.amount)
+          }
+        (tx, alphAmount.sub(transferredAlph).getOrElse(U256.Zero), remainTokens)
+      }
+  }
+
+  // scalastyle:off parameter.number method.length
+  private def fundSourceWithAlphAndRetryTransfer(
+      blockFlow: BlockFlow,
+      toLockupPair: (LockupScript.Asset, UnlockScript),
+      otherLockupPairs: AVector[(LockupScript.Asset, UnlockScript)],
+      toUtxos: AVector[FlowUtils.AssetOutputInfo],
+      builtTxs: AVector[UnsignedTransaction],
+      fromLockupPair: (LockupScript.Asset, UnlockScript),
+      fromUtxos: AVector[FlowUtils.AssetOutputInfo],
+      sourceAlphBalance: U256,
+      transferTokens: AVector[(TokenId, U256)],
+      alphAmount: U256,
+      tokenAmounts: AVector[(TokenId, U256)],
+      gasPrice: GasPrice,
+      targetBlockHash: Option[BlockHash]
+  ): Either[String, (AVector[UnsignedTransaction], U256, AVector[(TokenId, U256)])] = {
+    val fromLockup = fromLockupPair._1
+    val fundingAlphAmount =
+      calcFundingAlphAmount(
+        fromLockupPair,
+        sourceAlphBalance,
+        transferTokens.length,
+        fromUtxos.length + 1,
+        gasPrice
+      )
+    if (fundingAlphAmount.isZero) {
+      Left("No additional ALPH funding is required")
+    } else {
+      val fundingLockupPairs =
+        otherLockupPairs.filter(_._1 != fromLockup) :+ toLockupPair
+      buildAlphFundingTx(
+        blockFlow,
+        toLockupPair,
+        toUtxos,
+        builtTxs,
+        fundingLockupPairs,
+        fromLockup,
+        fundingAlphAmount,
+        gasPrice,
+        targetBlockHash
+      ).flatMap { fundingTx =>
+        val fundedSourceUtxos = getAvailableUtxos(fromLockup, fromUtxos, AVector(fundingTx))
+        transferFromFallbackAddress(
+          blockFlow,
+          fromLockupPair,
+          toLockupPair._1,
+          alphAmount,
+          tokenAmounts,
+          gasPrice,
+          fundedSourceUtxos
+        ).map { transferTx =>
+          (AVector(fundingTx, transferTx._1), transferTx._2, transferTx._3)
+        }
+      }
+    }
+  }
+  // scalastyle:on parameter.number method.length
+
+  // scalastyle:off parameter.number
+  private def buildAlphFundingTx(
+      blockFlow: BlockFlow,
+      toLockupPair: (LockupScript.Asset, UnlockScript),
+      toUtxos: AVector[FlowUtils.AssetOutputInfo],
+      builtTxs: AVector[UnsignedTransaction],
+      fundingLockupPairs: AVector[(LockupScript.Asset, UnlockScript)],
+      destinationLockup: LockupScript.Asset,
+      fundingAmount: U256,
+      gasPrice: GasPrice,
+      targetBlockHash: Option[BlockHash]
+  ): Either[String, UnsignedTransaction] = {
+    fundingLockupPairs.iterator
+      .foldLeft[Either[String, UnsignedTransaction]](
+        Left("No grouped address has enough ALPH to fund the token transfer")
+      ) {
+        case (right @ Right(_), _) => right
+        case (Left(_), fundingLockupPair) =>
+          val fundingUtxos =
+            if (fundingLockupPair._1 == toLockupPair._1) {
+              Right(getAvailableUtxos(toLockupPair._1, toUtxos, builtTxs))
+            } else {
+              getAvailableUtxos(
+                blockFlow,
+                fundingLockupPair._1,
+                builtTxs,
+                targetBlockHash
+              )
+            }
+          fundingUtxos.flatMap { utxos =>
+            val outputInfos = AVector(
+              UnsignedTransaction.TxOutputInfo(
+                destinationLockup,
+                fundingAmount,
+                AVector.empty,
+                None
+              )
+            )
+            buildTransferTx(
+              blockFlow,
+              fundingLockupPair._1,
+              fundingLockupPair._2,
+              utxos,
+              outputInfos,
+              gasPrice
+            )
           }
       }
   }
+  // scalastyle:on parameter.number
 
   protected def calcAlphAmount(
       lockPair: (LockupScript.Asset, UnlockScript),
@@ -298,16 +460,20 @@ trait ChainedTxUtils { self: ServerUtils =>
       numOfInputs: Int,
       gasPrice: GasPrice
   ): U256 = {
-    val tokenDustAmount  = U256.unsafe(tokenSize).mulUnsafe(dustUtxoAmount)
-    val changeDustAmount = U256.unsafe(tokenSize + 1).mulUnsafe(dustUtxoAmount)
+    val tokenDustAmount = U256.unsafe(tokenSize).mulUnsafe(dustUtxoAmount)
     if (alphNeeded <= tokenDustAmount) {
       tokenDustAmount
     } else {
       // The funding tx outputs: destination (tokenSize + 1) + sender change (tokenSize + 1)
       val numOutputs = 2 * (tokenSize + 1)
-      val maxGasFee =
-        estimateMaxTransferGasFee(lockPair._1, lockPair._2, numOfInputs, numOutputs, gasPrice)
-      val extraAmount = tokenDustAmount.addUnsafe(changeDustAmount).addUnsafe(maxGasFee)
+      val extraAmount =
+        calcRequiredAlphForTokenTransfer(
+          lockPair,
+          tokenSize,
+          numOfInputs,
+          numOutputs,
+          gasPrice
+        )
       if (alphBalance > extraAmount) {
         val available    = alphBalance.subUnsafe(extraAmount)
         val remainNeeded = alphNeeded.subUnsafe(tokenDustAmount)
@@ -316,6 +482,42 @@ trait ChainedTxUtils { self: ServerUtils =>
         tokenDustAmount
       }
     }
+  }
+
+  private def calcFundingAlphAmount(
+      lockPair: (LockupScript.Asset, UnlockScript),
+      alphBalance: U256,
+      tokenSize: Int,
+      numOfInputs: Int,
+      gasPrice: GasPrice
+  ): U256 = {
+    val requiredAlph =
+      calcRequiredAlphForTokenTransfer(
+        lockPair,
+        tokenSize,
+        numOfInputs,
+        2 * (tokenSize + 1),
+        gasPrice
+      )
+    requiredAlph.sub(alphBalance).getOrElse(U256.Zero) match {
+      case amount if amount.isZero           => U256.Zero
+      case amount if amount < dustUtxoAmount => dustUtxoAmount
+      case amount                            => amount
+    }
+  }
+
+  private def calcRequiredAlphForTokenTransfer(
+      lockPair: (LockupScript.Asset, UnlockScript),
+      tokenSize: Int,
+      numOfInputs: Int,
+      numOutputs: Int,
+      gasPrice: GasPrice
+  ): U256 = {
+    val tokenDustAmount  = U256.unsafe(tokenSize).mulUnsafe(dustUtxoAmount)
+    val changeDustAmount = U256.unsafe(tokenSize + 1).mulUnsafe(dustUtxoAmount)
+    val maxGasFee =
+      estimateMaxTransferGasFee(lockPair._1, lockPair._2, numOfInputs, numOutputs, gasPrice)
+    tokenDustAmount.addUnsafe(changeDustAmount).addUnsafe(maxGasFee)
   }
 
   private def buildTransferTx(
@@ -405,6 +607,32 @@ trait ChainedTxUtils { self: ServerUtils =>
       }
     )
     AVector.from(extraUtxos)
+  }
+
+  protected def getAvailableUtxos(
+      lockup: LockupScript.Asset,
+      utxos: AVector[FlowUtils.AssetOutputInfo],
+      txs: AVector[UnsignedTransaction]
+  ): AVector[FlowUtils.AssetOutputInfo] = {
+    txs.iterator
+      .foldLeft(ExtraUtxosInfo.empty) { case (extraUtxosInfo, tx) =>
+        extraUtxosInfo.updateWithUnsignedTx(tx)
+      }
+      .merge(utxos)
+      .filter(_.output.lockupScript == lockup)
+  }
+
+  private def getAvailableUtxos(
+      blockFlow: BlockFlow,
+      lockup: LockupScript.Asset,
+      builtTxs: AVector[UnsignedTransaction],
+      targetBlockHash: Option[BlockHash]
+  ): Either[String, AVector[FlowUtils.AssetOutputInfo]] = {
+    blockFlow
+      .getUsableUtxos(targetBlockHash, lockup, self.apiConfig.defaultUtxosLimit)
+      .left
+      .map(_.getMessage)
+      .map(getAvailableUtxos(lockup, _, builtTxs))
   }
 
   protected def estimateMaxTransferGasFee(
