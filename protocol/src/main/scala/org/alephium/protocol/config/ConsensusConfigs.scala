@@ -24,7 +24,8 @@ trait ConsensusConfigs {
   def rhone: ConsensusConfig
   def danube: ConsensusConfig
 
-  lazy val maxAllowedMiningTarget: Target = Math.max(mainnet.maxMiningTarget, rhone.maxMiningTarget)
+  lazy val maxAllowedMiningTarget: Target =
+    Math.max(Math.max(mainnet.maxMiningTarget, rhone.maxMiningTarget), danube.maxMiningTarget)
 
   def getConsensusConfig(hardFork: HardFork): ConsensusConfig = {
     if (hardFork.isDanubeEnabled()) {

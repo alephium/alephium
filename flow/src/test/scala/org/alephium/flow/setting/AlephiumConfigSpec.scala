@@ -137,6 +137,41 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.danubeHardForkTimestamp is TimeStamp.unsafe(1752573600000L)
   }
 
+  it should "allow a separate post-genesis mining floor on testnet without changing genesis" in {
+    val fixture = new AlephiumConfigFixture {
+      override val configValues: Map[String, Any] = Map(
+        ("alephium.network.network-id", 1),
+        ("alephium.consensus.num-zeros-at-least-in-hash", 24),
+        ("alephium.consensus.num-zeros-at-least-in-hash-testnet-patch", 19)
+      )
+    }
+
+    val overrideConfig = AlephiumConfig.load(fixture.buildNewConfig())
+
+    overrideConfig.consensus.danube.genesisNumZerosAtLeastInHash is 24
+    overrideConfig.consensus.danube.numZerosAtLeastInHash is 19
+    (overrideConfig.consensus.danube.genesisMaxMiningTarget !=
+      overrideConfig.consensus.danube.maxMiningTarget) is true
+    overrideConfig.consensus.danube.minMiningDiff is
+      overrideConfig.consensus.danube.maxMiningTarget.getDifficulty()
+    overrideConfig.genesisBlocks.forall(
+      _.forall(_.header.target == overrideConfig.consensus.mainnet.genesisMaxMiningTarget)
+    ) is true
+  }
+
+  it should "reject the post-genesis mining floor override on mainnet" in {
+    val fixture = new AlephiumConfigFixture {
+      override val configValues: Map[String, Any] = Map(
+        ("alephium.network.network-id", 0),
+        ("alephium.consensus.num-zeros-at-least-in-hash", 37),
+        ("alephium.consensus.num-zeros-at-least-in-hash-testnet-patch", 19)
+      )
+    }
+
+    intercept[IllegalArgumentException](AlephiumConfig.load(fixture.buildNewConfig())).getMessage is
+      "alephium.consensus.num-zeros-at-least-in-hash-testnet-patch is only supported on testnet."
+  }
+
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", 0),

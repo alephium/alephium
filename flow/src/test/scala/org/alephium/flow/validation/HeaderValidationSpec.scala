@@ -129,7 +129,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check genesis PoW target" in new GenesisFixture {
-    genesis.target is consensusConfigs.mainnet.maxMiningTarget
+    genesis.target is consensusConfigs.mainnet.genesisMaxMiningTarget
 
     val modified = genesis.copy(target = Target.unsafe(BigInteger.ZERO))
     failValidation(headerValidator.validateGenesisHeader(modified), InvalidGenesisWorkTarget)
