@@ -70,12 +70,14 @@ trait BaseActor extends Actor with ActorLogging {
   def terminateSystem(): Unit = {
     Env.currentEnv match {
       case Env.Prod =>
+        context.system.terminate()
         sys.exit(1)
       case Env.Integration =>
         context.system.terminate()
         ()
       case _ =>
         context.stop(self)
+        sys.exit(1)
     }
   }
 }
