@@ -37,6 +37,7 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     io,
     crypto,
     api,
+    ws,
     rpc,
     app,
     benchmark,
@@ -103,10 +104,30 @@ lazy val rpc = project("rpc")
     libraryDependencies ++= Seq(
       `scala-logging`,
       `akka-test`
-    ),
-    publish / skip := true
+    )
   )
   .dependsOn(json, util % "test->test;compile->compile")
+
+lazy val ws = project("ws")
+  .dependsOn(
+    api,
+    http,
+    json,
+    protocol,
+    rpc,
+    util
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      `scala-logging`,
+      vertx,
+      `tapir-core`,
+      `tapir-server`,
+      `tapir-openapi`,
+      `tapir-openapi-model`,
+      `tapir-vertx`
+    )
+  )
 
 lazy val api = project("api")
   .dependsOn(
@@ -131,6 +152,7 @@ lazy val app = mainProject("app")
   .dependsOn(
     json,
     api,
+    ws,
     rpc,
     http % "compile->compile;test->test",
     util % "test->test",
