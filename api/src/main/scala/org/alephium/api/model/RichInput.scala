@@ -51,7 +51,11 @@ final case class RichContractInput(
     address: Address.Contract,
     tokens: AVector[Token],
     outputRefTxId: TransactionId
-) extends RichInput
+) extends RichInput {
+  def unsafeToContractOutputRef(): ContractOutputRef = {
+    ContractOutputRef.unsafe(Hint.unsafe(hint), TxOutputRef.unsafeKey(key))
+  }
+}
 
 object RichInput {
   def from(

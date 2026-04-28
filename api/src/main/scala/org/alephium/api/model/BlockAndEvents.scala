@@ -18,4 +18,17 @@ package org.alephium.api.model
 
 import org.alephium.util.AVector
 
-final case class BlockAndEvents(block: BlockEntry, events: AVector[ContractEventByBlockHash])
+final case class BlockAndEvents(block: BlockEntry, events: AVector[ContractEventByBlockHash]) {
+  def getContractEvents: AVector[ContractEvent] = {
+    events.map { event =>
+      ContractEvent(
+        block.hash,
+        event.txId,
+        event.timestamp,
+        event.contractAddress,
+        event.eventIndex,
+        event.fields
+      )
+    }
+  }
+}
