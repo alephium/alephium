@@ -65,13 +65,12 @@ trait Server extends Service {
   def blocksExporter: BlocksExporter
 
   lazy val restServer: RestServer =
-    RestServer(node, miner, blocksExporter, walletApp.map(_.walletServer))(
+    RestServer(flowSystem, node, miner, blocksExporter, walletApp.map(_.walletServer))(
       config.broker,
       apiConfig,
+      config.network,
       executionContext
     )
-  lazy val webSocketServer: WebSocketServer =
-    WebSocketServer(node)(flowSystem, apiConfig, executionContext)
   lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 
   lazy val miner: ActorRefT[Miner.Command] = {
@@ -80,7 +79,7 @@ trait Server extends Service {
   }
 
   override lazy val subServices: ArraySeq[Service] = {
-    ArraySeq(restServer, webSocketServer, node) ++ ArraySeq.from[Service](walletService.toList)
+    ArraySeq(restServer, node) ++ ArraySeq.from[Service](walletService.toList)
   }
 
   override protected def startSelfOnce(): Future[Unit] = Future {

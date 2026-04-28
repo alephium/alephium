@@ -19,6 +19,7 @@ package org.alephium.app
 import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
+import akka.actor.ActorSystem
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
 import io.vertx.core.http.{HttpMethod, HttpServer, HttpServerOptions}
@@ -30,18 +31,19 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.flow.client.Node
 import org.alephium.flow.mining.Miner
-import org.alephium.http.{EndpointSender, ServerOptions, SwaggerUI}
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.http.{EndpointSender, HttpServerLike, ServerOptions, SwaggerUI}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.NetworkId
 import org.alephium.util._
 import org.alephium.wallet.web.WalletServer
 
-// scalastyle:off method.length
 class RestServer(
     val node: Node,
     val port: Int,
     val miner: ActorRefT[Miner.Command],
     val blocksExporter: BlocksExporter,
+    val httpServer: HttpServerLike,
     val walletServer: Option[WalletServer]
 )(implicit
     val brokerConfig: BrokerConfig,
@@ -188,10 +190,16 @@ class RestServer(
   private val httpBindingPromise: Promise[HttpServer] = Promise()
 
   protected def startSelfOnce(): Future[Unit] = {
+    val address = apiConfig.networkInterface.getHostAddress
     for {
-      httpBinding <- server.listen(port, apiConfig.networkInterface.getHostAddress).asScala
+      httpBinding <- httpServer.httpServer
+        .requestHandler(router)
+        .listen(port, address)
+        .asScala
     } yield {
-      logger.info(s"Listening http request on ${httpBinding.actualPort}")
+      logger.info(
+        s"Listening to rest-http requests including websocket endpoint '/ws' on /$address:${httpBinding.actualPort}"
+      )
       httpBindingPromise.success(httpBinding)
     }
   }
@@ -207,9 +215,10 @@ class RestServer(
       ()
     }
 }
-
+// scalastyle:off parameter.number
 object RestServer {
   def apply(
+      flowSystem: ActorSystem,
       node: Node,
       miner: ActorRefT[Miner.Command],
       blocksExporter: BlocksExporter,
@@ -217,9 +226,26 @@ object RestServer {
   )(implicit
       brokerConfig: BrokerConfig,
       apiConfig: ApiConfig,
+      networkSetting: NetworkSetting,
       executionContext: ExecutionContext
   ): RestServer = {
     val restPort = node.config.network.restPort
-    new RestServer(node, restPort, miner, blocksExporter, walletServer)
+    val httpOptions =
+      new HttpServerOptions()
+        .setMaxWebSocketFrameSize(networkSetting.wsMaxFrameSize)
+        .setRegisterWebSocketWriteHandlers(true)
+        .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
+    val webSocketServer =
+      ws.WsServer(
+        flowSystem,
+        node,
+        networkSetting.wsMaxConnections,
+        networkSetting.wsMaxSubscriptionsPerConnection,
+        networkSetting.wsMaxContractEventAddresses,
+        networkSetting.wsPingFrequency,
+        httpOptions
+      )
+    new RestServer(node, restPort, miner, blocksExporter, webSocketServer, walletServer)
   }
 }
+// scalastyle:on parameter.number
