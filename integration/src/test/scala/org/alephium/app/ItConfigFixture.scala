@@ -26,7 +26,6 @@ import org.alephium.flow.setting.AlephiumConfigFixture
 
 trait ItConfigFixture extends AlephiumConfigFixture {
 
-  def wsPort(port: Int)    = port - 1
   def restPort(port: Int)  = port - 2
   def minerPort(port: Int) = port - 3
 
@@ -48,8 +47,6 @@ trait ItConfigFixture extends AlephiumConfigFixture {
         udp.bind(new InetSocketAddress("127.0.0.1", tcpPort))
         rest.setReuseAddress(true)
         rest.bind(new InetSocketAddress("127.0.0.1", restPort(tcpPort)))
-        ws.setReuseAddress(true)
-        ws.bind(new InetSocketAddress("127.0.0.1", wsPort(tcpPort)))
         minerApi.setReuseAddress(true)
         minerApi.bind(new InetSocketAddress("127.0.0.1", minerPort(tcpPort)))
         usedPort.add(tcpPort)

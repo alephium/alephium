@@ -29,16 +29,15 @@ import akka.io.Tcp
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import io.vertx.core.Vertx
-import io.vertx.core.http.WebSocketBase
+import io.vertx.core.http.WebSocketClientOptions
 import org.scalatest.Assertion
 import org.scalatest.time.{Seconds, Span}
 import sttp.model.StatusCode
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson.avectorWriter
 import org.alephium.api.model._
-import org.alephium.flow.RichBlockFlowT
+import org.alephium.ws.{ClientWs, WsClient}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.{Job, Miner}
 import org.alephium.flow.network.DiscoveryServer
@@ -70,8 +69,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     with RichBlockFlowT { Fixture =>
   implicit val system: ActorSystem = spec.system
 
-  private val vertx           = Vertx.vertx()
-  private val webSocketClient = vertx.createWebSocketClient()
+  private val vertx = Vertx.vertx()
+  private val wsClient =
+    WsClient(vertx, new WebSocketClientOptions().setMaxFrameSize(networkConfig.wsMaxFrameSize))
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
@@ -104,7 +104,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   val defaultMasterPort     = generatePort()
   val defaultRestMasterPort = restPort(defaultMasterPort)
-  val defaultWsMasterPort   = wsPort(defaultMasterPort)
   val defaultWalletPort     = generatePort()
 
   val blockNotifyProbe = TestProbe()
@@ -284,7 +283,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.coordinator-address", s"127.0.0.1:$masterPort"),
         ("alephium.network.external-address", s"127.0.0.1:$publicPort"),
-        ("alephium.network.ws-port", wsPort(publicPort)),
         ("alephium.network.rest-port", restPort(publicPort)),
         ("alephium.network.miner-api-port", minerPort(publicPort)),
         ("alephium.broker.broker-num", brokerNum),
@@ -400,15 +398,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     server
   }
 
-  def startWS(port: Int): Future[WebSocketBase] = {
-    webSocketClient
-      .connect(port, "127.0.0.1", "/events")
-      .asScala
-      .map { ws =>
-        ws.textMessageHandler { blockNotify =>
-          blockNotifyProbe.ref ! blockNotify
-        }
-      }(system.dispatcher)
+  def startWsClient(port: Int): Future[ClientWs] = {
+    implicit val ec: ExecutionContext = system.dispatcher
+    wsClient.connect(port)(blockNotifyProbe.ref ! _)(_ => ())
   }
 
   def jsonRpc(method: String, params: String): String =
@@ -919,10 +911,15 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       servers.map(_.stop()).foreach(_.futureValue is ())
     }
 
-    def startWs(): Unit = {
-      servers.foreach { server =>
-        startWS(server.config.network.wsPort)
-      }
+    def startWs(): Future[Unit] = {
+      implicit val ec: ExecutionContext = system.dispatcher
+      Future
+        .sequence(
+          servers.map { server =>
+            startWsClient(server.config.network.restPort)
+          }.toSeq
+        )
+        .map(_ => ())
     }
 
     def startMining(): Unit = {
