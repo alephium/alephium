@@ -30,7 +30,6 @@ final case class PeerInfo private (
     externalAddress: Option[InetSocketAddress],
     internalAddress: InetSocketAddress,
     restPort: Int,
-    wsPort: Int,
     minerApiPort: Int
 )
 
@@ -41,7 +40,6 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
       publicAddress: Option[InetSocketAddress],
       privateAddress: InetSocketAddress,
       restPort: Int,
-      wsPort: Int,
       minerApiPort: Int
   ): PeerInfo =
     new PeerInfo(
@@ -50,12 +48,11 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
       publicAddress,
       privateAddress,
       restPort,
-      wsPort,
       minerApiPort
     )
 
   val unsafeSerde: Serde[PeerInfo] =
-    Serde.forProduct7(
+    Serde.forProduct6(
       unsafe,
       t =>
         (
@@ -64,7 +61,6 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
           t.externalAddress,
           t.internalAddress,
           t.restPort,
-          t.wsPort,
           t.minerApiPort
         )
     )
@@ -77,7 +73,6 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
         Configs.validatePort(address.getPort)
       )
       _ <- Configs.validatePort(info.restPort)
-      _ <- Configs.validatePort(info.wsPort)
     } yield ()
   }
 
@@ -100,7 +95,6 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
       networkSetting.externalAddressInferred,
       networkSetting.internalAddress,
       networkSetting.restPort,
-      networkSetting.wsPort,
       networkSetting.minerApiPort
     )
   }
