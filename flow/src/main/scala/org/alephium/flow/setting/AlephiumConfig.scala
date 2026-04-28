@@ -162,6 +162,11 @@ final case class NetworkSetting(
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
     maxCliqueFromSameIp: Int,
+    wsMaxConnections: Int,
+    wsMaxFrameSize: Int,
+    wsMaxSubscriptionsPerConnection: Int,
+    wsMaxContractEventAddresses: Int,
+    wsPingFrequency: Duration,
     pingFrequency: Duration,
     retryTimeout: Duration,
     banDuration: Duration,
@@ -187,7 +192,6 @@ final case class NetworkSetting(
     coordinatorAddress: InetSocketAddress,
     externalAddress: Option[InetSocketAddress],
     restPort: Int,
-    wsPort: Int,
     minerApiPort: Int,
     connectionBuild: ActorRef => ActorRefT[Tcp.Command]
 ) extends NetworkConfig {
@@ -356,6 +360,11 @@ object AlephiumConfig {
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
       maxCliqueFromSameIp: Int,
+      wsMaxConnections: Int,
+      wsMaxFrameSize: Int,
+      wsMaxSubscriptionsPerConnection: Int,
+      wsMaxContractEventAddresses: Int,
+      wsPingFrequency: Duration,
       pingFrequency: Duration,
       retryTimeout: Duration,
       banDuration: Duration,
@@ -381,7 +390,6 @@ object AlephiumConfig {
       coordinatorAddress: InetSocketAddress,
       externalAddress: Option[InetSocketAddress],
       restPort: Int,
-      wsPort: Int,
       minerApiPort: Int
   ) {
     def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
@@ -395,6 +403,11 @@ object AlephiumConfig {
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
         maxCliqueFromSameIp,
+        wsMaxConnections,
+        wsMaxFrameSize,
+        wsMaxSubscriptionsPerConnection,
+        wsMaxContractEventAddresses,
+        wsPingFrequency,
         pingFrequency,
         retryTimeout,
         banDuration: Duration,
@@ -420,7 +433,6 @@ object AlephiumConfig {
         coordinatorAddress,
         externalAddress,
         restPort,
-        wsPort,
         minerApiPort,
         connectionBuild
       )
