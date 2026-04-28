@@ -84,9 +84,10 @@ class TxUtilsSpec extends AlephiumSpec {
       val tx         = TransactionTemplate.from(unsignedTx, genesisPriKey)
       val chainIndex = tx.chainIndex
       TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
+      val timestamp = TimeStamp.now()
       blockFlow
         .getGrandPool()
-        .add(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToMemPool
+        .add(chainIndex, tx, timestamp) is MemPool.AddedToMemPool(timestamp)
     }
   }
 
@@ -2226,8 +2227,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "calculate balances correctly" in new TxGenerators with AlephiumConfigFixture {
-    val now          = TimeStamp.now()
-    val timestampGen = Gen.oneOf(Seq(TimeStamp.zero, now.plusHoursUnsafe(1)))
+    val now = TimeStamp.now()
     val assetOutputsGen = Gen
       .listOf(
         assetOutputGen(GroupIndex.unsafe(0))(
@@ -2377,9 +2377,10 @@ class TxUtilsSpec extends AlephiumSpec {
       scriptSignatures = AVector.empty
     )
     TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
+    val timestamp = TimeStamp.now()
     blockFlow
       .getGrandPool()
-      .add(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToMemPool
+      .add(chainIndex, tx, timestamp) is MemPool.AddedToMemPool(timestamp)
   }
 
   "TxUtils.transferMultiInputs" should "transfer multi inputs" in new MultiInputTransactionFixture {

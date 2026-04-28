@@ -22,6 +22,7 @@ import scala.util.{Success, Try}
 import org.scalatest.{Assertion, EitherValues, Inside}
 
 import org.alephium.json.Json._
+import org.alephium.rpc.model.JsonRPC.Notification
 import org.alephium.util.AlephiumSpec
 
 class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
@@ -62,19 +63,11 @@ class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
     write(request) is """{"method":"foobar","params":{"bar":42},"id":1,"jsonrpc":"2.0"}"""
   }
 
-  it should "encode notification" in {
-    val notification = JsonRPC.Notification("foobar", jsonObjectEmpty)
-    write(notification) is """{"method":"foobar","params":{},"jsonrpc":"2.0"}"""
-  }
-
-  it should "encode notification - drop nulls" in {
-    val notification = JsonRPC.Notification("foobar", jsonObjectWihNull)
-    write(notification) is """{"method":"foobar","params":{"bar":42},"jsonrpc":"2.0"}"""
-  }
-
   it should "encode response - success" in {
     val success: JsonRPC.Response = JsonRPC.Response.Success(ujson.Num(42), 1)
     write(success) is """{"result":42,"id":1,"jsonrpc":"2.0"}"""
+    val successWithoutType = JsonRPC.Response.Success(ujson.Num(42), 1)
+    write(successWithoutType) is """{"result":42,"id":1,"jsonrpc":"2.0"}"""
   }
 
   it should "encode response - success - drop nulls" in {
@@ -86,6 +79,10 @@ class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
     val failure: JsonRPC.Response = JsonRPC.Response.Failure(JsonRPC.Error.InvalidRequest, Some(1))
     write(
       failure
+    ) is """{"error":{"code":-32600,"message":"Invalid Request"},"id":1,"jsonrpc":"2.0"}"""
+    val failureWithoutType = JsonRPC.Response.Failure(JsonRPC.Error.InvalidRequest, Some(1))
+    write(
+      failureWithoutType
     ) is """{"error":{"code":-32600,"message":"Invalid Request"},"id":1,"jsonrpc":"2.0"}"""
   }
 
@@ -124,6 +121,22 @@ class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
       parseNotificationUnsafe("""{ "method": "foobar", "params": null,"jsonrpc": "2.0"}"""),
       JsonRPC.Error.InvalidParams
     )
+  }
+
+  it should "encode notification with empty object" in {
+    val notification = JsonRPC.Notification("foobar", jsonObjectEmpty)
+    write(notification) is """{"method":"foobar","params":{},"jsonrpc":"2.0"}"""
+  }
+
+  it should "encode notification with object" in {
+    val notification = Notification("foobar", ujson.Obj("foo" -> ujson.Num(42)))
+    val encoded      = write(notification)
+    encoded is """{"method":"foobar","params":{"foo":42},"jsonrpc":"2.0"}"""
+  }
+
+  it should "encode notification - drop nulls" in {
+    val notification = JsonRPC.Notification("foobar", jsonObjectWihNull)
+    write(notification) is """{"method":"foobar","params":{"bar":42},"jsonrpc":"2.0"}"""
   }
 
   def checkRequestParams(jsonRaw: String, params: ujson.Value): Assertion = {

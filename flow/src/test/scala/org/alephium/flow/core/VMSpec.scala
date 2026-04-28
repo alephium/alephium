@@ -2623,9 +2623,10 @@ class VMSpec extends AlephiumSpec with Generators {
       } else {
         validator.validateMempoolTxTemplate(tx, blockFlow) isE ()
       }
+      val timestamp = TimeStamp.now()
       blockFlow
         .getGrandPool()
-        .add(chainIndex, tx, TimeStamp.now()) is AddedToMemPool
+        .add(chainIndex, tx, timestamp) is AddedToMemPool(timestamp)
     }
 
     val blockTemplate =

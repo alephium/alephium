@@ -77,7 +77,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector.empty,
       ALPH.oneAlph,
       utxosLimitInApiConfig,
-      128,
+      maxFormBufferedBytes = 128,
       enableHttpMetrics = true
     )
   }
@@ -5725,13 +5725,27 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.getEventsForContractCurrentCount(blockFlow, contractAddress) isE 1
     serverUtils.getEventsByContractAddress(blockFlow, 0, 1, contractAddress) isE ContractEvents(
       AVector(
-        ContractEvent(block.hash, txId, block.timestamp, 0, AVector(ValU256(U256.unsafe(5))))
+        ContractEvent(
+          block.hash,
+          txId,
+          block.timestamp,
+          contractAddress,
+          0,
+          AVector(ValU256(U256.unsafe(5)))
+        )
       ),
       1
     )
     serverUtils.getEventsByContractAddress(blockFlow, 0, 10, contractAddress) isE ContractEvents(
       AVector(
-        ContractEvent(block.hash, txId, block.timestamp, 0, AVector(ValU256(U256.unsafe(5))))
+        ContractEvent(
+          block.hash,
+          txId,
+          block.timestamp,
+          contractAddress,
+          0,
+          AVector(ValU256(U256.unsafe(5)))
+        )
       ),
       1
     )

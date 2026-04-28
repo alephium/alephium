@@ -154,7 +154,8 @@ class ApiConfigSpec extends AlephiumSpec {
       ("alephium.api.gas-fee-cap", "1000000000000000000"),
       ("alephium.api.default-utxos-limit", 512),
       ("alephium.api.max-form-buffered-bytes", 128 * 1024),
-      ("alephium.api.enable-http-metrics", enableHttpMetrics.getOrElse(null))
+      ("alephium.api.enable-http-metrics", enableHttpMetrics.getOrElse(null)),
+      ("alephium.api.max-web-socket-frame-size", 1024 * 1024)
     )
 
     lazy val config = ConfigFactory

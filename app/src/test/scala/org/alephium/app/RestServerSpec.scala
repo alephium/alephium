@@ -40,8 +40,8 @@ import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.bootstrap._
 import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.http.{HttpRouteFixture, SimpleHttpServer}
 import org.alephium.http.HttpFixture._
-import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.mining.HashRate
@@ -1291,6 +1291,7 @@ abstract class RestServerSpec(
                    |      "blockHash": "${blockHash.toHexString}",
                    |      "txId": "${dummyTx.id.toHexString}",
                    |      "timestamp": ${dummyBlock.timestamp.millis},
+                   |      "contractAddress": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
                    |      "eventIndex": 0,
                    |      "fields": [
                    |        {
@@ -1784,7 +1785,6 @@ trait RestServerFixture
       publicAddress = None,
       privateAddress = address,
       restPort = peerPort,
-      wsPort = peerPort,
       minerApiPort = peerPort
     )
 
@@ -1840,6 +1840,7 @@ trait RestServerFixture
         peer.restPort,
         miner,
         blocksExporter,
+        SimpleHttpServer(),
         Some(walletApp.walletServer)
       )(
         serverConfig.broker,

@@ -25,7 +25,7 @@ import org.scalacheck.Gen
 import org.alephium.protocol.config.{BrokerConfig, CliqueConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasBox
-import org.alephium.util.{AVector, I256, NumericHelpers, U256}
+import org.alephium.util.{AVector, I256, NumericHelpers, TimeStamp, U256}
 
 trait Generators extends NumericHelpers {
   implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
@@ -43,6 +43,8 @@ trait Generators extends NumericHelpers {
 
   def groupIndexGen(implicit config: GroupConfig): Gen[GroupIndex] =
     Gen.choose(0, config.groups - 1).map(GroupIndex.unsafe)
+
+  val timestampGen = Gen.oneOf(Seq(TimeStamp.zero, TimeStamp.now().plusHoursUnsafe(1)))
 
   def chainIndexGen(implicit config: GroupConfig): Gen[ChainIndex] =
     for {
