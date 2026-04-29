@@ -144,14 +144,13 @@ final case class WsSubscriptionsState[C: ClassTag](
   def removeAllSubscriptions(wsId: WsId): Unit = {
     connections.remove(wsId)
 
-    contractKeysBySubscription.keysIterator
-      .map {
-        case subscription if subscription.wsId == wsId =>
-          contractKeysBySubscription.remove(subscription).getOrElse(AVector.empty[ContractEventKey])
-        case _ =>
-          AVector.empty[ContractEventKey]
-      }
-      .foreach { affectedContractKeys =>
+    // Collect keys first to avoid mutation during iteration
+    val subscriptionsToRemove = contractKeysBySubscription.keys
+      .filter(_.wsId == wsId)
+      .toVector
+
+    subscriptionsToRemove.foreach { subscription =>
+      contractKeysBySubscription.remove(subscription).foreach { affectedContractKeys =>
         affectedContractKeys.foreach { affectedContractKey =>
           subscriptionsByContractKey.updateWith(affectedContractKey) {
             case Some(ss) => Option(ss.filterNot(_.wsId == wsId)).filter(_.nonEmpty)
@@ -159,6 +158,7 @@ final case class WsSubscriptionsState[C: ClassTag](
           }
         }
       }
+    }
   }
 }
 

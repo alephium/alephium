@@ -150,6 +150,24 @@ class WsSubscriptionHandler(
 
   override def postStop(): Unit = {
     pingScheduler.cancel()
+
+    // Close all active connections gracefully
+    if (openedWsConnections.nonEmpty) {
+      log.info(
+        s"WebSocket handler stopping, closing ${openedWsConnections.size} active connections"
+      )
+      openedWsConnections.values.foreach { ws =>
+        if (!ws.isClosed) {
+          ws.writeTextMessage(
+            """{"jsonrpc":"2.0","method":"server_shutdown","params":{}}"""
+          ).recover { case ex: Throwable =>
+            log.debug(s"Failed to send shutdown notification: ${ex.getMessage}")
+            ()
+          }(context.dispatcher)
+          ()
+        }
+      }
+    }
     ()
   }
 
@@ -251,9 +269,15 @@ class WsSubscriptionHandler(
   }
 
   private def connect(ws: ServerWsLike): Unit = {
-    ws.closeHandler(() => self ! Disconnect(ws.textHandlerID()))
+    ws.closeHandler(() => {
+      log.debug(s"WebSocket connection closed: ${ws.textHandlerID()}")
+      self ! Disconnect(ws.textHandlerID())
+    })
     ws.textMessageHandler(msg => handleMessage(ws, msg))
     openedWsConnections.put(ws.textHandlerID(), ws)
+    log.debug(
+      s"WebSocket connected: ${ws.textHandlerID()}, total connections: ${openedWsConnections.size}"
+    )
     ()
   }
 
@@ -285,6 +309,9 @@ class WsSubscriptionHandler(
                   case Success(_) =>
                   case Failure(ex) =>
                     if (!ws.isClosed) {
+                      log.debug(
+                        s"Notification failed but connection still open, retrying: ${ex.getMessage}"
+                      )
                       self ! NotificationFailed(
                         id,
                         ws,
@@ -292,6 +319,9 @@ class WsSubscriptionHandler(
                         message.body(),
                         ex.getMessage
                       )
+                    } else {
+                      log.debug(s"Notification failed due to closed connection, triggering cleanup")
+                      self ! Disconnect(ws.textHandlerID())
                     }
                 }
               }
