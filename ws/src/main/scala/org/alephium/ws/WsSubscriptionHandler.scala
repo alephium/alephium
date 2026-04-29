@@ -292,54 +292,69 @@ class WsSubscriptionHandler(
     }
   }
 
+  private def createNotificationHandler(
+      id: WsCorrelationId,
+      ws: ServerWsLike,
+      subscriptionId: WsSubscriptionId
+  )(implicit ec: ExecutionContext): io.vertx.core.Handler[Message[String]] = {
+    new io.vertx.core.Handler[Message[String]] {
+      override def handle(message: Message[String]): Unit = {
+        if (!ws.isClosed) {
+          ws.writeTextMessage(message.body()).onComplete {
+            case Success(_) => // Success
+            case Failure(ex) =>
+              if (!ws.isClosed) {
+                log.debug(
+                  s"Notification failed but connection still open, retrying: ${ex.getMessage}"
+                )
+                self ! NotificationFailed(
+                  id,
+                  ws,
+                  subscriptionId,
+                  message.body(),
+                  ex.getMessage
+                )
+              } else {
+                log.debug(s"Notification failed due to closed connection, triggering cleanup")
+                self ! Disconnect(ws.textHandlerID())
+              }
+          }
+        }
+      }
+    }
+  }
+
+  private def validateSubscription(
+      ws: ServerWsLike,
+      subscriptionId: WsSubscriptionId
+  ): Option[JsonRPC.Error] = {
+    val subscriptions = subscriptionsState.getSubscriptions(ws.textHandlerID())
+    if (subscriptions.contains(subscriptionId)) {
+      Some(WsError.alreadySubscribed(subscriptionId))
+    } else if (subscriptions.length >= maxSubscriptionsPerConnection) {
+      Some(WsError.subscriptionLimitExceeded(maxSubscriptionsPerConnection))
+    } else {
+      None
+    }
+  }
+
   private def subscribe(id: WsCorrelationId, ws: ServerWsLike, params: WsSubscriptionParams)(
       implicit ec: ExecutionContext
   ): Unit = {
     val subscriptionId = params.subscriptionId
 
-    def registerConsumer: Try[MessageConsumer[String]] = Try {
-      vertx
-        .eventBus()
-        .consumer[String](
-          subscriptionId.toHexString,
-          new io.vertx.core.Handler[Message[String]] {
-            override def handle(message: Message[String]): Unit = {
-              if (!ws.isClosed) {
-                ws.writeTextMessage(message.body()).onComplete {
-                  case Success(_) =>
-                  case Failure(ex) =>
-                    if (!ws.isClosed) {
-                      log.debug(
-                        s"Notification failed but connection still open, retrying: ${ex.getMessage}"
-                      )
-                      self ! NotificationFailed(
-                        id,
-                        ws,
-                        subscriptionId,
-                        message.body(),
-                        ex.getMessage
-                      )
-                    } else {
-                      log.debug(s"Notification failed due to closed connection, triggering cleanup")
-                      self ! Disconnect(ws.textHandlerID())
-                    }
-                }
-              }
-            }
-          }
-        )
-    }
-
-    subscriptionsState.getSubscriptions(ws.textHandlerID()) match {
-      case subscriptions if subscriptions.contains(subscriptionId) =>
-        self ! RequestRejected(ws, Response.failed(id, WsError.alreadySubscribed(subscriptionId)))
-      case subscriptions if subscriptions.length >= maxSubscriptionsPerConnection =>
-        self ! RequestRejected(
-          ws,
-          Response.failed(id, WsError.subscriptionLimitExceeded(maxSubscriptionsPerConnection))
-        )
-      case _ =>
-        registerConsumer match {
+    validateSubscription(ws, subscriptionId) match {
+      case Some(error) =>
+        self ! RequestRejected(ws, Response.failed(id, error))
+      case None =>
+        Try {
+          vertx
+            .eventBus()
+            .consumer[String](
+              subscriptionId.toHexString,
+              createNotificationHandler(id, ws, subscriptionId)
+            )
+        } match {
           case Success(consumer) =>
             self ! Subscribed(id, ws, params, consumer)
           case Failure(ex) =>
