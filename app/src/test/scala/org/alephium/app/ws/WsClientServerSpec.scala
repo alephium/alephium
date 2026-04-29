@@ -328,7 +328,8 @@ class WsClientServerSpec extends AlephiumSpec {
       node.eventBus ! BlockNotify(
         dummyBlock,
         0,
-        logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0))
+        logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0)),
+        None
       )
 
       measureTime(s"$numberOfNotifications notifications with ser/deser") {
@@ -356,7 +357,7 @@ class WsClientServerSpec extends AlephiumSpec {
           }
       }
 
-      node.eventBus ! BlockNotify(dummyBlock, 1, AVector.empty)
+      node.eventBus ! BlockNotify(dummyBlock, 1, AVector.empty, None)
       clientProbe.expectNoMessage(50.millis)
     } finally {
       Future.sequence(websockets.map(_._2.close())).futureValue

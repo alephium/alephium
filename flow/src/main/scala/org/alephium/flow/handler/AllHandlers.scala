@@ -24,7 +24,13 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{MemPoolSetting, MiningSetting, NetworkSetting}
 import org.alephium.io.IOError
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
-import org.alephium.protocol.model.{Block, ChainIndex, ContractId, TransactionTemplate}
+import org.alephium.protocol.model.{
+  Block,
+  ChainIndex,
+  ContractId,
+  TransactionId,
+  TransactionTemplate
+}
 import org.alephium.protocol.vm.{LogConfig, LogState}
 import org.alephium.util.{ActorRefT, AVector, EventBus, TimeStamp}
 
@@ -190,7 +196,8 @@ object AllHandlers {
   final case class BlockNotify(
       block: Block,
       height: Int,
-      logStates: AVector[(ContractId, LogState)]
+      logStates: AVector[(ContractId, LogState)],
+      conflictedTxs: Option[AVector[TransactionId]]
   ) extends EventBus.Event
 
   object BlockNotify {
@@ -201,8 +208,9 @@ object AllHandlers {
           if (blockFlow.logConfig.enabled) {
             blockFlow.getEventsByHash(Byte32.unsafe(block.hash.bytes))
           } else { Right(AVector.empty) }
+        conflictedTxs <- blockFlow.getConflictedTxsFromBlock(block.hash)
         logStates = events.map(e => e._2.id.contractId -> e._3)
-      } yield BlockNotify(block, height, logStates)
+      } yield BlockNotify(block, height, logStates, conflictedTxs)
     }
   }
   final case class TxNotify(tx: TransactionTemplate, seenAt: TimeStamp) extends EventBus.Event

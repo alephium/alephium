@@ -88,7 +88,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       eventBusRef ! BlockNotify(
         blockGen.sample.get,
         height = 0,
-        logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0))
+        logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0)),
+        None
       )
       eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
     }
@@ -375,7 +376,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
               contractAddress_2.contractId -> EventIndex_1,
               contractAddress_3.contractId -> 1234 // contractAddress_3 is not filtered by eventIndex
             )
-          )
+          ),
+          None
         )
         eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
       },
@@ -387,7 +389,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         eventBusRef ! BlockNotify(
           blockGen.sample.get,
           height = 1,
-          logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0))
+          logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0)),
+          None
         )
         eventBusRef ! TxNotify(transactionGen().sample.get.toTemplate, TimeStamp.now())
       },

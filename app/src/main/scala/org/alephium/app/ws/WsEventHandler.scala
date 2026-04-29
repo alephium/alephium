@@ -58,16 +58,21 @@ class WsEventHandler(subscriptionHandlerRef: ActorRefT[SubscriptionMsg])(implici
     case TxNotify(tx, seenAt) =>
       val params = WsTxNotificationParams.from(TransactionTemplate.fromProtocol(tx, seenAt))
       subscriptionHandlerRef ! NotificationPublished(params)
-    case BlockNotify(block, height, logStates) =>
-      //TODO FIX ME, conflictedTxs is not included in BlockEntry, need to add it in the future
-      BlockEntry.from(block, height, None) match {
+    case BlockNotify(block, height, logStates, conflictedTxs) =>
+      BlockEntry.from(block, height, conflictedTxs) match {
         case Right(blockEntry) =>
           val contractEvents =
             logStates.map { case (contractId, logState) =>
               val contractAddress = Address.contract(contractId)
               val eventIndex      = logState.index.toInt
               val fields          = logState.fields.map(Val.from)
-              ContractEventByBlockHash(logState.txId, block.timestamp, contractAddress, eventIndex, fields)
+              ContractEventByBlockHash(
+                logState.txId,
+                block.timestamp,
+                contractAddress,
+                eventIndex,
+                fields
+              )
             }
           val params = WsBlockNotificationParams.from(BlockAndEvents(blockEntry, contractEvents))
           subscriptionHandlerRef ! NotificationPublished(params)

@@ -326,7 +326,11 @@ class WsProtocolSpec
         BlockEntry.from(dummyBlock, 0, None).rightValue,
         logStatesFor(AVector(contractAddress_0.contractId -> EventIndex_0)).map {
           case (contractId, logState) =>
-            ContractEventByBlockHash.from(LogStateRef(LogStatesId(contractId, 0), 0), logState, dummyBlock.timestamp)
+            ContractEventByBlockHash.from(
+              LogStateRef(LogStatesId(contractId, 0), 0),
+              logState,
+              dummyBlock.timestamp
+            )
         }
       )
 
