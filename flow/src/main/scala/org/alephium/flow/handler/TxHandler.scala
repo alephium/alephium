@@ -143,8 +143,6 @@ object TxHandler {
                   MemPool.AddedToMemPool(seenAt)
                 )
               } yield result
-              mineTxForDev(blockFlow, ChainIndex(chainIndex.from, chainIndex.from), publishBlock)
-                .map(_ => MemPool.AddedToMemPool(seenAt))
             } else {
               Right(MemPool.AddedToMemPool(seenAt))
             }
