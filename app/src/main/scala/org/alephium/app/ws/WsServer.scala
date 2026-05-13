@@ -18,67 +18,72 @@ package org.alephium.app.ws
 
 import java.util.concurrent.TimeUnit
 
-import scala.concurrent.Future
+import scala.collection.immutable.ArraySeq
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.FiniteDuration
 
 import akka.actor.ActorSystem
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
-import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket, WebSocketFrame}
+import io.vertx.core.http.{ServerWebSocket, WebSocketFrame}
 
 import org.alephium.flow.client.Node
-import org.alephium.http.HttpServerLike
+import org.alephium.http.HttpService
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.util.{ActorRefT, Duration, EventBus}
+import org.alephium.util.{Duration, Service}
 import org.alephium.ws._
 import org.alephium.ws.WsParams.WsId
 
-final case class WsServer(
-    httpServer: HttpServer,
-    eventHandler: ActorRefT[EventBus.Message],
-    subscriptionHandler: ActorRefT[WsSubscriptionHandler.SubscriptionMsg]
-) extends HttpServerLike
+final class WsServer(
+    httpService: HttpService,
+    system: ActorSystem,
+    node: Node,
+    maxConnections: Int,
+    maxSubscriptionsPerConnection: Int,
+    maxContractEventAddresses: Int,
+    pingFrequency: Duration
+)(implicit
+    networkConfig: NetworkConfig,
+    groupConfig: GroupConfig,
+    val executionContext: ExecutionContext
+) extends Service
+    with StrictLogging {
 
-object WsServer extends StrictLogging {
+  def vertx: Vertx = httpService.vertx
 
-  // scalastyle:off parameter.number
-  def apply(
-      system: ActorSystem,
-      node: Node,
-      maxConnections: Int,
-      maxSubscriptionsPerConnection: Int,
-      maxContractEventAddresses: Int,
-      pingFrequency: Duration,
-      options: HttpServerOptions
-  )(implicit
-      networkConfig: NetworkConfig,
-      groupConfig: GroupConfig
-  ): WsServer = {
-    val vertx  = Vertx.vertx()
-    val server = vertx.createHttpServer(options)
+  lazy val subscriptionHandler =
+    WsSubscriptionHandler.apply(
+      vertx,
+      system,
+      maxConnections,
+      maxSubscriptionsPerConnection,
+      maxContractEventAddresses,
+      FiniteDuration(pingFrequency.millis, TimeUnit.MILLISECONDS)
+    )
+  lazy val eventHandler =
+    WsEventHandler.getSubscribedEventHandler(node.eventBus, subscriptionHandler, system)
 
-    val subscriptionHandler =
-      WsSubscriptionHandler.apply(
-        vertx,
-        system,
-        maxConnections,
-        maxSubscriptionsPerConnection,
-        maxContractEventAddresses,
-        FiniteDuration(pingFrequency.millis, TimeUnit.MILLISECONDS)
-      )
-    val eventHandler =
-      WsEventHandler.getSubscribedEventHandler(node.eventBus, subscriptionHandler, system)
-    server
+  override def subServices: ArraySeq[Service] = ArraySeq(httpService)
+
+  override protected def startSelfOnce(): Future[Unit] = {
+    logger.info("Starting service: WsServer")
+
+    // Initialize eventHandler to subscribe to event bus
+    eventHandler
+
+    httpService.httpServer
       .webSocketHandshakeHandler { handshake =>
         subscriptionHandler ! WsSubscriptionHandler.Handshake(handshake)
       }
       .webSocketHandler { ws =>
         subscriptionHandler ! WsSubscriptionHandler.Connect(ServerWs(ws))
       }
-    WsServer(server, eventHandler, subscriptionHandler)
+
+    Future.unit
   }
-  // scalastyle:on parameter.number
+
+  override protected def stopSelfOnce(): Future[Unit] = Future.unit
 }
 
 final case class ServerWs(underlying: ServerWebSocket) extends ServerWsLike {

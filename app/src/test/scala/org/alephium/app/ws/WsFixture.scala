@@ -36,6 +36,7 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter.VertxFutureToScalaFu
 import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate, ValU256}
 import org.alephium.app.{ApiConfig, ServerFixture}
 import org.alephium.app.ServerFixture.NodeDummy
+import org.alephium.app.ws.WsServer
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json.{read, reader, Reader}
 import org.alephium.protocol.Hash
@@ -163,25 +164,37 @@ trait WsClientServerFixture
   protected def maxClientConnections: Int   = 500
   protected def keepAliveInterval: Duration = Duration.ofSecondsUnsafe(10)
 
+  val httpService = new org.alephium.http.HttpService(wsOptions)(executionContext)
   protected def bindAndListen(): WsServer = {
     val wsServer =
-      WsServer(
+      new WsServer(
+        httpService,
         system,
         node,
         maxServerConnections,
         config.network.wsMaxSubscriptionsPerConnection,
         config.network.wsMaxContractEventAddresses,
-        keepAliveInterval,
-        wsOptions
-      )
-    wsServer.httpServer
+        keepAliveInterval
+      )(config.network, config.broker, executionContext)
+
+    // Start the services
+    wsServer.start().futureValue
+
+    // Listen on the port
+    httpService
       .listen(config.network.restPort, apiConfig.networkInterface.getHostAddress)
-      .asScala
       .futureValue
+
     wsServer
   }
 
-  protected lazy val WsServer(httpServer, eventHandler, subscriptionHandler) = bindAndListen()
+  protected lazy val wsServer0 = bindAndListen()
+  protected lazy val httpServer = {
+    wsServer0 // Force initialization
+    httpService.httpServer
+  }
+  protected lazy val eventHandler        = wsServer0.eventHandler
+  protected lazy val subscriptionHandler = wsServer0.subscriptionHandler
   protected lazy val wsClient: WsClient = {
     httpServer.actualPort() is config.network.restPort
     testEventHandlerInitialized(eventHandler)

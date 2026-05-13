@@ -22,11 +22,14 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 
 import akka.actor.ActorSystem
+import io.vertx.core.http.HttpServerOptions
 
+import org.alephium.app.ws.WsServer
 import org.alephium.flow.client.Node
 import org.alephium.flow.io.Storages
 import org.alephium.flow.mining.{CpuMiner, Miner, MinerApiController}
 import org.alephium.flow.setting.AlephiumConfig
+import org.alephium.http.HttpService
 import org.alephium.io.RocksDBSource.ProdSettings
 import org.alephium.util.{ActorRefT, Service}
 import org.alephium.wallet.WalletApp
@@ -64,13 +67,40 @@ trait Server extends Service {
 
   def blocksExporter: BlocksExporter
 
+  lazy val httpOptions =
+    if (config.network.wsEnabled) {
+      new HttpServerOptions()
+        .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
+        .setMaxWebSocketFrameSize(config.network.wsMaxFrameSize)
+        .setRegisterWebSocketWriteHandlers(true)
+    } else {
+      new HttpServerOptions()
+        .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
+    }
+
+  val httpService = new HttpService(httpOptions)
+
   lazy val restServer: RestServer =
-    RestServer(flowSystem, node, miner, blocksExporter, walletApp.map(_.walletServer))(
+    RestServer(httpService, node, miner, blocksExporter, walletApp.map(_.walletServer))(
       config.broker,
       apiConfig,
       config.network,
       executionContext
     )
+
+  lazy val wsServer: Option[WsServer] =
+    Option.when(config.network.wsEnabled) {
+      new ws.WsServer(
+        httpService,
+        flowSystem,
+        node,
+        config.network.wsMaxConnections,
+        config.network.wsMaxSubscriptionsPerConnection,
+        config.network.wsMaxContractEventAddresses,
+        config.network.wsPingFrequency
+      )(node.config.network, config.broker, executionContext)
+    }
+
   lazy val walletService: Option[WalletService] = walletApp.map(_.walletService)
 
   lazy val miner: ActorRefT[Miner.Command] = {
@@ -79,7 +109,10 @@ trait Server extends Service {
   }
 
   override lazy val subServices: ArraySeq[Service] = {
-    ArraySeq(restServer, node) ++ ArraySeq.from[Service](walletService.toList)
+    ArraySeq.from(walletService.toList) ++ ArraySeq.from(wsServer.toList) ++ ArraySeq(
+      restServer,
+      node
+    )
   }
 
   override protected def startSelfOnce(): Future[Unit] = Future {

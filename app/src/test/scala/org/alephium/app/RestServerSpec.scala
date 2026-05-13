@@ -25,6 +25,7 @@ import scala.util.{Random, Using}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{TestActor, TestProbe}
+import io.vertx.core.http.HttpServerOptions
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, EitherValues}
 import org.scalatest.compatible.Assertion
 import sttp.client3.Response
@@ -40,7 +41,7 @@ import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.bootstrap._
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.http.{HttpRouteFixture, SimpleHttpServer}
+import org.alephium.http.{HttpRouteFixture, HttpService}
 import org.alephium.http.HttpFixture._
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash}
@@ -1835,16 +1836,19 @@ trait RestServerFixture
         misbehaviorManagerOpt = Some(misbehaviorManager)
       )(serverConfig)
 
+      val httpService = new HttpService(new HttpServerOptions())
+
       new RestServer(
         nodeDummy,
         peer.restPort,
         miner,
         blocksExporter,
-        SimpleHttpServer(),
+        httpService,
         Some(walletApp.walletServer)
       )(
         serverConfig.broker,
         peerConf,
+        networkConfig,
         scala.concurrent.ExecutionContext.Implicits.global
       )
     })
