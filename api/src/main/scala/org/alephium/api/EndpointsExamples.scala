@@ -67,7 +67,7 @@ trait EndpointsExamples extends ErrorExamples {
   private val restPort          = 12377
   private val inetSocketAddress = new InetSocketAddress("1.2.3.4", port)
   private val inetAddress       = inetSocketAddress.getAddress
-  private val peerAddress       = PeerAddress(inetAddress, restPort, minerApiPort)
+  private val peerAddress       = PeerAddress(inetAddress, restPort, restPort, minerApiPort)
   private val peers             = AVector(peerAddress)
   private val bigAmount         = Amount(ALPH.oneAlph.mulUnsafe(U256.Two))
   private def alph(value: Int)  = Amount(ALPH.oneAlph.mulUnsafe(U256.unsafe(value)))
