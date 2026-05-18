@@ -23,12 +23,14 @@ alephium {
     max-inbound-connections-per-group = 40
     max-clique-from-same-ip = 2
 
-    ws-enabled = true
-    ws-max-connections = 100
-    ws-max-frame-size = 16384 // increase with ws-max-contract-event-addresses
-    ws-max-subscriptions-per-connection = 50
-    ws-max-contract-event-addresses = 100 // increase with ws-max-frame-size
-    ws-ping-frequency = 30 second
+    ws {
+      enabled = true
+      max-connections = 100
+      max-frame-size = 16384 // increase with max-contract-event-addresses
+      max-subscriptions-per-connection = 50
+      max-contract-event-addresses = 100 // increase with max-frame-size
+      ping-frequency = 30 second
+    }
 
     ping-frequency = 300 second
     retry-timeout = 10 second

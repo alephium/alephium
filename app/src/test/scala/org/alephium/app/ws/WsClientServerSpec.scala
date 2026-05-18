@@ -128,7 +128,7 @@ class WsClientServerSpec extends AlephiumSpec {
         Future
           .sequence(
             AVector
-              .tabulate(node.config.network.wsMaxSubscriptionsPerConnection) { index =>
+              .tabulate(node.config.network.ws.maxSubscriptionsPerConnection) { index =>
                 val req = WsRequest(
                   index.toLong,
                   ContractEventsSubscribeParams(params_addr_01_eventIndex_0.addresses, Some(index))
@@ -148,7 +148,7 @@ class WsClientServerSpec extends AlephiumSpec {
       ws.writeRequestToSocket(requestOverLimit).futureValue is Response
         .failed(
           requestOverLimit.id,
-          WsError.subscriptionLimitExceeded(node.config.network.wsMaxSubscriptionsPerConnection)
+          WsError.subscriptionLimitExceeded(node.config.network.ws.maxSubscriptionsPerConnection)
         )
     }
   }
@@ -162,7 +162,7 @@ class WsClientServerSpec extends AlephiumSpec {
       ws.writeRequestToSocket(tooManyAddressesRequest).futureValue is Response
         .failed(
           tooManyAddressesRequest.id,
-          WsError.tooManyContractAddresses(node.config.network.wsMaxContractEventAddresses)
+          WsError.tooManyContractAddresses(node.config.network.ws.maxContractEventAddresses)
         )
     }
   }

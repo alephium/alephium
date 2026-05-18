@@ -142,7 +142,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         ws <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
         successfulSubscriptions <- Future.sequence(
           AVector
-            .tabulate(node.config.network.wsMaxSubscriptionsPerConnection) { index =>
+            .tabulate(node.config.network.ws.maxSubscriptionsPerConnection) { index =>
               ws.subscribeToContractEvents(
                 index.toLong,
                 params_addr_01_eventIndex_0.addresses,
@@ -166,7 +166,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         }
         inside(rejectedSubscription) { case JsonRPC.Response.Failure(error, id) =>
           error is WsError.subscriptionLimitExceeded(
-            node.config.network.wsMaxSubscriptionsPerConnection
+            node.config.network.ws.maxSubscriptionsPerConnection
           )
           id is Some(50L)
         }
@@ -412,10 +412,10 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       WsSubscriptionHandler.apply(
         Vertx.vertx(),
         system,
-        config.network.wsMaxConnections,
-        config.network.wsMaxSubscriptionsPerConnection,
-        config.network.wsMaxContractEventAddresses,
-        FiniteDuration(config.network.wsPingFrequency.millis, TimeUnit.MILLISECONDS)
+        config.network.ws.maxConnections,
+        config.network.ws.maxSubscriptionsPerConnection,
+        config.network.ws.maxContractEventAddresses,
+        FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
       )
     eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
 
@@ -511,10 +511,10 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       WsSubscriptionHandler.apply(
         Vertx.vertx(),
         system,
-        config.network.wsMaxConnections,
-        config.network.wsMaxSubscriptionsPerConnection,
-        config.network.wsMaxContractEventAddresses,
-        FiniteDuration(config.network.wsPingFrequency.millis, TimeUnit.MILLISECONDS)
+        config.network.ws.maxConnections,
+        config.network.ws.maxSubscriptionsPerConnection,
+        config.network.ws.maxContractEventAddresses,
+        FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
       )
     eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
 

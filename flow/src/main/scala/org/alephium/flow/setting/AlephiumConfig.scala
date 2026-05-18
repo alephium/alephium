@@ -153,6 +153,15 @@ final case class MiningSetting(
     minTaskBroadcastInterval: Duration
 )
 
+final case class WsConfig(
+    enabled: Boolean,
+    maxConnections: Int,
+    maxFrameSize: Int,
+    maxSubscriptionsPerConnection: Int,
+    maxContractEventAddresses: Int,
+    pingFrequency: Duration
+)
+
 final case class NetworkSetting(
     networkId: NetworkId,
     lemanHardForkTimestamp: TimeStamp,
@@ -162,12 +171,7 @@ final case class NetworkSetting(
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
     maxCliqueFromSameIp: Int,
-    wsEnabled: Boolean,
-    wsMaxConnections: Int,
-    wsMaxFrameSize: Int,
-    wsMaxSubscriptionsPerConnection: Int,
-    wsMaxContractEventAddresses: Int,
-    wsPingFrequency: Duration,
+    ws: WsConfig,
     pingFrequency: Duration,
     retryTimeout: Duration,
     banDuration: Duration,
@@ -361,12 +365,7 @@ object AlephiumConfig {
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
       maxCliqueFromSameIp: Int,
-      wsEnabled: Boolean,
-      wsMaxConnections: Int,
-      wsMaxFrameSize: Int,
-      wsMaxSubscriptionsPerConnection: Int,
-      wsMaxContractEventAddresses: Int,
-      wsPingFrequency: Duration,
+      ws: WsConfig,
       pingFrequency: Duration,
       retryTimeout: Duration,
       banDuration: Duration,
@@ -405,12 +404,7 @@ object AlephiumConfig {
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
         maxCliqueFromSameIp,
-        wsEnabled,
-        wsMaxConnections,
-        wsMaxFrameSize,
-        wsMaxSubscriptionsPerConnection,
-        wsMaxContractEventAddresses,
-        wsPingFrequency,
+        ws,
         pingFrequency,
         retryTimeout,
         banDuration: Duration,

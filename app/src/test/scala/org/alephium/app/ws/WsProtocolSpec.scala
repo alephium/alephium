@@ -36,7 +36,7 @@ class WsProtocolSpec
     with WsSubscriptionFixture
     with WsParams.WsNotificationParamsCodec {
 
-  private val contractAddressLimit = config.network.wsMaxContractEventAddresses
+  private val contractAddressLimit = config.network.ws.maxContractEventAddresses
 
   "WsProtocol" should "refuse all WsRequests that are not JsonRPC compliant" in {
     val method    = WsMethod.SubscribeMethod

@@ -190,7 +190,7 @@ class RestServer(
     httpService.httpServer.requestHandler(router)
 
     val address = apiConfig.networkInterface.getHostAddress
-    val wsMsg   = if (networkSetting.wsEnabled) " including websocket endpoint '/ws'" else ""
+    val wsMsg   = if (networkSetting.ws.enabled) " including websocket endpoint '/ws'" else ""
     httpService.listen(port, address).map { httpBinding =>
       logger.info(
         s"Listening to rest-http requests$wsMsg on /$address:${httpBinding.actualPort}"

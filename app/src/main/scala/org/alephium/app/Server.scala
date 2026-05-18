@@ -68,10 +68,10 @@ trait Server extends Service {
   def blocksExporter: BlocksExporter
 
   lazy val httpOptions =
-    if (config.network.wsEnabled) {
+    if (config.network.ws.enabled) {
       new HttpServerOptions()
         .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
-        .setMaxWebSocketFrameSize(config.network.wsMaxFrameSize)
+        .setMaxWebSocketFrameSize(config.network.ws.maxFrameSize)
         .setRegisterWebSocketWriteHandlers(true)
     } else {
       new HttpServerOptions()
@@ -89,15 +89,15 @@ trait Server extends Service {
     )
 
   lazy val wsServer: Option[WsServer] =
-    Option.when(config.network.wsEnabled) {
+    Option.when(config.network.ws.enabled) {
       new ws.WsServer(
         httpService,
         flowSystem,
         node,
-        config.network.wsMaxConnections,
-        config.network.wsMaxSubscriptionsPerConnection,
-        config.network.wsMaxContractEventAddresses,
-        config.network.wsPingFrequency
+        config.network.ws.maxConnections,
+        config.network.ws.maxSubscriptionsPerConnection,
+        config.network.ws.maxContractEventAddresses,
+        config.network.ws.pingFrequency
       )(node.config.network, config.broker, executionContext)
     }
 

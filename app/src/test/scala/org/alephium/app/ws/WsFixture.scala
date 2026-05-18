@@ -107,7 +107,7 @@ trait WsFixture extends ServerFixture {
 
   protected lazy val tooManyContractAddresses: AVector[Address.Contract] =
     Gen
-      .listOfN(networkConfig.wsMaxContractEventAddresses + 1, contractAddressGen)
+      .listOfN(networkConfig.ws.maxContractEventAddresses + 1, contractAddressGen)
       .map(AVector.from)
       .sample
       .get
@@ -157,7 +157,7 @@ trait WsClientServerFixture
   protected lazy val wsPort: Int = config.network.restPort
   protected lazy val wsOptions =
     new HttpServerOptions()
-      .setMaxWebSocketFrameSize(config.network.wsMaxFrameSize)
+      .setMaxWebSocketFrameSize(config.network.ws.maxFrameSize)
       .setRegisterWebSocketWriteHandlers(true)
 
   protected def maxServerConnections: Int   = 10
@@ -172,8 +172,8 @@ trait WsClientServerFixture
         system,
         node,
         maxServerConnections,
-        config.network.wsMaxSubscriptionsPerConnection,
-        config.network.wsMaxContractEventAddresses,
+        config.network.ws.maxSubscriptionsPerConnection,
+        config.network.ws.maxContractEventAddresses,
         keepAliveInterval
       )(config.network, config.broker, executionContext)
 
@@ -202,7 +202,7 @@ trait WsClientServerFixture
     WsClientFactory(
       vertx,
       new WebSocketClientOptions()
-        .setMaxFrameSize(config.network.wsMaxFrameSize)
+        .setMaxFrameSize(config.network.ws.maxFrameSize)
         .setMaxConnections(maxClientConnections)
     )
   }
@@ -341,7 +341,7 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
     reader[ujson.Value].map[WsRequest] { json =>
       fromJsonString(
         json.render(),
-        config.network.wsMaxContractEventAddresses
+        config.network.ws.maxContractEventAddresses
       ) match {
         case Right(wsRequest) => wsRequest
         case Left(failure)    => throw failure.error
