@@ -57,7 +57,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         SimpleSubscribeParams.Tx.subscriptionId,
         params_addr_01_eventIndex_0.subscriptionId
       )
-    def subscribingRequestResponseBehavior(clientProbe: TestProbe): Future[ClientWs] = {
+    def subscribingRequestResponseBehavior(clientProbe: TestProbe): Future[WsClient] = {
       for {
         ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
         blockSubscriptionResponse <- ws.subscribeToBlock(corId(0))
@@ -95,7 +95,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     }
 
     def assertValidNotification(
-        wsEither: Either[Throwable, ClientWs],
+        wsEither: Either[Throwable, WsClient],
         clientProbe: TestProbe
     ): Assertion = {
       wsEither.left.foreach(ex => fail(s"Expected Right, but got Left with exception: $ex"))
@@ -137,7 +137,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
   }
 
   it should "not allow for more subscriptions per ws client than limit" in new WsBehaviorFixture {
-    def subscribingBehavior(clientProbe: TestProbe): Future[ClientWs] = {
+    def subscribingBehavior(clientProbe: TestProbe): Future[WsClient] = {
       for {
         ws <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
         successfulSubscriptions <- Future.sequence(
@@ -188,10 +188,10 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
   }
 
   it should "handle invalid messages with error" in new WsBehaviorFixture {
-    def invalidMessageBehavior(clientProbe: TestProbe): Future[ClientWs] = {
+    def invalidMessageBehavior(clientProbe: TestProbe): Future[WsClient] = {
       for {
         vertxWs <- wsClient.underlying.connect(wsPort, "127.0.0.1", "/ws").asScala
-        ws = ClientWs(vertxWs, _ => (), _ => ())
+        ws = WsClient(vertxWs, _ => (), _ => ())
         // using underlying ws to test unexpected messages, WsClient does not allow that
         _ = vertxWs.textMessageHandler(clientProbe.ref ! _)
         _ <- vertxWs.writeTextMessage("invalid_msg").asScala
@@ -199,7 +199,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     }
 
     def assertParsingError(
-        wsEither: Either[Throwable, ClientWs],
+        wsEither: Either[Throwable, WsClient],
         clientProbe: TestProbe
     ): Assertion = {
       wsEither.left.foreach(ex => fail(s"Expected Right, but got Left with exception: $ex"))
@@ -209,7 +209,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       }
     }
 
-    def invalidSubscriptionParamsBehavior(wsEither: Either[Throwable, ClientWs]): Unit = {
+    def invalidSubscriptionParamsBehavior(wsEither: Either[Throwable, WsClient]): Unit = {
       wsEither match {
         case Right(clientWs) =>
           clientWs.underlying
@@ -240,7 +240,9 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       }
     }
 
-    def invalidUnsubscriptionParamsBehavior(wsEither: Either[Throwable, ClientWs]): Unit = {
+    def invalidUnsubscriptionParamsBehavior(
+        wsEither: Either[Throwable, WsClient]
+    ): Unit = {
       val invalidUnsubscribeReq = ujson
         .Obj(
           "method"  -> WsMethod.UnsubscribeMethod,
@@ -275,7 +277,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
   }
 
   it should "subscribe/unsubscribe from block, tx and contract events from multiple addresses of different event indexes" in new WsBehaviorFixture {
-    def subscribingBehavior(clientProbe: TestProbe): Future[ClientWs] = {
+    def subscribingBehavior(clientProbe: TestProbe): Future[WsClient] = {
       for {
         ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
         blockSubscriptionResponse <- ws.subscribeToBlock(corId(0))
@@ -321,7 +323,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     }
 
     def assertCorrectNotificationResponse(
-        wsEither: Either[Throwable, ClientWs],
+        wsEither: Either[Throwable, WsClient],
         clientProbe: TestProbe
     ): Assertion = {
       wsEither.left.foreach(ex => fail(s"Expected Right, but got Left with exception: $ex"))
@@ -341,7 +343,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       ()
     }
 
-    def unsubscribingBehavior(wsEither: Either[Throwable, ClientWs]): Unit = {
+    def unsubscribingBehavior(wsEither: Either[Throwable, WsClient]): Unit = {
       val ws = wsEither match {
         case Right(clientWs) =>
           clientWs

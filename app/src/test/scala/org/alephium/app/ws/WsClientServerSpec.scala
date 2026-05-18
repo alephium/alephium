@@ -60,7 +60,7 @@ class WsClientServerSpec extends AlephiumSpec {
   "WsServer" should "keep ws connection alive" in new WsClientServerFixture {
     override val keepAliveInterval = Duration.ofMillisUnsafe(20)
     val keepAliveProbe             = TestProbe()
-    testWsAndClose(wsClient.connect(wsPort)(_ => ())(keepAliveProbe.ref ! _)) { _ =>
+    testWsAndClose(wsClient.connect(wsPort)(_ => ())(ka => keepAliveProbe.ref ! ka)) { _ =>
       eventually {
         keepAliveProbe.expectMsgType[WsClient.KeepAlive]
       }

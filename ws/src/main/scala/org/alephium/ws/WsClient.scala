@@ -32,8 +32,7 @@ import org.alephium.protocol.model.Address
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.{Notification, Response}
 import org.alephium.util.AVector
-import org.alephium.ws.ClientWs.WsException
-import org.alephium.ws.WsClient.KeepAlive
+import org.alephium.ws.WsClient._
 import org.alephium.ws.WsParams.{
   ContractEventsSubscribeParams,
   SimpleSubscribeParams,
@@ -43,13 +42,16 @@ import org.alephium.ws.WsParams.{
 }
 import org.alephium.ws.WsUtils._
 
-object ClientWs {
+object WsClient {
+  final case class KeepAlive(data: Buffer)
+
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class WsException(message: String, source: Option[Throwable] = None)
       extends RuntimeException(message, source.orNull)
 }
 
-final case class WsClient(underlying: WebSocketClient) {
+/** Factory for creating WebSocket client connections */
+final case class WsClientFactory(underlying: WebSocketClient) {
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def connect(
@@ -58,27 +60,28 @@ final case class WsClient(underlying: WebSocketClient) {
       uri: String = "/ws"
   )(
       notificationHandler: Notification => Unit
-  )(keepAliveHandler: KeepAlive => Unit)(implicit ec: ExecutionContext): Future[ClientWs] = {
+  )(
+      keepAliveHandler: KeepAlive => Unit
+  )(implicit ec: ExecutionContext): Future[WsClient] = {
     underlying
       .connect(port, host, uri)
       .asScala
-      .map(underlying => ClientWs(underlying, notificationHandler, keepAliveHandler))
+      .map(underlying => WsClient(underlying, notificationHandler, keepAliveHandler))
   }
 }
 
-object WsClient {
-  final case class KeepAlive(data: Buffer)
-
-  def apply(vertx: Vertx): WsClient = {
-    WsClient(vertx.createWebSocketClient())
+object WsClientFactory {
+  def apply(vertx: Vertx): WsClientFactory = {
+    WsClientFactory(vertx.createWebSocketClient())
   }
 
-  def apply(vertx: Vertx, options: WebSocketClientOptions): WsClient = {
-    WsClient(vertx.createWebSocketClient(options))
+  def apply(vertx: Vertx, options: WebSocketClientOptions): WsClientFactory = {
+    WsClientFactory(vertx.createWebSocketClient(options))
   }
 }
 
-final case class ClientWs(
+/** An active WebSocket client connection with subscription capabilities */
+final case class WsClient(
     underlying: WebSocket,
     notificationHandler: Notification => Unit,
     keepAliveHandler: KeepAlive => Unit

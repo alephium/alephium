@@ -195,11 +195,11 @@ trait WsClientServerFixture
   }
   protected lazy val eventHandler        = wsServer0.eventHandler
   protected lazy val subscriptionHandler = wsServer0.subscriptionHandler
-  protected lazy val wsClient: WsClient = {
+  protected lazy val wsClient: WsClientFactory = {
     httpServer.actualPort() is config.network.restPort
     testEventHandlerInitialized(eventHandler)
     testSubscriptionHandlerInitialized(subscriptionHandler)
-    WsClient(
+    WsClientFactory(
       vertx,
       new WebSocketClientOptions()
         .setMaxFrameSize(config.network.wsMaxFrameSize)
@@ -218,7 +218,7 @@ trait WsClientServerFixture
   }
   // scalastyle:on regex
 
-  def testWsAndClose[A](wsF: Future[ClientWs])(testCode: ClientWs => A): A = {
+  def testWsAndClose[A](wsF: Future[WsClient])(testCode: WsClient => A): A = {
     val ws = wsF.futureValue
     try {
       testCode(ws)
@@ -409,13 +409,13 @@ object WsBehaviorFixture {
 
   sealed trait WsBehavior
   final case class WsStartBehavior(
-      clientInitBehavior: TestProbe => Future[ClientWs],
+      clientInitBehavior: TestProbe => Future[WsClient],
       serverBehavior: ActorRefT[EventBus.Message] => Unit,
-      clientAssertionOnMsg: (Either[Throwable, ClientWs], TestProbe) => Any
+      clientAssertionOnMsg: (Either[Throwable, WsClient], TestProbe) => Any
   ) extends WsBehavior
 
   final case class WsNextBehavior(
-      clientInitBehavior: Either[Throwable, ClientWs] => Any,
+      clientInitBehavior: Either[Throwable, WsClient] => Any,
       serverBehavior: ActorRefT[EventBus.Message] => Unit,
       clientAssertionOnMsg: TestProbe => Any
   ) extends WsBehavior

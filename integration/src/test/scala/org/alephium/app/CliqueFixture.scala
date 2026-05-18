@@ -37,7 +37,7 @@ import sttp.model.StatusCode
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson.avectorWriter
 import org.alephium.api.model._
-import org.alephium.ws.{ClientWs, WsClient}
+import org.alephium.ws.{WsClientConnection, WsClientFactory}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.{Job, Miner}
 import org.alephium.flow.network.DiscoveryServer
@@ -70,8 +70,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   implicit val system: ActorSystem = spec.system
 
   private val vertx = Vertx.vertx()
-  private val wsClient =
-    WsClient(vertx, new WebSocketClientOptions().setMaxFrameSize(networkConfig.wsMaxFrameSize))
+  private val wsClientFactory =
+    WsClientFactory(vertx, new WebSocketClientOptions().setMaxFrameSize(networkConfig.wsMaxFrameSize))
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
@@ -398,9 +398,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     server
   }
 
-  def startWsClient(port: Int): Future[ClientWs] = {
+  def startWsClient(port: Int): Future[WsClientConnection] = {
     implicit val ec: ExecutionContext = system.dispatcher
-    wsClient.connect(port)(blockNotifyProbe.ref ! _)(_ => ())
+    wsClientFactory.connect(port)(blockNotifyProbe.ref ! _)(_ => ())
   }
 
   def jsonRpc(method: String, params: String): String =
