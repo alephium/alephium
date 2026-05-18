@@ -39,7 +39,7 @@ object JsonRPC extends StrictLogging {
     case ujson.Obj(_) | ujson.Arr(_) => true
     case _                           => false
   }
-  private def versionSet(json: ujson.Value): ujson.Value = {
+  private def withRpcVersion(json: ujson.Value): ujson.Value = {
     json match {
       case ujson.Obj(obj) => obj.addOne(versionKey -> ujson.Str(version))
       case other          => other
@@ -48,7 +48,7 @@ object JsonRPC extends StrictLogging {
 
   private def writerWithVersion[A](tmpWriter: Writer[A]): Writer[A] = writer[ujson.Value].comap {
     request =>
-      versionSet(writeJs(request)(tmpWriter))
+      withRpcVersion(writeJs(request)(tmpWriter))
   }
 
   final case class Error(code: Int, message: String, data: Option[String]) extends Throwable
@@ -209,7 +209,7 @@ object JsonRPC extends StrictLogging {
       }
       implicit val successReadWriter: ReadWriter[Success] = readwriter[ujson.Value].bimap[Success](
         success =>
-          versionSet(success.result match {
+          withRpcVersion(success.result match {
             case ujson.Null => ujson.Obj("id" -> writeJs(success.id))
             case _          => ujson.Obj("result" -> success.result, "id" -> writeJs(success.id))
           }),
@@ -220,7 +220,7 @@ object JsonRPC extends StrictLogging {
     object Failure {
       implicit val failureReadWriter: ReadWriter[Failure] = readwriter[ujson.Value].bimap[Failure](
         failure =>
-          versionSet(failure.id match {
+          withRpcVersion(failure.id match {
             case Some(id) => ujson.Obj("error" -> writeJs(failure.error), "id" -> writeJs(id))
             case None     => ujson.Obj("error" -> writeJs(failure.error))
           }),
