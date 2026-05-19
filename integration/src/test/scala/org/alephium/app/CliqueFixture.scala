@@ -37,7 +37,7 @@ import sttp.model.StatusCode
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson.avectorWriter
 import org.alephium.api.model._
-import org.alephium.ws.{WsClientConnection, WsClientFactory}
+import org.alephium.flow.RichBlockFlowT
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.{Job, Miner}
 import org.alephium.flow.network.DiscoveryServer
@@ -50,11 +50,13 @@ import org.alephium.protocol.{ALPH, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, Block, ChainIndex, GroupIndex, TokenId, TransactionId}
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{GasPrice, LockupScript}
-import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
+import org.alephium.rpc.model.JsonRPC.Notification
 import org.alephium.serde._
 import org.alephium.util._
 import org.alephium.wallet
 import org.alephium.wallet.api.model._
+import org.alephium.ws.{WsClient, WsClientFactory}
+import org.alephium.ws.WsParams._
 
 // scalastyle:off method.length
 // scalastyle:off number.of.methods
@@ -66,6 +68,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     with ApiModelCodec
     with wallet.json.ModelCodecs
     with HttpFixture
+    with WsNotificationParamsCodec
     with RichBlockFlowT { Fixture =>
   implicit val system: ActorSystem = spec.system
 
@@ -245,8 +248,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     def iter(): Unit = {
       blockNotifyProbe.receiveOne(max = timeout) match {
         case text: String =>
-          val notification = read[NotificationUnsafe](text).asNotification.rightValue
-          val blockEntry   = read[BlockEntry](notification.params)
+          val notification      = read[Notification](text)
+          val blockNotification = read[WsBlockNotificationParams](notification.params)
+          val blockEntry        = blockNotification.result.block
           buffer(blockEntry.chainFrom)(blockEntry.chainTo) += 1
           if (buffer.forall(_.forall(_ >= number))) () else iter()
       }
@@ -402,7 +406,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     server
   }
 
-  def startWsClient(port: Int): Future[WsClientConnection] = {
+  def startWsClient(port: Int): Future[WsClient] = {
     implicit val ec: ExecutionContext = system.dispatcher
     wsClientFactory.connect(port)(blockNotifyProbe.ref ! _)(_ => ())
   }
@@ -925,7 +929,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       Future
         .sequence(
           servers.map { server =>
-            startWsClient(server.config.network.restPort)
+            startWsClient(server.config.network.restPort).flatMap { client =>
+              client.subscribeToBlock(0)
+            }
           }.toSeq
         )
         .map(_ => ())
