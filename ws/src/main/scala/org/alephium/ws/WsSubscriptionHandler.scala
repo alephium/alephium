@@ -94,23 +94,12 @@ object WsSubscriptionHandler {
       ws: ServerWsLike,
       params: WsSubscriptionParams
   ) extends Command
-  final private case class Subscribed(
-      id: WsCorrelationId,
-      ws: ServerWsLike,
-      params: WsSubscriptionParams,
-      consumer: MessageConsumer[String]
-  ) extends CommandResponse
 
   final case class Unsubscribe(
       id: WsCorrelationId,
       ws: ServerWsLike,
       subscriptionId: WsSubscriptionId
   ) extends Command
-  final private case class Unsubscribed(
-      id: WsCorrelationId,
-      ws: ServerWsLike,
-      subscriptionId: WsSubscriptionId
-  ) extends CommandResponse
 
   final private case class RequestRejected(
       ws: ServerWsLike,
@@ -183,14 +172,8 @@ class WsSubscriptionHandler(
       subscribe(id, ws, params)
     case Unsubscribe(id, ws, subscriptionId) =>
       unsubscribe(id, ws, subscriptionId)
-    case Subscribed(id, ws, params, consumer) =>
-      subscriptionsState.addNewSubscription(ws.textHandlerID(), params, consumer)
-      respondAsyncAndForget(ws, Response.successful(id, params.subscriptionId.toHexString))
     case RequestRejected(ws, response) =>
       respondAsyncAndForget(ws, response)
-    case Unsubscribed(id, ws, subscriptionId) =>
-      subscriptionsState.removeSubscription(ws.textHandlerID(), subscriptionId)
-      respondAsyncAndForget(ws, Response.successful(id))
     case NotificationFailed(_, ws, _, msg, error) =>
       ws.writeTextMessage(msg).onComplete {
         case Success(_) =>
@@ -338,14 +321,15 @@ class WsSubscriptionHandler(
     }
   }
 
-  private def subscribe(id: WsCorrelationId, ws: ServerWsLike, params: WsSubscriptionParams)(
-      implicit ec: ExecutionContext
+  private def subscribe(
+      id: WsCorrelationId,
+      ws: ServerWsLike,
+      params: WsSubscriptionParams
   ): Unit = {
     val subscriptionId = params.subscriptionId
-
     validateSubscription(ws, subscriptionId) match {
       case Some(error) =>
-        self ! RequestRejected(ws, Response.failed(id, error))
+        respondAsyncAndForget(ws, Response.failed(id, error))
       case None =>
         Try {
           vertx
@@ -356,9 +340,10 @@ class WsSubscriptionHandler(
             )
         } match {
           case Success(consumer) =>
-            self ! Subscribed(id, ws, params, consumer)
+            subscriptionsState.addNewSubscription(ws.textHandlerID(), params, consumer)
+            respondAsyncAndForget(ws, Response.successful(id, subscriptionId.toHexString))
           case Failure(ex) =>
-            self ! RequestRejected(ws, Response.failed(id, Error.server(ex.getMessage)))
+            respondAsyncAndForget(ws, Response.failed(id, Error.server(ex.getMessage)))
         }
     }
   }
@@ -370,17 +355,19 @@ class WsSubscriptionHandler(
   ): Unit = {
     subscriptionsState.getConsumer(ws.textHandlerID(), subscriptionId) match {
       case Some(consumer) =>
+        subscriptionsState.removeSubscription(ws.textHandlerID(), subscriptionId)
         consumer
           .unregister()
           .asScala
           .onComplete {
             case Success(_) =>
-              self ! Unsubscribed(id, ws, subscriptionId)
+              respondAsyncAndForget(ws, Response.successful(id))
             case Failure(ex) =>
-              self ! RequestRejected(ws, Response.failed(id, Error.server(ex.getMessage)))
+              log.warning(ex, s"Failed to unregister consumer for subscription $subscriptionId")
+              respondAsyncAndForget(ws, Response.successful(id))
           }(context.dispatcher)
       case _ =>
-        self ! RequestRejected(ws, Response.failed(id, WsError.alreadyUnSubscribed(subscriptionId)))
+        respondAsyncAndForget(ws, Response.failed(id, WsError.alreadyUnSubscribed(subscriptionId)))
     }
   }
 }
