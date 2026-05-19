@@ -189,5 +189,5 @@ final case class WsClient(
 
   def isClosed: Boolean = underlying.isClosed
 
-  def close(): Future[Unit] = underlying.close().asScala.mapTo[Unit]
+  def close(): Future[Unit] = underlying.close().asScala.map(_ => ())
 }
