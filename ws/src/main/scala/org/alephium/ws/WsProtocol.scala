@@ -276,18 +276,24 @@ object WsRequest { // extends ApiModelCodec {
           r.method match {
             case WsMethod.SubscribeMethod   => SimpleSubscribeParams.read(arr(0))
             case WsMethod.UnsubscribeMethod => UnsubscribeParams.read(arr(0))
+            case _                          => Left(WsError.invalidParamsFormat(ujson.Arr(arr)))
           }
         case ujson.Arr(arr) if arr.length == 2 =>
-          arr(0) match {
-            case ujson.Str(ContractEventsSubscribeParams.ContractEvent) =>
-              arr(1) match {
-                case ujson.Obj(filterObj) =>
-                  ContractEventsSubscribeParams.read(filterObj, contractAddressLimit)
+          r.method match {
+            case WsMethod.SubscribeMethod =>
+              arr(0) match {
+                case ujson.Str(ContractEventsSubscribeParams.ContractEvent) =>
+                  arr(1) match {
+                    case ujson.Obj(filterObj) =>
+                      ContractEventsSubscribeParams.read(filterObj, contractAddressLimit)
+                    case unsupported =>
+                      Left(WsError.invalidParamsFormat(unsupported))
+                  }
                 case unsupported =>
                   Left(WsError.invalidParamsFormat(unsupported))
               }
-            case unsupported =>
-              Left(WsError.invalidParamsFormat(unsupported))
+            case _ =>
+              Left(WsError.invalidParamsFormat(ujson.Arr(arr)))
           }
         case unsupported =>
           Left(WsError.invalidParamsFormat(unsupported))

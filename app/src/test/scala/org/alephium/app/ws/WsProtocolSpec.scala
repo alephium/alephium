@@ -320,6 +320,29 @@ class WsProtocolSpec
       .isLeft is true
   }
 
+  it should "reject unsubscribe requests with contract event params (length 2 array)" in {
+    val eventType  = ujson.Str(ContractEventsSubscribeParams.ContractEvent)
+    val eventIndex = ujson.Num(EventIndex_0.toDouble)
+
+    // Unsubscribe method should not accept contract event params (2-element array)
+    val invalidUnsubscribeRequest =
+      RequestUnsafe(
+        "2.0",
+        WsMethod.UnsubscribeMethod,
+        ujson.Arr(
+          eventType,
+          ujson.Obj(
+            EventIndexField -> eventIndex,
+            AddressesField  -> ujson.Arr(ujson.Str(contractAddress_0.toBase58))
+          )
+        ),
+        0
+      )
+    WsRequest
+      .fromJsonRpc(invalidUnsubscribeRequest, contractAddressLimit)
+      .isLeft is true
+  }
+
   "WsNotificationParams" should "pass ser/deser round-trip for notifications" in {
     val blockAndEvents =
       BlockAndEvents(
