@@ -590,5 +590,5 @@ addCommandAlias(
 
 addCommandAlias(
   "integrationTest",
-  "integration/scalafmtCheck;integration/scalastyle;integration/test"
+  "integration/test:scalafmtCheck;integration/test:scalastyle;integration/test"
 )

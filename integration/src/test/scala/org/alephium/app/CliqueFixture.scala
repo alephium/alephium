@@ -71,7 +71,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   private val vertx = Vertx.vertx()
   private val wsClientFactory =
-    WsClientFactory(vertx, new WebSocketClientOptions().setMaxFrameSize(networkConfig.ws.maxFrameSize))
+    WsClientFactory(
+      vertx,
+      new WebSocketClientOptions().setMaxFrameSize(networkConfig.ws.maxFrameSize)
+    )
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
@@ -140,7 +143,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       privateKey: String,
       restPort: Int
   ): SubmitTxResult = eventually {
-    val destinations = AVector(Destination(Address.asset(toAddress).rightValue, Some(Amount(amount))))
+    val destinations =
+      AVector(Destination(Address.asset(toAddress).rightValue, Some(Amount(amount))))
     transfer(fromPubKey, destinations, privateKey, restPort)
   }
 
@@ -161,9 +165,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       privateKeys: AVector[String],
       restPort: Int
   ): SubmitTxResult = eventually {
-    val buildTx      = buildChainedTransaction(inputs)
-    val unsignedTxs  = request[BuildTransferTxResult](buildTx, restPort)
-    val txs          = signAndSubmitMultisigTransaction(unsignedTxs, privateKeys)
+    val buildTx     = buildChainedTransaction(inputs)
+    val unsignedTxs = request[BuildTransferTxResult](buildTx, restPort)
+    val txs         = signAndSubmitMultisigTransaction(unsignedTxs, privateKeys)
     submitTxs(txs, restPort)
   }
 
@@ -371,14 +375,14 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     val server: Server = new Server {
       val flowSystem: ActorSystem =
         ActorSystem(s"flow-${Random.nextInt()}", platformEnv.newConfig)
-      implicit val executionContext: ExecutionContext = flowSystem.dispatcher
+      implicit lazy val executionContext: ExecutionContext = flowSystem.dispatcher
 
-      val defaultNetwork = platformEnv.config.network
-      val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
+      lazy val defaultNetwork = platformEnv.config.network
+      lazy val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
 
-      implicit val config: AlephiumConfig = platformEnv.config.copy(network = network)
-      implicit val apiConfig: ApiConfig   = ApiConfig.load(platformEnv.newConfig)
-      val storages                        = platformEnv.storages
+      implicit lazy val config: AlephiumConfig = platformEnv.config.copy(network = network)
+      implicit lazy val apiConfig: ApiConfig   = ApiConfig.load(platformEnv.newConfig)
+      lazy val storages                        = platformEnv.storages
 
       override lazy val blocksExporter: BlocksExporter =
         new BlocksExporter(node.blockFlow, rootPath)(config.broker)
@@ -587,8 +591,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   private def submitTransaction(
-    buildTransactionResult: BuildSimpleTransferTxResult,
-    privateKey: String
+      buildTransactionResult: BuildSimpleTransferTxResult,
+      privateKey: String
   ) = {
     val signature: Signature = SignatureSchema.sign(
       buildTransactionResult.txId.bytes,
@@ -614,8 +618,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def signAndSubmitTransaction(
-    buildTransactionResult: BuildTransferTxResult,
-    signAndSubmitFunc: BuildSimpleTransferTxResult => Int => HttpRequest
+      buildTransactionResult: BuildTransferTxResult,
+      signAndSubmitFunc: BuildSimpleTransferTxResult => Int => HttpRequest
   ) = {
     buildTransactionResult match {
       case result: BuildSimpleTransferTxResult =>
@@ -634,10 +638,13 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def signAndSubmitMultisigTransaction(
-    buildTransactionResult: BuildTransferTxResult,
-    privateKeys: AVector[String]
+      buildTransactionResult: BuildTransferTxResult,
+      privateKeys: AVector[String]
   ): AVector[Int => HttpRequest] = {
-    signAndSubmitTransaction(buildTransactionResult, signAndSubmitMultisigTransaction(_, privateKeys))
+    signAndSubmitTransaction(
+      buildTransactionResult,
+      signAndSubmitMultisigTransaction(_, privateKeys)
+    )
   }
 
   private def signAndSubmitMultisigTransaction(
@@ -862,7 +869,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       case result: BuildSimpleExecuteScriptTxResult =>
         submitTxWithPort(result.unsignedTx, result.txId, restPort)
       case result: BuildGrouplessExecuteScriptTxResult =>
-        result.fundingTxs.foreach(_.foreach(tx => submitTxWithPort(tx.unsignedTx, tx.txId, restPort)))
+        result.fundingTxs.foreach(
+          _.foreach(tx => submitTxWithPort(tx.unsignedTx, tx.txId, restPort))
+        )
         submitTxWithPort(result.unsignedTx, result.txId, restPort)
     }
     buildResult
