@@ -78,7 +78,7 @@ trait Server extends Service {
         .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
     }
 
-  val httpService = new HttpService(httpOptions)
+  lazy val httpService = new HttpService(httpOptions)
 
   lazy val restServer: RestServer =
     RestServer(httpService, node, miner, blocksExporter, walletApp.map(_.walletServer))(
