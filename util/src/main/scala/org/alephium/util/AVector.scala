@@ -153,7 +153,11 @@ final class AVector[@sp A](
   }
 
   def distinct: AVector[A] = {
-    AVector.unsafe(elems.distinct)
+    if (start == 0 && end == elems.length) {
+      AVector.unsafe(elems.distinct)
+    } else {
+      AVector.unsafe(toArray.distinct)
+    }
   }
 
   def exists(f: A => Boolean): Boolean = {
