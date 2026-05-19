@@ -340,6 +340,7 @@ class WsProtocolSpec
     read[WsNotificationParams](blockNotificationJson) is blockNotificationParams
 
     val blockNotificationRpc = asJsonRpcNotification(blockNotificationParams)
+    blockNotificationRpc("jsonrpc") is JsonRPC.version
     blockNotificationRpc("method") is WsMethod.SubscriptionMethod
     blockNotificationRpc("params") is writeJs(blockNotificationParams)
 
@@ -351,6 +352,7 @@ class WsProtocolSpec
     read[WsNotificationParams](txNotificationJson) is txNotificationParams
 
     val txNotificationRpc = asJsonRpcNotification(txNotificationParams)
+    txNotificationRpc("jsonrpc") is JsonRPC.version
     txNotificationRpc("method") is WsMethod.SubscriptionMethod
     txNotificationRpc("params") is writeJs(txNotificationParams)
 
@@ -362,6 +364,7 @@ class WsProtocolSpec
     read[WsNotificationParams](contractEventNotificationJson) is contractEventNotificationParams
 
     val contractEventNotificationRpc = asJsonRpcNotification(contractEventNotificationParams)
+    contractEventNotificationRpc("jsonrpc") is JsonRPC.version
     contractEventNotificationRpc("method") is WsMethod.SubscriptionMethod
     contractEventNotificationRpc("params") is writeJs(contractEventNotificationParams)
 

@@ -175,8 +175,9 @@ object WsParams {
     def asJsonRpcNotification(notification: WsNotificationParams): ujson.Obj = {
       ujson
         .Obj(
-          "method" -> WsMethod.SubscriptionMethod,
-          "params" -> writeJs(notification)
+          "jsonrpc" -> JsonRPC.version,
+          "method"  -> WsMethod.SubscriptionMethod,
+          "params"  -> writeJs(notification)
         )
     }
 
