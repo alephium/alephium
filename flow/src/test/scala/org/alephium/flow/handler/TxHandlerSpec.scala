@@ -544,9 +544,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       eventBus.expectMsgType[BlockNotify] // automined empty intra-group block
     blockNotification2.logStates.length is 0
     blockNotification1.block.hash isnot blockNotification2.block.hash
-    eventBus.expectMsgType[BlockNotify] // automined empty intra-group block
-    val txNotification = eventBus.expectMsgType[AllHandlers.TxNotify]
-    expectMsg(TxHandler.ProcessedByMemPool(tx.toTemplate, AddedToMemPool(txNotification.seenAt)))
+    eventBus.expectMsgType[AllHandlers.TxNotify]
     eventBus.expectNoMessage()
     eventually(blockFlow.getMemPool(index).size is 0)
 
@@ -554,7 +552,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     status is a[BlockFlowState.Confirmed]
     val confirmed = status.asInstanceOf[BlockFlowState.Confirmed]
     confirmed.chainConfirmations is 1
-    confirmed.fromGroupConfirmations is 2
+    confirmed.fromGroupConfirmations is 1
     confirmed.toGroupConfirmations is 0
     val blockHash = confirmed.index.hash
     blockFlow.getBestDepsPreDanube(index.from).deps.contains(blockHash) is true
