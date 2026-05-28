@@ -68,7 +68,9 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
   }
 
   def buildNewConfig() = {
-    buildUserFile()
+    if (env == Env.Test) {
+      buildUserFile()
+    }
     val predefined = ConfigFactory
       .parseMap(
         (configPortsValues ++ networkConfigValues.getOrElse(Map.empty) ++ configValues).view
