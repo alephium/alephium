@@ -1012,7 +1012,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val tooMuchGasFee = UnsignedTransaction(
       DefaultTxVersion,
-      NetworkId.AlephiumDevNet,
+      networkId,
       None,
       minimalGas,
       GasPrice(ALPH.oneAlph),
@@ -1028,7 +1028,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val noInputs = UnsignedTransaction(
       DefaultTxVersion,
-      NetworkId.AlephiumDevNet,
+      networkId,
       None,
       minimalGas,
       nonCoinbaseMinGasPrice,

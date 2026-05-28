@@ -299,15 +299,19 @@ object AlephiumConfig {
         Emission.rhone(groupConfig, mainnet.blockTargetTime, rhone.blockTargetTime)
       val danubeEmission =
         Emission.danube(groupConfig, mainnet.blockTargetTime, danube.blockTargetTime)
-      val effectiveNumZerosAtLeastInHash =
+      val effectiveNumZerosAtLeastInHash = {
         numZerosAtLeastInHashTestnetPatch match {
-          case Some(value) if networkId.networkType != NetworkId.TestNet =>
+          case Some(value) if networkId == NetworkId.AlephiumTestNet =>
+            value
+          case Some(_) if networkId.networkType != NetworkId.TestNetType =>
             throw new IllegalArgumentException(
               "alephium.consensus.num-zeros-at-least-in-hash-testnet-patch is only supported on testnet."
             )
-          case Some(value) => value
-          case None        => numZerosAtLeastInHash
+          case _ =>
+            numZerosAtLeastInHash
         }
+      }
+
       ConsensusSettings(
         mainnet.toConsensusSetting(
           mainnetEmission,

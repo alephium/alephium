@@ -27,7 +27,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     val chainIndex = ChainIndex(groupIndex, groupIndex)
     BlockEnv(
       chainIndex,
-      NetworkId.AlephiumDevNet,
+      networkId,
       TimeStamp.now(),
       Target.Max,
       Some(BlockHash.generate)

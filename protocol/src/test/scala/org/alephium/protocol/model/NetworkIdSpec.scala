@@ -16,12 +16,54 @@
 
 package org.alephium.protocol.model
 
+import org.scalacheck.Gen
+
 import org.alephium.util.AlephiumSpec
 
 class NetworkIdSpec extends AlephiumSpec {
   it should "return the right node folder" in {
     NetworkId.AlephiumMainNet.nodeFolder is "mainnet"
     NetworkId.AlephiumTestNet.nodeFolder is "testnet"
-    NetworkId.AlephiumDevNet.nodeFolder is "network-2"
+    NetworkId(2).nodeFolder is "network-2"
+  }
+
+  it should "correctly identify network types" in {
+    NetworkId(0).networkType is NetworkId.MainNetType
+    NetworkId(1).networkType is NetworkId.TestNetType
+    NetworkId(2).networkType is NetworkId.TestNetType
+  }
+
+  it should "treat all non-canonical network IDs as testnet type" in {
+    forAll(Gen.chooseNum[Byte](Byte.MinValue, Byte.MaxValue)) { id =>
+      val networkId = NetworkId(id)
+      if (id == 0) {
+        networkId.networkType is NetworkId.MainNetType
+      } else if (id == 1) {
+        networkId.networkType is NetworkId.TestNetType
+      } else {
+        networkId.networkType is NetworkId.TestNetType
+      }
+    }
+  }
+
+  it should "generate correct node folders" in {
+    forAll(Gen.chooseNum[Byte](Byte.MinValue, Byte.MaxValue)) { id =>
+      val networkId = NetworkId(id)
+      if (id == 0) {
+        networkId.nodeFolder is "mainnet"
+      } else if (id == 1) {
+        networkId.nodeFolder is "testnet"
+      } else {
+        networkId.nodeFolder is s"network-$id"
+      }
+    }
+  }
+
+  it should "validate network ID" in {
+    NetworkId.from(Byte.MinValue) is Some(NetworkId(Byte.MinValue))
+    NetworkId.from(Byte.MaxValue) is Some(NetworkId(Byte.MaxValue))
+
+    NetworkId.from(Byte.MinValue - 1) is None
+    NetworkId.from(Byte.MaxValue + 1) is None
   }
 }

@@ -20,13 +20,12 @@ import org.alephium.serde._
 
 final case class NetworkId(id: Byte) extends AnyVal {
   // network type will only be used to load the correct config file
-  def networkType: NetworkId.Type = (id % 3) match {
-    case 0 => NetworkId.MainNet
-    case 1 => NetworkId.TestNet
-    case 2 => NetworkId.DevNet
+  // Devnet or any other network default to testnet config
+  def networkType: NetworkId.Type = id match {
+    case 0 => NetworkId.MainNetType
+    case 1 => NetworkId.TestNetType
+    case _ => NetworkId.TestNetType
   }
-
-  def verboseName: String = s"${networkType.name}-$id"
 
   def nodeFolder: String = id match {
     case 0 => "mainnet"
@@ -38,7 +37,6 @@ final case class NetworkId(id: Byte) extends AnyVal {
 object NetworkId {
   val AlephiumMainNet: NetworkId = NetworkId(0)
   val AlephiumTestNet: NetworkId = NetworkId(1)
-  val AlephiumDevNet: NetworkId  = NetworkId(2)
 
   implicit val serde: Serde[NetworkId] = byteSerde.xmap(NetworkId.apply, _.id)
 
@@ -49,7 +47,6 @@ object NetworkId {
     def name: String
     override def toString: String = name
   }
-  case object MainNet extends Type { val name: String = "mainnet" }
-  case object TestNet extends Type { val name: String = "testnet" }
-  case object DevNet  extends Type { val name: String = "devnet"  }
+  case object MainNetType extends Type { val name: String = "mainnet" }
+  case object TestNetType extends Type { val name: String = "testnet" }
 }

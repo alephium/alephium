@@ -25,7 +25,7 @@ import org.alephium.protocol.{ALPH, PrivateKey, PublicKey}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model.{Address, GroupIndex, HardFork}
 import org.alephium.protocol.vm.{LogConfig, NodeIndexesConfig}
-import org.alephium.util.{AVector, Duration, Env, Number, U256}
+import org.alephium.util.{AVector, Duration, Env, Files, Number, U256}
 
 trait AlephiumConfigFixture extends RandomPortsConfigFixture {
 
@@ -60,7 +60,15 @@ trait AlephiumConfigFixture extends RandomPortsConfigFixture {
   lazy val env      = Env.resolve()
   lazy val rootPath = Platform.getRootPath(env)
 
+  def buildUserFile() = {
+    val file = Configs.getConfigFile(rootPath, "user")
+    // Always overwrite the user.conf file, otherwise it may cause some unexpected errors in tests.
+    file.delete()
+    Files.copyFromResource(s"/user.conf", file.toPath)
+  }
+
   def buildNewConfig() = {
+    buildUserFile()
     val predefined = ConfigFactory
       .parseMap(
         (configPortsValues ++ networkConfigValues.getOrElse(Map.empty) ++ configValues).view

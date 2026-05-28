@@ -81,7 +81,7 @@ object NetworkConfigFixture {
   }
 
   trait Default extends NetworkConfigFixture {
-    def networkId: NetworkId               = NetworkId.AlephiumDevNet
+    def networkId: NetworkId               = NetworkId(2)
     def lemanHardForkTimestamp: TimeStamp  = TimeStamp.zero
     def rhoneHardForkTimestamp: TimeStamp  = TimeStamp.zero
     def danubeHardForkTimestamp: TimeStamp = TimeStamp.zero

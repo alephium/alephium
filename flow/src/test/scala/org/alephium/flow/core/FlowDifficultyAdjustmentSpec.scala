@@ -212,11 +212,11 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
 
   it should "use diff penalty for leman fork" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(
-      ("alephium.network.network-id", NetworkId.AlephiumDevNet.id),
+      ("alephium.network.network-id", networkId.id),
       ("alephium.consensus.num-zeros-at-least-in-hash", 3)
     )
     setHardFork(HardFork.Leman)
-    config.network.networkId is NetworkId.AlephiumDevNet
+    config.network.networkId is networkId
     implicit val consensusConfig: ConsensusSetting = consensusConfigs.mainnet
     consensusConfig.numZerosAtLeastInHash is 3
 

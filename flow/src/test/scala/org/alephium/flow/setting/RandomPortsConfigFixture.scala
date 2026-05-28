@@ -26,14 +26,15 @@ trait RandomPortsConfigFixture extends SocketUtil {
   private val wsPort       = generatePort()
   private val minerApiPort = generatePort()
 
+  lazy val networkId = Env.currentEnv match {
+    case Env.Test        => NetworkId(2)
+    case Env.Integration => NetworkId(4) // A testnet that is different from public testnet (id = 1)
+    case _               => throw new RuntimeException("Invalid test env")
+  }
+
   lazy val configPortsValues: Map[String, Any] = {
-    val networkId = Env.currentEnv match {
-      case Env.Test        => NetworkId.AlephiumDevNet.id
-      case Env.Integration => 4 // A testnet that is different from public testnet (id = 1)
-      case _               => throw new RuntimeException("Invalid test env")
-    }
     Map(
-      ("alephium.network.network-id", networkId),
+      ("alephium.network.network-id", networkId.id),
       ("alephium.network.bind-address", s"127.0.0.1:$publicPort"),
       ("alephium.network.external-address", s"127.0.0.1:$publicPort"),
       ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),

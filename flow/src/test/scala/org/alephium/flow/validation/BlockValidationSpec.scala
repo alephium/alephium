@@ -1520,7 +1520,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
   it should "not check miner for devnet" in new TestnetFixture {
     setHardForkBefore(HardFork.Rhone)
-    networkConfig.networkId is NetworkId.AlephiumDevNet
+    networkConfig.networkId is networkId
 
     newBlock(whitelistedMiner).pass()
     newBlock(randomMiner).pass()
