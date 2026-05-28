@@ -227,8 +227,11 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     def test(p2pVersions: Seq[P2PVersion]) = {
       assume(p2pVersions.length == 4)
 
-      val fromTs  = TimeStamp.now()
-      val clique1 = bootClique(1, configOverrides = Map(("alephium.network.enable-p2p-v2", p2pVersions.head == P2PV2)))
+      val fromTs = TimeStamp.now()
+      val clique1 = bootClique(
+        1,
+        configOverrides = Map(("alephium.network.enable-p2p-v2", p2pVersions.head == P2PV2))
+      )
 
       clique1.start()
       clique1.startWs()
@@ -465,12 +468,13 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
   }
 
   it should "sync ghost uncle blocks" in new CliqueFixture {
-    val fromTs = TimeStamp.now()
+    val fromTs          = TimeStamp.now()
     val bootstrapClique = bootClique(1, None)
     bootstrapClique.startWithoutCheckSyncState()
 
     val cliques0 = AVector.from(0 until 3).map { _ =>
-      val clique = bootClique(1, Some(new InetSocketAddress("127.0.0.1", bootstrapClique.masterTcpPort)))
+      val clique =
+        bootClique(1, Some(new InetSocketAddress("127.0.0.1", bootstrapClique.masterTcpPort)))
       clique.startWithoutCheckSyncState()
       clique
     }
@@ -510,7 +514,8 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     blocks.foreach { block =>
       eventually {
         allCliques.foreach { clique =>
-          val response = request[BlockEntry](getBlock(block.hash.toHexString), clique.masterRestPort)
+          val response =
+            request[BlockEntry](getBlock(block.hash.toHexString), clique.masterRestPort)
           response is block
         }
       }

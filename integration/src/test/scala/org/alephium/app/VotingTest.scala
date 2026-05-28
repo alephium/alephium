@@ -143,7 +143,9 @@ class VotingTest extends AlephiumActorSpec {
       contractState.mutFields.get(1).get is ValU256(U256.unsafe(nbNo))
       contractState.mutFields.get(2).get is ValBool(isClosed)
       contractState.mutFields.get(3).get is ValBool(isInitialized)
-      contractState.immFields.get(0).get is ValAddress(Address.fromBase58(admin.activeAddress).rightValue)
+      contractState.immFields.get(0).get is ValAddress(
+        Address.fromBase58(admin.activeAddress).rightValue
+      )
       contractState.immFields.drop(1) is AVector.from[Val](
         voters.map(v => ValAddress(Address.fromBase58(v.activeAddress).rightValue))
       )
