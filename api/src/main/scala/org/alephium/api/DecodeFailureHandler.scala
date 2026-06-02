@@ -50,5 +50,5 @@ trait DecodeFailureHandler {
   }
 
   val myDecodeFailureHandler =
-    DefaultDecodeFailureHandler[Future](respond, failureMessage, failureResponse)
+    DefaultDecodeFailureHandler[Future](respond(_), failureMessage(_), failureResponse(_, _, _))
 }
