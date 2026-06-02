@@ -36,7 +36,7 @@ object Dependencies {
 
   lazy val ficus           = "com.iheart"                 %% "ficus"           % "1.5.2"
   lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk18on"  % "1.84"
-  lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "3.1.0"
+  lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "3.1.1"
   lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.5.18"
   lazy val rocksdb         = "org.rocksdb"                 % "rocksdbjni"      % "10.10.1.1"
   lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.5"
