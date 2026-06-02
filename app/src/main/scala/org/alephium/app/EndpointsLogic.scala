@@ -1001,19 +1001,23 @@ trait EndpointsLogic extends Endpoints {
 
   private def executeBlocking[T](blockingCodeHandler: Callable[T]): Future[T] = {
     val promise = Promise[T]()
-    vertx.executeBlocking(
-      blockingCodeHandler,
-      false,
-      new io.vertx.core.Handler[io.vertx.core.AsyncResult[T]] {
-        override def handle(ar: io.vertx.core.AsyncResult[T]): Unit = {
-          if (ar.succeeded()) {
-            promise.success(ar.result())
-          } else {
-            promise.failure(ar.cause())
+    vertx
+      .executeBlocking(
+        blockingCodeHandler,
+        false
+      )
+      .onComplete {
+        new io.vertx.core.Handler[io.vertx.core.AsyncResult[T]] {
+          override def handle(ar: io.vertx.core.AsyncResult[T]): Unit = {
+            if (ar.succeeded()) {
+              promise.success(ar.result())
+            } else {
+              promise.failure(ar.cause())
+            }
           }
         }
       }
-    )
+
     promise.future
   }
 }
