@@ -36,7 +36,7 @@ class MultisigTest extends AlephiumActorSpec {
     val (_, publicKey3, privateKey3) = generateAccount
 
     val allPublicKeys = AVector(publicKey, publicKey2, publicKey3)
-    val lockupScript = getLockupScript(allPublicKeys, 2)
+    val lockupScript  = getLockupScript(allPublicKeys, 2)
     val buildTxResult = createMultisigTransaction(allPublicKeys, AVector(publicKey, publicKey3))
 
     val unsignedTx =
@@ -83,8 +83,8 @@ class MultisigTest extends AlephiumActorSpec {
     val (_, publicKey3, _) = generateAccount
 
     val allPublicKeys = AVector(publicKey, publicKey2, publicKey3)
-    val lockupScript = getLockupScript(allPublicKeys, 1)
-    val buildResult = createMultisigTransaction(allPublicKeys, AVector(publicKey))
+    val lockupScript  = getLockupScript(allPublicKeys, 1)
+    val buildResult   = createMultisigTransaction(allPublicKeys, AVector(publicKey))
 
     val unsignedTx = submitSuccessfulMultisigTransaction(buildResult, AVector(privateKey))
 
@@ -99,8 +99,8 @@ class MultisigTest extends AlephiumActorSpec {
     val (_, publicKey3, privateKey3) = generateAccount
 
     val allPublicKeys = AVector(publicKey, publicKey2, publicKey3)
-    val lockupScript = getLockupScript(allPublicKeys, 2)
-    val buildResult = createMultisigTransaction(allPublicKeys, AVector(publicKey, publicKey3))
+    val lockupScript  = getLockupScript(allPublicKeys, 2)
+    val buildResult   = createMultisigTransaction(allPublicKeys, AVector(publicKey, publicKey3))
 
     val unsignedTx =
       submitSuccessfulMultisigTransaction(buildResult, AVector(privateKey, privateKey3))
@@ -117,8 +117,9 @@ class MultisigTest extends AlephiumActorSpec {
     val (_, publicKey4, privateKey4) = generateAccount
 
     val allPublicKeys = AVector(publicKey, publicKey2, publicKey3, publicKey4)
-    val lockupScript = getLockupScript(allPublicKeys, 3)
-    val buildResult = createMultisigTransaction(allPublicKeys, AVector(publicKey, publicKey3, publicKey4))
+    val lockupScript  = getLockupScript(allPublicKeys, 3)
+    val buildResult =
+      createMultisigTransaction(allPublicKeys, AVector(publicKey, publicKey3, publicKey4))
 
     val unsignedTx = submitSuccessfulMultisigTransaction(
       buildResult,
@@ -169,7 +170,8 @@ class MultisigTest extends AlephiumActorSpec {
       transferAmount / 2
     )
 
-    val buildTxResult = request[BuildTransferTxResult](buildTx, restPort).asInstanceOf[BuildSimpleTransferTxResult]
+    val buildTxResult =
+      request[BuildTransferTxResult](buildTx, restPort).asInstanceOf[BuildSimpleTransferTxResult]
 
     val unsignedTx =
       deserialize[UnsignedTransaction](Hex.from(buildTxResult.unsignedTx).get).rightValue
@@ -326,7 +328,7 @@ class MultisigTest extends AlephiumActorSpec {
 
       val submitMultisigTx = signAndSubmitMultisigTransaction(buildTxResult, unlockPrivKeys)
       assume(submitMultisigTx.length == 1)
-      val multisigTx       = request[SubmitTxResult](submitMultisigTx.head, restPort)
+      val multisigTx = request[SubmitTxResult](submitMultisigTx.head, restPort)
 
       confirmTx(multisigTx, restPort)
 
@@ -348,10 +350,17 @@ class MultisigTest extends AlephiumActorSpec {
     }
 
     def getLockupScript(allPublicKeys: AVector[String], unlockKeySize: Int) = {
-      LockupScript.p2mpkhUnsafe(allPublicKeys.map(key => PublicKey.unsafe(Hex.unsafe(key))), unlockKeySize)
+      LockupScript.p2mpkhUnsafe(
+        allPublicKeys.map(key => PublicKey.unsafe(Hex.unsafe(key))),
+        unlockKeySize
+      )
     }
 
-    def verifyEstimatedGas(lockupScript: LockupScript, unsignedTx: UnsignedTransaction, gas: GasBox) = {
+    def verifyEstimatedGas(
+        lockupScript: LockupScript,
+        unsignedTx: UnsignedTransaction,
+        gas: GasBox
+    ) = {
       val inputUnlockScripts = unsignedTx.inputs.map(i => (lockupScript, i.unlockScript))
       val estimatedGas = GasEstimation
         .estimate(

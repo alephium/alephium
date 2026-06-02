@@ -21,11 +21,12 @@ import org.alephium.util.{AlephiumActorSpec, TimeStamp}
 
 class DanubeUpgradeTest extends AlephiumActorSpec {
   it should "test danube upgrade" in new CliqueFixture {
-    val from = TimeStamp.now()
+    val from                    = TimeStamp.now()
     val danubeHardForkTimeStamp = from.plusSecondsUnsafe(20).millis
     val clique = bootClique(
       1,
-      configOverrides = Map(("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimeStamp))
+      configOverrides =
+        Map(("alephium.network.danube-hard-fork-timestamp", danubeHardForkTimeStamp))
     )
 
     clique.start()
@@ -33,12 +34,16 @@ class DanubeUpgradeTest extends AlephiumActorSpec {
     Thread.sleep(40000)
     clique.stopMining()
 
-    val blocks = clique.selfClique().nodes.flatMap { peer =>
-      request[BlocksPerTimeStampRange](
-        blockflowFetch(from, TimeStamp.now()),
-        peer.restPort
-      ).blocks
-    }.flatMap(identity)
+    val blocks = clique
+      .selfClique()
+      .nodes
+      .flatMap { peer =>
+        request[BlocksPerTimeStampRange](
+          blockflowFetch(from, TimeStamp.now()),
+          peer.restPort
+        ).blocks
+      }
+      .flatMap(identity)
 
     blocks.exists(_.timestamp.millis < danubeHardForkTimeStamp) is true
     blocks.exists(_.timestamp.millis > danubeHardForkTimeStamp) is true
