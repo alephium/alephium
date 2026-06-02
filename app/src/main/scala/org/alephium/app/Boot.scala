@@ -25,8 +25,9 @@ import akka.Done
 import akka.actor.{ActorSystem, CoordinatedShutdown}
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.scalalogging.StrictLogging
-import io.prometheus.client.Gauge
-import io.prometheus.client.hotspot.DefaultExports
+import io.prometheus.metrics.core.metrics.Gauge
+import io.prometheus.metrics.instrumentation.jvm.JvmMetrics
+import io.prometheus.metrics.model.registry.PrometheusRegistry
 
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
@@ -71,7 +72,7 @@ class BootUp extends StrictLogging {
     checkDatabaseCompatibility()
 
     // Register the default Hotspot (JVM) collectors for Prometheus
-    DefaultExports.initialize()
+    JvmMetrics.builder().register(PrometheusRegistry.defaultRegistry)
     collectBuildInfo()
     logConfig()
 
@@ -133,10 +134,12 @@ class BootUp extends StrictLogging {
 
   def collectBuildInfo(): Unit = {
     Gauge
-      .build("alephium_build_info", "Alephium full node build info")
+      .builder()
+      .name("alephium_build_info")
+      .help("Alephium full node build info")
       .labelNames("release_version", "commit_id")
-      .register()
-      .labels(BuildInfo.releaseVersion, BuildInfo.commitId)
+      .register(PrometheusRegistry.defaultRegistry)
+      .labelValues(BuildInfo.releaseVersion, BuildInfo.commitId)
       .set(1)
 
     logger.info(s"Build info: ${BuildInfo}")

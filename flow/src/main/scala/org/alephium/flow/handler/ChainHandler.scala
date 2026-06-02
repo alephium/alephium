@@ -16,7 +16,9 @@
 
 package org.alephium.flow.handler
 
-import io.prometheus.client.{Counter, Gauge, Histogram}
+import io.prometheus.metrics.core.datapoints.{CounterDataPoint, DistributionDataPoint}
+import io.prometheus.metrics.core.metrics.{Counter, Gauge, Histogram}
+import io.prometheus.metrics.model.registry.PrometheusRegistry
 
 import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.flow.model.DataOrigin
@@ -44,56 +46,50 @@ object ChainHandler {
       extends FlowDataValidationEvent
 
   val chainValidationFailed: Counter = Counter
-    .build(
-      "alephium_chain_validation_failed",
-      "Error count of chain validation errors"
-    )
+    .builder()
+    .name("alephium_chain_validation_failed")
+    .help("Error count of chain validation errors")
     .labelNames("validation_type", "invalid_status")
-    .register()
+    .register(PrometheusRegistry.defaultRegistry)
 
   val chainValidationTotal: Counter = Counter
-    .build(
-      "alephium_chain_validation_total",
-      "Total number of chain validations"
-    )
+    .builder()
+    .name("alephium_chain_validation_total")
+    .help("Total number of chain validations")
     .labelNames("validation_type")
-    .register()
+    .register(PrometheusRegistry.defaultRegistry)
 
   val chainValidationDurationMilliSeconds: Histogram = Histogram
-    .build(
-      "alephium_chain_validation_duration_milliseconds",
-      "Duration of the validation"
-    )
+    .builder()
+    .name("alephium_chain_validation_duration_milliseconds")
+    .help("Duration of the validation")
     .labelNames("validation_type")
-    .buckets(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000)
-    .register()
+    .classicExponentialUpperBounds(0.5, 2, 14)
+    .register(PrometheusRegistry.defaultRegistry)
 
   val blockDurationMilliSeconds: Histogram = Histogram
-    .build(
-      "alephium_block_duration_milliseconds",
-      "Block duration"
-    )
+    .builder()
+    .name("alephium_block_duration_milliseconds")
+    .help("Block duration")
     .labelNames("chain_from", "chain_to")
-    .buckets(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 300000,
-      600000, 1800000, 3600000)
-    .register()
+    .classicUpperBounds(0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000,
+      300000, 600000, 1800000, 3600000)
+    .register(PrometheusRegistry.defaultRegistry)
   // scalastyle:on magic.number
 
   val blockCurrentHeight: Gauge = Gauge
-    .build(
-      "alephium_block_current_height",
-      "Current height of the block"
-    )
+    .builder()
+    .name("alephium_block_current_height")
+    .help("Current height of the block")
     .labelNames("chain_from", "chain_to")
-    .register()
+    .register(PrometheusRegistry.defaultRegistry)
 
   val targetHashRateHertz: Gauge = Gauge
-    .build(
-      "alephium_target_hash_rate_hertz",
-      "Target hash rate"
-    )
+    .builder()
+    .name("alephium_target_hash_rate_hertz")
+    .help("Target hash rate")
     .labelNames("chain_from", "chain_to")
-    .register()
+    .register(PrometheusRegistry.defaultRegistry)
 }
 
 abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Validation[T, S, R]](
@@ -108,8 +104,8 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
   def networkConfig: NetworkConfig
   def consensusConfigs: ConsensusConfigs
 
-  def chainValidationTotalLabeled: Counter.Child
-  def chainValidationDurationMilliSecondsLabeled: Histogram.Child
+  def chainValidationTotalLabeled: CounterDataPoint
+  def chainValidationDurationMilliSecondsLabeled: DistributionDataPoint
 
   def handleData(data: T, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin): Unit = {
     log.debug(s"Try to add ${data.shortHex}")
@@ -145,7 +141,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
     log.error(
       s"IO failed in block/header ${data.hash.toHexString}: $blockHex validation: $error"
     )
-    chainValidationFailed.labels(data.`type`, "IOError").inc()
+    chainValidationFailed.labelValues(data.`type`, "IOError").inc()
 
     broker ! dataAddingFailed()
   }
@@ -158,7 +154,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
   ): Unit = {
     val blockHex = Hex.toHexString(serialize(data))
     log.warning(s"Invalid block/header ${data.hash.toHexString}: $status : $blockHex")
-    chainValidationFailed.labels(data.`type`, status.name).inc()
+    chainValidationFailed.labelValues(data.`type`, status.name).inc()
 
     if (!origin.isLocal) {
       sender() ! DependencyHandler.Invalid(data.hash)
@@ -242,11 +238,11 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
   protected def chainIndexToString   = chainIndex.to.value.toString
 
   private val blockDurationMilliSecondsLabeled = blockDurationMilliSeconds
-    .labels(chainIndexFromString, chainIndexToString)
+    .labelValues(chainIndexFromString, chainIndexToString)
 
   private val blockCurrentHeightLabeled = blockCurrentHeight
-    .labels(chainIndexFromString, chainIndexToString)
+    .labelValues(chainIndexFromString, chainIndexToString)
 
   private val targetHashRateHertzLabeled = targetHashRateHertz
-    .labels(chainIndexFromString, chainIndexToString)
+    .labelValues(chainIndexFromString, chainIndexToString)
 }

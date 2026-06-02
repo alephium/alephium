@@ -21,7 +21,7 @@ object Version {
   lazy val tapir      = "1.13.19"
   lazy val sttp       = "4.0.23"
   lazy val apispec    = "0.11.10"
-  lazy val prometheus = "0.16.0"
+  lazy val prometheus = "1.6.1"
 }
 
 object Dependencies {
@@ -58,11 +58,12 @@ object Dependencies {
   lazy val `tapir-files`  = "com.softwaremill.sttp.tapir"   %% "tapir-files"       % Version.tapir
   lazy val `sttp-backend` = "com.softwaremill.sttp.client4" %% "core"              % Version.sttp
 
-  lazy val `prometheus-simple-client` = "io.prometheus" % "simpleclient" % Version.prometheus
+  lazy val `prometheus-simple-client` =
+    "io.prometheus" % "prometheus-metrics-core" % Version.prometheus
   lazy val `prometheus-simple-client-common` =
-    "io.prometheus" % "simpleclient_common" % Version.prometheus
+    "io.prometheus" % "prometheus-metrics-exporter-common" % Version.prometheus
   lazy val `prometheus-simple-client-hotspot` =
-    "io.prometheus" % "simpleclient_hotspot" % Version.prometheus
+    "io.prometheus" % "prometheus-metrics-instrumentation-jvm" % Version.prometheus
   lazy val scopt = "com.github.scopt" %% "scopt" % "4.1.0"
 
   lazy val `tapir-prometheus-metrics` =

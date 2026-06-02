@@ -16,16 +16,17 @@
 
 package org.alephium.app
 
-import java.io.{StringWriter, Writer}
+import java.io.ByteArrayOutputStream
 import java.net.InetAddress
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.Callable
 
 import scala.concurrent._
 
 import akka.pattern.ask
 import akka.util.Timeout
-import io.prometheus.client.CollectorRegistry
-import io.prometheus.client.exporter.common.TextFormat
+import io.prometheus.metrics.expositionformats.OpenMetricsTextFormatWriter
+import io.prometheus.metrics.model.registry.PrometheusRegistry
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.metrics.prometheus.PrometheusMetrics.prometheusRegistryCodec
@@ -888,16 +889,25 @@ trait EndpointsLogic extends Endpoints {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   val metricsLogic = metrics.serverLogic[Future] { _ =>
     Future.successful {
-      val writer: Writer = new StringWriter()
+      val output = new ByteArrayOutputStream()
       try {
-        TextFormat.write004(writer, CollectorRegistry.defaultRegistry.metricFamilySamples())
-        writer.write(prometheusRegistryCodec.encode(Metrics.defaultRegistry))
-        Right(writer.toString)
+        OpenMetricsTextFormatWriter
+          .create()
+          .write(
+            output,
+            PrometheusRegistry.defaultRegistry.scrape()
+          )
+
+        val result =
+          output.toString(StandardCharsets.UTF_8) +
+            prometheusRegistryCodec.encode(Metrics.defaultRegistry)
+
+        Right(result)
       } catch {
         case error: Throwable =>
           Left(ApiError.InternalServerError(error.getMessage))
       } finally {
-        writer.close()
+        output.close()
       }
     }
   }
