@@ -2274,7 +2274,7 @@ object TransferAlphFromSelf extends Transfer with StatefulInstrCompanion0 {
       frame,
       getContractLockupScript(frame),
       getToAddressFromStack(frame),
-      Transfer.checkAddressForSelfTransfer
+      Transfer.checkAddressForSelfTransfer(_, _, _)
     )
   }
 }
@@ -2285,7 +2285,7 @@ object TransferAlphToSelf extends Transfer with StatefulInstrCompanion0 {
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
       getContractLockupScript(frame),
-      Transfer.checkAddressForSelfTransfer
+      Transfer.checkAddressForSelfTransfer(_, _, _)
     )
   }
 }

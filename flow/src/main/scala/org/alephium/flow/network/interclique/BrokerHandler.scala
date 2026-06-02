@@ -45,7 +45,11 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
   val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](maxBlockCapacity)
   val seenTxExpiryDuration: Duration     = BrokerHandler.seenTxExpiryDuration
   val seenTxs: Cache[TransactionId, TimeStamp] =
-    Cache.fifo[TransactionId, TimeStamp](maxTxsCapacity, identity[TimeStamp], seenTxExpiryDuration)
+    Cache.fifo[TransactionId, TimeStamp](
+      maxTxsCapacity,
+      identity[TimeStamp](_),
+      seenTxExpiryDuration
+    )
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 

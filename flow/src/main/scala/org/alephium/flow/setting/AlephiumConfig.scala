@@ -195,7 +195,7 @@ final case class NetworkSetting(
 
   def handshakeTimeout: Duration = retryTimeout
 
-  val externalAddressInferred: Option[InetSocketAddress] = externalAddress.orElse {
+  lazy val externalAddressInferred: Option[InetSocketAddress] = externalAddress.orElse {
     if (upnp.enabled) {
       Upnp.getUpnpClient(upnp).map { client =>
         val bindingPort = bindAddress.getPort

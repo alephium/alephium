@@ -16,7 +16,6 @@
 
 package org.alephium.app
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
@@ -586,7 +585,7 @@ object ServerFixture {
     }
 
     override def getSubContractIds(
-        @nowarn contractId: ContractId,
+        contractId: ContractId,
         start: Int,
         end: Int
     ): IOResult[(Int, AVector[ContractId])] = {

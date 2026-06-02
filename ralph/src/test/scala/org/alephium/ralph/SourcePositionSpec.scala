@@ -35,6 +35,6 @@ class SourcePositionSpec extends AlephiumSpec {
     runCheck("12345:")
     runCheck(":12345")
 
-    forAll(runCheck)
+    forAll(runCheck(_))
   }
 }

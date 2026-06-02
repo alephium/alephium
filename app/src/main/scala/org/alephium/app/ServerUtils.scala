@@ -272,7 +272,9 @@ class ServerUtils(implicit
           MempoolTransactions(
             chainIndex.from.value,
             chainIndex.to.value,
-            txsWithTimestamp.map(model.TransactionTemplate.fromProtocol.tupled)
+            txsWithTimestamp.map { case (template, timestamp) =>
+              model.TransactionTemplate.fromProtocol(template, timestamp)
+            }
           )
         }
       )

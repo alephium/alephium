@@ -2242,7 +2242,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
         }
       }
 
-      Seq(interface, abstractContract).foreach(code => {
+      Seq(interface(_, _), abstractContract(_, _)).foreach(code => {
         test(Parser.FunctionUsingAnnotation.usePreapprovedAssetsKey, true, code)
         test(Parser.FunctionUsingAnnotation.useContractAssetsKey, false, code)
         test(Parser.FunctionUsingAnnotation.useCheckExternalCallerKey, false, code)

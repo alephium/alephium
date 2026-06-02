@@ -16,7 +16,7 @@
 
 package org.alephium.macros
 
-import scala.annotation.{compileTimeOnly, nowarn, StaticAnnotation}
+import scala.annotation.{compileTimeOnly, StaticAnnotation}
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox
 
@@ -31,7 +31,7 @@ object GasImpl {
 
     def abort() = c.abort(c.enclosingPosition, s"Invalid annottee")
 
-    @nowarn def addByteCode(classDef: c.universe.ClassDef, compDef: ModuleDef): c.Expr[Any] =
+    def addByteCode(classDef: c.universe.ClassDef, compDef: ModuleDef): c.Expr[Any] =
       (classDef, compDef) match {
         case (
               q"trait $traitName extends ..$parents",
@@ -44,7 +44,7 @@ object GasImpl {
             object $comp extends ..$compBase { ..$compBody }
             """
           )
-        case x => abort()
+        case _ => abort()
       }
 
     annottees.map(_.tree) match {

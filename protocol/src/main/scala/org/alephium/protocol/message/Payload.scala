@@ -64,7 +64,9 @@ object Payload {
       case x: BlocksAndUnclesByHeightsResponse =>
         (BlocksAndUnclesByHeightsResponse, BlocksAndUnclesByHeightsResponse.serialize(x))
     }
-    intSerde.serialize(Code.toInt(code)) ++ data
+    @SuppressWarnings(Array("org.wartremover.warts.PartialFunctionApply"))
+    val codeInt = Code.toInt(code)
+    intSerde.serialize(codeInt) ++ data
   }
   // scalastyle:on cyclomatic.complexity
 
