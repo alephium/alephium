@@ -35,7 +35,7 @@ object Dependencies {
   lazy val `upickle` = "com.lihaoyi" %% "upickle" % "3.3.0"
 
   lazy val ficus           = "com.iheart"                 %% "ficus"           % "1.5.2"
-  lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk18on"  % "1.78.1"
+  lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk18on"  % "1.84"
   lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "3.1.0"
   lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.5.18"
   lazy val rocksdb         = "org.rocksdb"                 % "rocksdbjni"      % "10.10.1.1"
