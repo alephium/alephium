@@ -36,19 +36,30 @@ trait DecodeFailureHandler {
     )
   }
 
+  def rootMessage(error: Throwable): String = {
+    @annotation.tailrec
+    def loop(t: Throwable): Throwable =
+      if (t.getCause == null) t else loop(t.getCause)
+
+    Option(loop(error).getMessage).getOrElse(error.getMessage)
+  }
+
   def failureMessage(ctx: DecodeFailureContext): String = {
     val base = FailureMessages.failureSourceMessage(ctx.failingInput)
 
     val detail = ctx.failure match {
       case DecodeResult.InvalidValue(errors) if errors.nonEmpty =>
         Some(ValidationMessages.validationErrorsMessage(errors))
-      case DecodeResult.Error(original, error) => Some(s"${error.getMessage}: $original")
-      case _                                   => None
+
+      case DecodeResult.Error(original, error) =>
+        Some(s"${rootMessage(error)}: $original")
+
+      case _ =>
+        None
     }
 
     FailureMessages.combineSourceAndDetail(base, detail)
   }
-
   val myDecodeFailureHandler =
     DefaultDecodeFailureHandler[Future](respond(_), failureMessage(_), failureResponse(_, _, _))
 }

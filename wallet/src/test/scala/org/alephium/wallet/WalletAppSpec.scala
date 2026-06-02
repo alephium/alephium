@@ -138,7 +138,7 @@ class WalletAppSpec
 
     create(2) check { response =>
       val error = response.as[ApiError.BadRequest]
-      error.detail is s"""Invalid value for: body (Invalid mnemonic size: 2, expected: 12, 15, 18, 21, 24 at index 94: decoding failure)"""
+      error.detail is s"""Invalid value for: body (Invalid mnemonic size: 2, expected: 12, 15, 18, 21, 24: decoding failure)"""
       response.code is StatusCode.BadRequest
     }
 
@@ -369,13 +369,13 @@ class WalletAppSpec
 
     sign("non-hex-data") check { response =>
       val error = response.as[ApiError.BadRequest]
-      error.detail is "Invalid value for: body (Invalid hex string: non-hex-data at index 8: decoding failure)"
+      error.detail is "Invalid value for: body (Invalid hex string: non-hex-data: decoding failure)"
       response.code is StatusCode.BadRequest
     }
 
     sign(Hex.toHexString(serialize(unsignedTx))) check { response =>
       val error = response.as[ApiError.BadRequest]
-      error.detail is "Invalid value for: body (cannot decode 32 bytes hash at index 8: decoding failure)"
+      error.detail is "Invalid value for: body (cannot decode 32 bytes hash: decoding failure)"
       response.code is StatusCode.BadRequest
     }
 

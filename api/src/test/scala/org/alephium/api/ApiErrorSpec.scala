@@ -30,7 +30,13 @@ class ApiErrorSpec extends AlephiumSpec with EitherValues {
   }
 
   def parseFail[A: Reader](jsonRaw: String): String = {
-    scala.util.Try(read[A](jsonRaw)).toEither.swap.rightValue.getMessage
+    val error = scala.util.Try(read[A](jsonRaw)).toEither.swap.rightValue
+
+    def rootCause(t: Throwable): Throwable = {
+      if (t.getCause == null) t else rootCause(t.getCause)
+    }
+
+    Option(rootCause(error).getMessage).getOrElse(error.getMessage)
   }
 
   it should "encode/decode BadRequest" in {
