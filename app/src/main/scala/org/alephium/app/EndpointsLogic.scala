@@ -29,7 +29,6 @@ import io.prometheus.metrics.expositionformats.OpenMetricsTextFormatWriter
 import io.prometheus.metrics.model.registry.PrometheusRegistry
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.server.ServerEndpoint
-import sttp.tapir.server.metrics.prometheus.PrometheusMetrics.prometheusRegistryCodec
 
 import org.alephium.api.{badRequest, notFound, ApiError, Endpoints, Try}
 import org.alephium.api.model.{Address => _, TransactionTemplate => _, _}
@@ -43,7 +42,7 @@ import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSettings, NetworkSetting}
-import org.alephium.http.{EndpointSender, Metrics}
+import org.alephium.http.EndpointSender
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
@@ -898,11 +897,7 @@ trait EndpointsLogic extends Endpoints {
             PrometheusRegistry.defaultRegistry.scrape()
           )
 
-        val result =
-          output.toString(StandardCharsets.UTF_8) +
-            prometheusRegistryCodec.encode(Metrics.defaultRegistry)
-
-        Right(result)
+        Right(output.toString(StandardCharsets.UTF_8))
       } catch {
         case error: Throwable =>
           Left(ApiError.InternalServerError(error.getMessage))
