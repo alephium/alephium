@@ -2408,7 +2408,7 @@ sealed trait ContractFactory extends StatefulInstrSimpleGas with GasSimple {
       _                 <- frame.ctx.chargeFieldSize(immFields.toIterable ++ mutFields.toIterable)
       contractCode      <- prepareContractCode(frame)
       // Enable the check below for new network upgrades
-      _ <- checkInactiveInstructions(frame, contractCode)
+      _ <- ContractFactory.checkInactiveInstructions(frame, contractCode)
       newContractId <- CreateContractAbstract.getContractId(
         frame,
         subContract,
@@ -2431,9 +2431,12 @@ sealed trait ContractFactory extends StatefulInstrSimpleGas with GasSimple {
     } yield ()
   }
 
+}
+
+object ContractFactory {
   def checkInactiveInstructions[C <: StatefulContext](
       frame: Frame[C],
-      contractCode: StatefulContract.HalfDecoded
+      contractCode: Contract[StatefulContext]
   ): ExeResult[Unit] = {
     if (!frame.ctx.getHardFork().isDanubeEnabled()) {
       EitherF.foreachTry(0 until contractCode.methodsLength)(methodIndex => {
@@ -2777,6 +2780,7 @@ sealed trait MigrateBase
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
+      _ <- ContractFactory.checkInactiveInstructions(frame, contractCode)
       _ <- frame.migrateContract(contractCode, newImmFieldsOpt, newMutFieldsOpt)
     } yield ()
   }

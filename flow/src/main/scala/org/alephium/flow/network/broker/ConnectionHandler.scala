@@ -115,9 +115,10 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
     downloadBytesTotal.labels(remoteAddress.getAddress.getHostAddress)
   def reading: Receive = { case Tcp.Received(data) =>
     downloadBytesTotalLabeled.inc(data.length.toDouble)
-    bufferInMessage(data)
-    processInMessageBuffer()
-    connection ! Tcp.ResumeReading
+    if (bufferInMessage(data)) {
+      processInMessageBuffer()
+      connection ! Tcp.ResumeReading
+    }
   }
 
   def writing: Receive = {
@@ -251,8 +252,16 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
 
   final private var inMessageBuffer = ByteString.empty
 
-  def bufferInMessage(data: ByteString): Unit = {
+  def bufferInMessage(data: ByteString): Boolean = {
     inMessageBuffer ++= data
+    if (inMessageBuffer.length > maxBufferCapacity) {
+      log.warning(s"Drop connection to [$remoteAddress] (inbound buffer overrun)")
+      handleInvalidMessage(MisbehaviorManager.SerdeError(remoteAddress))
+      context.stop(self)
+      false
+    } else {
+      true
+    }
   }
 
   def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[T]]]

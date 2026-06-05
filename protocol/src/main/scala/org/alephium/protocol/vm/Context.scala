@@ -650,6 +650,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
     val newImmFields = newImmFieldsOpt.getOrElse(AVector.from(obj.immFields))
     val newMutFields = newMutFieldsOpt.getOrElse(AVector.from(obj.mutFields))
     for {
+      _ <- StatefulContract.check(newContractCode, getHardFork())
+      _ <- newContractCode.checkAssetsModifier(this)
       _ <- newContractCode.check(newImmFields, newMutFields)
       _ <- chargeFieldSize(newImmFields.toIterable ++ newMutFields.toIterable)
       succeeded <- worldState

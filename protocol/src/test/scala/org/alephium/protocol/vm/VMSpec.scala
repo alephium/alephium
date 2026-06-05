@@ -738,12 +738,25 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
           )
           Some(MutBalanceState(MutBalances.empty, bs))
       }
-      genStatefulFrame(
+      val frame = genStatefulFrame(
         balances,
         usePreapprovedAssets = balanceType != NoBalance && useAssetType == UsePreapproved,
         useAssetsInContract = balanceType != NoBalance && useAssetType == UseAssetInContract,
         usePayToContractOnly = balanceType != NoBalance && useAssetType == UsePayToContractOnly
       )
+      if (useAssetType == UsePreapproved) {
+        frame
+      } else {
+        val contract = StatefulContract(0, AVector(frame.method))
+        frame.copy(
+          obj = StatefulContractObject.from(
+            contract,
+            AVector.empty,
+            AVector.empty,
+            contractFrom.contractId
+          )
+        )
+      }
     }
   }
 
