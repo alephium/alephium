@@ -51,15 +51,32 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
       minerApiPort
     )
 
+  // Keep the legacy wsPort field in the wire format for bootstrap compatibility.
+  // WebSocket now shares restPort, so the legacy slot is ignored on read and filled
+  // with restPort on write.
+  private def unsafeWithLegacyWsPort(
+      id: Int,
+      groupNumPerBroker: Int,
+      publicAddress: Option[InetSocketAddress],
+      privateAddress: InetSocketAddress,
+      restPort: Int,
+      wsPort: Int,
+      minerApiPort: Int
+  ): PeerInfo = {
+    val _ = wsPort
+    unsafe(id, groupNumPerBroker, publicAddress, privateAddress, restPort, minerApiPort)
+  }
+
   val unsafeSerde: Serde[PeerInfo] =
-    Serde.forProduct6(
-      unsafe,
+    Serde.forProduct7(
+      unsafeWithLegacyWsPort,
       t =>
         (
           t.id,
           t.groupNumPerBroker,
           t.externalAddress,
           t.internalAddress,
+          t.restPort,
           t.restPort,
           t.minerApiPort
         )

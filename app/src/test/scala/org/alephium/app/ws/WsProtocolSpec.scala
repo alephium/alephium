@@ -62,6 +62,13 @@ class WsProtocolSpec
       .isLeft is true
     WsRequest
       .fromJsonString(
+        s"""{"jsonrpc": "1.0", "id": 0, "method": "$method", "params": ["${SimpleSubscribeParams.BlockEvent}"]}""",
+        contractAddressLimit
+      )
+      .leftValue
+      .error is JsonRPC.Error.InvalidRequest
+    WsRequest
+      .fromJsonString(
         s"""{"id": 0, "method": "$method", "params": "$eventType"}""",
         contractAddressLimit
       )

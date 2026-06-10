@@ -22,7 +22,6 @@ alephium {
     max-outbound-connections-per-group = 10
     max-inbound-connections-per-group = 40
     max-clique-from-same-ip = 10
-    max-ws-connections = 100
 
     ws {
       enabled = true
@@ -66,7 +65,6 @@ alephium {
     num-of-sync-blocks-limit = 128
 
     rest-port = null
-    ws-port = null
     miner-api-port = null
   }
 
@@ -91,7 +89,6 @@ alephium {
     default-utxos-limit = 512
     max-form-buffered-bytes = 131072 // 128 * 1024
     enable-http-metrics = false
-    max-web-socket-frame-size = 1048576 // 1024 * 1024
   }
 
   mempool {

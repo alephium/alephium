@@ -270,6 +270,9 @@ object WsRequest { // extends ApiModelCodec {
       r: RequestUnsafe,
       contractAddressLimit: Int
   ): Either[Error, WsRequest] = {
+    def validateVersion =
+      Either.cond(r.jsonrpc == JsonRPC.version, (), Error.InvalidRequest)
+
     def readParams =
       r.params match {
         case ujson.Arr(arr) if arr.length == 1 =>
@@ -298,7 +301,7 @@ object WsRequest { // extends ApiModelCodec {
         case unsupported =>
           Left(WsError.invalidParamsFormat(unsupported))
       }
-    readParams.map(params => WsRequest(r.id, params))
+    validateVersion.flatMap(_ => readParams.map(params => WsRequest(r.id, params)))
   }
 
   def fromJsonString(

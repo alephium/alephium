@@ -48,6 +48,13 @@ class WebSocketTest extends AlephiumActorSpec {
       probe.ref ! message
     })
 
+    def cleanup(): Unit = {
+      if (!wsClient.isClosed) {
+        wsClient.close().futureValue
+      }
+      clique.stop()
+    }
+
     def subscribeToEvent(wsClient: WsClient, subscriptionType: String): Unit = {
       // Create subscription JSON
       val subscribeJson = jsonRpc("subscribe", s"""["$subscriptionType"]""")
@@ -82,51 +89,58 @@ class WebSocketTest extends AlephiumActorSpec {
   }
 
   it should "establish WebSocket connection" in new WebSocketFixture {
-    wsClient.isClosed is false
+    try {
+      wsClient.isClosed is false
 
-    wsClient.close().futureValue is ()
+      wsClient.close().futureValue is ()
 
-    eventually {
-      wsClient.isClosed is true
+      eventually {
+        wsClient.isClosed is true
+      }
+    } finally {
+      cleanup()
     }
   }
 
   it should "receive block notifications when subscribed" in new WebSocketFixture {
+    try {
+      clique.startMining()
 
-    clique.startMining()
+      subscribeToEvent(wsClient, "block")
 
-    subscribeToEvent(wsClient, "block")
+      expectSubscriptionSuccess()
 
-    expectSubscriptionSuccess()
-
-    expectBlockNotification()
-
-    wsClient.close().futureValue is ()
+      expectBlockNotification()
+    } finally {
+      cleanup()
+    }
   }
 
   it should "receive transaction notifications when subscribed" in new WebSocketFixture {
+    try {
+      subscribeToEvent(wsClient, "tx")
 
-    subscribeToEvent(wsClient, "tx")
+      expectSubscriptionSuccess()
 
-    expectSubscriptionSuccess()
+      transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
 
-    transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
-
-    expectTxNotification()
-
-    wsClient.close().futureValue is ()
+      expectTxNotification()
+    } finally {
+      cleanup()
+    }
   }
 
   it should "refuse second subscription attempt" in new WebSocketFixture {
+    try {
+      subscribeToEvent(wsClient, "block")
 
-    subscribeToEvent(wsClient, "block")
+      expectSubscriptionSuccess()
 
-    expectSubscriptionSuccess()
+      subscribeToEvent(wsClient, "block")
 
-    subscribeToEvent(wsClient, "block")
-
-    expectSubscriptionFailure()
-
-    wsClient.close().futureValue is ()
+      expectSubscriptionFailure()
+    } finally {
+      cleanup()
+    }
   }
 }

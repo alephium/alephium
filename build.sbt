@@ -217,7 +217,6 @@ lazy val app = mainProject("app")
         run("chmod", "644", artifactTargetPath)
 
         expose(12973) // http
-        expose(11973) // ws
         expose(10973) // miner
         expose(9973)  // p2p
 

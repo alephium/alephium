@@ -25,20 +25,23 @@ The WebSocket API runs on the same port as the REST API under the `/ws` endpoint
 Default network settings:
 
 ```conf
-ws-max-connections = 100
-ws-max-frame-size = 16384
-ws-max-subscriptions-per-connection = 50
-ws-max-contract-event-addresses = 100
-ws-ping-frequency = 30 second
+alephium.network.ws {
+  enabled = false
+  max-connections = 100
+  max-frame-size = 16384
+  max-subscriptions-per-connection = 50
+  max-contract-event-addresses = 100
+  ping-frequency = 30 second
+}
 ```
 
 ## Connection
 
 ### Endpoint URLs
 
-- **DevNet**: `ws://localhost:22973/ws`
-- **TestNet**: `ws://localhost:12973/ws`
-- **MainNet**: `ws://localhost:10973/ws`
+- **Configured REST port**: `ws://localhost:<rest-port>/ws`
+- **Default node port**: `ws://localhost:12973/ws`
+- **Typical DevNet port**: `ws://localhost:22973/ws`
 
 ### Using wscat
 
@@ -199,10 +202,10 @@ $ wscat --show-ping-pong -c ws://localhost:22973/ws
 
 The WebSocket API includes protection against various attack vectors:
 
-- **Connection flooding**: Limited by `ws-max-connections`
-- **Subscription flooding**: Limited by `ws-max-subscriptions-per-connection`
-- **Contract address flooding**: Limited by `ws-max-contract-event-addresses`
-- **Large payload flooding**: Limited by `ws-max-frame-size`
+- **Connection flooding**: Limited by `alephium.network.ws.max-connections`
+- **Subscription flooding**: Limited by `alephium.network.ws.max-subscriptions-per-connection`
+- **Contract address flooding**: Limited by `alephium.network.ws.max-contract-event-addresses`
+- **Large payload flooding**: Limited by `alephium.network.ws.max-frame-size`
 
 ## See Also
 

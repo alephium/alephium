@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.Bootstrapper
-import org.alephium.serde.Staging
+import org.alephium.serde._
 import org.alephium.util.ActorRefT
 
 class BrokerSpec extends AlephiumFlowActorSpec with InfoFixture {
@@ -62,5 +62,60 @@ class BrokerSpec extends AlephiumFlowActorSpec with InfoFixture {
 
     bootstrapper.expectMsg(Bootstrapper.SendIntraCliqueInfo(randomInfo))
     expectTerminated(broker)
+  }
+
+  it should "keep legacy wsPort in PeerInfo wire format" in {
+    final case class LegacyPeerInfo(
+        id: Int,
+        groupNumPerBroker: Int,
+        externalAddress: Option[java.net.InetSocketAddress],
+        internalAddress: java.net.InetSocketAddress,
+        restPort: Int,
+        wsPort: Int,
+        minerApiPort: Int
+    )
+
+    implicit val legacyPeerInfoSerde: Serde[LegacyPeerInfo] =
+      Serde.forProduct7(
+        LegacyPeerInfo.apply,
+        t =>
+          (
+            t.id,
+            t.groupNumPerBroker,
+            t.externalAddress,
+            t.internalAddress,
+            t.restPort,
+            t.wsPort,
+            t.minerApiPort
+          )
+      )
+
+    val address      = SocketUtil.temporaryServerAddress()
+    val restPort     = SocketUtil.temporaryServerAddress().getPort
+    val legacyWsPort = SocketUtil.temporaryServerAddress().getPort
+    val minerApiPort = SocketUtil.temporaryServerAddress().getPort
+    val peerInfo =
+      PeerInfo.unsafe(
+        brokerConfig.brokerId,
+        brokerConfig.groupNumPerBroker,
+        Some(address),
+        address,
+        restPort,
+        minerApiPort
+      )
+    val legacyPeerInfo =
+      LegacyPeerInfo(
+        brokerConfig.brokerId,
+        brokerConfig.groupNumPerBroker,
+        Some(address),
+        address,
+        restPort,
+        legacyWsPort,
+        minerApiPort
+      )
+
+    PeerInfo.deserialize(legacyPeerInfoSerde.serialize(legacyPeerInfo)) isE peerInfo
+    legacyPeerInfoSerde.deserialize(PeerInfo.serialize(peerInfo)) isE
+      legacyPeerInfo.copy(wsPort = restPort)
   }
 }
