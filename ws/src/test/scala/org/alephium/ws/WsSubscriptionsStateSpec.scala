@@ -34,11 +34,11 @@ class WsSubscriptionsStateSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "add and retrieve subscriptions" in {
-    val state = WsSubscriptionsState.empty[TestConsumer]()
-    val wsId = "test-ws-1"
+    val state    = WsSubscriptionsState.empty[TestConsumer]()
+    val wsId     = "test-ws-1"
     val consumer = TestConsumer(1)
-    val address = generateContractAddress()
-    val params = ContractEventsSubscribeParams(AVector(address), None)
+    val address  = generateContractAddress()
+    val params   = ContractEventsSubscribeParams(AVector(address), None)
 
     state.addNewSubscription(wsId, params, consumer)
 
@@ -48,12 +48,12 @@ class WsSubscriptionsStateSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "get unique subscription IDs for contract events" in {
-    val state = WsSubscriptionsState.empty[TestConsumer]()
-    val wsId1 = "test-ws-1"
-    val wsId2 = "test-ws-2"
-    val consumer1 = TestConsumer(1)
-    val consumer2 = TestConsumer(2)
-    val address = generateContractAddress()
+    val state      = WsSubscriptionsState.empty[TestConsumer]()
+    val wsId1      = "test-ws-1"
+    val wsId2      = "test-ws-2"
+    val consumer1  = TestConsumer(1)
+    val consumer2  = TestConsumer(2)
+    val address    = generateContractAddress()
     val eventIndex = 1
 
     val params1 = ContractEventsSubscribeParams(AVector(address), Some(eventIndex))
@@ -68,12 +68,12 @@ class WsSubscriptionsStateSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "remove specific subscription" in {
-    val state = WsSubscriptionsState.empty[TestConsumer]()
-    val wsId = "test-ws-1"
+    val state     = WsSubscriptionsState.empty[TestConsumer]()
+    val wsId      = "test-ws-1"
     val consumer1 = TestConsumer(1)
     val consumer2 = TestConsumer(2)
-    val address1 = generateContractAddress()
-    val address2 = generateContractAddress()
+    val address1  = generateContractAddress()
+    val address2  = generateContractAddress()
 
     val params1 = ContractEventsSubscribeParams(AVector(address1), None)
     val params2 = ContractEventsSubscribeParams(AVector(address2), None)
@@ -91,12 +91,12 @@ class WsSubscriptionsStateSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "remove all subscriptions for a connection" in {
-    val state = WsSubscriptionsState.empty[TestConsumer]()
-    val wsId = "test-ws-1"
+    val state     = WsSubscriptionsState.empty[TestConsumer]()
+    val wsId      = "test-ws-1"
     val consumer1 = TestConsumer(1)
     val consumer2 = TestConsumer(2)
-    val address1 = generateContractAddress()
-    val address2 = generateContractAddress()
+    val address1  = generateContractAddress()
+    val address2  = generateContractAddress()
 
     val params1 = ContractEventsSubscribeParams(AVector(address1), None)
     val params2 = ContractEventsSubscribeParams(AVector(address2), None)
@@ -113,8 +113,8 @@ class WsSubscriptionsStateSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "build contract event keys correctly" in {
-    val address1 = generateContractAddress()
-    val address2 = generateContractAddress()
+    val address1   = generateContractAddress()
+    val address2   = generateContractAddress()
     val eventIndex = 42
 
     val paramsWithIndex = ContractEventsSubscribeParams(
@@ -139,11 +139,11 @@ class WsSubscriptionsStateSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "handle multiple addresses in subscription" in {
-    val state = WsSubscriptionsState.empty[TestConsumer]()
-    val wsId = "test-ws-1"
-    val consumer = TestConsumer(1)
-    val address1 = generateContractAddress()
-    val address2 = generateContractAddress()
+    val state      = WsSubscriptionsState.empty[TestConsumer]()
+    val wsId       = "test-ws-1"
+    val consumer   = TestConsumer(1)
+    val address1   = generateContractAddress()
+    val address2   = generateContractAddress()
     val eventIndex = 1
 
     val params = ContractEventsSubscribeParams(
@@ -153,14 +153,18 @@ class WsSubscriptionsStateSpec extends AnyFlatSpec with Matchers {
 
     state.addNewSubscription(wsId, params, consumer)
 
-    state.getUniqueSubscriptionIds(address1, eventIndex).contains(params.subscriptionId) should be(true)
-    state.getUniqueSubscriptionIds(address2, eventIndex).contains(params.subscriptionId) should be(true)
+    state.getUniqueSubscriptionIds(address1, eventIndex).contains(params.subscriptionId) should be(
+      true
+    )
+    state.getUniqueSubscriptionIds(address2, eventIndex).contains(params.subscriptionId) should be(
+      true
+    )
   }
 
   it should "return empty when no subscriptions exist" in {
-    val state = WsSubscriptionsState.empty[TestConsumer]()
-    val wsId = "test-ws-1"
-    val address = generateContractAddress()
+    val state      = WsSubscriptionsState.empty[TestConsumer]()
+    val wsId       = "test-ws-1"
+    val address    = generateContractAddress()
     val eventIndex = 1
 
     state.getConsumers(wsId).isEmpty should be(true)

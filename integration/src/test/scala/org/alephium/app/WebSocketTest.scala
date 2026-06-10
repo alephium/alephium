@@ -33,26 +33,22 @@ class WebSocketTest extends AlephiumActorSpec {
 
   trait WebSocketFixture extends CliqueFixture with WsNotificationParamsCodec {
     val clique = bootClique(nbOfNodes = 1)
-    clique.start()
-
-    val restPort = clique.getRestPort(clique.getGroup(address).group)
 
     implicit val ec: ExecutionContext = system.dispatcher
 
-    val wsClient = startWsClient(restPort).futureValue
-
     val probe = TestProbe()
 
-    // Overriding message handler to simulate raw websocket connection, not using our client.
-    wsClient.underlying.textMessageHandler((message: String) => {
-      probe.ref ! message
-    })
-
-    def cleanup(): Unit = {
-      if (!wsClient.isClosed) {
-        wsClient.close().futureValue
+    def withRawWsClient[T](body: (WsClient, Int) => T): T = {
+      withStartedClique(clique) { _ =>
+        val restPort = clique.getRestPort(clique.getGroup(address).group)
+        withWsClient(restPort) { wsClient =>
+          // Overriding message handler to simulate raw websocket connection, not using our client.
+          wsClient.underlying.textMessageHandler((message: String) => {
+            probe.ref ! message
+          })
+          body(wsClient, restPort)
+        }
       }
-      clique.stop()
     }
 
     def subscribeToEvent(wsClient: WsClient, subscriptionType: String): Unit = {
@@ -89,7 +85,7 @@ class WebSocketTest extends AlephiumActorSpec {
   }
 
   it should "establish WebSocket connection" in new WebSocketFixture {
-    try {
+    withRawWsClient { (wsClient, _) =>
       wsClient.isClosed is false
 
       wsClient.close().futureValue is ()
@@ -97,27 +93,23 @@ class WebSocketTest extends AlephiumActorSpec {
       eventually {
         wsClient.isClosed is true
       }
-    } finally {
-      cleanup()
     }
   }
 
   it should "receive block notifications when subscribed" in new WebSocketFixture {
-    try {
-      clique.startMining()
+    withRawWsClient { (wsClient, _) =>
+      withCliqueMining(clique) {
+        subscribeToEvent(wsClient, "block")
 
-      subscribeToEvent(wsClient, "block")
+        expectSubscriptionSuccess()
 
-      expectSubscriptionSuccess()
-
-      expectBlockNotification()
-    } finally {
-      cleanup()
+        expectBlockNotification()
+      }
     }
   }
 
   it should "receive transaction notifications when subscribed" in new WebSocketFixture {
-    try {
+    withRawWsClient { (wsClient, restPort) =>
       subscribeToEvent(wsClient, "tx")
 
       expectSubscriptionSuccess()
@@ -125,13 +117,11 @@ class WebSocketTest extends AlephiumActorSpec {
       transfer(publicKey, transferAddress, transferAmount, privateKey, restPort)
 
       expectTxNotification()
-    } finally {
-      cleanup()
     }
   }
 
   it should "refuse second subscription attempt" in new WebSocketFixture {
-    try {
+    withRawWsClient { (wsClient, _) =>
       subscribeToEvent(wsClient, "block")
 
       expectSubscriptionSuccess()
@@ -139,8 +129,6 @@ class WebSocketTest extends AlephiumActorSpec {
       subscribeToEvent(wsClient, "block")
 
       expectSubscriptionFailure()
-    } finally {
-      cleanup()
     }
   }
 }

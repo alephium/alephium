@@ -21,7 +21,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Random
+import scala.util.{Random, Try}
 
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown}
@@ -72,8 +72,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     with RichBlockFlowT { Fixture =>
   implicit val system: ActorSystem = spec.system
 
-  private val vertx = Vertx.vertx()
-  private val wsClientFactory =
+  private lazy val vertx = Vertx.vertx()
+  private lazy val wsClientFactory =
     WsClientFactory(
       vertx,
       new WebSocketClientOptions().setMaxFrameSize(networkConfig.ws.maxFrameSize)
@@ -246,14 +246,23 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
     @tailrec
     def iter(): Unit = {
-      blockNotifyProbe.receiveOne(max = timeout) match {
-        case text: String =>
-          val notification      = read[Notification](text)
-          val blockNotification = read[WsBlockNotificationParams](notification.params)
-          val blockEntry        = blockNotification.result.block
-          buffer(blockEntry.chainFrom)(blockEntry.chainTo) += 1
-          if (buffer.forall(_.forall(_ >= number))) () else iter()
+      Option(blockNotifyProbe.receiveOne(max = timeout)) match {
+        case Some(text: String) =>
+          if (handleNotification(read[Notification](text))) () else iter()
+        case Some(notification: Notification) =>
+          if (handleNotification(notification)) () else iter()
+        case Some(_) =>
+          fail("Unexpected non-text websocket notification")
+        case None =>
+          fail("Timed out waiting for websocket block notifications")
       }
+    }
+
+    def handleNotification(notification: Notification): Boolean = {
+      val blockNotification = read[WsBlockNotificationParams](notification.params)
+      val blockEntry        = blockNotification.result.block
+      buffer(blockEntry.chainFrom)(blockEntry.chainTo) += 1
+      buffer.forall(_.forall(_ >= number))
     }
 
     iter()
@@ -263,13 +272,32 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   final def awaitNBlocks(number: Int): Unit = {
     assume(number > 0)
     val timeout = Duration.ofMinutesUnsafe(2).asScala
-    blockNotifyProbe.receiveOne(max = timeout) match {
-      case _: String =>
+    Option(blockNotifyProbe.receiveOne(max = timeout)) match {
+      case Some(_: String) =>
         if (number <= 1) {
           ()
         } else {
           awaitNBlocks(number - 1)
         }
+      case Some(_: Notification) =>
+        if (number <= 1) {
+          ()
+        } else {
+          awaitNBlocks(number - 1)
+        }
+      case Some(_) =>
+        fail("Unexpected non-text websocket notification")
+      case None =>
+        fail("Timed out waiting for websocket block notifications")
+    }
+  }
+
+  @tailrec
+  final def drainBlockNotifications(): Unit = {
+    val timeout = Duration.ofMillisUnsafe(100).asScala
+    Option(blockNotifyProbe.receiveOne(max = timeout)) match {
+      case Some(_) => drainBlockNotifications()
+      case None    => ()
     }
   }
 
@@ -409,6 +437,83 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def startWsClient(port: Int): Future[WsClient] = {
     implicit val ec: ExecutionContext = system.dispatcher
     wsClientFactory.connect(port)(blockNotifyProbe.ref ! _)(_ => ())
+  }
+
+  def withStartedServer[T](server: Server)(body: Server => T): T = {
+    try {
+      server.start().futureValue is ()
+      body(server)
+    } finally {
+      discard(Try(server.stop().futureValue))
+    }
+  }
+
+  def withStartedClique[T](clique: Clique)(body: Clique => T): T = {
+    try {
+      clique.start()
+      body(clique)
+    } finally {
+      discard(Try(clique.stop()))
+    }
+  }
+
+  def withStartedCliques[T](cliques: AVector[Clique])(body: => T): T = {
+    var started = List.empty[Clique]
+    try {
+      cliques.foreach { clique =>
+        started = clique :: started
+        clique.start()
+      }
+      body
+    } finally {
+      started.foreach(clique => discard(Try(clique.stop())))
+    }
+  }
+
+  def withWsClient[T](port: Int)(body: WsClient => T): T = {
+    val client = startWsClient(port).futureValue
+    client.isClosed is false
+    try {
+      body(client)
+    } finally {
+      if (!client.isClosed) {
+        discard(Try(client.close().futureValue))
+      }
+    }
+  }
+
+  def withBlockSubscription[T](port: Int, id: WsCorrelationId = 0L)(body: WsClient => T): T = {
+    withWsClient(port) { client =>
+      client.subscribeToBlock(id).futureValue
+      body(client)
+    }
+  }
+
+  def withMining[T](port: Int)(body: => T): T = {
+    try {
+      request[Boolean](startMining, port) is true
+      body
+    } finally {
+      discard(Try(request[Boolean](stopMining, port)))
+    }
+  }
+
+  def withCliqueMining[T](clique: Clique)(body: => T): T = {
+    try {
+      clique.startMining()
+      body
+    } finally {
+      discard(Try(clique.stopMining()))
+    }
+  }
+
+  def withFakeMining[T](clique: Clique)(body: => T): T = {
+    try {
+      clique.startFakeMining()
+      body
+    } finally {
+      discard(Try(clique.stopFakeMining()))
+    }
   }
 
   def jsonRpc(method: String, params: String): String =
