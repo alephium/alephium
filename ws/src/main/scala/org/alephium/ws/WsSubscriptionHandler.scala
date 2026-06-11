@@ -46,6 +46,7 @@ object WsSubscriptionHandler {
       maxConnections: Int,
       apiKeys: AVector[ApiKey],
       maxRequestsPerSecond: Int,
+      maxWriteQueueSize: Int,
       maxSubscriptionsPerConnection: Int,
       maxContractEventAddresses: Int,
       pingFrequency: FiniteDuration
@@ -59,6 +60,7 @@ object WsSubscriptionHandler {
             maxConnections,
             apiKeys,
             maxRequestsPerSecond,
+            maxWriteQueueSize,
             maxSubscriptionsPerConnection,
             maxContractEventAddresses,
             pingFrequency
@@ -77,6 +79,12 @@ object WsSubscriptionHandler {
       subscriptionId: WsSubscriptionId,
       msg: String,
       error: String
+  ) extends Event
+  final private case class SendNotification(
+      id: WsCorrelationId,
+      ws: ServerWsLike,
+      subscriptionId: WsSubscriptionId,
+      msg: String
   ) extends Event
 
   sealed trait Command         extends SubscriptionMsg
@@ -129,6 +137,7 @@ class WsSubscriptionHandler(
     maxConnections: Int,
     apiKeys: AVector[ApiKey],
     maxRequestsPerSecond: Int,
+    maxWriteQueueSize: Int,
     maxSubscriptionsPerConnection: Int,
     maxContractEventAddresses: Int,
     pingFrequency: FiniteDuration
@@ -139,6 +148,7 @@ class WsSubscriptionHandler(
   import org.alephium.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
   private val effectiveMaxRequestsPerSecond: Int   = math.max(1, maxRequestsPerSecond)
+  private val effectiveMaxWriteQueueSize: Int      = math.max(1, maxWriteQueueSize)
 
   private val openedWsConnections = mutable.Map.empty[WsId, ServerWsLike]
   private val missedPongs         = mutable.Map.empty[WsId, Int]
@@ -193,14 +203,16 @@ class WsSubscriptionHandler(
       unsubscribe(id, ws, subscriptionId)
     case RequestRejected(ws, response) =>
       respondAsyncAndForget(ws, response)
+    case SendNotification(id, ws, subscriptionId, msg) =>
+      sendNotification(id, ws, subscriptionId, msg)
     case NotificationFailed(_, ws, _, msg, error) =>
-      ws.writeTextMessage(msg).onComplete {
-        case Success(_) =>
-          log.warning(error, "Open ws connection recovered from notification writing error.")
-        case Failure(ex) =>
+      writeTextMessageOrClose(ws, msg, "notification retry")(
+        log.warning(s"Open ws connection recovered from notification writing error: $error"),
+        ex => {
           log.warning(ex, "Ws notification writing failed repeatedly, closing.")
-          self ! Disconnect(ws.textHandlerID())
-      }
+          closeAndDisconnect(ws.textHandlerID(), ws)
+        }
+      )
     case Disconnect(id) =>
       val _         = openedWsConnections.remove(id)
       val _         = missedPongs.remove(id)
@@ -256,6 +268,9 @@ class WsSubscriptionHandler(
       if (missed >= MaxMissedPongs) {
         log.warning(s"WebSocket connection $wsId missed $missed pong responses, closing.")
         closeAndDisconnect(wsId, ws)
+      } else if (ws.writeQueueFull) {
+        log.warning(s"WebSocket connection $wsId write queue is full, closing.")
+        closeAndDisconnect(wsId, ws)
       } else {
         missedPongs.update(wsId, missed + 1)
         val _ = ws.writePing(Buffer.buffer("ping")).failed.foreach { ex =>
@@ -282,15 +297,39 @@ class WsSubscriptionHandler(
   ): Unit = {
     Try(write(response)) match {
       case Success(responseStr) =>
-        if (!ws.isClosed) {
-          val _ = ws
-            .writeTextMessage(responseStr)
-            .andThen { case Failure(exception) =>
-              log.warning(exception, s"Failed to respond with: $responseStr")
-            }
-        }
+        writeTextMessageOrClose(ws, responseStr, "response")(
+          (),
+          exception => {
+            log.warning(exception, s"Failed to respond with: $responseStr")
+            closeAndDisconnect(ws.textHandlerID(), ws)
+          }
+        )
       case Failure(ex) =>
         log.warning(ex, s"Failed to serialize response: $response")
+    }
+  }
+
+  private def writeTextMessageOrClose(
+      ws: ServerWsLike,
+      msg: String,
+      writeDescription: String
+  )(
+      onSuccess: => Unit,
+      onFailure: Throwable => Unit
+  )(implicit ec: ExecutionContext): Unit = {
+    if (!ws.isClosed) {
+      val wsId = ws.textHandlerID()
+      if (ws.writeQueueFull) {
+        log.warning(
+          s"WebSocket connection $wsId $writeDescription write queue is full, closing."
+        )
+        closeAndDisconnect(wsId, ws)
+      } else {
+        val _ = ws.writeTextMessage(msg).onComplete {
+          case Success(_)  => onSuccess
+          case Failure(ex) => onFailure(ex)
+        }
+      }
     }
   }
 
@@ -348,6 +387,7 @@ class WsSubscriptionHandler(
   private def connect(ws: ServerWsLike): Unit = {
     releaseOldestPendingConnection()
     missedPongs.update(ws.textHandlerID(), 0)
+    ws.setWriteQueueMaxSize(effectiveMaxWriteQueueSize)
     ws.closeHandler(() => {
       log.debug(s"WebSocket connection closed: ${ws.textHandlerID()}")
       self ! Disconnect(ws.textHandlerID())
@@ -403,32 +443,33 @@ class WsSubscriptionHandler(
       id: WsCorrelationId,
       ws: ServerWsLike,
       subscriptionId: WsSubscriptionId
-  )(implicit ec: ExecutionContext): io.vertx.core.Handler[Message[String]] = {
+  ): io.vertx.core.Handler[Message[String]] = {
     new io.vertx.core.Handler[Message[String]] {
       override def handle(message: Message[String]): Unit = {
         if (!ws.isClosed) {
-          ws.writeTextMessage(message.body()).onComplete {
-            case Success(_) => // Success
-            case Failure(ex) =>
-              if (!ws.isClosed) {
-                log.debug(
-                  s"Notification failed but connection still open, retrying: ${ex.getMessage}"
-                )
-                self ! NotificationFailed(
-                  id,
-                  ws,
-                  subscriptionId,
-                  message.body(),
-                  ex.getMessage
-                )
-              } else {
-                log.debug(s"Notification failed due to closed connection, triggering cleanup")
-                self ! Disconnect(ws.textHandlerID())
-              }
-          }
+          self ! SendNotification(id, ws, subscriptionId, message.body())
         }
       }
     }
+  }
+
+  private def sendNotification(
+      id: WsCorrelationId,
+      ws: ServerWsLike,
+      subscriptionId: WsSubscriptionId,
+      msg: String
+  ): Unit = {
+    writeTextMessageOrClose(ws, msg, "notification")(
+      (),
+      ex =>
+        if (!ws.isClosed) {
+          log.debug(s"Notification failed but connection still open, retrying: ${ex.getMessage}")
+          self ! NotificationFailed(id, ws, subscriptionId, msg, ex.getMessage)
+        } else {
+          log.debug("Notification failed due to closed connection, triggering cleanup")
+          self ! Disconnect(ws.textHandlerID())
+        }
+    )
   }
 
   private def validateSubscription(

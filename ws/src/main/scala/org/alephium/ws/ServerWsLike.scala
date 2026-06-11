@@ -29,6 +29,8 @@ trait ServerWsLike {
   def closeHandler(handler: () => Unit): ServerWsLike
   def textMessageHandler(handler: String => Unit): ServerWsLike
   def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike
+  def setWriteQueueMaxSize(maxSize: Int): ServerWsLike
+  def writeQueueFull: Boolean
   def writeTextMessage(msg: String): Future[Unit]
   def writePing(data: Buffer): Future[Unit]
   def close(): Future[Unit]

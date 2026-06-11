@@ -163,6 +163,7 @@ trait WsClientServerFixture
   protected def maxServerConnections: Int   = 10
   protected def maxClientConnections: Int   = 500
   protected def maxRequestsPerSecond: Int   = config.network.ws.maxRequestsPerSecond
+  protected def maxWriteQueueSize: Int      = config.network.ws.maxWriteQueueSize
   protected def keepAliveInterval: Duration = Duration.ofSecondsUnsafe(10)
 
   val httpService = new org.alephium.http.HttpService(wsOptions)(executionContext)
@@ -175,6 +176,7 @@ trait WsClientServerFixture
         maxServerConnections,
         apiConfig.apiKey,
         maxRequestsPerSecond,
+        maxWriteQueueSize,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         keepAliveInterval
@@ -256,6 +258,8 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
     override def closeHandler(handler: () => Unit): ServerWsLike             = this
     override def textMessageHandler(handler: String => Unit): ServerWsLike   = this
     override def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike = this
+    override def setWriteQueueMaxSize(maxSize: Int): ServerWsLike            = this
+    override def writeQueueFull: Boolean                                     = false
     override def writeTextMessage(msg: String): Future[Unit]                 = Future.successful(())
     override def writePing(data: Buffer): Future[Unit]                       = Future.successful(())
     override def close(): Future[Unit]                                       = Future.successful(())

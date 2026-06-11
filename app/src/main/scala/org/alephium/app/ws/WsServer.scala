@@ -43,6 +43,7 @@ final class WsServer(
     maxConnections: Int,
     apiKeys: AVector[ApiKey],
     maxRequestsPerSecond: Int,
+    maxWriteQueueSize: Int,
     maxSubscriptionsPerConnection: Int,
     maxContractEventAddresses: Int,
     pingFrequency: Duration
@@ -62,6 +63,7 @@ final class WsServer(
       maxConnections,
       apiKeys,
       maxRequestsPerSecond,
+      maxWriteQueueSize,
       maxSubscriptionsPerConnection,
       maxContractEventAddresses,
       FiniteDuration(pingFrequency.millis, TimeUnit.MILLISECONDS)
@@ -109,6 +111,14 @@ final case class ServerWs(underlying: ServerWebSocket) extends ServerWsLike {
     underlying.frameHandler((msg: WebSocketFrame) => handler(msg))
     this
   }
+
+  def setWriteQueueMaxSize(maxSize: Int): ServerWs = {
+    underlying.setWriteQueueMaxSize(maxSize)
+    this
+  }
+
+  def writeQueueFull: Boolean =
+    underlying.writeQueueFull()
 
   def writeTextMessage(msg: String): Future[Unit] =
     underlying.writeTextMessage(msg).asScala.mapTo[Unit]

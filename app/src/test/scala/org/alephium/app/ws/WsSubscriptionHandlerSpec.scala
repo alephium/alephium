@@ -17,6 +17,7 @@
 package org.alephium.app.ws
 
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -152,6 +153,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       }
       override def textMessageHandler(handler: String => Unit): ServerWsLike   = this
       override def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike = this
+      override def setWriteQueueMaxSize(maxSize: Int): ServerWsLike            = this
+      override def writeQueueFull: Boolean                                     = false
       override def writeTextMessage(msg: String): Future[Unit]                 = Future.successful(())
       override def writePing(data: Buffer): Future[Unit]                       = Future.successful(())
       override def close(): Future[Unit] = {
@@ -168,6 +171,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         config.network.ws.maxConnections,
         AVector.empty,
         config.network.ws.maxRequestsPerSecond,
+        config.network.ws.maxWriteQueueSize,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(20, TimeUnit.MILLISECONDS)
@@ -205,6 +209,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         this
       }
       override def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike = this
+      override def setWriteQueueMaxSize(maxSize: Int): ServerWsLike            = this
+      override def writeQueueFull: Boolean                                     = false
       override def writeTextMessage(msg: String): Future[Unit]                 = Future.successful(())
       override def writePing(data: Buffer): Future[Unit]                       = Future.successful(())
       override def close(): Future[Unit] = {
@@ -228,6 +234,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         config.network.ws.maxConnections,
         AVector.empty,
         2,
+        config.network.ws.maxWriteQueueSize,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
@@ -244,6 +251,80 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
 
     eventually {
       ws.closed is true
+    }
+  }
+
+  it should "disconnect websocket clients with full write queues" in new WsSubscriptionFixture
+    with Eventually {
+    final class BackpressuredServerWs(id: String) extends ServerWsLike {
+      @volatile var closed: Boolean = false
+      @volatile var textHandler: Option[String => Unit] = None
+      @volatile var writeQueueMaxSize: Option[Int] = None
+      val writes: AtomicInteger = new AtomicInteger(0)
+      private var onClose: () => Unit = () => ()
+
+      override def textHandlerID(): WsParams.WsId = id
+      override def isClosed: Boolean              = closed
+      override def closeHandler(handler: () => Unit): ServerWsLike = {
+        onClose = handler
+        this
+      }
+      override def textMessageHandler(handler: String => Unit): ServerWsLike = {
+        textHandler = Some(handler)
+        this
+      }
+      override def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike = this
+      override def setWriteQueueMaxSize(maxSize: Int): ServerWsLike = {
+        writeQueueMaxSize = Some(maxSize)
+        this
+      }
+      override def writeQueueFull: Boolean = true
+      override def writeTextMessage(msg: String): Future[Unit] = {
+        writes.incrementAndGet()
+        Future.successful(())
+      }
+      override def writePing(data: Buffer): Future[Unit] = Future.successful(())
+      override def close(): Future[Unit] = {
+        closed = true
+        onClose()
+        Future.successful(())
+      }
+
+      def sendText(message: String): Unit = {
+        textHandler match {
+          case Some(handler) => handler(message)
+          case None          => fail("Expected text handler to be registered")
+        }
+      }
+    }
+
+    val subscriptionHandler =
+      WsSubscriptionHandler.apply(
+        Vertx.vertx(),
+        system,
+        config.network.ws.maxConnections,
+        AVector.empty,
+        config.network.ws.maxRequestsPerSecond,
+        config.network.ws.maxWriteQueueSize,
+        config.network.ws.maxSubscriptionsPerConnection,
+        config.network.ws.maxContractEventAddresses,
+        FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
+      )
+    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
+
+    val ws = new BackpressuredServerWs("backpressured")
+    subscriptionHandler ! Connect(ws)
+
+    eventually {
+      ws.textHandler.nonEmpty is true
+      ws.writeQueueMaxSize is Some(config.network.ws.maxWriteQueueSize)
+    }
+    ws.sendText("invalid_msg")
+
+    eventually {
+      ws.closed is true
+      ws.writes.get() is 0
+      assertNotConnected(ws.textHandlerID(), subscriptionHandler)
     }
   }
 
@@ -526,6 +607,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         config.network.ws.maxConnections,
         AVector.empty,
         config.network.ws.maxRequestsPerSecond,
+        config.network.ws.maxWriteQueueSize,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
@@ -627,6 +709,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         config.network.ws.maxConnections,
         AVector.empty,
         config.network.ws.maxRequestsPerSecond,
+        config.network.ws.maxWriteQueueSize,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
