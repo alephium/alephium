@@ -42,6 +42,7 @@ final class WsServer(
     node: Node,
     maxConnections: Int,
     apiKeys: AVector[ApiKey],
+    maxRequestsPerSecond: Int,
     maxSubscriptionsPerConnection: Int,
     maxContractEventAddresses: Int,
     pingFrequency: Duration
@@ -60,6 +61,7 @@ final class WsServer(
       system,
       maxConnections,
       apiKeys,
+      maxRequestsPerSecond,
       maxSubscriptionsPerConnection,
       maxContractEventAddresses,
       FiniteDuration(pingFrequency.millis, TimeUnit.MILLISECONDS)

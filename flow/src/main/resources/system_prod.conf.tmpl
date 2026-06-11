@@ -25,6 +25,7 @@ alephium {
     ws {
       enabled = false
       max-connections = 100
+      max-requests-per-second = 100
       max-frame-size = 16384 // increase with max-contract-event-addresses
       # Each websocket client connection is limited by number of subscriptions
       max-subscriptions-per-connection = 50

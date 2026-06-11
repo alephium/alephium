@@ -45,6 +45,7 @@ object WsSubscriptionHandler {
       system: ActorSystem,
       maxConnections: Int,
       apiKeys: AVector[ApiKey],
+      maxRequestsPerSecond: Int,
       maxSubscriptionsPerConnection: Int,
       maxContractEventAddresses: Int,
       pingFrequency: FiniteDuration
@@ -57,6 +58,7 @@ object WsSubscriptionHandler {
             vertx,
             maxConnections,
             apiKeys,
+            maxRequestsPerSecond,
             maxSubscriptionsPerConnection,
             maxContractEventAddresses,
             pingFrequency
@@ -110,6 +112,7 @@ object WsSubscriptionHandler {
   ) extends CommandResponse
 
   final case class Disconnect(id: WsId) extends Command
+  final private case class IncomingMessage(ws: ServerWsLike, msg: String) extends Command
   final private case class PongReceived(id: WsId) extends Command
   final private case class ReleasePendingConnection(id: Long) extends Command
 
@@ -117,6 +120,7 @@ object WsSubscriptionHandler {
 
   val ApiKeyHeader: String = "X-API-KEY"
   private val MaxMissedPongs: Int = 2
+  private val RequestRateWindowMillis: Long = 1000L
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -124,6 +128,7 @@ class WsSubscriptionHandler(
     vertx: Vertx,
     maxConnections: Int,
     apiKeys: AVector[ApiKey],
+    maxRequestsPerSecond: Int,
     maxSubscriptionsPerConnection: Int,
     maxContractEventAddresses: Int,
     pingFrequency: FiniteDuration
@@ -133,9 +138,11 @@ class WsSubscriptionHandler(
 
   import org.alephium.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
+  private val effectiveMaxRequestsPerSecond: Int   = math.max(1, maxRequestsPerSecond)
 
   private val openedWsConnections = mutable.Map.empty[WsId, ServerWsLike]
   private val missedPongs         = mutable.Map.empty[WsId, Int]
+  private val requestRates        = mutable.Map.empty[WsId, RequestRate]
   private val pendingWsConnections = mutable.LinkedHashSet.empty[Long]
   private var nextPendingConnectionId: Long = 0L
 
@@ -178,6 +185,8 @@ class WsSubscriptionHandler(
       openedWsConnections.foreachEntry(keepAlive)
     case Handshake(hs) => handshake(hs)
     case Connect(ws)   => connect(ws)
+    case IncomingMessage(ws, msg) =>
+      handleMessage(ws, msg)
     case Subscribe(id, ws, params) =>
       subscribe(id, ws, params)
     case Unsubscribe(id, ws, subscriptionId) =>
@@ -195,6 +204,7 @@ class WsSubscriptionHandler(
     case Disconnect(id) =>
       val _         = openedWsConnections.remove(id)
       val _         = missedPongs.remove(id)
+      val _         = requestRates.remove(id)
       val customers = subscriptionsState.getConsumers(id)
       subscriptionsState.removeAllSubscriptions(id)
       Future
@@ -235,6 +245,8 @@ class WsSubscriptionHandler(
       .publish(params.subscription.toHexString, asJsonRpcNotification(params).render())
     ()
   }
+
+  private case class RequestRate(windowStartMillis: Long, count: Int)
 
   private def keepAlive(wsId: WsId, ws: ServerWsLike): Unit = {
     if (ws.isClosed) {
@@ -343,7 +355,7 @@ class WsSubscriptionHandler(
     ws.frameHandler(frame =>
       if (frame.`type`() == WebSocketFrameType.PONG) self ! PongReceived(ws.textHandlerID())
     )
-    ws.textMessageHandler(msg => handleMessage(ws, msg))
+    ws.textMessageHandler(msg => self ! IncomingMessage(ws, msg))
     openedWsConnections.put(ws.textHandlerID(), ws)
     log.debug(
       s"WebSocket connected: ${ws.textHandlerID()}, total connections: ${openedWsConnections.size}"
@@ -352,13 +364,38 @@ class WsSubscriptionHandler(
   }
 
   private def handleMessage(ws: ServerWsLike, msg: String): Unit = {
-    WsRequest.fromJsonString(msg, maxContractEventAddresses) match {
-      case Right(WsRequest(id, UnsubscribeParams(subscriptionId))) =>
-        val _ = self ! Unsubscribe(id, ws, subscriptionId)
-      case Right(WsRequest(id, params: WsSubscriptionParams)) =>
-        val _ = self ! Subscribe(id, ws, params)
-      case Left(failure) =>
-        val _ = self ! RequestRejected(ws, failure)
+    if (allowRequest(ws.textHandlerID())) {
+      WsRequest.fromJsonString(msg, maxContractEventAddresses) match {
+        case Right(WsRequest(id, UnsubscribeParams(subscriptionId))) =>
+          val _ = self ! Unsubscribe(id, ws, subscriptionId)
+        case Right(WsRequest(id, params: WsSubscriptionParams)) =>
+          val _ = self ! Subscribe(id, ws, params)
+        case Left(failure) =>
+          val _ = self ! RequestRejected(ws, failure)
+      }
+    } else {
+      log.warning(
+        s"WebSocket connection ${ws.textHandlerID()} exceeded " +
+          s"$effectiveMaxRequestsPerSecond requests per second, closing."
+      )
+      closeAndDisconnect(ws.textHandlerID(), ws)
+    }
+  }
+
+  private def allowRequest(wsId: WsId): Boolean = {
+    val now = System.currentTimeMillis()
+    requestRates.get(wsId) match {
+      case Some(RequestRate(windowStartMillis, count))
+          if now - windowStartMillis < RequestRateWindowMillis =>
+        if (count >= effectiveMaxRequestsPerSecond) {
+          false
+        } else {
+          requestRates.update(wsId, RequestRate(windowStartMillis, count + 1))
+          true
+        }
+      case _ =>
+        requestRates.update(wsId, RequestRate(now, 1))
+        true
     }
   }
 

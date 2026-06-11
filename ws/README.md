@@ -28,6 +28,7 @@ Default network settings:
 alephium.network.ws {
   enabled = false
   max-connections = 100
+  max-requests-per-second = 100
   max-frame-size = 16384
   max-subscriptions-per-connection = 50
   max-contract-event-addresses = 100
@@ -203,6 +204,7 @@ $ wscat --show-ping-pong -c ws://localhost:22973/ws
 The WebSocket API includes protection against various attack vectors:
 
 - **Connection flooding**: Limited by `alephium.network.ws.max-connections`
+- **Request flooding**: Limited by `alephium.network.ws.max-requests-per-second`
 - **Subscription flooding**: Limited by `alephium.network.ws.max-subscriptions-per-connection`
 - **Contract address flooding**: Limited by `alephium.network.ws.max-contract-event-addresses`
 - **Large payload flooding**: Limited by `alephium.network.ws.max-frame-size`

@@ -167,6 +167,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         system,
         config.network.ws.maxConnections,
         AVector.empty,
+        config.network.ws.maxRequestsPerSecond,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(20, TimeUnit.MILLISECONDS)
@@ -183,6 +184,66 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     eventually {
       ws.closed is true
       assertNotConnected(ws.textHandlerID(), subscriptionHandler)
+    }
+  }
+
+  it should "disconnect websocket clients that exceed request rate limit" in new WsSubscriptionFixture
+    with Eventually {
+    final class CapturingServerWs(id: String) extends ServerWsLike {
+      @volatile var closed: Boolean = false
+      @volatile var textHandler: Option[String => Unit] = None
+      private var onClose: () => Unit = () => ()
+
+      override def textHandlerID(): WsParams.WsId = id
+      override def isClosed: Boolean              = closed
+      override def closeHandler(handler: () => Unit): ServerWsLike = {
+        onClose = handler
+        this
+      }
+      override def textMessageHandler(handler: String => Unit): ServerWsLike = {
+        textHandler = Some(handler)
+        this
+      }
+      override def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike = this
+      override def writeTextMessage(msg: String): Future[Unit]                 = Future.successful(())
+      override def writePing(data: Buffer): Future[Unit]                       = Future.successful(())
+      override def close(): Future[Unit] = {
+        closed = true
+        onClose()
+        Future.successful(())
+      }
+
+      def sendText(message: String): Unit = {
+        textHandler match {
+          case Some(handler) => handler(message)
+          case None          => fail("Expected text handler to be registered")
+        }
+      }
+    }
+
+    val subscriptionHandler =
+      WsSubscriptionHandler.apply(
+        Vertx.vertx(),
+        system,
+        config.network.ws.maxConnections,
+        AVector.empty,
+        2,
+        config.network.ws.maxSubscriptionsPerConnection,
+        config.network.ws.maxContractEventAddresses,
+        FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
+      )
+    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
+
+    val ws = new CapturingServerWs("rate-limited")
+    subscriptionHandler ! Connect(ws)
+
+    eventually(ws.textHandler.nonEmpty is true)
+    AVector
+      .tabulate(3)(index => write(WsRequest.subscribe(corId(index.toLong), SimpleSubscribeParams.Tx)))
+      .foreach(ws.sendText)
+
+    eventually {
+      ws.closed is true
     }
   }
 
@@ -464,6 +525,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         system,
         config.network.ws.maxConnections,
         AVector.empty,
+        config.network.ws.maxRequestsPerSecond,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
@@ -564,6 +626,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         system,
         config.network.ws.maxConnections,
         AVector.empty,
+        config.network.ws.maxRequestsPerSecond,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)

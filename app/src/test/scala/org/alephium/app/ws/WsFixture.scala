@@ -162,6 +162,7 @@ trait WsClientServerFixture
 
   protected def maxServerConnections: Int   = 10
   protected def maxClientConnections: Int   = 500
+  protected def maxRequestsPerSecond: Int   = config.network.ws.maxRequestsPerSecond
   protected def keepAliveInterval: Duration = Duration.ofSecondsUnsafe(10)
 
   val httpService = new org.alephium.http.HttpService(wsOptions)(executionContext)
@@ -173,6 +174,7 @@ trait WsClientServerFixture
         node,
         maxServerConnections,
         apiConfig.apiKey,
+        maxRequestsPerSecond,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         keepAliveInterval

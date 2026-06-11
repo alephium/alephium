@@ -156,6 +156,7 @@ final case class MiningSetting(
 final case class WsConfig(
     enabled: Boolean,
     maxConnections: Int,
+    maxRequestsPerSecond: Int,
     maxFrameSize: Int,
     maxSubscriptionsPerConnection: Int,
     maxContractEventAddresses: Int,
