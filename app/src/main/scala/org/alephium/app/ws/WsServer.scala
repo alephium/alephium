@@ -28,10 +28,11 @@ import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.{ServerWebSocket, WebSocketFrame}
 
+import org.alephium.api.model.ApiKey
 import org.alephium.flow.client.Node
 import org.alephium.http.HttpService
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.util.{Duration, Service}
+import org.alephium.util.{AVector, Duration, Service}
 import org.alephium.ws._
 import org.alephium.ws.WsParams.WsId
 
@@ -40,6 +41,7 @@ final class WsServer(
     system: ActorSystem,
     node: Node,
     maxConnections: Int,
+    apiKeys: AVector[ApiKey],
     maxSubscriptionsPerConnection: Int,
     maxContractEventAddresses: Int,
     pingFrequency: Duration
@@ -57,6 +59,7 @@ final class WsServer(
       vertx,
       system,
       maxConnections,
+      apiKeys,
       maxSubscriptionsPerConnection,
       maxContractEventAddresses,
       FiniteDuration(pingFrequency.millis, TimeUnit.MILLISECONDS)

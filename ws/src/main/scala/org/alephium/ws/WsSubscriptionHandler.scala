@@ -28,6 +28,7 @@ import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.{Message, MessageConsumer}
 import io.vertx.core.http.ServerWebSocketHandshake
 
+import org.alephium.api.model.ApiKey
 import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.rpc.model.JsonRPC
@@ -43,6 +44,7 @@ object WsSubscriptionHandler {
       vertx: Vertx,
       system: ActorSystem,
       maxConnections: Int,
+      apiKeys: AVector[ApiKey],
       maxSubscriptionsPerConnection: Int,
       maxContractEventAddresses: Int,
       pingFrequency: FiniteDuration
@@ -54,6 +56,7 @@ object WsSubscriptionHandler {
           new WsSubscriptionHandler(
             vertx,
             maxConnections,
+            apiKeys,
             maxSubscriptionsPerConnection,
             maxContractEventAddresses,
             pingFrequency
@@ -109,12 +112,15 @@ object WsSubscriptionHandler {
   final case class Disconnect(id: WsId) extends Command
 
   private case object KeepAlive
+
+  val ApiKeyHeader: String = "X-API-KEY"
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
 class WsSubscriptionHandler(
     vertx: Vertx,
     maxConnections: Int,
+    apiKeys: AVector[ApiKey],
     maxSubscriptionsPerConnection: Int,
     maxContractEventAddresses: Int,
     pingFrequency: FiniteDuration
@@ -238,16 +244,29 @@ class WsSubscriptionHandler(
   private def handshake(handshake: ServerWebSocketHandshake): Unit = {
     discard {
       if (handshake.path().equals("/ws")) {
-        val connectionsCount = openedWsConnections.size
-        if (connectionsCount >= maxConnections) {
-          log.warning(s"WebSocket connections reached max limit $connectionsCount")
-          handshake.reject(HttpResponseStatus.SERVICE_UNAVAILABLE.code())
+        if (!isAuthorized(handshake)) {
+          handshake.reject(HttpResponseStatus.UNAUTHORIZED.code())
         } else {
-          handshake.accept()
+          val connectionsCount = openedWsConnections.size
+          if (connectionsCount >= maxConnections) {
+            log.warning(s"WebSocket connections reached max limit $connectionsCount")
+            handshake.reject(HttpResponseStatus.SERVICE_UNAVAILABLE.code())
+          } else {
+            handshake.accept()
+          }
         }
       } else {
         handshake.reject(HttpResponseStatus.BAD_REQUEST.code())
       }
+    }
+  }
+
+  private def isAuthorized(handshake: ServerWebSocketHandshake): Boolean = {
+    val apiKeyHeader = Option(handshake.headers().get(ApiKeyHeader))
+    if (apiKeys.isEmpty) {
+      apiKeyHeader.isEmpty
+    } else {
+      apiKeyHeader.exists(header => apiKeys.exists(_.value == header))
     }
   }
 

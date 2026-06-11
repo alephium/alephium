@@ -25,8 +25,14 @@ import scala.util.{Failure, Success, Try}
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
-import io.vertx.core.http.{WebSocket, WebSocketClient, WebSocketClientOptions}
+import io.vertx.core.http.{
+  WebSocket,
+  WebSocketClient,
+  WebSocketClientOptions,
+  WebSocketConnectOptions
+}
 
+import org.alephium.api.model.ApiKey
 import org.alephium.json.Json._
 import org.alephium.protocol.model.Address
 import org.alephium.rpc.model.JsonRPC
@@ -57,14 +63,20 @@ final case class WsClientFactory(underlying: WebSocketClient) {
   def connect(
       port: Int,
       host: String = "127.0.0.1",
-      uri: String = "/ws"
+      uri: String = "/ws",
+      apiKey: Option[ApiKey] = None
   )(
       notificationHandler: Notification => Unit
   )(
       keepAliveHandler: KeepAlive => Unit
   )(implicit ec: ExecutionContext): Future[WsClient] = {
+    val options = new WebSocketConnectOptions()
+      .setPort(port)
+      .setHost(host)
+      .setURI(uri)
+    apiKey.foreach(key => options.addHeader(WsSubscriptionHandler.ApiKeyHeader, key.value))
     underlying
-      .connect(port, host, uri)
+      .connect(options)
       .asScala
       .map(underlying => WsClient(underlying, notificationHandler, keepAliveHandler))
   }

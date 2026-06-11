@@ -413,6 +413,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         Vertx.vertx(),
         system,
         config.network.ws.maxConnections,
+        AVector.empty,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
@@ -512,6 +513,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         Vertx.vertx(),
         system,
         config.network.ws.maxConnections,
+        AVector.empty,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)

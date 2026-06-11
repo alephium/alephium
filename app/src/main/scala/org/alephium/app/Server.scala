@@ -95,6 +95,7 @@ trait Server extends Service {
         flowSystem,
         node,
         config.network.ws.maxConnections,
+        apiConfig.apiKey,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         config.network.ws.pingFrequency

@@ -172,6 +172,7 @@ trait WsClientServerFixture
         system,
         node,
         maxServerConnections,
+        apiConfig.apiKey,
         config.network.ws.maxSubscriptionsPerConnection,
         config.network.ws.maxContractEventAddresses,
         keepAliveInterval

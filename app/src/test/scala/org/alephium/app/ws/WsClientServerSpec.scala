@@ -24,6 +24,8 @@ import org.scalatest.Inside.inside
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.exceptions.TestFailedException
 
+import org.alephium.api.model.ApiKey
+import org.alephium.app.ApiConfig
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.rpc.model.JsonRPC
 import org.alephium.rpc.model.JsonRPC.Response
@@ -72,6 +74,30 @@ class WsClientServerSpec extends AlephiumSpec {
       wsClient.connect(wsPort, uri = "/wrong")(_ => ())(_ => ()).futureValue
     )
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
+      ws.isClosed is false
+    }
+  }
+
+  "WsServer" should "require API key when configured" in new WsClientServerFixture {
+    private val validApiKey = ApiKey.unsafe("a" * 64)
+    implicit override protected lazy val apiConfig: ApiConfig =
+      ApiConfig.load(newConfig).copy(apiKey = AVector(validApiKey))
+
+    wsClient
+      .connect(wsPort)(_ => ())(_ => ())
+      .failed
+      .futureValue
+      .getMessage
+      .contains("WebSocket upgrade failure") is true
+
+    wsClient
+      .connect(wsPort, apiKey = Some(ApiKey.unsafe("b" * 64)))(_ => ())(_ => ())
+      .failed
+      .futureValue
+      .getMessage
+      .contains("WebSocket upgrade failure") is true
+
+    testWsAndClose(wsClient.connect(wsPort, apiKey = Some(validApiKey))(_ => ())(_ => ())) { ws =>
       ws.isClosed is false
     }
   }
