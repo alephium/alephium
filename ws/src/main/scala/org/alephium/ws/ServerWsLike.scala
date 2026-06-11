@@ -31,4 +31,5 @@ trait ServerWsLike {
   def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike
   def writeTextMessage(msg: String): Future[Unit]
   def writePing(data: Buffer): Future[Unit]
+  def close(): Future[Unit]
 }

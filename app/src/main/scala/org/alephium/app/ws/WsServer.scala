@@ -113,4 +113,7 @@ final case class ServerWs(underlying: ServerWebSocket) extends ServerWsLike {
 
   def writePing(data: Buffer): Future[Unit] =
     underlying.writePing(data).asScala.mapTo[Unit]
+
+  def close(): Future[Unit] =
+    underlying.close().asScala.map(_ => ())(ExecutionContext.parasitic)
 }

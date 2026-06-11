@@ -24,6 +24,8 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import io.vertx.core.Vertx
+import io.vertx.core.buffer.Buffer
+import io.vertx.core.http.WebSocketFrame
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.scalatest.Inside.inside
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
@@ -134,6 +136,54 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       expectedSubscriptions = 0,
       openWebsocketsCount = 0
     )
+  }
+
+  it should "disconnect websocket clients that miss pong responses" in new WsSubscriptionFixture
+    with Eventually {
+    final class NonPongingServerWs(id: String) extends ServerWsLike {
+      @volatile var closed: Boolean = false
+      private var onClose: () => Unit = () => ()
+
+      override def textHandlerID(): WsParams.WsId = id
+      override def isClosed: Boolean              = closed
+      override def closeHandler(handler: () => Unit): ServerWsLike = {
+        onClose = handler
+        this
+      }
+      override def textMessageHandler(handler: String => Unit): ServerWsLike   = this
+      override def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike = this
+      override def writeTextMessage(msg: String): Future[Unit]                 = Future.successful(())
+      override def writePing(data: Buffer): Future[Unit]                       = Future.successful(())
+      override def close(): Future[Unit] = {
+        closed = true
+        onClose()
+        Future.successful(())
+      }
+    }
+
+    val subscriptionHandler =
+      WsSubscriptionHandler.apply(
+        Vertx.vertx(),
+        system,
+        config.network.ws.maxConnections,
+        AVector.empty,
+        config.network.ws.maxSubscriptionsPerConnection,
+        config.network.ws.maxContractEventAddresses,
+        FiniteDuration(20, TimeUnit.MILLISECONDS)
+      )
+    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
+
+    val ws = new NonPongingServerWs("stale")
+    subscriptionHandler ! Connect(ws)
+    subscriptionHandler ! Subscribe(corId(0), ws, SimpleSubscribeParams.Block)
+
+    eventually {
+      getSubscriptions(subscriptionHandler).connections.contains(ws.textHandlerID()) is true
+    }
+    eventually {
+      ws.closed is true
+      assertNotConnected(ws.textHandlerID(), subscriptionHandler)
+    }
   }
 
   it should "not allow for more subscriptions per ws client than limit" in new WsBehaviorFixture {

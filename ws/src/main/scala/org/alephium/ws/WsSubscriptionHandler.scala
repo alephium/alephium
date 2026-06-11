@@ -26,7 +26,7 @@ import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.{Message, MessageConsumer}
-import io.vertx.core.http.ServerWebSocketHandshake
+import io.vertx.core.http.{ServerWebSocketHandshake, WebSocketFrameType}
 
 import org.alephium.api.model.ApiKey
 import org.alephium.json.Json._
@@ -110,11 +110,13 @@ object WsSubscriptionHandler {
   ) extends CommandResponse
 
   final case class Disconnect(id: WsId) extends Command
+  final private case class PongReceived(id: WsId) extends Command
   final private case class ReleasePendingConnection(id: Long) extends Command
 
   private case object KeepAlive
 
   val ApiKeyHeader: String = "X-API-KEY"
+  private val MaxMissedPongs: Int = 2
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -133,6 +135,7 @@ class WsSubscriptionHandler(
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
 
   private val openedWsConnections = mutable.Map.empty[WsId, ServerWsLike]
+  private val missedPongs         = mutable.Map.empty[WsId, Int]
   private val pendingWsConnections = mutable.LinkedHashSet.empty[Long]
   private var nextPendingConnectionId: Long = 0L
 
@@ -172,9 +175,7 @@ class WsSubscriptionHandler(
   // scalastyle:off cyclomatic.complexity method.length
   override def receive: Receive = {
     case KeepAlive =>
-      openedWsConnections.foreachEntry { case (wsId, ws) =>
-        if (ws.isClosed) self ! Disconnect(wsId) else ws.writePing(Buffer.buffer("ping"))
-      }
+      openedWsConnections.foreachEntry(keepAlive)
     case Handshake(hs) => handshake(hs)
     case Connect(ws)   => connect(ws)
     case Subscribe(id, ws, params) =>
@@ -193,6 +194,7 @@ class WsSubscriptionHandler(
       }
     case Disconnect(id) =>
       val _         = openedWsConnections.remove(id)
+      val _         = missedPongs.remove(id)
       val customers = subscriptionsState.getConsumers(id)
       subscriptionsState.removeAllSubscriptions(id)
       Future
@@ -201,6 +203,10 @@ class WsSubscriptionHandler(
           case Success(_)  =>
           case Failure(ex) => log.warning(ex, "Unregistering consumer failed.")
         }
+    case PongReceived(id) =>
+      if (openedWsConnections.contains(id)) {
+        missedPongs.update(id, 0)
+      }
     case ReleasePendingConnection(id) =>
       pendingWsConnections.remove(id)
       ()
@@ -227,6 +233,35 @@ class WsSubscriptionHandler(
     vertx
       .eventBus()
       .publish(params.subscription.toHexString, asJsonRpcNotification(params).render())
+    ()
+  }
+
+  private def keepAlive(wsId: WsId, ws: ServerWsLike): Unit = {
+    if (ws.isClosed) {
+      self ! Disconnect(wsId)
+    } else {
+      val missed = missedPongs.getOrElse(wsId, 0)
+      if (missed >= MaxMissedPongs) {
+        log.warning(s"WebSocket connection $wsId missed $missed pong responses, closing.")
+        closeAndDisconnect(wsId, ws)
+      } else {
+        missedPongs.update(wsId, missed + 1)
+        val _ = ws.writePing(Buffer.buffer("ping")).failed.foreach { ex =>
+          log.debug(s"Failed to send ping to WebSocket connection $wsId: ${ex.getMessage}")
+          closeAndDisconnect(wsId, ws)
+        }
+      }
+    }
+  }
+
+  private def closeAndDisconnect(wsId: WsId, ws: ServerWsLike): Unit = {
+    if (!ws.isClosed) {
+      val _ = ws.close().recover { case ex: Throwable =>
+        log.debug(s"Failed to close WebSocket connection $wsId: ${ex.getMessage}")
+        ()
+      }(context.dispatcher)
+    }
+    self ! Disconnect(wsId)
     ()
   }
 
@@ -300,10 +335,14 @@ class WsSubscriptionHandler(
 
   private def connect(ws: ServerWsLike): Unit = {
     releaseOldestPendingConnection()
+    missedPongs.update(ws.textHandlerID(), 0)
     ws.closeHandler(() => {
       log.debug(s"WebSocket connection closed: ${ws.textHandlerID()}")
       self ! Disconnect(ws.textHandlerID())
     })
+    ws.frameHandler(frame =>
+      if (frame.`type`() == WebSocketFrameType.PONG) self ! PongReceived(ws.textHandlerID())
+    )
     ws.textMessageHandler(msg => handleMessage(ws, msg))
     openedWsConnections.put(ws.textHandlerID(), ws)
     log.debug(
