@@ -40,6 +40,7 @@ import org.alephium.ws.WsUtils._
 
 object WsSubscriptionHandler {
 
+  // scalastyle:off parameter.number
   def apply(
       vertx: Vertx,
       system: ActorSystem,
@@ -51,6 +52,7 @@ object WsSubscriptionHandler {
       maxContractEventAddresses: Int,
       pingFrequency: FiniteDuration
   )(implicit groupConfig: GroupConfig): ActorRefT[SubscriptionMsg] = {
+    // scalastyle:on parameter.number
     ActorRefT
       .build[WsSubscriptionHandler.SubscriptionMsg](
         system,
@@ -119,15 +121,15 @@ object WsSubscriptionHandler {
       response: JsonRPC.Response.Failure
   ) extends CommandResponse
 
-  final case class Disconnect(id: WsId) extends Command
+  final case class Disconnect(id: WsId)                                   extends Command
   final private case class IncomingMessage(ws: ServerWsLike, msg: String) extends Command
-  final private case class PongReceived(id: WsId) extends Command
-  final private case class ReleasePendingConnection(id: Long) extends Command
+  final private case class PongReceived(id: WsId)                         extends Command
+  final private case class ReleasePendingConnection(id: Long)             extends Command
 
   private case object KeepAlive
 
-  val ApiKeyHeader: String = "X-API-KEY"
-  private val MaxMissedPongs: Int = 2
+  val ApiKeyHeader: String                  = "X-API-KEY"
+  private val MaxMissedPongs: Int           = 2
   private val RequestRateWindowMillis: Long = 1000L
 }
 
@@ -147,13 +149,13 @@ class WsSubscriptionHandler(
 
   import org.alephium.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
-  private val effectiveMaxRequestsPerSecond: Int   = math.max(1, maxRequestsPerSecond)
-  private val effectiveMaxWriteQueueSize: Int      = math.max(1, maxWriteQueueSize)
+  private val effectiveMaxRequestsPerSecond: Int    = math.max(1, maxRequestsPerSecond)
+  private val effectiveMaxWriteQueueSize: Int       = math.max(1, maxWriteQueueSize)
 
-  private val openedWsConnections = mutable.Map.empty[WsId, ServerWsLike]
-  private val missedPongs         = mutable.Map.empty[WsId, Int]
-  private val requestRates        = mutable.Map.empty[WsId, RequestRate]
-  private val pendingWsConnections = mutable.LinkedHashSet.empty[Long]
+  private val openedWsConnections           = mutable.Map.empty[WsId, ServerWsLike]
+  private val missedPongs                   = mutable.Map.empty[WsId, Int]
+  private val requestRates                  = mutable.Map.empty[WsId, RequestRate]
+  private val pendingWsConnections          = mutable.LinkedHashSet.empty[Long]
   private var nextPendingConnectionId: Long = 0L
 
   private val subscriptionsState = WsSubscriptionsState.empty[MessageConsumer[String]]()
@@ -283,10 +285,12 @@ class WsSubscriptionHandler(
 
   private def closeAndDisconnect(wsId: WsId, ws: ServerWsLike): Unit = {
     if (!ws.isClosed) {
-      val _ = ws.close().recover { case ex: Throwable =>
-        log.debug(s"Failed to close WebSocket connection $wsId: ${ex.getMessage}")
-        ()
-      }(context.dispatcher)
+      val _ = ws
+        .close()
+        .recover { case ex: Throwable =>
+          log.debug(s"Failed to close WebSocket connection $wsId: ${ex.getMessage}")
+          ()
+        }(context.dispatcher)
     }
     self ! Disconnect(wsId)
     ()

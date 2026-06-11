@@ -142,7 +142,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
   it should "disconnect websocket clients that miss pong responses" in new WsSubscriptionFixture
     with Eventually {
     final class NonPongingServerWs(id: String) extends ServerWsLike {
-      @volatile var closed: Boolean = false
+      @volatile var closed: Boolean   = false
       private var onClose: () => Unit = () => ()
 
       override def textHandlerID(): WsParams.WsId = id
@@ -155,8 +155,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       override def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike = this
       override def setWriteQueueMaxSize(maxSize: Int): ServerWsLike            = this
       override def writeQueueFull: Boolean                                     = false
-      override def writeTextMessage(msg: String): Future[Unit]                 = Future.successful(())
-      override def writePing(data: Buffer): Future[Unit]                       = Future.successful(())
+      override def writeTextMessage(msg: String): Future[Unit] = Future.successful(())
+      override def writePing(data: Buffer): Future[Unit]       = Future.successful(())
       override def close(): Future[Unit] = {
         closed = true
         onClose()
@@ -194,9 +194,9 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
   it should "disconnect websocket clients that exceed request rate limit" in new WsSubscriptionFixture
     with Eventually {
     final class CapturingServerWs(id: String) extends ServerWsLike {
-      @volatile var closed: Boolean = false
+      @volatile var closed: Boolean                     = false
       @volatile var textHandler: Option[String => Unit] = None
-      private var onClose: () => Unit = () => ()
+      private var onClose: () => Unit                   = () => ()
 
       override def textHandlerID(): WsParams.WsId = id
       override def isClosed: Boolean              = closed
@@ -211,8 +211,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       override def frameHandler(handler: WebSocketFrame => Unit): ServerWsLike = this
       override def setWriteQueueMaxSize(maxSize: Int): ServerWsLike            = this
       override def writeQueueFull: Boolean                                     = false
-      override def writeTextMessage(msg: String): Future[Unit]                 = Future.successful(())
-      override def writePing(data: Buffer): Future[Unit]                       = Future.successful(())
+      override def writeTextMessage(msg: String): Future[Unit] = Future.successful(())
+      override def writePing(data: Buffer): Future[Unit]       = Future.successful(())
       override def close(): Future[Unit] = {
         closed = true
         onClose()
@@ -246,7 +246,9 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
 
     eventually(ws.textHandler.nonEmpty is true)
     AVector
-      .tabulate(3)(index => write(WsRequest.subscribe(corId(index.toLong), SimpleSubscribeParams.Tx)))
+      .tabulate(3)(index =>
+        write(WsRequest.subscribe(corId(index.toLong), SimpleSubscribeParams.Tx))
+      )
       .foreach(ws.sendText)
 
     eventually {
@@ -257,11 +259,11 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
   it should "disconnect websocket clients with full write queues" in new WsSubscriptionFixture
     with Eventually {
     final class BackpressuredServerWs(id: String) extends ServerWsLike {
-      @volatile var closed: Boolean = false
+      @volatile var closed: Boolean                     = false
       @volatile var textHandler: Option[String => Unit] = None
-      @volatile var writeQueueMaxSize: Option[Int] = None
-      val writes: AtomicInteger = new AtomicInteger(0)
-      private var onClose: () => Unit = () => ()
+      @volatile var writeQueueMaxSize: Option[Int]      = None
+      val writes: AtomicInteger                         = new AtomicInteger(0)
+      private var onClose: () => Unit                   = () => ()
 
       override def textHandlerID(): WsParams.WsId = id
       override def isClosed: Boolean              = closed
