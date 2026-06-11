@@ -110,6 +110,7 @@ object WsSubscriptionHandler {
   ) extends CommandResponse
 
   final case class Disconnect(id: WsId) extends Command
+  final private case class ReleasePendingConnection(id: Long) extends Command
 
   private case object KeepAlive
 
@@ -132,6 +133,8 @@ class WsSubscriptionHandler(
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
 
   private val openedWsConnections = mutable.Map.empty[WsId, ServerWsLike]
+  private val pendingWsConnections = mutable.LinkedHashSet.empty[Long]
+  private var nextPendingConnectionId: Long = 0L
 
   private val subscriptionsState = WsSubscriptionsState.empty[MessageConsumer[String]]()
 
@@ -198,6 +201,9 @@ class WsSubscriptionHandler(
           case Success(_)  =>
           case Failure(ex) => log.warning(ex, "Unregistering consumer failed.")
         }
+    case ReleasePendingConnection(id) =>
+      pendingWsConnections.remove(id)
+      ()
     case GetSubscriptions =>
       sender() ! WsImmutableSubscriptions(
         subscriptionsState.connections.toMap,
@@ -247,18 +253,40 @@ class WsSubscriptionHandler(
         if (!isAuthorized(handshake)) {
           handshake.reject(HttpResponseStatus.UNAUTHORIZED.code())
         } else {
-          val connectionsCount = openedWsConnections.size
+          val connectionsCount = openedWsConnections.size + pendingWsConnections.size
           if (connectionsCount >= maxConnections) {
             log.warning(s"WebSocket connections reached max limit $connectionsCount")
             handshake.reject(HttpResponseStatus.SERVICE_UNAVAILABLE.code())
           } else {
-            handshake.accept()
+            val pendingConnectionId = reservePendingConnection()
+            val _ = handshake
+              .accept()
+              .asScala
+              .failed
+              .foreach(_ => self ! ReleasePendingConnection(pendingConnectionId))
+            val _ = context.system.scheduler.scheduleOnce(
+              pingFrequency,
+              self,
+              ReleasePendingConnection(pendingConnectionId)
+            )
           }
         }
       } else {
         handshake.reject(HttpResponseStatus.BAD_REQUEST.code())
       }
     }
+  }
+
+  private def reservePendingConnection(): Long = {
+    val id = nextPendingConnectionId
+    nextPendingConnectionId += 1
+    pendingWsConnections.add(id)
+    id
+  }
+
+  private def releaseOldestPendingConnection(): Unit = {
+    pendingWsConnections.headOption.foreach(pendingWsConnections.remove)
+    ()
   }
 
   private def isAuthorized(handshake: ServerWebSocketHandshake): Boolean = {
@@ -271,6 +299,7 @@ class WsSubscriptionHandler(
   }
 
   private def connect(ws: ServerWsLike): Unit = {
+    releaseOldestPendingConnection()
     ws.closeHandler(() => {
       log.debug(s"WebSocket connection closed: ${ws.textHandlerID()}")
       self ! Disconnect(ws.textHandlerID())

@@ -102,6 +102,25 @@ class WsClientServerSpec extends AlephiumSpec {
     }
   }
 
+  "WsServer" should "enforce connection limit during concurrent handshakes" in new WsClientServerFixture {
+    override def maxServerConnections: Int = 1
+
+    val connectionAttempts =
+      AVector
+        .fill(20)(wsClient.connect(wsPort)(_ => ())(_ => ()).map(Some(_)).recover { case _ =>
+          None
+        })
+        .toIterable
+    val connected = Future.sequence(connectionAttempts).futureValue.flatten
+
+    try {
+      connected.size is 1
+    } finally {
+      Future.sequence(connected.map(_.close())).futureValue
+      ()
+    }
+  }
+
   "WsServer" should "initialize subscription and event handler" in new WsClientServerFixture {
     eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
     eventually(testEventHandlerInitialized(eventHandler))
