@@ -24,7 +24,6 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
-import io.vertx.core.eventbus.{EventBus => VertxEventBus}
 import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
@@ -51,8 +50,7 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
   implicit val askTimeout: Timeout          = Timeout(apiConfig.askTimeout.asScala)
   lazy val blockflowFetchMaxAge             = apiConfig.blockflowFetchMaxAge
 
-  private val vertx         = Vertx.vertx()
-  private val vertxEventBus = vertx.eventBus()
+  private val vertx = Vertx.vertx()
   private val server = {
     val options = new HttpServerOptions()
       .setMaxWebSocketFrameSize(1024 * 1024)
@@ -60,7 +58,7 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
     vertx.createHttpServer(options)
   }
 
-  val eventHandler: ActorRef = system.actorOf(EventHandler.props(vertxEventBus))
+  val eventHandler: ActorRef = system.actorOf(EventHandler.props(vertx))
 
   node.eventBus.tell(EventBus.Subscribe, eventHandler)
 
@@ -69,19 +67,14 @@ class WebSocketServer(node: Node, wsPort: Int)(implicit
       if (!handshake.path().equals("/events")) {
         handshake.reject();
       } else {
-        handshake.accept().map { (webSocket: ServerWebSocket) =>
-          eventHandler ! EventHandler.Subscribe(webSocket.textHandlerID())
-        }
+        handshake.accept()
       }
     }
   }
 
   server.webSocketHandler { webSocket =>
-    discard(
-      webSocket.closeHandler(_ =>
-        eventHandler ! EventHandler.Unsubscribe(webSocket.textHandlerID())
-      )
-    )
+    eventHandler ! EventHandler.Subscribe(webSocket)
+    discard(webSocket.closeHandler(_ => eventHandler ! EventHandler.Unsubscribe(webSocket)))
   }
 
   private val wsBindingPromise: Promise[HttpServer] = Promise()
@@ -122,20 +115,20 @@ object WebSocketServer {
 
   object EventHandler {
     def props(
-        vertxEventBus: VertxEventBus
+        vertx: Vertx
     )(implicit
         networkConfig: NetworkConfig,
         groupConfig: GroupConfig,
         apiConfig: ApiConfig
     ): Props = {
-      Props(new EventHandler(vertxEventBus))
+      Props(new EventHandler(vertx))
     }
 
-    final case class Subscribe(address: String)
-    final case class Unsubscribe(address: String)
+    final case class Subscribe(webSocket: ServerWebSocket)
+    final case class Unsubscribe(webSocket: ServerWebSocket)
     case object ListSubscribers
   }
-  class EventHandler(vertxEventBus: VertxEventBus)(implicit
+  class EventHandler(vertx: Vertx)(implicit
       val networkConfig: NetworkConfig,
       val groupConfig: GroupConfig,
       apiConfig: ApiConfig
@@ -144,7 +137,7 @@ object WebSocketServer {
 
     lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
 
-    private val subscribers: mutable.HashSet[String] = mutable.HashSet.empty
+    private val subscribers: mutable.HashSet[ServerWebSocket] = mutable.HashSet.empty
 
     def receive: Receive = {
       case event: EventBus.Event => handleEvent(event)
@@ -163,7 +156,13 @@ object WebSocketServer {
             case Right(blockEntry) =>
               val params       = writeJs(blockEntry)
               val notification = write(Notification("block_notify", params))
-              subscribers.foreach(subscriber => vertxEventBus.send(subscriber, notification))
+              vertx.runOnContext(_ =>
+                subscribers.foreach { subscriber =>
+                  if (!subscriber.isClosed) {
+                    discard(subscriber.writeTextMessage(notification))
+                  }
+                }
+              )
             case _ => // this should never happen
               log.error(s"Received invalid block $block")
           }
