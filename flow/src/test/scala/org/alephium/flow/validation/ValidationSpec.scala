@@ -21,7 +21,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfig, ConsensusConfigs}
 import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.*
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StackOverflow
 import org.alephium.util.{AVector, Duration}
 

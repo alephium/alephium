@@ -24,7 +24,7 @@ import scala.collection.mutable
 import akka.actor.{Props, Terminated}
 import akka.io.Tcp
 import akka.util.ByteString
-import io.prometheus.client.Counter
+import io.prometheus.metrics.core.metrics.Counter
 
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
@@ -74,16 +74,22 @@ object ConnectionHandler {
   }
 
   val uploadBytesTotal: Counter = Counter
-    .build(
-      "alephium_upload_bytes_total",
+    .builder()
+    .name(
+      "alephium_upload_bytes_total"
+    )
+    .help(
       "Total upload bytes"
     )
     .labelNames("remote_address")
     .register()
 
   val downloadBytesTotal: Counter = Counter
-    .build(
-      "alephium_download_bytes_total",
+    .builder()
+    .name(
+      "alephium_download_bytes_total"
+    )
+    .help(
       "Total upload bytes"
     )
     .labelNames("remote_address")
@@ -112,7 +118,7 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
   def bufferedCommunicating: Receive = reading orElse bufferedWriting orElse closed
 
   private val downloadBytesTotalLabeled =
-    downloadBytesTotal.labels(remoteAddress.getAddress.getHostAddress)
+    downloadBytesTotal.labelValues(remoteAddress.getAddress.getHostAddress)
   def reading: Receive = { case Tcp.Received(data) =>
     downloadBytesTotalLabeled.inc(data.length.toDouble)
     if (bufferInMessage(data)) {
@@ -244,7 +250,7 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
   }
 
   private val uploadBytesTotalLabeled =
-    uploadBytesTotal.labels(remoteAddress.getAddress.getHostAddress)
+    uploadBytesTotal.labelValues(remoteAddress.getAddress.getHostAddress)
   private def sendData(data: ByteString, ack: Long): Unit = {
     connection ! Tcp.Write(data, Ack(ack))
     uploadBytesTotalLabeled.inc(data.length.toDouble)

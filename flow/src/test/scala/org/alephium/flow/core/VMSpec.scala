@@ -7357,11 +7357,21 @@ class VMSpec extends AlephiumSpec with Generators {
       ("/=", "10i", "1i", "10i")
     )
 
-    testCases.foreach(verifySimpleNumber.tupled)
-    testCases.foreach(verifyArray.tupled)
-    testCases.foreach(verifyMapping.tupled)
-    testCases.foreach(verifySimpleStruct.tupled)
-    testCases.foreach(verifyNestedStruct.tupled)
+    testCases.foreach { case (op, initValue, operationValue, assertValue) =>
+      verifySimpleNumber(op, initValue, operationValue, assertValue)
+    }
+    testCases.foreach { case (op, initValue, operationValue, assertValue) =>
+      verifyArray(op, initValue, operationValue, assertValue)
+    }
+    testCases.foreach { case (op, initValue, operationValue, assertValue) =>
+      verifyMapping(op, initValue, operationValue, assertValue)
+    }
+    testCases.foreach { case (op, initValue, operationValue, assertValue) =>
+      verifySimpleStruct(op, initValue, operationValue, assertValue)
+    }
+    testCases.foreach { case (op, initValue, operationValue, assertValue) =>
+      verifyNestedStruct(op, initValue, operationValue, assertValue)
+    }
 
     CompoundAssignmentOperator.values.foreach { op =>
       intercept[AssertionError] {

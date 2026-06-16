@@ -73,7 +73,7 @@ class GrandPoolSpec extends AlephiumSpec {
       groupConfig.cliqueChainIndexes.map { chainIndex =>
         val expected = if (indexesWithTx.contains(chainIndex)) 1 else 0
         MemPool.sharedPoolTransactionsTotal
-          .labels(chainIndex.from.value.toString, chainIndex.to.value.toString)
+          .labelValues(chainIndex.from.value.toString, chainIndex.to.value.toString)
           .get() is expected.toDouble
       }
     }
@@ -81,7 +81,7 @@ class GrandPoolSpec extends AlephiumSpec {
     // Reset the metrics
     groupConfig.cliqueChainIndexes.foreach { chainIndex =>
       MemPool.sharedPoolTransactionsTotal
-        .labels(chainIndex.from.value.toString, chainIndex.to.value.toString)
+        .labelValues(chainIndex.from.value.toString, chainIndex.to.value.toString)
         .set(0)
     }
 

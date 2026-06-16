@@ -18,7 +18,9 @@ package org.alephium.flow.handler
 
 import akka.actor.{ActorSystem, Props}
 import akka.util.ByteString
-import io.prometheus.client.{Counter, Gauge, Histogram}
+import io.prometheus.metrics.core.datapoints.{CounterDataPoint, DistributionDataPoint}
+import io.prometheus.metrics.core.metrics.{Counter, Gauge}
+import io.prometheus.metrics.model.registry.PrometheusRegistry
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxForkDepth, BlockFlow}
@@ -80,36 +82,32 @@ object BlockChainHandler {
   final case class InvalidBlock(hash: BlockHash, reason: InvalidBlockStatus) extends Event
 
   val blocksTotal: Gauge = Gauge
-    .build(
-      "alephium_blocks_total",
-      "Total number of blocks"
-    )
+    .builder()
+    .name("alephium_blocks_total")
+    .help("Total number of blocks")
     .labelNames("chain_from", "chain_to")
-    .register()
+    .register(PrometheusRegistry.defaultRegistry)
 
   val blocksReceivedTotal: Counter = Counter
-    .build(
-      "alephium_blocks_received_total",
-      "Total number of blocks received"
-    )
+    .builder()
+    .name("alephium_blocks_received_total")
+    .help("Total number of blocks received")
     .labelNames("chain_from", "chain_to")
-    .register()
+    .register(PrometheusRegistry.defaultRegistry)
 
   val uncleBlocksReceivedTotal: Counter = Counter
-    .build(
-      "alephium_uncle_blocks_received_total",
-      "Total number of uncle blocks received"
-    )
+    .builder()
+    .name("alephium_uncle_blocks_received_total")
+    .help("Total number of uncle blocks received")
     .labelNames("chain_from", "chain_to")
-    .register()
+    .register(PrometheusRegistry.defaultRegistry)
 
   val transactionsReceivedTotal: Counter = Counter
-    .build(
-      "alephium_transactions_received_total",
-      "Total number of transactions received"
-    )
+    .builder()
+    .name("alephium_transactions_received_total")
+    .help("Total number of transactions received")
     .labelNames("chain_from", "chain_to")
-    .register()
+    .register(PrometheusRegistry.defaultRegistry)
 }
 
 class BlockChainHandler(
@@ -262,14 +260,14 @@ class BlockChainHandler(
     showHeader(block.header) + s"; #tx: ${block.transactions.length}"
   }
 
-  private val blocksTotalLabeled = blocksTotal.labels(chainIndexFromString, chainIndexToString)
+  private val blocksTotalLabeled = blocksTotal.labelValues(chainIndexFromString, chainIndexToString)
   private val blocksReceivedTotalLabeled =
-    blocksReceivedTotal.labels(chainIndexFromString, chainIndexToString)
+    blocksReceivedTotal.labelValues(chainIndexFromString, chainIndexToString)
   // how to get uncle blocks received total for this block?
   private val uncleBlocksReceivedTotalLabeled =
-    uncleBlocksReceivedTotal.labels(chainIndexFromString, chainIndexToString)
+    uncleBlocksReceivedTotal.labelValues(chainIndexFromString, chainIndexToString)
   private val transactionsReceivedTotalLabeled =
-    transactionsReceivedTotal.labels(chainIndexFromString, chainIndexToString)
+    transactionsReceivedTotal.labelValues(chainIndexFromString, chainIndexToString)
   override def measure(block: Block)(implicit networkConfig: NetworkConfig): Unit = {
     val chain             = measureCommon(block.header)
     val numOfTransactions = block.transactions.length
@@ -285,7 +283,8 @@ class BlockChainHandler(
     transactionsReceivedTotalLabeled.inc(numOfTransactions.toDouble)
   }
 
-  val chainValidationTotalLabeled: Counter.Child = ChainHandler.chainValidationTotal.labels("Block")
-  val chainValidationDurationMilliSecondsLabeled: Histogram.Child =
-    ChainHandler.chainValidationDurationMilliSeconds.labels("Block")
+  val chainValidationTotalLabeled: CounterDataPoint =
+    ChainHandler.chainValidationTotal.labelValues("Block")
+  val chainValidationDurationMilliSecondsLabeled: DistributionDataPoint =
+    ChainHandler.chainValidationDurationMilliSeconds.labelValues("Block")
 }

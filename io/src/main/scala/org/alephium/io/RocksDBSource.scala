@@ -168,7 +168,7 @@ object RocksDBSource {
     val (databaseOptions, columnOptions) = AEnv.resolve() match {
       case AEnv.Test =>
         (TestSettings.databaseOptions(), (_: Boolean) => TestSettings.columnOptions())
-      case _ => (ProdSettings.databaseOptions(), ProdSettings.columnOptions)
+      case _ => (ProdSettings.databaseOptions(), ProdSettings.columnOptions(_))
     }
     openUnsafeWithOptions(path, databaseOptions, columnOptions)
   }

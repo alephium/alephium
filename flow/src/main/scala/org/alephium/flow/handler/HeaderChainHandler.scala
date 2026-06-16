@@ -17,7 +17,8 @@
 package org.alephium.flow.handler
 
 import akka.actor.{ActorSystem, Props}
-import io.prometheus.client.{Counter, Gauge, Histogram}
+import io.prometheus.metrics.core.datapoints.{CounterDataPoint, DistributionDataPoint}
+import io.prometheus.metrics.core.metrics.{Counter, Gauge}
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
@@ -61,16 +62,22 @@ object HeaderChainHandler {
   final case class InvalidHeader(hash: BlockHash) extends Event
 
   val headersTotal: Gauge = Gauge
-    .build(
-      "alephium_headers_total",
+    .builder()
+    .name(
+      "alephium_headers_total"
+    )
+    .help(
       "Total number of headers"
     )
     .labelNames("chain_from", "chain_to")
     .register()
 
   val headersReceivedTotal: Counter = Counter
-    .build(
-      "alephium_headers_received_total",
+    .builder()
+    .name(
+      "alephium_headers_received_total"
+    )
+    .help(
       "Total number of headers received"
     )
     .labelNames("chain_from", "chain_to")
@@ -121,9 +128,10 @@ class HeaderChainHandler(
 
   override def show(header: BlockHeader): String = showHeader(header)
 
-  private val headersTotalLabeled = headersTotal.labels(chainIndexFromString, chainIndexToString)
+  private val headersTotalLabeled =
+    headersTotal.labelValues(chainIndexFromString, chainIndexToString)
   private val headersReceivedTotalLabeled =
-    headersReceivedTotal.labels(chainIndexFromString, chainIndexToString)
+    headersReceivedTotal.labelValues(chainIndexFromString, chainIndexToString)
   override def measure(header: BlockHeader)(implicit networkConfig: NetworkConfig): Unit = {
     val chain = measureCommon(header)
 
@@ -131,8 +139,8 @@ class HeaderChainHandler(
     headersReceivedTotalLabeled.inc()
   }
 
-  val chainValidationTotalLabeled: Counter.Child =
-    ChainHandler.chainValidationTotal.labels("BlockHeader")
-  val chainValidationDurationMilliSecondsLabeled: Histogram.Child =
-    ChainHandler.chainValidationDurationMilliSeconds.labels("BlockHeader")
+  val chainValidationTotalLabeled: CounterDataPoint =
+    ChainHandler.chainValidationTotal.labelValues("BlockHeader")
+  val chainValidationDurationMilliSecondsLabeled: DistributionDataPoint =
+    ChainHandler.chainValidationDurationMilliSeconds.labelValues("BlockHeader")
 }

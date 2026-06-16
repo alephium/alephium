@@ -19,6 +19,8 @@ package org.alephium.api
 import java.math.BigInteger
 import java.net.InetSocketAddress
 
+import scala.reflect.ClassTag
+
 import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.Assertion
@@ -41,6 +43,15 @@ class UtilJsonSpec extends AlephiumSpec {
     read[T](json) is input
   }
 
+  def assertFail[E <: Throwable: ClassTag](body: => Any): Assertion = {
+    val error = intercept[Throwable](body)
+
+    Iterator
+      .iterate(error)(_.getCause)
+      .takeWhile(_ != null)
+      .exists(implicitly[ClassTag[E]].runtimeClass.isInstance) is true
+  }
+
   it should "write/read vectors" in {
     forAll { (ys: List[Int]) => check(AVector.from(ys), ys.mkString("[", ",", "]")) }
   }
@@ -59,7 +70,7 @@ class UtilJsonSpec extends AlephiumSpec {
 
   it should "fail for address based on host name" in {
     val rawJson = addressJson("foobar")
-    assertThrows[java.net.UnknownHostException](read[InetSocketAddress](rawJson))
+    assertFail[java.net.UnknownHostException](read[InetSocketAddress](rawJson))
   }
 
   it should "read hexstring" in {
@@ -76,12 +87,12 @@ class UtilJsonSpec extends AlephiumSpec {
   }
 
   it should "fail to read negative TimeStamp" in {
-    assertThrows[upickle.core.AbortException](read[TimeStamp]("-12345"))
+    assertFail[upickle.core.AbortException](read[TimeStamp]("-12345"))
   }
 
   it should "fail to read a Double as a BigInteger" in {
     forAll(Gen.chooseNum(Double.MinValue, Double.MaxValue)) { double =>
-      assertThrows[upickle.core.AbortException](read[BigInteger](s"$double"))
+      assertFail[upickle.core.AbortException](read[BigInteger](s"$double"))
     }
   }
 }

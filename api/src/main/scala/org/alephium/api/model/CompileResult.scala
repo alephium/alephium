@@ -98,8 +98,9 @@ object CompileContractResult {
       functions = AVector.from(contractAst.orderedFuncs.view.map(CompileResult.FunctionSig.from)),
       maps = CompileResult.MapsSig.from(contractAst.maps),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from)),
-      constants =
-        AVector.from(contractAst.getCalculatedConstants().map(CompileResult.Constant.from.tupled)),
+      constants = AVector.from(contractAst.getCalculatedConstants().map { case (ident, value) =>
+        CompileResult.Constant.from(ident, value)
+      }),
       enums = AVector.from(contractAst.enums.map(CompileResult.Enum.from)),
       warnings = compiled.warnings.map(_.message),
       stdInterfaceId = if (contractAst.hasStdIdField) {
@@ -141,7 +142,9 @@ object CompileProjectResult {
       compiledContracts,
       compiledScripts,
       Option.when(structs.nonEmpty)(structs.map(CompileResult.StructSig.from)),
-      Option.when(constants.nonEmpty)(constants.map(CompileResult.Constant.from.tupled)),
+      Option.when(constants.nonEmpty)(constants.map { case (ident, value) =>
+        CompileResult.Constant.from(ident, value)
+      }),
       Option.when(enums.nonEmpty)(enums.map(CompileResult.Enum.from)),
       Option.when(warnings.nonEmpty)(warnings.map(_.message)),
       testError

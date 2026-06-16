@@ -16,19 +16,19 @@
 
 package org.alephium.app
 
-import java.io.{StringWriter, Writer}
+import java.io.ByteArrayOutputStream
 import java.net.InetAddress
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.Callable
 
 import scala.concurrent._
 
 import akka.pattern.ask
 import akka.util.Timeout
-import io.prometheus.client.CollectorRegistry
-import io.prometheus.client.exporter.common.TextFormat
+import io.prometheus.metrics.expositionformats.OpenMetricsTextFormatWriter
+import io.prometheus.metrics.model.registry.PrometheusRegistry
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.server.ServerEndpoint
-import sttp.tapir.server.metrics.prometheus.PrometheusMetrics.prometheusRegistryCodec
 
 import org.alephium.api.{badRequest, notFound, ApiError, Endpoints, Try}
 import org.alephium.api.model.{Address => _, TransactionTemplate => _, _}
@@ -42,7 +42,7 @@ import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSettings, NetworkSetting}
-import org.alephium.http.{EndpointSender, Metrics}
+import org.alephium.http.EndpointSender
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
@@ -888,16 +888,21 @@ trait EndpointsLogic extends Endpoints {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   val metricsLogic = metrics.serverLogic[Future] { _ =>
     Future.successful {
-      val writer: Writer = new StringWriter()
+      val output = new ByteArrayOutputStream()
       try {
-        TextFormat.write004(writer, CollectorRegistry.defaultRegistry.metricFamilySamples())
-        writer.write(prometheusRegistryCodec.encode(Metrics.defaultRegistry))
-        Right(writer.toString)
+        OpenMetricsTextFormatWriter
+          .create()
+          .write(
+            output,
+            PrometheusRegistry.defaultRegistry.scrape()
+          )
+
+        Right(output.toString(StandardCharsets.UTF_8))
       } catch {
         case error: Throwable =>
           Left(ApiError.InternalServerError(error.getMessage))
       } finally {
-        writer.close()
+        output.close()
       }
     }
   }
@@ -991,19 +996,23 @@ trait EndpointsLogic extends Endpoints {
 
   private def executeBlocking[T](blockingCodeHandler: Callable[T]): Future[T] = {
     val promise = Promise[T]()
-    vertx.executeBlocking(
-      blockingCodeHandler,
-      false,
-      new io.vertx.core.Handler[io.vertx.core.AsyncResult[T]] {
-        override def handle(ar: io.vertx.core.AsyncResult[T]): Unit = {
-          if (ar.succeeded()) {
-            promise.success(ar.result())
-          } else {
-            promise.failure(ar.cause())
+    vertx
+      .executeBlocking(
+        blockingCodeHandler,
+        false
+      )
+      .onComplete {
+        new io.vertx.core.Handler[io.vertx.core.AsyncResult[T]] {
+          override def handle(ar: io.vertx.core.AsyncResult[T]): Unit = {
+            if (ar.succeeded()) {
+              promise.success(ar.result())
+            } else {
+              promise.failure(ar.cause())
+            }
           }
         }
       }
-    )
+
     promise.future
   }
 }

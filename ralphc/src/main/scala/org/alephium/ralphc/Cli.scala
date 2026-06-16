@@ -33,7 +33,7 @@ final case class Cli() {
   var configs: Configs = Configs()
   private val builder  = OParser.builder[Configs]
   private val parser = {
-    import builder.*
+    import builder._
     OParser.sequence(
       programName("ralphc"),
       head("ralphc", BuildInfo.version),
@@ -45,7 +45,7 @@ final case class Cli() {
       ),
       note("\nOptions:"),
       opt[Seq[Path]]('c', "contracts")
-        .validate(validateFolders)
+        .validate(validateFolders(_))
         .action((path, c) => c.copy(contracts = ArraySeq.from(path)))
         .text("Contract folder, default: ./contracts"),
       opt[Seq[Path]]('a', "artifacts")

@@ -125,6 +125,7 @@ object BuiltIn {
   // scalastyle:off parameter.number
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   object SimpleBuiltIn {
+    @scala.annotation.nowarn("cat=scala3-migration")
     private def tag[Ctx <: StatelessContext](category: Category) = new {
       def apply(
           name: String,
@@ -151,6 +152,7 @@ object BuiltIn {
         )
     }
 
+    @scala.annotation.nowarn("cat=scala3-migration")
     private def simpleReturn[Ctx <: StatelessContext](category: Category) = new {
       def apply(
           name: String,
@@ -176,6 +178,7 @@ object BuiltIn {
         )
     }
 
+    @scala.annotation.nowarn("cat=scala3-migration")
     private def multipleInstr[Ctx <: StatelessContext](category: Category) = new {
       def apply(
           name: String,
@@ -202,6 +205,7 @@ object BuiltIn {
         )
     }
 
+    @scala.annotation.nowarn("cat=scala3-migration")
     private def multipleInstrReturn[Ctx <: StatelessContext](category: Category) = new {
       def apply(
           name: String,
@@ -227,23 +231,38 @@ object BuiltIn {
         )
     }
 
+    @scala.annotation.nowarn("cat=scala3-migration")
     private[ralph] val cryptography = tag[StatelessContext](Category.Cryptography)
+    @scala.annotation.nowarn("cat=scala3-migration")
     private[ralph] val cryptographyMultipleInstr =
       multipleInstr[StatelessContext](Category.Cryptography)
-    private[ralph] val chain       = tag[StatelessContext](Category.Chain)
-    private[ralph] val conversion  = tag[StatelessContext](Category.Conversion)
-    private[ralph] val byteVec     = tag[StatelessContext](Category.ByteVec)
-    private[ralph] val asset       = tag[StatefulContext](Category.Asset)
-    private[ralph] val contract    = tag[StatefulContext](Category.Contract)
+    @scala.annotation.nowarn("cat=scala3-migration")
+    private[ralph] val chain = tag[StatelessContext](Category.Chain)
+    @scala.annotation.nowarn("cat=scala3-migration")
+    private[ralph] val conversion = tag[StatelessContext](Category.Conversion)
+    @scala.annotation.nowarn("cat=scala3-migration")
+    private[ralph] val byteVec = tag[StatelessContext](Category.ByteVec)
+    @scala.annotation.nowarn("cat=scala3-migration")
+    private[ralph] val asset = tag[StatefulContext](Category.Asset)
+    @scala.annotation.nowarn("cat=scala3-migration")
+    private[ralph] val contract = tag[StatefulContext](Category.Contract)
+    @scala.annotation.nowarn("cat=scala3-migration")
     private[ralph] val subContract = tag[StatefulContext](Category.SubContract)
 
-    private[ralph] val chainSimple    = simpleReturn[StatelessContext](Category.Chain)
-    private[ralph] val byteVecSimple  = simpleReturn[StatelessContext](Category.ByteVec)
-    private[ralph] val assetSimple    = simpleReturn[StatefulContext](Category.Asset)
+    @scala.annotation.nowarn("cat=scala3-migration")
+    private[ralph] val chainSimple = simpleReturn[StatelessContext](Category.Chain)
+    @scala.annotation.nowarn("cat=scala3-migration")
+    private[ralph] val byteVecSimple = simpleReturn[StatelessContext](Category.ByteVec)
+    @scala.annotation.nowarn("cat=scala3-migration")
+    private[ralph] val assetSimple = simpleReturn[StatefulContext](Category.Asset)
+    @scala.annotation.nowarn("cat=scala3-migration")
     private[ralph] val contractSimple = simpleReturn[StatefulContext](Category.Contract)
 
-    private[BuiltIn] def utils[Ctx <: StatelessContext]       = tag[Ctx](Category.Utils)
+    @scala.annotation.nowarn("cat=scala3-migration")
+    private[BuiltIn] def utils[Ctx <: StatelessContext] = tag[Ctx](Category.Utils)
+    @scala.annotation.nowarn("cat=scala3-migration")
     private[BuiltIn] def utilsSimple[Ctx <: StatelessContext] = simpleReturn[Ctx](Category.Utils)
+    @scala.annotation.nowarn("cat=scala3-migration")
     private[BuiltIn] def utilsMultipleInstr[Ctx <: StatelessContext] =
       multipleInstrReturn[Ctx](Category.Utils)
 

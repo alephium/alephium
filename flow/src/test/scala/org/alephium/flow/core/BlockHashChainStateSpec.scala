@@ -28,6 +28,7 @@ import org.alephium.util.{ConcurrentHashMap, TimeStamp}
 
 class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
   trait Fixture {
+    @scala.annotation.nowarn("cat=scala3-migration")
     val chainState = new BlockHashChainState {
       private val dummyIndex        = ChainIndex.unsafe(0, 0)
       override def consensusConfigs = Test.consensusConfigs
