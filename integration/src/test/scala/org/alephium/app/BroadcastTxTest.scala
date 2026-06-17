@@ -122,8 +122,9 @@ class BroadcastTxTest extends AlephiumActorSpec {
       }
     })
 
+    val fromAddressGroup = Address.fromBase58(address).rightValue.groupIndex
     val transactions = AVector.fill(numTxs) {
-      val (toAddress, _, _) = generateAccount
+      val (toAddress, _, _) = generateAccount(fromAddressGroup)
 
       transfer(
         publicKey,
