@@ -16,7 +16,7 @@
 
 package org.alephium.crypto
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.bouncycastle.crypto.digests.Blake3Digest
 
 import org.alephium.serde.RandomBytes

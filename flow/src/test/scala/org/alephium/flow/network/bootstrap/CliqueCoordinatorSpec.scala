@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.bootstrap
 
-import akka.testkit.{SocketUtil, TestProbe}
+import org.apache.pekko.testkit.{SocketUtil, TestProbe}
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.Bootstrapper

@@ -20,11 +20,11 @@ import java.net.InetSocketAddress
 
 import scala.util.Random
 
-import akka.actor.{ActorContext, Props}
-import akka.event.LoggingAdapter
-import akka.io.Tcp
-import akka.util.ByteString
 import io.prometheus.metrics.core.metrics.Gauge
+import org.apache.pekko.actor.{ActorContext, Props}
+import org.apache.pekko.event.LoggingAdapter
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.{Utils => FlowUtils}
 import org.alephium.flow.core.BlockFlow

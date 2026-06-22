@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.bootstrap
 
-import akka.actor.ActorRef
+import org.apache.pekko.actor.ActorRef
 
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.{PrivateKey, PublicKey}

@@ -21,10 +21,10 @@ import java.net.InetSocketAddress
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-import akka.actor.{ActorRef, Cancellable, Props, Terminated}
-import akka.io.{IO, Tcp}
-import akka.pattern.pipe
-import akka.util.ByteString
+import org.apache.pekko.actor.{ActorRef, Cancellable, Props, Terminated}
+import org.apache.pekko.io.{IO, Tcp}
+import org.apache.pekko.pattern.pipe
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, IOBaseActor, ViewHandler}

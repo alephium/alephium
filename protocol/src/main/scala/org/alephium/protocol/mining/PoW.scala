@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.mining
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHash, BlockHeader, ChainIndex, FlowData, Target}

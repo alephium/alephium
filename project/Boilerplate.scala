@@ -109,7 +109,7 @@ object Boilerplate {
       block"""
         |package org.alephium.serde
         |
-        |import akka.util.ByteString
+        |import org.apache.pekko.util.ByteString
         |
         |private[serde] trait ProductSerde {
         +
@@ -172,7 +172,7 @@ object Boilerplate {
       block"""
         |package org.alephium.serde
         |
-        |import akka.util.ByteString
+        |import org.apache.pekko.util.ByteString
         |
         |private[serde] trait ProductSerializer {
         +

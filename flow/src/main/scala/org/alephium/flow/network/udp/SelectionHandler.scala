@@ -22,18 +22,24 @@ import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-import akka.actor.{ActorRef, ExtendedActorSystem, Extension, ExtensionId, ExtensionIdProvider}
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.pekko.actor.{
+  ActorRef,
+  ExtendedActorSystem,
+  Extension,
+  ExtensionId,
+  ExtensionIdProvider
+}
 
 import org.alephium.util.Duration
 
-// This is modified from akka.io.SelectionHandler
+// This is modified from pekko.io.SelectionHandler
 object SelectionHandler extends ExtensionId[SelectionHandler] with ExtensionIdProvider {
   override def lookup: ExtensionId[_ <: Extension] = SelectionHandler
 
   override def createExtension(system: ExtendedActorSystem): SelectionHandler = {
     val selector         = Selector.open()
-    val dispatcher       = system.dispatchers.lookup(s"akka.io.pinned-dispatcher")
+    val dispatcher       = system.dispatchers.lookup(s"pekko.io.pinned-dispatcher")
     val executionContext = SerializedExecutionContext(dispatcher)
 
     system.registerOnTermination(selector.close())

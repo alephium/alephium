@@ -18,9 +18,9 @@ package org.alephium.flow.network.broker
 
 import java.net.InetSocketAddress
 
-import akka.io.Tcp
-import akka.testkit.{SocketUtil, TestActorRef, TestProbe}
-import akka.util.ByteString
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.testkit.{SocketUtil, TestActorRef, TestProbe}
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.network.broker.ConnectionHandler.Ack
 import org.alephium.flow.setting.AlephiumConfigFixture

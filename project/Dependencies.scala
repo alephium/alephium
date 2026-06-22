@@ -17,7 +17,7 @@
 import sbt._
 
 object Version {
-  lazy val akka       = "2.6.20"
+  lazy val pekko      = "1.0.0"
   lazy val tapir      = "1.13.21"
   lazy val sttp       = "4.0.23"
   lazy val apispec    = "0.11.10"
@@ -25,9 +25,9 @@ object Version {
 }
 
 object Dependencies {
-  lazy val akka         = "com.typesafe.akka" %% "akka-actor"   % Version.akka
-  lazy val `akka-slf4j` = "com.typesafe.akka" %% "akka-slf4j"   % Version.akka
-  lazy val `akka-test`  = "com.typesafe.akka" %% "akka-testkit" % Version.akka % Test
+  lazy val pekko         = "org.apache.pekko" %% "pekko-actor"   % Version.pekko
+  lazy val `pekko-slf4j` = "org.apache.pekko" %% "pekko-slf4j"   % Version.pekko
+  lazy val `pekko-test`  = "org.apache.pekko" %% "pekko-testkit" % Version.pekko % Test
 
   lazy val vertx =
     "io.vertx" % "vertx-core" % "5.1.2"

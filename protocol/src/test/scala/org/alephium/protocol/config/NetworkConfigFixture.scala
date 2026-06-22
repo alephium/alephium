@@ -19,7 +19,7 @@ package org.alephium.protocol.config
 import scala.collection.immutable.ArraySeq
 import scala.util.Random
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.model.{HardFork, NetworkId}
 import org.alephium.util.TimeStamp

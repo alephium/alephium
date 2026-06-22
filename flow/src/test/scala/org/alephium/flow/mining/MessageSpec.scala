@@ -18,7 +18,7 @@ package org.alephium.flow.mining
 
 import java.math.BigInteger
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.model.BlockFlowTemplate

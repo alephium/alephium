@@ -16,8 +16,8 @@
 
 package org.alephium.flow.network
 
-import akka.io.Tcp
-import akka.testkit.TestProbe
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.testkit.TestProbe
 
 import org.alephium.crypto.SecP256K1PrivateKey
 import org.alephium.flow.io.StoragesFixture

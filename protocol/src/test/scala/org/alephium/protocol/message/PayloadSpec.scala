@@ -20,7 +20,7 @@ import java.net.InetSocketAddress
 
 import scala.util.Random
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.compatible.Assertion
 

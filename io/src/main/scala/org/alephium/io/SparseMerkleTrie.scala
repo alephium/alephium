@@ -18,7 +18,7 @@ package org.alephium.io
 
 import scala.collection.mutable
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.serde._

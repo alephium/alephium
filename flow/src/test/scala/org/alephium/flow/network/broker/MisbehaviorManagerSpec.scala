@@ -16,9 +16,9 @@
 
 package org.alephium.flow.network.broker
 
-import akka.actor.Props
-import akka.io.Tcp
-import akka.testkit.TestProbe
+import org.apache.pekko.actor.Props
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.DiscoveryServer

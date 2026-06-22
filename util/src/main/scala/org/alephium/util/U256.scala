@@ -18,7 +18,7 @@ package org.alephium.util
 
 import java.math.BigInteger
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 // scalastyle:off number.of.methods
 

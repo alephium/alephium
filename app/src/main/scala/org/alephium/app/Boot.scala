@@ -21,13 +21,13 @@ import java.nio.file.Path
 import scala.concurrent.{Await, ExecutionContext}
 import scala.util.{Failure, Success}
 
-import akka.Done
-import akka.actor.{ActorSystem, CoordinatedShutdown}
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.scalalogging.StrictLogging
 import io.prometheus.metrics.core.metrics.Gauge
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics
 import io.prometheus.metrics.model.registry.PrometheusRegistry
+import org.apache.pekko.Done
+import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
 
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
@@ -123,9 +123,9 @@ class BootUp extends StrictLogging {
     val renderOptions =
       ConfigRenderOptions.defaults().setOriginComments(false).setComments(true).setJson(false)
     val alephiumConf = typesafeConfig.withOnlyPath("alephium").withoutPath("alephium.genesis")
-    val akkaConf     = typesafeConfig.withOnlyPath("akka")
+    val pekkoConf    = typesafeConfig.withOnlyPath("pekko")
     logger.debug(
-      alephiumConf.withFallback(akkaConf).root().render(renderOptions)
+      alephiumConf.withFallback(pekkoConf).root().render(renderOptions)
     )
 
     val digests = config.genesisBlocks.map(showBlocks).mkString("-")

@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.bootstrap
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.message.MessageSerde

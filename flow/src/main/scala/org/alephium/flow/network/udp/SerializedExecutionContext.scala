@@ -22,7 +22,7 @@ import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-import akka.dispatch.AbstractNodeQueue
+import org.apache.pekko.dispatch.AbstractNodeQueue
 
 // This is modified from akk.io.SerializedSuspendableExecutionContext
 object SerializedExecutionContext {

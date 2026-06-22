@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.model
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.macros.HPC.cfor
 import org.alephium.protocol.PublicKey

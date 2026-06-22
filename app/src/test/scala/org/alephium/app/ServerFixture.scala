@@ -19,9 +19,9 @@ package org.alephium.app
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.testkit.TestProbe
-import akka.util.ByteString
+import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
+import org.apache.pekko.testkit.TestProbe
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.api.ApiModelCodec

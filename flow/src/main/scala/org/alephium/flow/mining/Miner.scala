@@ -19,8 +19,8 @@ package org.alephium.flow.mining
 import scala.annotation.tailrec
 import scala.util.{Failure, Success}
 
-import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.Utils
 import org.alephium.flow.model.BlockFlowTemplate

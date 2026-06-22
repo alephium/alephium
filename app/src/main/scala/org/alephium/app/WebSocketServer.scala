@@ -20,11 +20,11 @@ import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 import scala.concurrent._
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
 import io.vertx.core.http.{HttpServer, HttpServerOptions, ServerWebSocket}
+import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
+import org.apache.pekko.util.Timeout
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.ApiModelCodec

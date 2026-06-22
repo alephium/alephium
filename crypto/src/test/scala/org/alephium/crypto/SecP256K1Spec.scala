@@ -19,7 +19,7 @@ package org.alephium.crypto
 import java.io.ByteArrayInputStream
 import java.math.BigInteger
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.bouncycastle.asn1.{ASN1Integer, ASN1StreamParser, DLSequence}
 
 import org.alephium.serde.byteAVectorSerde

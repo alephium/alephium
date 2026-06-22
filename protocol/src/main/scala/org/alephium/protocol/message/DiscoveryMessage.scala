@@ -19,7 +19,7 @@ package org.alephium.protocol.message
 import scala.language.existentials
 import scala.reflect.ClassTag
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}

@@ -20,8 +20,8 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import scala.collection.immutable.ArraySeq
 
-import akka.actor.{ActorRef, Cancellable, Props, Stash, Terminated}
 import io.prometheus.metrics.core.metrics.Gauge
+import org.apache.pekko.actor.{ActorRef, Cancellable, Props, Stash, Terminated}
 
 import org.alephium.flow.handler.IOBaseActor
 import org.alephium.flow.io.BrokerStorage

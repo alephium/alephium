@@ -19,7 +19,7 @@ package org.alephium.api
 import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import sttp.tapir.{FieldName, Schema, Validator}
 import sttp.tapir.SchemaType.{SArray, SInteger, SProduct, SProductField, SString}
 

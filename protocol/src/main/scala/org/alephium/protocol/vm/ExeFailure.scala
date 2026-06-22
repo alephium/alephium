@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import java.math.BigInteger
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.io.IOError
 import org.alephium.protocol.ALPH

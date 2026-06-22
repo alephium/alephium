@@ -16,7 +16,7 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.Storages

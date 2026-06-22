@@ -21,7 +21,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 
-import akka.event.LoggingAdapter
+import org.apache.pekko.event.LoggingAdapter
 
 import org.alephium.flow.network.DiscoveryServer.AwaitReply
 import org.alephium.flow.network.udp.UdpServer

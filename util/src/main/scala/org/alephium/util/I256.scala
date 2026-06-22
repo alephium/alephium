@@ -18,7 +18,7 @@ package org.alephium.util
 
 import java.math.BigInteger
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
   import I256.validate

@@ -22,7 +22,7 @@ import java.nio.file.Paths
 import scala.concurrent.ExecutionContext
 import scala.util.Random
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 
 import org.alephium.api.model.{Amount, Destination}
 import org.alephium.crypto.wallet.Mnemonic
