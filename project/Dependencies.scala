@@ -17,7 +17,7 @@
 import sbt._
 
 object Version {
-  lazy val pekko      = "1.0.0"
+  lazy val pekko      = "1.6.0"
   lazy val tapir      = "1.13.21"
   lazy val sttp       = "4.0.23"
   lazy val apispec    = "0.11.10"
