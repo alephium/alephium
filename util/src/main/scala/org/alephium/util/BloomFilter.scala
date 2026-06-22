@@ -18,7 +18,7 @@ package org.alephium.util
 
 import scala.collection.mutable.BitSet
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 class BloomFilter(numberOfBits: Long, numberOfHashes: Int) {
   private var bitCount: Long = 0

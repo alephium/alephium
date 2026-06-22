@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.ArrayBuffer
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest.Assertion

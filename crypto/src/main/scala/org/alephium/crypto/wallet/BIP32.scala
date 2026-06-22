@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets
 
 import scala.annotation.tailrec
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.bouncycastle.crypto.digests.SHA512Digest
 import org.bouncycastle.crypto.macs.HMac
 import org.bouncycastle.crypto.params.KeyParameter

@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.crypto._
 import org.alephium.protocol.config.GroupConfigFixture

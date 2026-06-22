@@ -53,7 +53,7 @@ class ValueSortedMapSpec extends AlephiumSpec {
   }
 
   it should "remove elements" in {
-    import akka.util.ByteString
+    import org.apache.pekko.util.ByteString
     import Bytes.byteStringOrdering
     val map    = ValueSortedMap.empty[ByteString, TimeStamp]
     val hashes = (0 until 100).map(_ => UnsecureRandom.nextU256().toBytes)

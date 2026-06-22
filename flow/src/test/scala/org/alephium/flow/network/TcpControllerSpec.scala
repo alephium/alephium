@@ -18,10 +18,10 @@ package org.alephium.flow.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.actor.ActorRef.noSender
-import akka.io.{IO, Tcp}
-import akka.testkit.{EventFilter, SocketUtil, TestProbe}
+import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
+import org.apache.pekko.actor.ActorRef.noSender
+import org.apache.pekko.io.{IO, Tcp}
+import org.apache.pekko.testkit.{EventFilter, SocketUtil, TestProbe}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.{AlephiumConfigFixture, NetworkSetting}

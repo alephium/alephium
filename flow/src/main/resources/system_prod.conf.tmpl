@@ -145,10 +145,10 @@ alephium {
   }
 }
 
-akka {
+pekko {
   loglevel = "DEBUG"
-  loggers = ["akka.event.slf4j.Slf4jLogger"]
-  logging-filter = "akka.event.slf4j.Slf4jLoggingFilter"
+  loggers = ["org.apache.pekko.event.slf4j.Slf4jLogger"]
+  logging-filter = "org.apache.pekko.event.slf4j.Slf4jLoggingFilter"
 
   jvm-shutdown-hooks = off
 

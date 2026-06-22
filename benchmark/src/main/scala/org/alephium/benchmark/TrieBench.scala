@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
 
 import scala.util.Random
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.openjdk.jmh.annotations._
 
 import org.alephium.io.{KeyValueStorage, RocksDBKeyValueStorage, RocksDBSource, SparseMerkleTrie}

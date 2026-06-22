@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.crypto.Byte64

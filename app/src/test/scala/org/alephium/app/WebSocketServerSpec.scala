@@ -18,12 +18,12 @@ package org.alephium.app
 
 import scala.concurrent.ExecutionContext
 
-import akka.actor.ActorSystem
-import akka.pattern.ask
-import akka.testkit.TestProbe
-import akka.util.Timeout
 import io.vertx.core.Vertx
 import io.vertx.core.http.WebSocketClientOptions
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.testkit.TestProbe
+import org.apache.pekko.util.Timeout
 import org.scalatest.{Assertion, EitherValues}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 

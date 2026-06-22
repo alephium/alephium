@@ -21,8 +21,8 @@ import java.nio.charset.StandardCharsets
 import scala.annotation.nowarn
 import scala.collection.{immutable, mutable}
 
-import akka.util.ByteString
 import fastparse.Parsed
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Ast.{Ident, MultiContract}

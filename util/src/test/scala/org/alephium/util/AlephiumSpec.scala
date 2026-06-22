@@ -24,7 +24,7 @@ import scala.annotation.nowarn
 import scala.collection.mutable
 import scala.language.implicitConversions
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalacheck.Arbitrary._
 import org.scalactic.Equality

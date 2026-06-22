@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import java.nio.charset.StandardCharsets
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Arbitrary
 
 import org.alephium.crypto.{Byte64, SecP256R1, SecP256R1Signature}

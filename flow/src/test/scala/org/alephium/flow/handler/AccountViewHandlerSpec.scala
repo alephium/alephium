@@ -16,7 +16,7 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.Props
+import org.apache.pekko.actor.Props
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow

@@ -3,7 +3,7 @@
 // format: off
 package org.alephium.serde
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 private[serde] trait ProductSerde {
 

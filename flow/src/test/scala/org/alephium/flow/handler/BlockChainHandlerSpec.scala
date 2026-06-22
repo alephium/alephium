@@ -18,9 +18,9 @@ package org.alephium.flow.handler
 
 import java.net.InetSocketAddress
 
-import akka.actor.Props
-import akka.testkit.{TestActorRef, TestProbe}
-import akka.util.ByteString
+import org.apache.pekko.actor.Props
+import org.apache.pekko.testkit.{TestActorRef, TestProbe}
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow

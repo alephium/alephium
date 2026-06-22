@@ -18,9 +18,9 @@ package org.alephium.flow.network.bootstrap
 
 import scala.util.Random
 
-import akka.io.Tcp
-import akka.testkit.{TestActorRef, TestProbe}
-import akka.util.ByteString
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.testkit.{TestActorRef, TestProbe}
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.model.ModelGenerators

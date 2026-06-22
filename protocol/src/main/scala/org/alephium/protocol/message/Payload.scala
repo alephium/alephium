@@ -16,10 +16,10 @@
 
 package org.alephium.protocol.message
 
-import akka.util.ByteString
 import io.prometheus.metrics.core.datapoints.CounterDataPoint
 import io.prometheus.metrics.core.metrics.Counter
 import io.prometheus.metrics.model.registry.PrometheusRegistry
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig

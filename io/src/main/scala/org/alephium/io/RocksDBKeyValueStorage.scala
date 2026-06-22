@@ -16,7 +16,7 @@
 
 package org.alephium.io
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.rocksdb._
 
 import org.alephium.serde._

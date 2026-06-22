@@ -21,7 +21,7 @@ import java.util.Base64
 
 import scala.annotation.tailrec
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.crypto.{Byte64, SecP256R1, SecP256R1PublicKey, SecP256R1Signature, Sha256}
 import org.alephium.protocol.model.TransactionId

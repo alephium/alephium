@@ -21,7 +21,7 @@ import java.nio.file.Path
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 
 import org.alephium.flow.client.Node
 import org.alephium.flow.io.Storages

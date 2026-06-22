@@ -18,7 +18,7 @@ package org.alephium.flow.network.interclique
 
 import scala.collection.mutable
 
-import akka.actor.Cancellable
+import org.apache.pekko.actor.Cancellable
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxForkDepth, maxSyncBlocksPerChain, BlockFlow}

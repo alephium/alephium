@@ -16,7 +16,7 @@
 
 package org.alephium.flow.core
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.model.{BlockHash, Weight}
 import org.alephium.util.AlephiumSpec

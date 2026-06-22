@@ -19,7 +19,7 @@ package org.alephium.protocol.model
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalatest.OptionValues
 
 import org.alephium.serde._

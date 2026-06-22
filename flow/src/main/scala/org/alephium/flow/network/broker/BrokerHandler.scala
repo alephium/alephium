@@ -18,8 +18,8 @@ package org.alephium.flow.network.broker
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Cancellable, Terminated}
-import akka.util.ByteString
+import org.apache.pekko.actor.{Cancellable, Terminated}
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow

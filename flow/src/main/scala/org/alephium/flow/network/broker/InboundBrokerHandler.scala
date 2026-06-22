@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.broker
 
-import akka.io.Tcp
+import org.apache.pekko.io.Tcp
 
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.setting.NetworkSetting

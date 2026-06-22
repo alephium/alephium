@@ -16,7 +16,7 @@
 
 package org.alephium.flow.mining
 
-import akka.actor.Props
+import org.apache.pekko.actor.Props
 
 import org.alephium.flow.client.Node
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}

@@ -51,7 +51,7 @@ object Utils {
       case Left(e)  => throw e
     }
 
-  val PoolDispatcher = "akka.actor.pool-dispatcher"
+  val PoolDispatcher = "pekko.actor.pool-dispatcher"
 
   trait BaseActorWithPoolExecutor extends BaseActor {
     implicit lazy val poolEC: ExecutionContext =

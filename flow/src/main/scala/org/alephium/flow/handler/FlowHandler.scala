@@ -16,7 +16,7 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.{Props, Stash}
+import org.apache.pekko.actor.{Props, Stash}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.config.GroupConfig

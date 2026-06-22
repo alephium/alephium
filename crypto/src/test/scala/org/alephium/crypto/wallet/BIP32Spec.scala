@@ -16,7 +16,7 @@
 
 package org.alephium.crypto.wallet
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.crypto.{SecP256K1PrivateKey, SecP256K1PublicKey}
