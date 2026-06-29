@@ -255,7 +255,10 @@ class WsProtocolSpec
           "id"      -> 0,
           "jsonrpc" -> "2.0"
         )
-    assertThrows[JsonRPC.Error](read[WsRequest](invalidSubscriptionRequest))
+    WsRequest
+      .fromJsonString(invalidSubscriptionRequest.render(), contractAddressLimit)
+      .leftValue
+      .error is WsError.emptyContractAddress
 
     val requestWithEmptyAddresses =
       RequestUnsafe(
@@ -282,7 +285,9 @@ class WsProtocolSpec
           eventType,
           ujson.Obj(
             EventIndexField -> eventIndex,
-            AddressesField  -> ujson.Arr(duplicateAddresses.map(_.toBase58))
+            AddressesField -> ujson.Arr.from(
+              duplicateAddresses.map(address => ujson.Str(address.toBase58))
+            )
           )
         ),
         0
@@ -297,17 +302,18 @@ class WsProtocolSpec
         WsMethod.SubscribeMethod,
         ujson.Arr(
           eventType,
-          eventIndex,
           ujson.Obj(
             EventIndexField -> eventIndex,
-            AddressesField  -> ujson.Arr(tooManyContractAddresses.map(_.toBase58))
+            AddressesField -> ujson.Arr.from(
+              tooManyContractAddresses.map(address => ujson.Str(address.toBase58))
+            )
           )
         ),
         0
       )
     WsRequest
       .fromJsonRpc(requestWithTooManyAddresses, contractAddressLimit)
-      .isLeft is true
+      .leftValue is WsError.tooManyContractAddresses(contractAddressLimit)
 
     val requestWithInvalidEventIndex =
       RequestUnsafe(

@@ -84,7 +84,11 @@ final class WsServer(
         subscriptionHandler ! WsSubscriptionHandler.Handshake(handshake)
       }
       .webSocketHandler { ws =>
-        subscriptionHandler ! WsSubscriptionHandler.Connect(ServerWs(ws))
+        val serverWs = ServerWs(ws)
+        WsSubscriptionHandler.attachWebSocketHandlers(serverWs, maxWriteQueueSize) { message =>
+          subscriptionHandler ! message
+        }
+        subscriptionHandler ! WsSubscriptionHandler.Connect.withAttachedHandlers(serverWs)
       }
 
     Future.unit

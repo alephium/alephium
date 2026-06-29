@@ -30,7 +30,12 @@ import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.Timeout
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, BeforeAndAfterEach}
-import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
+import org.scalatest.concurrent.{
+  Eventually,
+  IntegrationPatience,
+  PatienceConfiguration,
+  ScalaFutures
+}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter.VertxFutureToScalaFuture
 
 import org.alephium.api.model.{BlockAndEvents, ContractEvent, TransactionTemplate, ValU256}
@@ -140,7 +145,16 @@ trait WsClientServerFixture
   implicit protected val system: ActorSystem       = ActorSystem("WsServerFixtureSystem")
   implicit protected val executionContext: ExecutionContext = system.dispatcher
 
-  protected lazy val vertx            = Vertx.vertx()
+  @volatile private var startedWsServer: Option[WsServer] = None
+  @volatile private var clientVertxStarted: Boolean       = false
+  @volatile private var stopped: Boolean                  = false
+
+  AlephiumSpec.addCleanTask(() => stopFixture())
+
+  protected lazy val vertx = {
+    clientVertxStarted = true
+    Vertx.vertx()
+  }
   protected lazy val blockFlowProbe   = TestProbe()
   protected lazy val (allHandlers, _) = TestUtils.createAllHandlersProbe
   protected lazy val node = new NodeDummy(
@@ -184,6 +198,7 @@ trait WsClientServerFixture
 
     // Start the services
     wsServer.start().futureValue
+    startedWsServer = Some(wsServer)
 
     // Listen on the port
     httpService
@@ -223,12 +238,20 @@ trait WsClientServerFixture
   }
   // scalastyle:on regex
 
-  def testWsAndClose[A](wsF: Future[WsClient])(testCode: WsClient => A): A = {
-    val ws = wsF.futureValue
+  def testWsAndClose[A](wsF: => Future[WsClient])(testCode: WsClient => A): A = {
+    val previousConnections = getSubscriptions(subscriptionHandler).activeConnections
+    val ws                  = wsF.futureValue
+    val newConnections      = waitUntilNewWsConnection(previousConnections)
     try {
       testCode(ws)
     } finally {
       ws.close().futureValue
+      val _ = eventually(PatienceConfiguration.Timeout(5.seconds)) {
+        getSubscriptions(subscriptionHandler).activeConnections
+          .intersect(newConnections)
+          .isEmpty is true
+      }
+      ()
     }
   }
 
@@ -243,11 +266,34 @@ trait WsClientServerFixture
       .contains(eventHandler.ref) is true
   }
 
-  override def afterAll(): Unit = {
-    super.afterAll()
-    httpServer.close().asScala.futureValue
-    system.terminate().futureValue
+  protected def waitUntilNewWsConnection(previousConnections: Set[WsId]): Set[WsId] = {
+    eventually(PatienceConfiguration.Timeout(5.seconds)) {
+      val newConnections =
+        getSubscriptions(subscriptionHandler).activeConnections.diff(previousConnections)
+      newConnections.nonEmpty is true
+      newConnections
+    }
+  }
+
+  private def stopFixture(): Unit = {
+    if (!stopped) {
+      synchronized {
+        if (!stopped) {
+          stopped = true
+          startedWsServer.foreach(_.stop().futureValue)
+          if (clientVertxStarted) {
+            vertx.close().asScala.futureValue
+          }
+          system.terminate().futureValue
+        }
+      }
+    }
     ()
+  }
+
+  override def afterAll(): Unit = {
+    stopFixture()
+    super.afterAll()
   }
 }
 

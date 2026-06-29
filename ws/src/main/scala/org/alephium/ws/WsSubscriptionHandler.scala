@@ -94,14 +94,20 @@ object WsSubscriptionHandler {
 
   final case class Handshake(handshake: ServerWebSocketHandshake) extends Command
 
-  final case class Connect(socket: ServerWsLike) extends Command
+  final case class Connect(socket: ServerWsLike, handlersAttached: Boolean) extends Command
+  object Connect {
+    def apply(socket: ServerWsLike): Connect = Connect(socket, handlersAttached = false)
+    def withAttachedHandlers(socket: ServerWsLike): Connect =
+      Connect(socket, handlersAttached = true)
+  }
 
   final case object GetSubscriptions extends Command
 
   final case class WsImmutableSubscriptions(
       connections: Map[WsId, AVector[(WsSubscriptionId, MessageConsumer[String])]],
       subscriptionsByContractKey: Map[ContractEventKey, AVector[SubscriptionOfConnection]],
-      contractKeysBySubscription: Map[SubscriptionOfConnection, AVector[ContractEventKey]]
+      contractKeysBySubscription: Map[SubscriptionOfConnection, AVector[ContractEventKey]],
+      activeConnections: Set[WsId]
   ) extends CommandResponse
 
   final case class Subscribe(
@@ -131,6 +137,22 @@ object WsSubscriptionHandler {
   val ApiKeyHeader: String                  = "X-API-KEY"
   private val MaxMissedPongs: Int           = 2
   private val RequestRateWindowMillis: Long = 1000L
+
+  def attachWebSocketHandlers(
+      ws: ServerWsLike,
+      maxWriteQueueSize: Int
+  )(send: SubscriptionMsg => Unit): Unit = {
+    ws.setWriteQueueMaxSize(effectiveMaxWriteQueueSize(maxWriteQueueSize))
+    ws.closeHandler(() => send(Disconnect(ws.textHandlerID())))
+    ws.frameHandler(frame =>
+      if (frame.`type`() == WebSocketFrameType.PONG) send(PongReceived(ws.textHandlerID()))
+    )
+    ws.textMessageHandler(msg => send(IncomingMessage(ws, msg)))
+    ()
+  }
+
+  private def effectiveMaxWriteQueueSize(maxWriteQueueSize: Int): Int =
+    math.max(1, maxWriteQueueSize)
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -150,7 +172,6 @@ class WsSubscriptionHandler(
   import org.alephium.ws.WsSubscriptionHandler._
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
   private val effectiveMaxRequestsPerSecond: Int    = math.max(1, maxRequestsPerSecond)
-  private val effectiveMaxWriteQueueSize: Int       = math.max(1, maxWriteQueueSize)
 
   private val openedWsConnections           = mutable.Map.empty[WsId, ServerWsLike]
   private val missedPongs                   = mutable.Map.empty[WsId, Int]
@@ -196,7 +217,8 @@ class WsSubscriptionHandler(
     case KeepAlive =>
       openedWsConnections.foreachEntry(keepAlive)
     case Handshake(hs) => handshake(hs)
-    case Connect(ws)   => connect(ws)
+    case Connect(ws, handlersAttached) =>
+      connect(ws, handlersAttached)
     case IncomingMessage(ws, msg) =>
       handleMessage(ws, msg)
     case Subscribe(id, ws, params) =>
@@ -238,7 +260,8 @@ class WsSubscriptionHandler(
       sender() ! WsImmutableSubscriptions(
         subscriptionsState.connections.toMap,
         subscriptionsState.subscriptionsByContractKey.toMap,
-        subscriptionsState.contractKeysBySubscription.toMap
+        subscriptionsState.contractKeysBySubscription.toMap,
+        openedWsConnections.keySet.toSet
       )
     case NotificationPublished(params: WsTxNotificationParams) =>
       publishNotification(params)
@@ -388,18 +411,14 @@ class WsSubscriptionHandler(
     }
   }
 
-  private def connect(ws: ServerWsLike): Unit = {
+  private def connect(ws: ServerWsLike, handlersAttached: Boolean): Unit = {
     releaseOldestPendingConnection()
     missedPongs.update(ws.textHandlerID(), 0)
-    ws.setWriteQueueMaxSize(effectiveMaxWriteQueueSize)
-    ws.closeHandler(() => {
-      log.debug(s"WebSocket connection closed: ${ws.textHandlerID()}")
-      self ! Disconnect(ws.textHandlerID())
-    })
-    ws.frameHandler(frame =>
-      if (frame.`type`() == WebSocketFrameType.PONG) self ! PongReceived(ws.textHandlerID())
-    )
-    ws.textMessageHandler(msg => self ! IncomingMessage(ws, msg))
+    if (!handlersAttached) {
+      WsSubscriptionHandler.attachWebSocketHandlers(ws, maxWriteQueueSize)(message =>
+        self ! message
+      )
+    }
     openedWsConnections.put(ws.textHandlerID(), ws)
     log.debug(
       s"WebSocket connected: ${ws.textHandlerID()}, total connections: ${openedWsConnections.size}"
