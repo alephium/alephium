@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.broker
 
-import akka.actor.Props
+import org.apache.pekko.actor.Props
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.protocol.Generators.socketAddressGen

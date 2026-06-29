@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.model
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.serde.Serde
 import org.alephium.util.{SecureAndSlowRandom, UnsecureRandom}

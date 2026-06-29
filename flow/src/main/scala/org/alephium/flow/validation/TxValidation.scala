@@ -18,7 +18,7 @@ package org.alephium.flow.validation
 
 import scala.collection.mutable
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.crypto.{ED25519, ED25519PublicKey, SecP256R1, SecP256R1PublicKey}
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
@@ -1099,6 +1099,7 @@ object TxValidation {
       }
     }
 
+    // scalastyle:off method.length
     protected[validation] def checkTxScript(
         chainIndex: ChainIndex,
         tx: Transaction,
@@ -1137,7 +1138,14 @@ object TxValidation {
                 checkScriptExeFlag(tx, false, GasBox.zero)
               case Left(Left(ioFalure)) => Left(Left(ioFalure.error))
             }
-          case None => checkScriptExeFlag(tx, true, gasRemaining)
+          case None =>
+            if (tx.contractInputs.nonEmpty) {
+              invalidTx(InvalidContractInputs)
+            } else if (tx.generatedOutputs.nonEmpty) {
+              invalidTx(InvalidGeneratedOutputs)
+            } else {
+              checkScriptExeFlag(tx, true, gasRemaining)
+            }
         }
       } else {
         if (tx.unsigned.scriptOpt.nonEmpty) {

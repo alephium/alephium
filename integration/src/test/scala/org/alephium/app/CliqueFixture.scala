@@ -23,13 +23,13 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Random, Try}
 
-import akka.Done
-import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown}
-import akka.io.Tcp
-import akka.testkit.TestProbe
-import akka.util.Timeout
 import io.vertx.core.Vertx
 import io.vertx.core.http.WebSocketClientOptions
+import org.apache.pekko.Done
+import org.apache.pekko.actor.{ActorRef, ActorSystem, CoordinatedShutdown}
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.testkit.TestProbe
+import org.apache.pekko.util.Timeout
 import org.scalatest.Assertion
 import org.scalatest.time.{Seconds, Span}
 import sttp.model.StatusCode

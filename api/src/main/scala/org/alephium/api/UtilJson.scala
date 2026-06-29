@@ -21,7 +21,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import scala.reflect.ClassTag
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import upickle.core.ParseUtils
 
 import org.alephium.json.Json._

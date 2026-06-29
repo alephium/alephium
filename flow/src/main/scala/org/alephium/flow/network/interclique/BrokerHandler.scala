@@ -18,7 +18,7 @@ package org.alephium.flow.network.interclique
 
 import scala.collection.mutable
 
-import akka.actor.Cancellable
+import org.apache.pekko.actor.Cancellable
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxForkDepth, maxSyncBlocksPerChain, BlockFlow}
@@ -45,7 +45,11 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
   val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](maxBlockCapacity)
   val seenTxExpiryDuration: Duration     = BrokerHandler.seenTxExpiryDuration
   val seenTxs: Cache[TransactionId, TimeStamp] =
-    Cache.fifo[TransactionId, TimeStamp](maxTxsCapacity, identity[TimeStamp], seenTxExpiryDuration)
+    Cache.fifo[TransactionId, TimeStamp](
+      maxTxsCapacity,
+      identity[TimeStamp](_),
+      seenTxExpiryDuration
+    )
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 

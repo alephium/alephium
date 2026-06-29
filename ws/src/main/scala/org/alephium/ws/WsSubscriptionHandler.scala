@@ -21,12 +21,12 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
 
-import akka.actor.{ActorSystem, Props}
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.{Message, MessageConsumer}
 import io.vertx.core.http.{ServerWebSocketHandshake, WebSocketFrameType}
+import org.apache.pekko.actor.{ActorSystem, Props}
 
 import org.alephium.api.model.ApiKey
 import org.alephium.json.Json._

@@ -19,10 +19,10 @@ package org.alephium.flow.network
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.io.Tcp
-import akka.testkit.{EventFilter, TestActorRef, TestProbe}
-import akka.util.Timeout
+import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.testkit.{EventFilter, TestActorRef, TestProbe}
+import org.apache.pekko.util.Timeout
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.FlowFixture

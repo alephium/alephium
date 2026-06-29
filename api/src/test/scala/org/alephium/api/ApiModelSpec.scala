@@ -19,7 +19,7 @@ package org.alephium.api
 import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.EitherValues
 
@@ -117,7 +117,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
        |}""".stripMargin
   }
   def parseFail[A: Reader](jsonRaw: String): String = {
-    scala.util.Try(read[A](jsonRaw)).toEither.swap.rightValue.getMessage
+    val error = scala.util.Try(read[A](jsonRaw)).toEither.swap.rightValue
+
+    def rootCause(t: Throwable): Throwable = {
+      if (t.getCause == null) t else rootCause(t.getCause)
+    }
+
+    Option(rootCause(error).getMessage).getOrElse(error.getMessage)
   }
 
   it should "encode/decode TimeStamp" in {
@@ -126,7 +132,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(TimeStamp.unsafe(4385002872679507624L), "\"4385002872679507624\"")
 
     forAll(negLongGen) { long =>
-      parseFail[TimeStamp](s"$long") is "expect positive timestamp at index 0"
+      parseFail[TimeStamp](s"$long") is "expect positive timestamp"
     }
   }
 
@@ -269,7 +275,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       s"""{"peers":[{"cliqueId":"$cliqueId","brokerId":1,"brokerNum":3,"address":{"addr":"127.0.0.1","port":9000}}]}"""
     checkData(neighborCliques, jsonRaw(cliqueIdString))
 
-    parseFail[NeighborPeers](jsonRaw("OOPS")) is "invalid clique id at index 98"
+    parseFail[NeighborPeers](jsonRaw("OOPS")) is "invalid clique id"
   }
 
   it should "encode/decode GetBalance" in {
@@ -1072,7 +1078,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     forAll(invalidRawApiKeyGen) { invaildApiKey =>
       parseFail[ApiKey](
         s""""$invaildApiKey""""
-      ) is s"Api key must have at least 32 characters at index 0"
+      ) is s"Api key must have at least 32 characters"
     }
   }
 

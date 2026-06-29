@@ -16,7 +16,7 @@
 
 package org.alephium.macros
 
-import scala.annotation.{compileTimeOnly, nowarn, StaticAnnotation}
+import scala.annotation.{compileTimeOnly, StaticAnnotation}
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox
 
@@ -31,7 +31,7 @@ object HashSerdeImpl {
 
     def abort() = c.abort(c.enclosingPosition, s"Invalid annottee")
 
-    @nowarn def addHash(classDef: c.universe.ClassDef, compDef: ModuleDef): c.Expr[Any] =
+    def addHash(classDef: c.universe.ClassDef, compDef: ModuleDef): c.Expr[Any] =
       (classDef, compDef) match {
         case (
               q"final case class $className $mods (..$fields) extends ..$parents { ..$body }",
@@ -39,7 +39,7 @@ object HashSerdeImpl {
             ) =>
           c.Expr[Any](
             q"""final case class $className $mods ( ..$fields ) extends ..$parents {
-              lazy val bytes: akka.util.ByteString = org.alephium.serde.serialize(this)
+              lazy val bytes: org.apache.pekko.util.ByteString = org.alephium.serde.serialize(this)
               lazy val hash: org.alephium.protocol.Hash = org.alephium.protocol.Hash.hash(bytes)
               def shortHex: String = hash.shortHex
               ..$body

@@ -21,7 +21,7 @@ import scala.collection.mutable
 import scala.language.implicitConversions
 import scala.util.Random
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.crypto.{Byte64, SecP256R1, SecP256R1PrivateKey}

@@ -16,7 +16,7 @@
 
 package org.alephium.flow.io
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.flow.io.HeightIndexStorage.hashesSerde

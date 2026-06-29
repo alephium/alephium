@@ -16,7 +16,7 @@
 
 package org.alephium.app.ws
 
-import akka.actor.{ActorSystem, Props}
+import org.apache.pekko.actor.{ActorSystem, Props}
 
 import org.alephium.api.model.{
   BlockAndEvents,

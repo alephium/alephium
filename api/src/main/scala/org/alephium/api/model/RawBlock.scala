@@ -16,6 +16,6 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 final case class RawBlock(value: ByteString)

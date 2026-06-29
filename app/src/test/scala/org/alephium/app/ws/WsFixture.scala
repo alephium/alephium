@@ -22,12 +22,12 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
-import akka.actor.ActorSystem
-import akka.testkit.TestProbe
-import akka.util.Timeout
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.{HttpServerOptions, WebSocketClientOptions, WebSocketFrame}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.testkit.TestProbe
+import org.apache.pekko.util.Timeout
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, BeforeAndAfterEach}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}

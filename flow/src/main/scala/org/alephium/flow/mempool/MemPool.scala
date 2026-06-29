@@ -18,7 +18,8 @@ package org.alephium.flow.mempool
 
 import scala.collection.mutable
 
-import io.prometheus.client.Gauge
+import io.prometheus.metrics.core.metrics.Gauge
+import io.prometheus.metrics.model.registry.PrometheusRegistry
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
@@ -304,7 +305,7 @@ class MemPool private (
   private val transactionsTotalLabeled = {
     groupConfig.cliqueChainIndexes.map(chainIndex =>
       MemPool.sharedPoolTransactionsTotal
-        .labels(chainIndex.from.value.toString, chainIndex.to.value.toString)
+        .labelValues(chainIndex.from.value.toString, chainIndex.to.value.toString)
     )
   }
 
@@ -407,10 +408,9 @@ object MemPool {
   }
 
   val sharedPoolTransactionsTotal: Gauge = Gauge
-    .build(
-      "alephium_mempool_shared_pool_transactions_total",
-      "Number of transactions in shared pool"
-    )
+    .builder()
+    .name("alephium_mempool_shared_pool_transactions_total")
+    .help("Number of transactions in shared pool")
     .labelNames("group_index", "chain_index")
-    .register()
+    .register(PrometheusRegistry.defaultRegistry)
 }

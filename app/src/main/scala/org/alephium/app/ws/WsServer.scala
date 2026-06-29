@@ -22,11 +22,11 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.FiniteDuration
 
-import akka.actor.ActorSystem
 import com.typesafe.scalalogging.StrictLogging
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.{ServerWebSocket, WebSocketFrame}
+import org.apache.pekko.actor.ActorSystem
 
 import org.alephium.api.model.ApiKey
 import org.alephium.flow.client.Node

@@ -22,7 +22,7 @@ import java.nio.file.Files
 import scala.io.Source
 import scala.util.{Try, Using}
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.api.UtilJson._
 import org.alephium.crypto.{AES, Sha256}

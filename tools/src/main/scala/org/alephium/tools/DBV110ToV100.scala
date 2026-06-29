@@ -18,7 +18,7 @@ package org.alephium.tools
 
 import java.nio.charset.StandardCharsets
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.io.{DatabaseVersion, Storages}
 import org.alephium.io.RocksDBSource.ColumnFamily

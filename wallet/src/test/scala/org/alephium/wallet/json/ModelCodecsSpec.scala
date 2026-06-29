@@ -58,7 +58,7 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   def parseFail[A: Reader](jsonRaw: String): String = {
-    scala.util.Try(read[A](jsonRaw)).toEither.swap.rightValue.getMessage
+    scala.util.Try(read[A](jsonRaw)).toEither.swap.rightValue.getCause.getMessage
   }
 
   it should "Addresses" in {

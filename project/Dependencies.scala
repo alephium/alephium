@@ -17,31 +17,32 @@
 import sbt._
 
 object Version {
-  lazy val akka       = "2.6.20"
-  lazy val tapir      = "1.11.43"
-  lazy val sttp       = "3.11.0"
+  lazy val pekko      = "1.6.0"
+  lazy val tapir      = "1.13.21"
+  lazy val sttp       = "4.0.23"
   lazy val apispec    = "0.11.10"
-  lazy val prometheus = "0.16.0"
+  lazy val prometheus = "1.6.1"
 }
 
 object Dependencies {
-  lazy val akka         = "com.typesafe.akka" %% "akka-actor"   % Version.akka
-  lazy val `akka-slf4j` = "com.typesafe.akka" %% "akka-slf4j"   % Version.akka
-  lazy val `akka-test`  = "com.typesafe.akka" %% "akka-testkit" % Version.akka % Test
+  lazy val pekko         = "org.apache.pekko" %% "pekko-actor"   % Version.pekko
+  lazy val `pekko-slf4j` = "org.apache.pekko" %% "pekko-slf4j"   % Version.pekko
+  lazy val `pekko-test`  = "org.apache.pekko" %% "pekko-testkit" % Version.pekko % Test
 
-  lazy val vertx = "io.vertx" % "vertx-core" % "4.5.20"
+  lazy val vertx =
+    "io.vertx" % "vertx-core" % "5.1.2"
 
-  lazy val `upickle` = "com.lihaoyi" %% "upickle" % "3.3.0"
+  lazy val `upickle` = "com.lihaoyi" %% "upickle" % "4.4.3"
 
   lazy val ficus           = "com.iheart"                 %% "ficus"           % "1.5.2"
-  lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk18on"  % "1.78.1"
-  lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "3.1.0"
-  lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.5.18"
-  lazy val rocksdb         = "org.rocksdb"                 % "rocksdbjni"      % "8.11.4"
+  lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk18on"  % "1.84"
+  lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "3.1.1"
+  lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.5.32"
+  lazy val rocksdb         = "org.rocksdb"                 % "rocksdbjni"      % "10.10.1.1"
   lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.5"
-  lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.18.0"  % Test
-  lazy val scalatest       = "org.scalatest"              %% "scalatest"       % "3.2.18"  % Test
-  lazy val scalatestplus   = "org.scalatestplus"          %% "scalacheck-1-14" % "3.2.2.0" % Test
+  lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.19.0"   % Test
+  lazy val scalatest       = "org.scalatest"              %% "scalatest"       % "3.2.20"   % Test
+  lazy val scalatestplus   = "org.scalatestplus"          %% "scalacheck-1-19" % "3.2.20.0" % Test
   lazy val weupnp          = "org.bitlet"                  % "weupnp"          % "0.1.4"
 
   def `scala-reflect`(scalaVersion: String) = "org.scala-lang" % "scala-reflect" % scalaVersion
@@ -56,13 +57,14 @@ object Dependencies {
     "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui" % Version.tapir
   lazy val `tapir-client` = "com.softwaremill.sttp.tapir"   %% "tapir-sttp-client" % Version.tapir
   lazy val `tapir-files`  = "com.softwaremill.sttp.tapir"   %% "tapir-files"       % Version.tapir
-  lazy val `sttp-backend` = "com.softwaremill.sttp.client3" %% "core"              % Version.sttp
+  lazy val `sttp-backend` = "com.softwaremill.sttp.client4" %% "core"              % Version.sttp
 
-  lazy val `prometheus-simple-client` = "io.prometheus" % "simpleclient" % Version.prometheus
+  lazy val `prometheus-simple-client` =
+    "io.prometheus" % "prometheus-metrics-core" % Version.prometheus
   lazy val `prometheus-simple-client-common` =
-    "io.prometheus" % "simpleclient_common" % Version.prometheus
+    "io.prometheus" % "prometheus-metrics-exporter-common" % Version.prometheus
   lazy val `prometheus-simple-client-hotspot` =
-    "io.prometheus" % "simpleclient_hotspot" % Version.prometheus
+    "io.prometheus" % "prometheus-metrics-instrumentation-jvm" % Version.prometheus
   lazy val scopt = "com.github.scopt" %% "scopt" % "4.1.0"
 
   lazy val `tapir-prometheus-metrics` =

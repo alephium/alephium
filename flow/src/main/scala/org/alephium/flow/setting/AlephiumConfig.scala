@@ -22,13 +22,13 @@ import java.nio.file.Path
 
 import scala.collection.immutable.ArraySeq
 
-import akka.actor.ActorRef
-import akka.io.Tcp
-import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.ValueReader
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.util.ByteString
 
 import org.alephium.conf._
 import org.alephium.flow.core.maxForkDepth
@@ -206,7 +206,7 @@ final case class NetworkSetting(
 
   def handshakeTimeout: Duration = retryTimeout
 
-  val externalAddressInferred: Option[InetSocketAddress] = externalAddress.orElse {
+  lazy val externalAddressInferred: Option[InetSocketAddress] = externalAddress.orElse {
     if (upnp.enabled) {
       Upnp.getUpnpClient(upnp).map { client =>
         val bindingPort = bindAddress.getPort

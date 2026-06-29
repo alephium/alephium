@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.model.ContractId
 import org.alephium.serde.{_deserialize => decode, serialize => encode, _}

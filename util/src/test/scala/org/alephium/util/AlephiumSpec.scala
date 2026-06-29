@@ -24,7 +24,7 @@ import scala.annotation.nowarn
 import scala.collection.mutable
 import scala.language.implicitConversions
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalacheck.Arbitrary._
 import org.scalactic.Equality
@@ -42,7 +42,8 @@ trait AlephiumSpec
     with ScalaCheckDrivenPropertyChecks
     with AlephiumFixture
     with BeforeAndAfterAll {
-  @nowarn implicit protected def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+  @nowarn("cat=deprecation") implicit protected def noShrink[A]: Shrink[A] =
+    Shrink(_ => Stream.empty)
 
   override def afterAll(): Unit = {
     super.afterAll()

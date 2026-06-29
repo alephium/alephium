@@ -18,7 +18,7 @@ package org.alephium.crypto
 
 import scala.util.control.NonFatal
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.bouncycastle.math.ec.rfc8032.{Ed25519 => bcEd25519}
 
 import org.alephium.serde.RandomBytes

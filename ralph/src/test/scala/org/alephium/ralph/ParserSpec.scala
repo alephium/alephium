@@ -16,8 +16,8 @@
 
 package org.alephium.ralph
 
-import akka.util.ByteString
 import fastparse._
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.protocol.{Hash, PublicKey}
@@ -1237,7 +1237,11 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
         )
       )
 
-    CompoundAssignmentOperator.values.foreach { stats(_).foreach(checkParseStat.tupled) }
+    CompoundAssignmentOperator.values.foreach {
+      stats(_).foreach { case (str, stat) =>
+        checkParseStat(str, stat)
+      }
+    }
   }
 
   it should "parse assign statement" in {

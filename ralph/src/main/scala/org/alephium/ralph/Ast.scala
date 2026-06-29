@@ -18,10 +18,10 @@ package org.alephium.ralph
 
 import java.nio.charset.StandardCharsets
 
-import scala.annotation.{nowarn, tailrec}
+import scala.annotation.tailrec
 import scala.collection.mutable
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{ALPHTokenId => ALPHTokenIdInstr, Contract => VmContract, _}
@@ -2456,7 +2456,7 @@ object Ast {
       }
     }
 
-    protected def checkConstants(@nowarn state: Compiler.State[Ctx]): Unit = {}
+    protected def checkConstants(state: Compiler.State[Ctx]): Unit = {}
 
     private def checkAndAddFields(state: Compiler.State[Ctx]): Unit = {
       fields.foreach { field =>

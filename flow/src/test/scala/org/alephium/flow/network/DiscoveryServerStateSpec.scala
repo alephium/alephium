@@ -21,8 +21,8 @@ import java.net.InetSocketAddress
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 
-import akka.event.LoggingAdapter
-import akka.testkit.{SocketUtil, TestProbe}
+import org.apache.pekko.event.LoggingAdapter
+import org.apache.pekko.testkit.{SocketUtil, TestProbe}
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.concurrent.Eventually

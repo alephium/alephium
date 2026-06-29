@@ -216,6 +216,6 @@ class JsonRPCSpec extends AlephiumSpec with EitherValues with Inside {
   it should "parse success - fail on wrong rpc version" in {
     val jsonRaw = """{"result": 42, "id": 1,"jsonrpc": "1.0"}"""
     val error   = Try(read[JsonRPC.Response](jsonRaw)).toEither.left.value
-    error.getMessage is "Invalid JSON-RPC version '1.0' at index 39"
+    error.getCause.getMessage is "Invalid JSON-RPC version '1.0' at index 39"
   }
 }

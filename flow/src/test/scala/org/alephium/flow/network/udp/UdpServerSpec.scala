@@ -18,8 +18,8 @@ package org.alephium.flow.network.udp
 
 import java.net.InetSocketAddress
 
-import akka.testkit.{EventFilter, SocketUtil, TestActorRef}
-import akka.util.ByteString
+import org.apache.pekko.testkit.{EventFilter, SocketUtil, TestActorRef}
+import org.apache.pekko.util.ByteString
 
 import org.alephium.crypto.Blake2b
 import org.alephium.util.{AlephiumActorSpec}

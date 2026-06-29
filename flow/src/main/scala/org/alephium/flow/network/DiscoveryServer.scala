@@ -20,8 +20,8 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import scala.collection.immutable.ArraySeq
 
-import akka.actor.{ActorRef, Cancellable, Props, Stash, Terminated}
-import io.prometheus.client.Gauge
+import io.prometheus.metrics.core.metrics.Gauge
+import org.apache.pekko.actor.{ActorRef, Cancellable, Props, Stash, Terminated}
 
 import org.alephium.flow.handler.IOBaseActor
 import org.alephium.flow.io.BrokerStorage
@@ -87,7 +87,9 @@ object DiscoveryServer {
   final case class NewPeer(info: BrokerInfo)                 extends Event with EventStream.Event
 
   val discoveredBrokerSize: Gauge = Gauge
-    .build("alephium_discovered_broker_size", "Number of discovered brokers")
+    .builder()
+    .name("alephium_discovered_broker_size")
+    .help("Number of discovered brokers")
     .register()
 }
 

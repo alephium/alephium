@@ -21,8 +21,8 @@ import java.nio.charset.StandardCharsets
 import scala.annotation.nowarn
 import scala.collection.{immutable, mutable}
 
-import akka.util.ByteString
 import fastparse.Parsed
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Ast.{Ident, MultiContract}
@@ -159,7 +159,7 @@ object Compiler {
     def inline: Boolean = false
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type]
     def getReturnType[C <: Ctx](
-        @nowarn ast: Ast.Positioned,
+        @nowarn("cat=unused") ast: Ast.Positioned,
         args: Seq[Ast.Expr[C]],
         state: State[C]
     ): Seq[Type] = {
@@ -170,7 +170,7 @@ object Compiler {
       args.flatMap(_.genCode(state))
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
     def genCode[C <: Ctx](
-        @nowarn ast: Ast.Positioned,
+        @nowarn("cat=unused") ast: Ast.Positioned,
         args: Seq[Ast.Expr[C]],
         state: State[C]
     ): Seq[Instr[C]] = {

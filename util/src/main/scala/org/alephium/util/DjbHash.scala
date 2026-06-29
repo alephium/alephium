@@ -16,7 +16,7 @@
 
 package org.alephium.util
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 object DjbHash {
   // scalastyle:off magic.number

@@ -16,7 +16,7 @@
 
 package org.alephium.serde
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 trait Serializer[T] {
   def serialize(input: T): ByteString

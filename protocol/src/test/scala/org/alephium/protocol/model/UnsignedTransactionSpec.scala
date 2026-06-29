@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.model
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.{ALPH, PublicKey}
 import org.alephium.protocol.model.UnsignedTransaction.{TotalAmountNeeded, TxOutputInfo}
@@ -243,7 +243,15 @@ class UnsignedTransactionSpec extends AlephiumSpec with NumericHelpers {
         amount: U256,
         _tokens: AVector[(TokenId, U256)] = AVector.empty
     ): TxOutputInfo = {
-      TxOutputInfo(lockupScript, amount, _tokens.flatMap(tokens.tupled), None, None)
+      TxOutputInfo(
+        lockupScript,
+        amount,
+        _tokens.flatMap { case (tokenId, tokenAmount) =>
+          tokens(tokenId, tokenAmount)
+        },
+        None,
+        None
+      )
     }
   }
 }

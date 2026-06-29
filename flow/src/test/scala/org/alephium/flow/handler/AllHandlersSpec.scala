@@ -16,7 +16,7 @@
 
 package org.alephium.flow.handler
 
-import akka.testkit.TestProbe
+import org.apache.pekko.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.model.DataOrigin

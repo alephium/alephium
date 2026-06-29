@@ -20,11 +20,11 @@ import java.net.InetSocketAddress
 
 import scala.util.Random
 
-import akka.actor.{ActorContext, Props}
-import akka.event.LoggingAdapter
-import akka.io.Tcp
-import akka.util.ByteString
-import io.prometheus.client.Gauge
+import io.prometheus.metrics.core.metrics.Gauge
+import org.apache.pekko.actor.{ActorContext, Props}
+import org.apache.pekko.event.LoggingAdapter
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.{Utils => FlowUtils}
 import org.alephium.flow.core.BlockFlow
@@ -125,7 +125,9 @@ object InterCliqueManager {
   final case class PeerDisconnected(peer: InetSocketAddress)
 
   val peersTotal: Gauge = Gauge
-    .build("alephium_peers_total", "Number of connected peers")
+    .builder()
+    .name("alephium_peers_total")
+    .help("Number of connected peers")
     .register()
 
   trait NodeSyncStatus extends BaseActor {

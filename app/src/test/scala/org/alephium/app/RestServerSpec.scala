@@ -23,9 +23,9 @@ import scala.concurrent._
 import scala.io.Source
 import scala.util.{Random, Using}
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.testkit.{TestActor, TestProbe}
 import io.vertx.core.http.HttpServerOptions
+import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
+import org.apache.pekko.testkit.{TestActor, TestProbe}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, EitherValues}
 import org.scalatest.compatible.Assertion
 import sttp.client3.Response

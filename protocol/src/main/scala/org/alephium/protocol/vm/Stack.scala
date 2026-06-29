@@ -59,7 +59,7 @@ class Stack[@sp T: ClassTag](
 
   def size: Int = currentIndex - offset
 
-  def top: Option[T] = Option.when(currentIndex >= 1)(underlying(currentIndex - 1))
+  def top: Option[T] = Option.when(currentIndex > offset)(underlying(currentIndex - 1))
 
   def push(elem: T): ExeResult[Unit] = {
     if (currentIndex < maxIndex) {
@@ -132,7 +132,7 @@ class Stack[@sp T: ClassTag](
   }
 
   def dupTop(): ExeResult[Unit] = {
-    if (currentIndex >= 1) {
+    if (currentIndex > offset) {
       push(underlying(currentIndex - 1))
     } else {
       failed(StackUnderflow)

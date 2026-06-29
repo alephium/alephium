@@ -18,7 +18,7 @@ package org.alephium.util
 
 import scala.annotation.tailrec
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 // scalastyle:off magic.number return
 object Base58 {

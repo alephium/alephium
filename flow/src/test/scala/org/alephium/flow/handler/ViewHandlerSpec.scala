@@ -16,9 +16,9 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.Props
-import akka.testkit.{EventFilter, TestActorRef, TestProbe}
-import akka.util.Timeout
+import org.apache.pekko.actor.Props
+import org.apache.pekko.testkit.{EventFilter, TestActorRef, TestProbe}
+import org.apache.pekko.util.Timeout
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool

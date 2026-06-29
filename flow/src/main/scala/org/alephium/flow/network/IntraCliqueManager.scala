@@ -16,9 +16,9 @@
 
 package org.alephium.flow.network
 
-import akka.actor.{ActorRef, Props, Terminated}
-import akka.io.Tcp
-import akka.util.ByteString
+import org.apache.pekko.actor.{ActorRef, Props, Terminated}
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow

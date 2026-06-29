@@ -22,11 +22,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-import akka.actor.ActorSystem
-import akka.testkit.TestProbe
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.WebSocketFrame
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.testkit.TestProbe
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.scalatest.Inside.inside
 import org.scalatest.concurrent.{Eventually, ScalaFutures}

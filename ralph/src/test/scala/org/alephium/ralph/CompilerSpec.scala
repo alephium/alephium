@@ -18,7 +18,7 @@ package org.alephium.ralph
 
 import scala.collection.mutable
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.crypto.Byte64
@@ -2242,7 +2242,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators with CompilerFixt
         }
       }
 
-      Seq(interface, abstractContract).foreach(code => {
+      Seq(interface(_, _), abstractContract(_, _)).foreach(code => {
         test(Parser.FunctionUsingAnnotation.usePreapprovedAssetsKey, true, code)
         test(Parser.FunctionUsingAnnotation.useContractAssetsKey, false, code)
         test(Parser.FunctionUsingAnnotation.useCheckExternalCallerKey, false, code)

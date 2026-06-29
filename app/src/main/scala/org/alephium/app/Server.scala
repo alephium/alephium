@@ -21,8 +21,8 @@ import java.nio.file.Path
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 
-import akka.actor.ActorSystem
 import io.vertx.core.http.HttpServerOptions
+import org.apache.pekko.actor.ActorSystem
 
 import org.alephium.app.ws.WsServer
 import org.alephium.flow.client.Node

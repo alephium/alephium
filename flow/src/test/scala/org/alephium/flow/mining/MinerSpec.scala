@@ -18,8 +18,8 @@ package org.alephium.flow.mining
 
 import scala.annotation.tailrec
 
-import akka.testkit.TestActorRef
-import akka.util.Timeout
+import org.apache.pekko.testkit.TestActorRef
+import org.apache.pekko.util.Timeout
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}

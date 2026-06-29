@@ -19,7 +19,7 @@ package org.alephium.app.ws
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-import akka.testkit.TestProbe
+import org.apache.pekko.testkit.TestProbe
 import org.scalatest.Inside.inside
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.exceptions.TestFailedException

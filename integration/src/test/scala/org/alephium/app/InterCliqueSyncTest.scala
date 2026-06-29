@@ -19,9 +19,9 @@ package org.alephium.app
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
 
-import akka.actor.{Actor, ActorRef}
-import akka.io.Tcp
-import akka.util.ByteString
+import org.apache.pekko.actor.{Actor, ActorRef}
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.util.ByteString
 
 import org.alephium.api.model._
 import org.alephium.flow.mining.Miner

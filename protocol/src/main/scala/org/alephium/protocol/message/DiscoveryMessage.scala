@@ -19,7 +19,7 @@ package org.alephium.protocol.message
 import scala.language.existentials
 import scala.reflect.ClassTag
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
@@ -78,7 +78,9 @@ object DiscoveryMessage {
         case x: FindNode  => (FindNode, FindNode.serialize(x))
         case x: Neighbors => (Neighbors, Neighbors.serialize(x))
       }
-      intSerde.serialize(Code.toInt(code)) ++ data
+      @SuppressWarnings(Array("org.wartremover.warts.PartialFunctionApply"))
+      val codeInt = Code.toInt(code)
+      intSerde.serialize(codeInt) ++ data
     }
 
     def deserialize(

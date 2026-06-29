@@ -18,9 +18,9 @@ package org.alephium.flow.network.bootstrap
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, Props, Terminated}
-import akka.io.Tcp
-import akka.util.ByteString
+import org.apache.pekko.actor.{ActorRef, Props, Terminated}
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.setting.NetworkSetting

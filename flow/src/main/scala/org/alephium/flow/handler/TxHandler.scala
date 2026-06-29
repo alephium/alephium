@@ -19,7 +19,7 @@ package org.alephium.flow.handler
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import akka.actor.{ActorSystem, Props}
+import org.apache.pekko.actor.{ActorSystem, Props}
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow

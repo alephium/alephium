@@ -22,9 +22,9 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.Random
 
-import akka.actor.Props
-import akka.io.Tcp
-import akka.testkit.{EventFilter, TestActorRef, TestProbe}
+import org.apache.pekko.actor.Props
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.testkit.{EventFilter, TestActorRef, TestProbe}
 import org.scalacheck.Gen
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}

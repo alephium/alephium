@@ -78,8 +78,8 @@ lazy val util = project("util")
   .dependsOn(macros)
   .settings(
     libraryDependencies ++= Seq(
-      akka,
-      `akka-slf4j`,
+      pekko,
+      `pekko-slf4j`,
       bcprov,
       `scala-logging`,
       `scala-reflect`(scalaVersion.value)
@@ -103,8 +103,9 @@ lazy val rpc = project("rpc")
   .settings(
     libraryDependencies ++= Seq(
       `scala-logging`,
-      `akka-test`
-    )
+      `pekko-test`
+    ),
+    publish / skip := true
   )
   .dependsOn(json, util % "test->test;compile->compile")
 
@@ -354,8 +355,8 @@ lazy val flow = project("flow")
   .dependsOn(conf, crypto, io, serde, util % "test->test")
   .settings(
     libraryDependencies ++= Seq(
-      akka,
-      `akka-slf4j`,
+      pekko,
+      `pekko-slf4j`,
       logback,
       `scala-logging`,
       weupnp,
@@ -485,7 +486,7 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion             := "2.13.16",
+  scalaVersion             := "2.13.18",
   Test / parallelExecution := false,
   scalacOptions ++= Seq(
     "-Xsource:3",
@@ -535,7 +536,7 @@ val commonSettings = publishSettings ++ Seq(
   Test / envVars += "ALEPHIUM_ENV" -> "test",
   Test / testOptions += Tests.Argument("-oD"),
   libraryDependencies ++= Seq(
-    `akka-test`,
+    `pekko-test`,
     scalacheck,
     scalatest,
     scalatestplus

@@ -16,7 +16,7 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.{ActorSystem, Props}
+import org.apache.pekko.actor.{ActorSystem, Props}
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.InterCliqueManager

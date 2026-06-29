@@ -18,7 +18,7 @@ package org.alephium.util
 
 import scala.math.Ordering.{Boolean => BooleanOrdering, Byte => ByteOrdering}
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 object Bytes {
   def toPosInt(byte: Byte): Int = {

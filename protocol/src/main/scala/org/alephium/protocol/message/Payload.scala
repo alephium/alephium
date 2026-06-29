@@ -16,8 +16,10 @@
 
 package org.alephium.protocol.message
 
-import akka.util.ByteString
-import io.prometheus.client.Counter
+import io.prometheus.metrics.core.datapoints.CounterDataPoint
+import io.prometheus.metrics.core.metrics.Counter
+import io.prometheus.metrics.model.registry.PrometheusRegistry
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
@@ -64,7 +66,9 @@ object Payload {
       case x: BlocksAndUnclesByHeightsResponse =>
         (BlocksAndUnclesByHeightsResponse, BlocksAndUnclesByHeightsResponse.serialize(x))
     }
-    intSerde.serialize(Code.toInt(code)) ++ data
+    @SuppressWarnings(Array("org.wartremover.warts.PartialFunctionApply"))
+    val codeInt = Code.toInt(code)
+    intSerde.serialize(codeInt) ++ data
   }
   // scalastyle:on cyclomatic.complexity
 
@@ -113,8 +117,8 @@ object Payload {
     }
 
   sealed trait Code {
-    def codeName: String                   = this.getClass.getSimpleName.dropRight(1)
-    lazy val payloadLabeled: Counter.Child = Payload.payloadTotal.labels(codeName)
+    def codeName: String                      = this.getClass.getSimpleName.dropRight(1)
+    lazy val payloadLabeled: CounterDataPoint = Payload.payloadTotal.labelValues(codeName)
   }
 
   trait FixUnused[T <: Payload] {
@@ -177,12 +181,11 @@ object Payload {
   }
 
   val payloadTotal: Counter = Counter
-    .build(
-      "alephium_payload_total",
-      "Total number of payloads"
-    )
+    .builder()
+    .name("alephium_payload_total")
+    .help("Total number of payloads")
     .labelNames("payload_type")
-    .register()
+    .register(PrometheusRegistry.defaultRegistry)
 
   sealed trait Solicited extends Payload {
     val id: RequestId

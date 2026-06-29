@@ -19,7 +19,7 @@ package org.alephium.app
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-import akka.testkit.TestProbe
+import org.apache.pekko.testkit.TestProbe
 import org.scalatest.Assertion
 
 import org.alephium.json.Json._

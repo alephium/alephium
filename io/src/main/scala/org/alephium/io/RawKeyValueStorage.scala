@@ -16,7 +16,7 @@
 
 package org.alephium.io
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 trait RawKeyValueStorage {
   def getRawUnsafe(key: ByteString): ByteString

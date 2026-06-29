@@ -20,7 +20,7 @@ import java.math.BigInteger
 
 import scala.math.BigInt.javaBigInteger2bigInt
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}

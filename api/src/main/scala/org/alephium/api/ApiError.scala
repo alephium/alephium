@@ -16,8 +16,6 @@
 
 package org.alephium.api
 
-import scala.annotation.nowarn
-
 import sttp.model.StatusCode
 import sttp.tapir.{FieldName, Schema}
 import sttp.tapir.Schema.SName
@@ -35,7 +33,6 @@ object ApiError {
   sealed abstract class Companion[S <: StatusCode, E <: ApiError[S]](val statusCode: S) {
     def description: String = this.getClass.getSimpleName.dropRight(1)
 
-    @nowarn
     def specificFields(e: E): Option[ujson.Obj] = {
       None
     }

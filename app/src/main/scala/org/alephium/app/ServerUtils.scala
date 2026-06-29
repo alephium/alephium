@@ -21,9 +21,9 @@ import java.math.BigInteger
 import scala.collection.mutable
 import scala.concurrent._
 
-import akka.util.ByteString
-import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
+import org.apache.pekko.util.ByteString
+import org.apache.pekko.util.Timeout
 
 import org.alephium.api._
 import org.alephium.api.{model => api}
@@ -272,7 +272,9 @@ class ServerUtils(implicit
           MempoolTransactions(
             chainIndex.from.value,
             chainIndex.to.value,
-            txsWithTimestamp.map(model.TransactionTemplate.fromProtocol.tupled)
+            txsWithTimestamp.map { case (template, timestamp) =>
+              model.TransactionTemplate.fromProtocol(template, timestamp)
+            }
           )
         }
       )

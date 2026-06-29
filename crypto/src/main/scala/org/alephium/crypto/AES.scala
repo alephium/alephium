@@ -21,7 +21,7 @@ import javax.crypto.spec.{GCMParameterSpec, PBEKeySpec, SecretKeySpec}
 
 import scala.util.Try
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.util.SecureAndSlowRandom
 

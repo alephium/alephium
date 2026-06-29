@@ -18,8 +18,8 @@ package org.alephium.flow.handler
 
 import scala.collection.mutable.ArrayBuffer
 
-import akka.actor.{ActorRef, ActorSystem, Cancellable, Props}
-import akka.pattern.pipe
+import org.apache.pekko.actor.{ActorRef, ActorSystem, Cancellable, Props}
+import org.apache.pekko.pattern.pipe
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.mining.Miner

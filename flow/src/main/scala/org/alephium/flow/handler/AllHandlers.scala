@@ -16,7 +16,7 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.BlockFlow
@@ -53,7 +53,9 @@ final case class AllHandlers(
 
   def getBlockHandlerUnsafe(chainIndex: ChainIndex): ActorRefT[BlockChainHandler.Command] = {
     assume(chainIndex.relateTo(brokerConfig))
-    blockHandlers(chainIndex)
+    @SuppressWarnings(Array("org.wartremover.warts.PartialFunctionApply"))
+    val handler = blockHandlers(chainIndex)
+    handler
   }
 
   def getHeaderHandler(chainIndex: ChainIndex): Option[ActorRefT[HeaderChainHandler.Command]] = {
@@ -62,7 +64,9 @@ final case class AllHandlers(
 
   def getHeaderHandlerUnsafe(chainIndex: ChainIndex): ActorRefT[HeaderChainHandler.Command] = {
     assume(!chainIndex.relateTo(brokerConfig))
-    headerHandlers(chainIndex)
+    @SuppressWarnings(Array("org.wartremover.warts.PartialFunctionApply"))
+    val handler = headerHandlers(chainIndex)
+    handler
   }
 }
 

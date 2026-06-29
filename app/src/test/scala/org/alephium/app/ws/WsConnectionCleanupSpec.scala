@@ -18,7 +18,7 @@ package org.alephium.app.ws
 
 import scala.concurrent.duration._
 
-import akka.testkit.TestProbe
+import org.apache.pekko.testkit.TestProbe
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 
 import org.alephium.flow.handler.AllHandlers.BlockNotify
