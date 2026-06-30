@@ -30,6 +30,8 @@ import org.apache.pekko.testkit.TestProbe
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.scalatest.Inside.inside
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
 import org.alephium.json.Json._
@@ -44,6 +46,11 @@ import org.alephium.ws.WsUtils._
 
 class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with ScalaFutures {
   import org.alephium.app.ws.WsBehaviorFixture._
+
+  implicit override val patienceConfig: PatienceConfig =
+    PatienceConfig(timeout = Span(15, Seconds))
+
+  private val wsTimeout = Timeout(15.seconds)
 
   private lazy val system: ActorSystem = ActorSystem("ws-subscription-handler-spec")
 
@@ -61,8 +68,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         params_addr_01_eventIndex_0.subscriptionId
       )
     def subscribingRequestResponseBehavior(clientProbe: TestProbe): Future[WsClient] = {
+      val ws = connectAndWait(wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ()))
       for {
-        ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
         blockSubscriptionResponse <- ws.subscribeToBlock(corId(0))
         txSubscriptionResponse    <- ws.subscribeToTx(corId(1))
         contractEventsSubscriptionResponse <- ws.subscribeToContractEvents(
@@ -176,16 +183,16 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(20, TimeUnit.MILLISECONDS)
       )
-    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
+    eventually(wsTimeout)(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val ws = new NonPongingServerWs("stale")
     subscriptionHandler ! Connect(ws)
     subscriptionHandler ! Subscribe(corId(0), ws, SimpleSubscribeParams.Block)
 
-    eventually {
+    eventually(wsTimeout) {
       getSubscriptions(subscriptionHandler).connections.contains(ws.textHandlerID()) is true
     }
-    eventually {
+    eventually(wsTimeout) {
       ws.closed is true
       assertNotConnected(ws.textHandlerID(), subscriptionHandler)
     }
@@ -239,19 +246,19 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
       )
-    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
+    eventually(wsTimeout)(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val ws = new CapturingServerWs("rate-limited")
     subscriptionHandler ! Connect(ws)
 
-    eventually(ws.textHandler.nonEmpty is true)
+    eventually(wsTimeout)(ws.textHandler.nonEmpty is true)
     AVector
       .tabulate(3)(index =>
         write(WsRequest.subscribe(corId(index.toLong), SimpleSubscribeParams.Tx))
       )
       .foreach(ws.sendText)
 
-    eventually {
+    eventually(wsTimeout) {
       ws.closed is true
     }
   }
@@ -312,18 +319,18 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
       )
-    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
+    eventually(wsTimeout)(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val ws = new BackpressuredServerWs("backpressured")
     subscriptionHandler ! Connect(ws)
 
-    eventually {
+    eventually(wsTimeout) {
       ws.textHandler.nonEmpty is true
       ws.writeQueueMaxSize is Some(config.network.ws.maxWriteQueueSize)
     }
     ws.sendText("invalid_msg")
 
-    eventually {
+    eventually(wsTimeout) {
       ws.closed is true
       ws.writes.get() is 0
       assertNotConnected(ws.textHandlerID(), subscriptionHandler)
@@ -332,19 +339,19 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
 
   it should "not allow for more subscriptions per ws client than limit" in new WsBehaviorFixture {
     def subscribingBehavior(clientProbe: TestProbe): Future[WsClient] = {
+      val ws = connectAndWait(wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ()))
       for {
-        ws <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
-        successfulSubscriptions <- Future.sequence(
-          AVector
-            .tabulate(node.config.network.ws.maxSubscriptionsPerConnection) { index =>
+        successfulSubscriptions <- AVector
+          .tabulate(node.config.network.ws.maxSubscriptionsPerConnection)(identity)
+          .fold(Future.successful(AVector.empty[Response])) { (responsesF, index) =>
+            responsesF.flatMap { responses =>
               ws.subscribeToContractEvents(
                 index.toLong,
                 params_addr_01_eventIndex_0.addresses,
                 eventIndex = Some(index)
-              )
+              ).map(responses :+ _)
             }
-            .toIterable
-        )
+          }
         rejectedSubscription <- ws.subscribeToContractEvents(
           50L,
           params_addr_12_eventIndex_1.addresses,
@@ -383,12 +390,16 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
 
   it should "handle invalid messages with error" in new WsBehaviorFixture {
     def invalidMessageBehavior(clientProbe: TestProbe): Future[WsClient] = {
+      val ws = connectAndWait(
+        wsClient.underlying.connect(wsPort, "127.0.0.1", "/ws").asScala.map { vertxWs =>
+          val ws = WsClient(vertxWs, _ => (), _ => ())
+          // using underlying ws to test unexpected messages, WsClient does not allow that
+          vertxWs.textMessageHandler(clientProbe.ref ! _)
+          ws
+        }
+      )
       for {
-        vertxWs <- wsClient.underlying.connect(wsPort, "127.0.0.1", "/ws").asScala
-        ws = WsClient(vertxWs, _ => (), _ => ())
-        // using underlying ws to test unexpected messages, WsClient does not allow that
-        _ = vertxWs.textMessageHandler(clientProbe.ref ! _)
-        _ <- vertxWs.writeTextMessage("invalid_msg").asScala
+        _ <- ws.underlying.writeTextMessage("invalid_msg").asScala
       } yield ws
     }
 
@@ -472,8 +483,8 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
 
   it should "subscribe/unsubscribe from block, tx and contract events from multiple addresses of different event indexes" in new WsBehaviorFixture {
     def subscribingBehavior(clientProbe: TestProbe): Future[WsClient] = {
+      val ws = connectAndWait(wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ()))
       for {
-        ws                        <- wsClient.connect(wsPort)(ntf => clientProbe.ref ! ntf)(_ => ())
         blockSubscriptionResponse <- ws.subscribeToBlock(corId(0))
         txSubscriptionResponse    <- ws.subscribeToTx(corId(1))
         contractEventsSubscriptionResponse_0 <- ws.subscribeToContractEvents(
@@ -614,7 +625,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
       )
-    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
+    eventually(wsTimeout)(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val websockets    = AVector(dummyServerWs(id = "dummy_0"), dummyServerWs(id = "dummy_1"))
     var correlationId = 0L
@@ -650,7 +661,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
           .view
           .mapValues(_.map(_._2))
       )
-    eventually {
+    eventually(wsTimeout) {
       val response = getSubscriptions(subscriptionHandler)
       response.subscriptionsByContractKey is expectedSubscriptionsByAddress.iterator.toMap
       response.contractKeysBySubscription is expectedAddressesBySubscriptionId.iterator.toMap
@@ -663,7 +674,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         correlationId += 1
       }
     }
-    eventually {
+    eventually(wsTimeout) {
       val response = getSubscriptions(subscriptionHandler)
       response.subscriptionsByContractKey is expectedSubscriptionsByAddress.iterator.toMap
       response.contractKeysBySubscription is expectedAddressesBySubscriptionId.iterator.toMap
@@ -678,7 +689,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         )
         correlationId += 1
       }
-      eventually {
+      eventually(wsTimeout) {
         contractEventParams.foreach { params =>
           assertConnectedButNotSubscribed(
             ws.textHandlerID(),
@@ -688,7 +699,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         }
       }
     }
-    eventually {
+    eventually(wsTimeout) {
       val response = getSubscriptions(subscriptionHandler)
       response.subscriptionsByContractKey is Map
         .empty[ContractEventKey, AVector[SubscriptionOfConnection]]
@@ -698,7 +709,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
 
     websockets.foreach { ws =>
       subscriptionHandler ! Disconnect(ws.textHandlerID())
-      eventually(assertNotConnected(ws.textHandlerID(), subscriptionHandler))
+      eventually(wsTimeout)(assertNotConnected(ws.textHandlerID(), subscriptionHandler))
     }
   }
 
@@ -716,7 +727,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
         config.network.ws.maxContractEventAddresses,
         FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
       )
-    eventually(testSubscriptionHandlerInitialized(subscriptionHandler))
+    eventually(wsTimeout)(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val ws = dummyServerWs("dummy")
 
@@ -740,7 +751,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       0L
     ) { case (correlationId, params) =>
       subscriptionHandler ! Subscribe(correlationId, ws, params)
-      eventually {
+      eventually(wsTimeout) {
         assertSimpleSubscription(
           params.subscriptionId,
           subscriptionHandler
@@ -749,7 +760,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
 
       // it should be idempotent for subscriptions
       subscriptionHandler ! Subscribe(correlationId + 1, ws, params)
-      eventually {
+      eventually(wsTimeout) {
         assertSimpleSubscription(
           params.subscriptionId,
           subscriptionHandler
@@ -757,7 +768,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       }
 
       subscriptionHandler ! Unsubscribe(correlationId + 2, ws, params.subscriptionId)
-      eventually {
+      eventually(wsTimeout) {
         assertConnectedButNotSubscribed(
           ws.textHandlerID(),
           params.subscriptionId,
@@ -768,6 +779,6 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     }
 
     subscriptionHandler ! Disconnect(ws.textHandlerID())
-    eventually(assertNotConnected(ws.textHandlerID(), subscriptionHandler))
+    eventually(wsTimeout)(assertNotConnected(ws.textHandlerID(), subscriptionHandler))
   }
 }

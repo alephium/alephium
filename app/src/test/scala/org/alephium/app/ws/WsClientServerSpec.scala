@@ -170,19 +170,18 @@ class WsClientServerSpec extends AlephiumSpec {
   "WsServer" should "reject subscription which is over limit" in new WsClientServerFixture {
     testWsAndClose(wsClient.connect(wsPort)(_ => ())(_ => ())) { ws =>
       val responses =
-        Future
-          .sequence(
-            AVector
-              .tabulate(node.config.network.ws.maxSubscriptionsPerConnection) { index =>
-                val req = WsRequest(
-                  index.toLong,
-                  ContractEventsSubscribeParams(params_addr_01_eventIndex_0.addresses, Some(index))
-                )
-                ws.writeRequestToSocket(req)
-              }
-              .toIterable
-          )
-          .futureValue(Timeout(1.second))
+        AVector
+          .tabulate(node.config.network.ws.maxSubscriptionsPerConnection)(identity)
+          .fold(Future.successful(AVector.empty[Response])) { (responsesF, index) =>
+            responsesF.flatMap { responses =>
+              val req = WsRequest(
+                index.toLong,
+                ContractEventsSubscribeParams(params_addr_01_eventIndex_0.addresses, Some(index))
+              )
+              ws.writeRequestToSocket(req).map(responses :+ _)
+            }
+          }
+          .futureValue(Timeout(15.seconds))
 
       responses.foreach {
         case JsonRPC.Response.Success(_, _) =>

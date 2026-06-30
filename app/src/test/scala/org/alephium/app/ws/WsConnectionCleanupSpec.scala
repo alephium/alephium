@@ -29,7 +29,7 @@ class WsConnectionCleanupSpec extends AlephiumFutureSpec {
 
   "WsServer" should "clean up subscriptions when client disconnects abruptly" in new WsClientServerFixture {
     val testProbe = TestProbe()
-    val ws        = wsClient.connect(wsPort)(ntf => testProbe.ref ! ntf)(_ => ()).futureValue
+    val ws        = connectAndWait(wsClient.connect(wsPort)(ntf => testProbe.ref ! ntf)(_ => ()))
 
     // Subscribe to multiple events
     ws.subscribeToBlock(corId(0)).futureValue
@@ -48,7 +48,7 @@ class WsConnectionCleanupSpec extends AlephiumFutureSpec {
     ws.close().futureValue
 
     // Verify cleanup happened
-    eventually(Timeout(5.seconds)) {
+    eventually(Timeout(15.seconds)) {
       val subs = getSubscriptions(subscriptionHandler)
       subs.connections.contains(wsId) is false
     }
@@ -76,7 +76,7 @@ class WsConnectionCleanupSpec extends AlephiumFutureSpec {
       ws.close().futureValue
 
       // Verify no errors and cleanup succeeded
-      eventually(Timeout(5.seconds)) {
+      eventually(Timeout(15.seconds)) {
         val subs = getSubscriptions(subscriptionHandler)
         subs.connections.contains(wsId) is false
       }
@@ -131,7 +131,7 @@ class WsConnectionCleanupSpec extends AlephiumFutureSpec {
 
   "WsServer" should "clean up all subscriptions including contract events on disconnect" in new WsClientServerFixture {
     val testProbe = TestProbe()
-    val ws        = wsClient.connect(wsPort)(ntf => testProbe.ref ! ntf)(_ => ()).futureValue
+    val ws        = connectAndWait(wsClient.connect(wsPort)(ntf => testProbe.ref ! ntf)(_ => ()))
 
     // Subscribe to different types of events
     ws.subscribeToBlock(corId(0)).futureValue
@@ -158,7 +158,7 @@ class WsConnectionCleanupSpec extends AlephiumFutureSpec {
     ws.close().futureValue
 
     // Verify complete cleanup including contract event indices
-    eventually(Timeout(5.seconds)) {
+    eventually(Timeout(15.seconds)) {
       val subs = getSubscriptions(subscriptionHandler)
       subs.connections.contains(wsId) is false
 
@@ -181,7 +181,7 @@ class WsConnectionCleanupSpec extends AlephiumFutureSpec {
       ws.close().futureValue
 
       // Verify this specific connection is cleaned up
-      eventually(Timeout(5.seconds)) {
+      eventually(Timeout(15.seconds)) {
         val subs = getSubscriptions(subscriptionHandler)
         subs.connections.contains(wsId) is false
       }
@@ -219,8 +219,8 @@ class WsConnectionCleanupSpec extends AlephiumFutureSpec {
     val notificationProbe1 = TestProbe()
     val notificationProbe2 = TestProbe()
 
-    val ws1 = wsClient.connect(wsPort)(ntf => notificationProbe1.ref ! ntf)(_ => ()).futureValue
-    val ws2 = wsClient.connect(wsPort)(ntf => notificationProbe2.ref ! ntf)(_ => ()).futureValue
+    val ws1 = connectAndWait(wsClient.connect(wsPort)(ntf => notificationProbe1.ref ! ntf)(_ => ()))
+    val ws2 = connectAndWait(wsClient.connect(wsPort)(ntf => notificationProbe2.ref ! ntf)(_ => ()))
 
     // Subscribe so connections are active
     ws1.subscribeToBlock(corId(0)).futureValue

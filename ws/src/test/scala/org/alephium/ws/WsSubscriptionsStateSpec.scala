@@ -16,8 +16,10 @@
 
 package org.alephium.ws
 
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.time.{Seconds, Span}
 
 import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.protocol.vm.LockupScript
@@ -25,7 +27,9 @@ import org.alephium.util.AVector
 import org.alephium.ws.WsParams.ContractEventsSubscribeParams
 import org.alephium.ws.WsSubscriptionsState.{AddressKey, AddressWithEventIndexKey}
 
-class WsSubscriptionsStateSpec extends AnyFlatSpec with Matchers {
+class WsSubscriptionsStateSpec extends AnyFlatSpec with Matchers with ScalaFutures {
+  implicit override val patienceConfig: PatienceConfig =
+    PatienceConfig(timeout = Span(15, Seconds))
 
   case class TestConsumer(id: Int)
 

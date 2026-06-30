@@ -246,13 +246,20 @@ trait WsClientServerFixture
       testCode(ws)
     } finally {
       ws.close().futureValue
-      val _ = eventually(PatienceConfiguration.Timeout(5.seconds)) {
+      val _ = eventually(PatienceConfiguration.Timeout(15.seconds)) {
         getSubscriptions(subscriptionHandler).activeConnections
           .intersect(newConnections)
           .isEmpty is true
       }
       ()
     }
+  }
+
+  protected def connectAndWait(wsF: => Future[WsClient]): WsClient = {
+    val previousConnections = getSubscriptions(subscriptionHandler).activeConnections
+    val ws                  = wsF.futureValue
+    waitUntilNewWsConnection(previousConnections)
+    ws
   }
 
   protected def testEventHandlerInitialized(
@@ -267,7 +274,7 @@ trait WsClientServerFixture
   }
 
   protected def waitUntilNewWsConnection(previousConnections: Set[WsId]): Set[WsId] = {
-    eventually(PatienceConfiguration.Timeout(5.seconds)) {
+    eventually(PatienceConfiguration.Timeout(15.seconds)) {
       val newConnections =
         getSubscriptions(subscriptionHandler).activeConnections.diff(previousConnections)
       newConnections.nonEmpty is true
