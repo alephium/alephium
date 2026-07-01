@@ -106,7 +106,8 @@ trait EndpointsLogic extends Endpoints {
         NodeInfo(
           NodeInfo.BuildInfo(BuildInfo.releaseVersion, BuildInfo.commitId),
           networkConfig.upnp.enabled,
-          networkConfig.externalAddressInferred
+          networkConfig.externalAddressInferred,  
+          Some(apiConfig.description)
         )
       )
     )

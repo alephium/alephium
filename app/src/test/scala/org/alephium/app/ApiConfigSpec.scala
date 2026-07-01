@@ -43,7 +43,9 @@ class ApiConfigSpec extends AlephiumSpec {
     alphConfig.network.networkId is NetworkId.AlephiumMainNet
     apiConfig.defaultUtxosLimit is 5000
     apiConfig.enableHttpMetrics is false
+    apiConfig.description is "Hello Alephium !"
   }
+
 
   behavior of "Api interface is 127.0.0.1"
 
@@ -138,6 +140,7 @@ class ApiConfigSpec extends AlephiumSpec {
     def apiKey: AVector[String]            = null
     def apiKeyEnabled: Boolean             = false
     def enableHttpMetrics: Option[Boolean] = None
+    def description: Option[String]        = Some("Hello Alephium !")
 
     lazy val apiKeyValue = if (apiKey == null) {
       null
@@ -154,7 +157,8 @@ class ApiConfigSpec extends AlephiumSpec {
       ("alephium.api.gas-fee-cap", "1000000000000000000"),
       ("alephium.api.default-utxos-limit", 512),
       ("alephium.api.max-form-buffered-bytes", 128 * 1024),
-      ("alephium.api.enable-http-metrics", enableHttpMetrics.getOrElse(null))
+      ("alephium.api.enable-http-metrics", enableHttpMetrics.getOrElse(null)),
+      ("alephium.api.description", description.getOrElse("Hello Alephium !"))
     )
 
     lazy val config = ConfigFactory

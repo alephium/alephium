@@ -78,7 +78,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       ALPH.oneAlph,
       utxosLimitInApiConfig,
       128,
-      enableHttpMetrics = true
+      enableHttpMetrics = true,   
+      description = "Hello Alephium !"
     )
   }
 

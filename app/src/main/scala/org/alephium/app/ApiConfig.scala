@@ -46,7 +46,8 @@ final case class ApiConfig(
     gasFeeCap: U256,
     defaultUtxosLimit: Int,
     maxFormBufferedBytes: Int,
-    enableHttpMetrics: Boolean
+    enableHttpMetrics: Boolean,
+    description: String, 
 )
 
 object ApiConfig extends StrictLogging {
@@ -77,7 +78,7 @@ object ApiConfig extends StrictLogging {
         throw new ConfigException.BadValue("api-key", errorMessage)
       }
 
-      ApiConfig(
+      ApiConfig(        
         as[InetAddress]("networkInterface"),
         as[Duration]("blockflowFetchMaxAge"),
         as[Duration]("askTimeout"),
@@ -85,7 +86,8 @@ object ApiConfig extends StrictLogging {
         as[U256]("gasFeeCap"),
         as[Int]("defaultUtxosLimit"),
         as[Int]("maxFormBufferedBytes"),
-        as[Option[Boolean]]("enableHttpMetrics").getOrElse(false)
+        as[Option[Boolean]]("enableHttpMetrics").getOrElse(false), 
+        as[Option[String]]("description").getOrElse("Hello Alephium !")
       )
     }
 

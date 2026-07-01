@@ -2465,7 +2465,9 @@
                   "externalAddress": {
                     "addr": "1.2.3.4",
                     "port": 12344
-                  }
+                  }, 
+                  "description": "Hello Alephium !"
+
                 }
               }
             }
