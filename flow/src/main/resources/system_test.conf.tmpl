@@ -23,6 +23,17 @@ alephium {
     max-inbound-connections-per-group = 40
     max-clique-from-same-ip = 2
 
+    ws {
+      enabled = true
+      max-connections = 100
+      max-requests-per-second = 100
+      max-frame-size = 16384 // increase with max-contract-event-addresses
+      max-write-queue-size = 262144
+      max-subscriptions-per-connection = 50
+      max-contract-event-addresses = 100 // increase with max-frame-size
+      ping-frequency = 30 second
+    }
+
     ping-frequency = 300 second
     retry-timeout = 10 second
     ban-duration = 1 day
@@ -57,7 +68,6 @@ alephium {
     num-of-sync-blocks-limit = 4
 
     rest-port = null
-    ws-port = null
     miner-api-port = null
   }
 

@@ -33,147 +33,144 @@ import org.alephium.wallet.api.model._
 
 class VotingTest extends AlephiumActorSpec {
   it should "test the voting pipeline" in new VotingFixture {
+    withStartedWalletClique {
+      val admin  = wallets.head
+      val voters = wallets.tail
+      val ContractRef(contractId, contractAddress @ Address.Contract(_), contractCode) =
+        buildDeployContractTx(admin, voters, U256.unsafe(voters.size))
 
-    val admin  = wallets.head
-    val voters = wallets.tail
-    val ContractRef(contractId, contractAddress @ Address.Contract(_), contractCode) =
-      buildDeployContractTx(admin, voters, U256.unsafe(voters.size))
-    checkState(0, 0, false, false)
+      def checkVotingStartedEvent(event: ContractEvent) = {
+        event.eventIndex is 0
+      }
 
-    allocateTokens(admin, voters, contractId.toHexString, contractCode)
-    checkState(0, 0, false, true)
+      def checkVoteCastedEventsByTxId(infos: Seq[(String, Boolean, TransactionId)]) = {
+        infos.foreach { info =>
+          val (address, choice, txId) = info
+          val response = request[ContractEventsByTxId](
+            getEventsByTxId(txId.toHexString),
+            restPort
+          )
 
-    checkEvents(contractAddress, 0) { events =>
-      events.length is 1
-      checkVotingStartedEvent(events.head)
-    }
-    val countAfterVotingStarted = getEventsCurrentCount(contractAddress)
+          val events = response.events.filter(event => isMainChainBlock(event.blockHash))
+          events.length is 1
+          val event = events.head
+          event.contractAddress is contractAddress
+          event.eventIndex is 1
+          event.fields.length is 2
+          event.fields(0) is ValAddress(Address.fromBase58(address).rightValue)
+          event.fields(1) is ValBool(choice)
+        }
+      }
 
-    val nbYes = voters.size - 1
-    val nbNo  = voters.size - nbYes
-    val voteForTxInfos = voters.take(nbYes).map { wallet =>
-      val txId = vote(wallet, contractId.toHexString, true, contractCode).txId
-      (wallet.activeAddress, true, txId)
-    }
-    val voteAgainstTxInfos = voters.drop(nbYes).map { wallet =>
-      val txId = vote(wallet, contractId.toHexString, false, contractCode).txId
-      (wallet.activeAddress, false, txId)
-    }
-    checkState(nbYes, nbNo, false, true)
+      def checkVotingClosedEvent(event: ContractEvent) = {
+        event.eventIndex is 2
+      }
 
-    checkVoteCastedEventsByTxId(voteForTxInfos)
-    checkVoteCastedEventsByTxId(voteAgainstTxInfos)
-    checkEvents(contractAddress, countAfterVotingStarted)(checkVoteCastedEvents)
+      def checkState(nbYes: Int, nbNo: Int, isClosed: Boolean, isInitialized: Boolean) = {
+        val contractState =
+          request[ContractState](
+            getContractState(contractAddress.toBase58),
+            restPort
+          )
+        contractState.mutFields.get(0).get is ValU256(U256.unsafe(nbYes))
+        contractState.mutFields.get(1).get is ValU256(U256.unsafe(nbNo))
+        contractState.mutFields.get(2).get is ValBool(isClosed)
+        contractState.mutFields.get(3).get is ValBool(isInitialized)
+        contractState.immFields.get(0).get is ValAddress(
+          Address.fromBase58(admin.activeAddress).rightValue
+        )
+        contractState.immFields.drop(1) is AVector.from[Val](
+          voters.map(v => ValAddress(Address.fromBase58(v.activeAddress).rightValue))
+        )
+      }
 
-    val countAfterVotingCasted = getEventsCurrentCount(contractAddress)
+      def checkEvents(contractAddress: Address, startCount: Int)(
+          validate: (AVector[ContractEvent]) => Any
+      ) = {
+        val response =
+          request[ContractEvents](
+            getContractEvents(startCount, contractAddress),
+            restPort
+          )
 
-    close(admin, contractId.toHexString, contractCode)
-    checkState(nbYes, nbNo, true, true)
+        // Filter out events from the occasional orphan blocks
+        val events = response.events.filter(event => isMainChainBlock(event.blockHash))
+        validate(events)
+      }
 
-    checkEvents(contractAddress, countAfterVotingCasted) { events =>
-      events.length is 1
-      checkVotingClosedEvent(events.head)
-    }
-
-    // Check all events for the contract from the beginning
-    checkEvents(contractAddress, 0) { events =>
-      val totalEventsNum = voters.length + 2
-      events.length is totalEventsNum
-
-      checkVotingStartedEvent(events.head)
-      checkVoteCastedEvents(events.tail.take(voters.length))
-      checkVotingClosedEvent(events.last)
-    }
-
-    clique.selfClique().nodes.foreach { peer =>
-      request[Boolean](stopMining, peer.restPort) is true
-    }
-    clique.stop()
-
-    def checkVotingStartedEvent(event: ContractEvent) = {
-      event.eventIndex is 0
-    }
-
-    def checkVoteCastedEventsByTxId(infos: Seq[(String, Boolean, TransactionId)]) = {
-      infos.foreach { info =>
-        val (address, choice, txId) = info
-        val response = request[ContractEventsByTxId](
-          getEventsByTxId(txId.toHexString),
+      def isMainChainBlock(blockHash: BlockHash): Boolean = {
+        request[Boolean](
+          isBlockInMainChain(blockHash.toHexString),
           restPort
         )
+      }
 
-        val events = response.events.filter(event => isBlockInMainChain(event.blockHash))
+      def getEventsCurrentCount(contractAddress: Address): Int = {
+        request[Int](getContractEventsCurrentCount(contractAddress), restPort)
+      }
+
+      checkState(0, 0, false, false)
+
+      allocateTokens(admin, voters, contractId.toHexString, contractCode)
+      checkState(0, 0, false, true)
+
+      checkEvents(contractAddress, 0) { events =>
         events.length is 1
-        val event = events.head
-        event.contractAddress is contractAddress
-        event.eventIndex is 1
-        event.fields.length is 2
-        event.fields(0) is ValAddress(Address.fromBase58(address).rightValue)
-        event.fields(1) is ValBool(choice)
+        checkVotingStartedEvent(events.head)
       }
-    }
+      val countAfterVotingStarted = getEventsCurrentCount(contractAddress)
 
-    def checkVoteCastedEvents(events: AVector[ContractEvent]) = {
-      val expectedResult = voters.take(nbYes).map { wallet =>
-        (1, wallet.activeAddress, true)
-      } ++ voters.drop(nbYes).map { wallet =>
-        (1, wallet.activeAddress, false)
+      val nbYes = voters.size - 1
+      val nbNo  = voters.size - nbYes
+      def checkVoteCastedEvents(events: AVector[ContractEvent]) = {
+        val expectedResult = voters.take(nbYes).map { wallet =>
+          (1, wallet.activeAddress, true)
+        } ++ voters.drop(nbYes).map { wallet =>
+          (1, wallet.activeAddress, false)
+        }
+
+        val returnedResult = events.map { event =>
+          val voterAddress = event.fields(0).asInstanceOf[ValAddress]
+          val decision     = event.fields(1).asInstanceOf[ValBool]
+          (event.eventIndex, voterAddress.value.toBase58, decision.value)
+        }
+
+        returnedResult.toSeq is expectedResult
       }
 
-      val returnedResult = events.map { event =>
-        val voterAddress = event.fields(0).asInstanceOf[ValAddress]
-        val decision     = event.fields(1).asInstanceOf[ValBool]
-        (event.eventIndex, voterAddress.value.toBase58, decision.value)
+      val voteForTxInfos = voters.take(nbYes).map { wallet =>
+        val txId = vote(wallet, contractId.toHexString, true, contractCode).txId
+        (wallet.activeAddress, true, txId)
+      }
+      val voteAgainstTxInfos = voters.drop(nbYes).map { wallet =>
+        val txId = vote(wallet, contractId.toHexString, false, contractCode).txId
+        (wallet.activeAddress, false, txId)
+      }
+      checkState(nbYes, nbNo, false, true)
+
+      checkVoteCastedEventsByTxId(voteForTxInfos)
+      checkVoteCastedEventsByTxId(voteAgainstTxInfos)
+      checkEvents(contractAddress, countAfterVotingStarted)(checkVoteCastedEvents)
+
+      val countAfterVotingCasted = getEventsCurrentCount(contractAddress)
+
+      close(admin, contractId.toHexString, contractCode)
+      checkState(nbYes, nbNo, true, true)
+
+      checkEvents(contractAddress, countAfterVotingCasted) { events =>
+        events.length is 1
+        checkVotingClosedEvent(events.head)
       }
 
-      returnedResult.toSeq is expectedResult
-    }
+      // Check all events for the contract from the beginning
+      checkEvents(contractAddress, 0) { events =>
+        val totalEventsNum = voters.length + 2
+        events.length is totalEventsNum
 
-    def checkVotingClosedEvent(event: ContractEvent) = {
-      event.eventIndex is 2
-    }
-
-    def checkState(nbYes: Int, nbNo: Int, isClosed: Boolean, isInitialized: Boolean) = {
-      val contractState =
-        request[ContractState](
-          getContractState(contractAddress.toBase58),
-          restPort
-        )
-      contractState.mutFields.get(0).get is ValU256(U256.unsafe(nbYes))
-      contractState.mutFields.get(1).get is ValU256(U256.unsafe(nbNo))
-      contractState.mutFields.get(2).get is ValBool(isClosed)
-      contractState.mutFields.get(3).get is ValBool(isInitialized)
-      contractState.immFields.get(0).get is ValAddress(
-        Address.fromBase58(admin.activeAddress).rightValue
-      )
-      contractState.immFields.drop(1) is AVector.from[Val](
-        voters.map(v => ValAddress(Address.fromBase58(v.activeAddress).rightValue))
-      )
-    }
-
-    def checkEvents(contractAddress: Address, startCount: Int)(
-        validate: (AVector[ContractEvent]) => Any
-    ) = {
-      val response =
-        request[ContractEvents](
-          getContractEvents(startCount, contractAddress),
-          restPort
-        )
-
-      // Filter out events from the occasional orphan blocks
-      val events = response.events.filter(event => isBlockInMainChain(event.blockHash))
-      validate(events)
-    }
-
-    def isBlockInMainChain(blockHash: BlockHash): Boolean = {
-      request[Boolean](
-        isBlockInMainChain(blockHash.toHexString),
-        restPort
-      )
-    }
-
-    def getEventsCurrentCount(contractAddress: Address): Int = {
-      request[Int](getContractEventsCurrentCount(contractAddress), restPort)
+        checkVotingStartedEvent(events.head)
+        checkVoteCastedEvents(events.tail.take(voters.length))
+        checkVotingClosedEvent(events.last)
+      }
     }
   }
 }
@@ -332,6 +329,7 @@ trait WalletFixture extends CliqueFixture {
   val clique                                  = bootClique(1)
   val activeAddressesGroup                    = 0
   val genesisWalletName                       = "genesis-wallet"
+
   def submitTx(unsignedTx: String, txId: TransactionId, walletName: String): SubmitTxResult = {
     val signature =
       request[SignResult](sign(walletName, s"${txId.toHexString}"), restPort).signature
@@ -449,21 +447,30 @@ trait WalletFixture extends CliqueFixture {
     }
   }
 
-  clique.start()
-
-  val restPort = clique.masterRestPort
-  request[Balance](getBalance(address), restPort) is initialBalance
-
-  startWS(defaultWsMasterPort)
-  clique.selfClique().nodes.foreach { peer => request[Boolean](startMining, peer.restPort) is true }
-
+  val restPort       = clique.masterRestPort
   val nWallets       = 5
   val walletsBalance = ALPH.alph(1000)
-  val wallets        = createWallets(nWallets, restPort, walletsBalance)
-  wallets.foreach(wallet =>
-    request[Balance](getBalance(wallet.activeAddress), restPort).balance.value is walletsBalance
-  )
-  val dustAmount = dustUtxoAmount.toString()
+  lazy val wallets   = createWallets(nWallets, restPort, walletsBalance)
+  val dustAmount     = dustUtxoAmount.toString()
+
+  def withStartedWalletClique[T](body: => T): T = {
+    withStartedClique(clique) { _ =>
+      request[Balance](getBalance(address), restPort) is initialBalance
+
+      withWsClient(restPort) { _ =>
+        withCliqueMining(clique) {
+          wallets.foreach(wallet =>
+            request[Balance](
+              getBalance(wallet.activeAddress),
+              restPort
+            ).balance.value is walletsBalance
+          )
+
+          body
+        }
+      }
+    }
+  }
 }
 
 final case class ContractRef(contractId: ContractId, contractAddress: Address, code: String)

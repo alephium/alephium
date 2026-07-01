@@ -425,7 +425,7 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     val mempool = blockFlow.getMemPool(chainIndex)
     val now     = TimeStamp.now()
-    blockFlow.grandPool.add(chainIndex, tx1, now) is MemPool.AddedToMemPool
+    blockFlow.grandPool.add(chainIndex, tx1, now) is MemPool.AddedToMemPool(now)
     val tx2 = { // build tx2 which depends on tx1
       val to     = chainIndex.to.generateKey._2
       val output = TxOutputInfo(LockupScript.p2pkh(to), ALPH.oneAlph, AVector.empty, None)
@@ -443,10 +443,14 @@ class FlowUtilsSpec extends AlephiumSpec {
       Transaction.from(unsignedTx, fromPrivateKey).toTemplate
     }
     tx2.unsigned.inputs.forall(input => tx1.fixedOutputRefs.contains(input.outputRef)) is true
-    blockFlow.grandPool.add(chainIndex, tx2, now.plusMillisUnsafe(1)) is MemPool.AddedToMemPool
+    blockFlow.grandPool.add(chainIndex, tx2, now.plusMillisUnsafe(1)) is MemPool.AddedToMemPool(
+      now.plusMillisUnsafe(1)
+    )
 
     tx1.unsigned.inputs.foreach(input => mempool.sharedTxIndexes.inputIndex.remove(input.outputRef))
-    blockFlow.grandPool.add(chainIndex, tx0, now.plusMillisUnsafe(2)) is MemPool.AddedToMemPool
+    blockFlow.grandPool.add(chainIndex, tx0, now.plusMillisUnsafe(2)) is MemPool.AddedToMemPool(
+      now.plusMillisUnsafe(2)
+    )
 
     val groupView = blockFlow.getMutableGroupView(chainIndex.from).rightValue
     val bestDeps  = blockFlow.getBestDeps(chainIndex, HardFork.Danube)

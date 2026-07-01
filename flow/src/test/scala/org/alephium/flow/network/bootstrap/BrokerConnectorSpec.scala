@@ -44,7 +44,6 @@ class BrokerConnectorSpec extends AlephiumFlowActorSpec with InfoFixture with Mo
         Some(randomAddress),
         randomAddress,
         Random.nextInt(),
-        Random.nextInt(),
         Random.nextInt()
       )
 

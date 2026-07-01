@@ -21,10 +21,11 @@ import java.net.{InetAddress, InetSocketAddress}
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Random
+import scala.util.{Random, Try}
+import scala.util.control.NonFatal
 
 import io.vertx.core.Vertx
-import io.vertx.core.http.WebSocketBase
+import io.vertx.core.http.WebSocketClientOptions
 import org.apache.pekko.Done
 import org.apache.pekko.actor.{ActorRef, ActorSystem, CoordinatedShutdown}
 import org.apache.pekko.io.Tcp
@@ -33,7 +34,6 @@ import org.apache.pekko.util.Timeout
 import org.scalatest.Assertion
 import org.scalatest.time.{Seconds, Span}
 import sttp.model.StatusCode
-import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson.avectorWriter
@@ -51,11 +51,13 @@ import org.alephium.protocol.{ALPH, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, Block, ChainIndex, GroupIndex, TokenId, TransactionId}
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{GasPrice, LockupScript}
-import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
+import org.alephium.rpc.model.JsonRPC.Notification
 import org.alephium.serde._
 import org.alephium.util._
 import org.alephium.wallet
 import org.alephium.wallet.api.model._
+import org.alephium.ws.{WsClient, WsClientFactory}
+import org.alephium.ws.WsParams._
 
 // scalastyle:off method.length
 // scalastyle:off number.of.methods
@@ -67,11 +69,16 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     with ApiModelCodec
     with wallet.json.ModelCodecs
     with HttpFixture
+    with WsNotificationParamsCodec
     with RichBlockFlowT { Fixture =>
   implicit val system: ActorSystem = spec.system
 
-  private val vertx           = Vertx.vertx()
-  private val webSocketClient = vertx.createWebSocketClient()
+  private lazy val vertx = Vertx.vertx()
+  private lazy val wsClientFactory =
+    WsClientFactory(
+      vertx,
+      new WebSocketClientOptions().setMaxFrameSize(networkConfig.ws.maxFrameSize)
+    )
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
@@ -104,7 +111,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   val defaultMasterPort     = generatePort()
   val defaultRestMasterPort = restPort(defaultMasterPort)
-  val defaultWsMasterPort   = wsPort(defaultMasterPort)
   val defaultWalletPort     = generatePort()
 
   val blockNotifyProbe = TestProbe()
@@ -241,13 +247,23 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
     @tailrec
     def iter(): Unit = {
-      blockNotifyProbe.receiveOne(max = timeout) match {
-        case text: String =>
-          val notification = read[NotificationUnsafe](text).asNotification.rightValue
-          val blockEntry   = read[BlockEntry](notification.params)
-          buffer(blockEntry.chainFrom)(blockEntry.chainTo) += 1
-          if (buffer.forall(_.forall(_ >= number))) () else iter()
+      Option(blockNotifyProbe.receiveOne(max = timeout)) match {
+        case Some(text: String) =>
+          if (handleNotification(read[Notification](text))) () else iter()
+        case Some(notification: Notification) =>
+          if (handleNotification(notification)) () else iter()
+        case Some(_) =>
+          fail("Unexpected non-text websocket notification")
+        case None =>
+          fail("Timed out waiting for websocket block notifications")
       }
+    }
+
+    def handleNotification(notification: Notification): Boolean = {
+      val blockNotification = read[WsBlockNotificationParams](notification.params)
+      val blockEntry        = blockNotification.result.block
+      buffer(blockEntry.chainFrom)(blockEntry.chainTo) += 1
+      buffer.forall(_.forall(_ >= number))
     }
 
     iter()
@@ -257,13 +273,32 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   final def awaitNBlocks(number: Int): Unit = {
     assume(number > 0)
     val timeout = Duration.ofMinutesUnsafe(2).asScala
-    blockNotifyProbe.receiveOne(max = timeout) match {
-      case _: String =>
+    Option(blockNotifyProbe.receiveOne(max = timeout)) match {
+      case Some(_: String) =>
         if (number <= 1) {
           ()
         } else {
           awaitNBlocks(number - 1)
         }
+      case Some(_: Notification) =>
+        if (number <= 1) {
+          ()
+        } else {
+          awaitNBlocks(number - 1)
+        }
+      case Some(_) =>
+        fail("Unexpected non-text websocket notification")
+      case None =>
+        fail("Timed out waiting for websocket block notifications")
+    }
+  }
+
+  @tailrec
+  final def drainBlockNotifications(): Unit = {
+    val timeout = Duration.ofMillisUnsafe(100).asScala
+    Option(blockNotifyProbe.receiveOne(max = timeout)) match {
+      case Some(_) => drainBlockNotifications()
+      case None    => ()
     }
   }
 
@@ -285,7 +320,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.coordinator-address", s"127.0.0.1:$masterPort"),
         ("alephium.network.external-address", s"127.0.0.1:$publicPort"),
-        ("alephium.network.ws-port", wsPort(publicPort)),
         ("alephium.network.rest-port", restPort(publicPort)),
         ("alephium.network.miner-api-port", minerPort(publicPort)),
         ("alephium.broker.broker-num", brokerNum),
@@ -374,14 +408,14 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     val server: Server = new Server {
       val flowSystem: ActorSystem =
         ActorSystem(s"flow-${Random.nextInt()}", platformEnv.newConfig)
-      implicit val executionContext: ExecutionContext = flowSystem.dispatcher
+      implicit lazy val executionContext: ExecutionContext = flowSystem.dispatcher
 
-      val defaultNetwork = platformEnv.config.network
-      val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
+      lazy val defaultNetwork = platformEnv.config.network
+      lazy val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
 
-      implicit val config: AlephiumConfig = platformEnv.config.copy(network = network)
-      implicit val apiConfig: ApiConfig   = ApiConfig.load(platformEnv.newConfig)
-      val storages                        = platformEnv.storages
+      implicit lazy val config: AlephiumConfig = platformEnv.config.copy(network = network)
+      implicit lazy val apiConfig: ApiConfig   = ApiConfig.load(platformEnv.newConfig)
+      lazy val storages                        = platformEnv.storages
 
       override lazy val blocksExporter: BlocksExporter =
         new BlocksExporter(node.blockFlow, rootPath)(config.broker)
@@ -401,15 +435,86 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     server
   }
 
-  def startWS(port: Int): Future[WebSocketBase] = {
-    webSocketClient
-      .connect(port, "127.0.0.1", "/events")
-      .asScala
-      .map { ws =>
-        ws.textMessageHandler { blockNotify =>
-          blockNotifyProbe.ref ! blockNotify
-        }
-      }(system.dispatcher)
+  def startWsClient(port: Int): Future[WsClient] = {
+    implicit val ec: ExecutionContext = system.dispatcher
+    wsClientFactory.connect(port)(blockNotifyProbe.ref ! _)(_ => ())
+  }
+
+  def withStartedServer[T](server: Server)(body: Server => T): T = {
+    try {
+      server.start().futureValue is ()
+      body(server)
+    } finally {
+      discard(Try(server.stop().futureValue))
+    }
+  }
+
+  def withStartedClique[T](clique: Clique)(body: Clique => T): T = {
+    try {
+      clique.start()
+      body(clique)
+    } finally {
+      discard(Try(clique.stop()))
+    }
+  }
+
+  def withStartedCliques[T](cliques: AVector[Clique])(body: => T): T = {
+    var started = List.empty[Clique]
+    try {
+      cliques.foreach { clique =>
+        started = clique :: started
+        clique.start()
+      }
+      body
+    } finally {
+      started.foreach(clique => discard(Try(clique.stop())))
+    }
+  }
+
+  def withWsClient[T](port: Int)(body: WsClient => T): T = {
+    val client = startWsClient(port).futureValue
+    client.isClosed is false
+    try {
+      body(client)
+    } finally {
+      if (!client.isClosed) {
+        discard(Try(client.close().futureValue))
+      }
+    }
+  }
+
+  def withBlockSubscription[T](port: Int, id: WsCorrelationId = 0L)(body: WsClient => T): T = {
+    withWsClient(port) { client =>
+      client.subscribeToBlock(id).futureValue
+      body(client)
+    }
+  }
+
+  def withMining[T](port: Int)(body: => T): T = {
+    try {
+      request[Boolean](startMining, port) is true
+      body
+    } finally {
+      discard(Try(request[Boolean](stopMining, port)))
+    }
+  }
+
+  def withCliqueMining[T](clique: Clique)(body: => T): T = {
+    try {
+      clique.startMining()
+      body
+    } finally {
+      discard(Try(clique.stopMining()))
+    }
+  }
+
+  def withFakeMining[T](clique: Clique)(body: => T): T = {
+    try {
+      clique.startFakeMining()
+      body
+    } finally {
+      discard(Try(clique.stopFakeMining()))
+    }
   }
 
   def jsonRpc(method: String, params: String): String =
@@ -895,6 +1000,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpGet(s"/blockflow/blocks?fromTs=${fromTs.millis}&toTs=${toTs.millis}")
 
   case class Clique(servers: AVector[Server]) {
+    private val wsClients = scala.collection.mutable.ListBuffer.empty[WsClient]
+
     def coordinator    = servers.head
     def masterTcpPort  = servers.head.config.network.coordinatorAddress.getPort
     def masterRestPort = servers.head.config.network.restPort
@@ -922,12 +1029,56 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     }
 
     def stop(): Unit = {
+      closeWsClients()
       servers.map(_.stop()).foreach(_.futureValue is ())
     }
 
-    def startWs(): Unit = {
-      servers.foreach { server =>
-        startWS(server.config.network.wsPort)
+    def startWs(): Future[Unit] = {
+      implicit val ec: ExecutionContext = system.dispatcher
+      Future
+        .sequence(
+          servers.map { server =>
+            startWsClient(server.config.network.restPort).flatMap { client =>
+              trackWsClient(client)
+              client.subscribeToBlock(0).map(_ => ()).recoverWith { case NonFatal(error) =>
+                untrackWsClient(client)
+                closeWsClient(client).flatMap(_ => Future.failed(error))
+              }
+            }
+          }.toSeq
+        )
+        .map(_ => ())
+    }
+
+    private def trackWsClient(client: WsClient): Unit = {
+      wsClients.synchronized {
+        wsClients += client
+        ()
+      }
+    }
+
+    private def untrackWsClient(client: WsClient): Unit = {
+      wsClients.synchronized {
+        wsClients -= client
+        ()
+      }
+    }
+
+    private def closeWsClients(): Unit = {
+      val clients = wsClients.synchronized {
+        val tracked = wsClients.toList
+        wsClients.clear()
+        tracked
+      }
+      clients.foreach(client => discard(Try(closeWsClient(client).futureValue)))
+    }
+
+    private def closeWsClient(client: WsClient): Future[Unit] = {
+      implicit val ec: ExecutionContext = system.dispatcher
+      if (client.isClosed) {
+        Future.unit
+      } else {
+        client.close().recover { case NonFatal(_) => () }
       }
     }
 

@@ -23,6 +23,7 @@ import scala.concurrent._
 import scala.io.Source
 import scala.util.{Random, Using}
 
+import io.vertx.core.http.HttpServerOptions
 import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
 import org.apache.pekko.testkit.{TestActor, TestProbe}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, EitherValues}
@@ -40,8 +41,8 @@ import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.bootstrap._
 import org.alephium.flow.network.broker.MisbehaviorManager
+import org.alephium.http.{HttpRouteFixture, HttpService}
 import org.alephium.http.HttpFixture._
-import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.mining.HashRate
@@ -1291,6 +1292,7 @@ abstract class RestServerSpec(
                    |      "blockHash": "${blockHash.toHexString}",
                    |      "txId": "${dummyTx.id.toHexString}",
                    |      "timestamp": ${dummyBlock.timestamp.millis},
+                   |      "contractAddress": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
                    |      "eventIndex": 0,
                    |      "fields": [
                    |        {
@@ -1784,7 +1786,6 @@ trait RestServerFixture
       publicAddress = None,
       privateAddress = address,
       restPort = peerPort,
-      wsPort = peerPort,
       minerApiPort = peerPort
     )
 
@@ -1835,15 +1836,19 @@ trait RestServerFixture
         misbehaviorManagerOpt = Some(misbehaviorManager)
       )(serverConfig)
 
+      val httpService = new HttpService(new HttpServerOptions())
+
       new RestServer(
         nodeDummy,
         peer.restPort,
         miner,
         blocksExporter,
+        httpService,
         Some(walletApp.walletServer)
       )(
         serverConfig.broker,
         peerConf,
+        networkConfig,
         scala.concurrent.ExecutionContext.Implicits.global
       )
     })

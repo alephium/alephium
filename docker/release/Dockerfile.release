@@ -12,8 +12,6 @@ COPY entrypoint.sh /entrypoint.sh
 
 # http
 EXPOSE 12973
-# ws
-EXPOSE 11973
 # miner
 EXPOSE 10973
 # p2p

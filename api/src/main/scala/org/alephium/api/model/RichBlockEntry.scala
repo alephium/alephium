@@ -20,7 +20,7 @@ import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.model.{Block, BlockHash, TransactionId}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -39,7 +39,35 @@ final case class RichBlockEntry(
     target: ByteString,
     ghostUncles: AVector[GhostUncleBlockEntry],
     conflictedTxs: Option[AVector[TransactionId]] = None
-)
+) {
+  def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, Block] = {
+    for {
+      header       <- toBlockHeader()
+      _            <- Either.cond(hash == header.hash, (), "Invalid hash")
+      transactions <- transactions.mapE(_.toProtocol())
+    } yield {
+      Block(
+        header,
+        transactions
+      )
+    }
+  }
+
+  def toBlockHeader(): Either[String, BlockHeader] =
+    for {
+      _nonce <- Nonce.from(nonce).toRight("Invalid nonce")
+    } yield {
+      BlockHeader(
+        _nonce,
+        version,
+        BlockDeps.unsafe(deps),
+        depStateHash,
+        txsHash,
+        timestamp,
+        Target.unsafe(target)
+      )
+    }
+}
 
 object RichBlockEntry {
   def from(
