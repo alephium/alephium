@@ -22,6 +22,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Random, Try}
+import scala.util.control.NonFatal
 
 import io.vertx.core.Vertx
 import io.vertx.core.http.WebSocketClientOptions
@@ -428,9 +429,14 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         } yield Done
       }
 
+      flowSystem.registerOnTermination { () =>
+        storages.closeUnsafe()
+      }
+
       override def stop(): Future[Unit] = flowSystem.terminate().map(_ => ())
     }
 
+    AlephiumSpec.addCleanTask(() => discard(Try(server.stop().futureValue)))
     server
   }
 
@@ -999,6 +1005,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpGet(s"/blockflow/blocks?fromTs=${fromTs.millis}&toTs=${toTs.millis}")
 
   case class Clique(servers: AVector[Server]) {
+    private val wsClients = scala.collection.mutable.ListBuffer.empty[WsClient]
+
     def coordinator    = servers.head
     def masterTcpPort  = servers.head.config.network.coordinatorAddress.getPort
     def masterRestPort = servers.head.config.network.restPort
@@ -1026,6 +1034,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     }
 
     def stop(): Unit = {
+      closeWsClients()
       servers.map(_.stop()).foreach(_.futureValue is ())
     }
 
@@ -1035,11 +1044,47 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         .sequence(
           servers.map { server =>
             startWsClient(server.config.network.restPort).flatMap { client =>
-              client.subscribeToBlock(0)
+              trackWsClient(client)
+              client.subscribeToBlock(0).map(_ => ()).recoverWith { case NonFatal(error) =>
+                untrackWsClient(client)
+                closeWsClient(client).flatMap(_ => Future.failed(error))
+              }
             }
           }.toSeq
         )
         .map(_ => ())
+    }
+
+    private def trackWsClient(client: WsClient): Unit = {
+      wsClients.synchronized {
+        wsClients += client
+        ()
+      }
+    }
+
+    private def untrackWsClient(client: WsClient): Unit = {
+      wsClients.synchronized {
+        wsClients -= client
+        ()
+      }
+    }
+
+    private def closeWsClients(): Unit = {
+      val clients = wsClients.synchronized {
+        val tracked = wsClients.toList
+        wsClients.clear()
+        tracked
+      }
+      clients.foreach(client => discard(Try(closeWsClient(client).futureValue)))
+    }
+
+    private def closeWsClient(client: WsClient): Future[Unit] = {
+      implicit val ec: ExecutionContext = system.dispatcher
+      if (client.isClosed) {
+        Future.unit
+      } else {
+        client.close().recover { case NonFatal(_) => () }
+      }
     }
 
     def startMining(): Unit = {
