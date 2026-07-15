@@ -158,6 +158,7 @@ final case class WsConfig(
     maxConnections: Int,
     maxRequestsPerSecond: Int,
     maxFrameSize: Int,
+    maxMessageSize: Int,
     maxWriteQueueSize: Int,
     maxSubscriptionsPerConnection: Int,
     maxContractEventAddresses: Int,

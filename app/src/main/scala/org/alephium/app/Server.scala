@@ -72,6 +72,7 @@ trait Server extends Service {
       new HttpServerOptions()
         .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
         .setMaxWebSocketFrameSize(config.network.ws.maxFrameSize)
+        .setMaxWebSocketMessageSize(config.network.ws.maxMessageSize)
         .setRegisterWebSocketWriteHandlers(true)
     } else {
       new HttpServerOptions()
