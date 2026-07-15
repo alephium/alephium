@@ -101,6 +101,25 @@ final case class WsClient(
     ec: ExecutionContext
 ) extends StrictLogging {
 
+  private val ongoingRequests =
+    new ConcurrentSkipListMap[WsCorrelationId, Promise[Response]]().asScala
+  private var terminalFailure: Option[WsException] = None
+
+  underlying.closeHandler(_ =>
+    failOngoingRequests(
+      WsException("WebSocket connection closed before receiving a response.")
+    )
+  )
+
+  underlying.exceptionHandler(exception =>
+    failOngoingRequests(
+      WsException(
+        s"WebSocket connection failed before receiving a response: ${exception.getMessage}",
+        Option(exception)
+      )
+    )
+  )
+
   underlying.frameHandler { frame =>
     if (frame.isPing) {
       underlying.writePong(Buffer.buffer("pong")).asScala.onComplete {
@@ -127,40 +146,72 @@ final case class WsClient(
     }
   )
 
-  private val ongoingRequests =
-    new ConcurrentSkipListMap[WsCorrelationId, Promise[Response]]().asScala
-
   def writeRequestToSocket(request: WsRequest): Future[Response] = {
-    if (ongoingRequests.contains(request.id)) {
-      Future.failed(WsException(s"Request with id ${request.id} is being already handled."))
-    } else {
-      val promise = Promise[Response]()
-      ongoingRequests.put(request.id, promise)
-      underlying
-        .writeTextMessage(write(request))
-        .asScala
-        .onComplete {
-          case Success(_) =>
-          case Failure(exception) =>
-            ongoingRequests.remove(request.id)
-            promise
-              .failure(
-                WsException(
-                  s"Failed to write message with id ${request.id}: ${exception.getMessage}",
-                  Option(exception)
+    reserveRequest(request.id) match {
+      case Left(failure) => Future.failed(failure)
+      case Right(promise) =>
+        underlying
+          .writeTextMessage(write(request))
+          .asScala
+          .onComplete {
+            case Success(_) =>
+            case Failure(exception) =>
+              removeRequest(request.id, promise)
+              promise
+                .tryFailure(
+                  WsException(
+                    s"Failed to write message with id ${request.id}: ${exception.getMessage}",
+                    Option(exception)
+                  )
                 )
-              )
-        }
-      promise.future
+          }
+        promise.future
     }
+  }
+
+  private def reserveRequest(
+      id: WsCorrelationId
+  ): Either[WsException, Promise[Response]] = ongoingRequests.synchronized {
+    terminalFailure match {
+      case Some(failure) => Left(failure)
+      case None =>
+        if (ongoingRequests.contains(id)) {
+          Left(WsException(s"Request with id $id is being already handled."))
+        } else {
+          val promise = Promise[Response]()
+          ongoingRequests.put(id, promise)
+          Right(promise)
+        }
+    }
+  }
+
+  private def removeRequest(id: WsCorrelationId, promise: Promise[Response]): Unit =
+    ongoingRequests.synchronized {
+      ongoingRequests.get(id) match {
+        case Some(current) if current eq promise =>
+          ongoingRequests.remove(id)
+          ()
+        case _ => ()
+      }
+    }
+
+  private def failOngoingRequests(failure: WsException): Unit = {
+    val (promises, effectiveFailure) = ongoingRequests.synchronized {
+      val effectiveFailure = terminalFailure.getOrElse(failure)
+      terminalFailure = Some(effectiveFailure)
+      val promises = ongoingRequests.values.toVector
+      ongoingRequests.clear()
+      promises -> effectiveFailure
+    }
+    promises.foreach(_.tryFailure(effectiveFailure))
   }
 
   private def handleResponse(message: ujson.Value): Unit = {
     read[Response](message) match {
       case r @ JsonRPC.Response.Success(_, id) =>
-        ongoingRequests.remove(id).foreach(_.success(r))
+        ongoingRequests.remove(id).foreach(_.trySuccess(r))
       case r @ JsonRPC.Response.Failure(_, Some(id)) =>
-        ongoingRequests.remove(id).foreach(_.success(r))
+        ongoingRequests.remove(id).foreach(_.trySuccess(r))
       case JsonRPC.Response.Failure(ex, None) =>
         logger.error(s"Response without id is not supported", ex)
     }
