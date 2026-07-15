@@ -164,6 +164,7 @@ final case class WsClient(
                     Option(exception)
                   )
                 )
+              ()
           }
         promise.future
     }
