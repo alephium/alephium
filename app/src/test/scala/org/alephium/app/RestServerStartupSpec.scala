@@ -36,11 +36,11 @@ class RestServerStartupSpec extends AlephiumFutureSpec with SocketUtil {
     implicit val api: ApiConfig       = ApiConfig.load(newConfig)
 
     @volatile var wsServiceCompletedAt: Long = 0L
-    @volatile var listenCalledAt: Long        = 0L
+    @volatile var listenCalledAt: Long       = 0L
 
     val wsStub = new Service {
       override protected def executionContext: ExecutionContext = ec
-      override def subServices: ArraySeq[Service]             = ArraySeq.empty
+      override def subServices: ArraySeq[Service]               = ArraySeq.empty
       override protected def startSelfOnce(): Future[Unit] = Future {
         wsServiceCompletedAt = System.nanoTime()
       }(ec)
@@ -58,8 +58,8 @@ class RestServerStartupSpec extends AlephiumFutureSpec with SocketUtil {
     }
 
     val (allHandlers, _) = TestUtils.createAllHandlersProbe
-    val minerProbe        = TestProbe()
-    val miner             = ActorRefT[Miner.Command](minerProbe.ref)
+    val minerProbe       = TestProbe()
+    val miner            = ActorRefT[Miner.Command](minerProbe.ref)
 
     val node = new ServerFixture.NodeDummy(
       dummyIntraCliqueInfo,
