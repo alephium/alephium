@@ -1844,7 +1844,8 @@ trait RestServerFixture
         miner,
         blocksExporter,
         httpService,
-        Some(walletApp.walletServer)
+        Some(walletApp.walletServer),
+        wsService = None
       )(
         serverConfig.broker,
         peerConf,

@@ -42,7 +42,8 @@ class RestServer(
     val miner: ActorRefT[Miner.Command],
     val blocksExporter: BlocksExporter,
     val httpService: HttpService,
-    val walletServer: Option[WalletServer]
+    val walletServer: Option[WalletServer],
+    val wsService: Option[Service]
 )(implicit
     val brokerConfig: BrokerConfig,
     val apiConfig: ApiConfig,
@@ -156,7 +157,7 @@ class RestServer(
   lazy val vertx: io.vertx.core.Vertx = httpService.vertx
 
   override def subServices: ArraySeq[Service] =
-    ArraySeq(httpService, node, endpointSender)
+    ArraySeq.from(wsService.toList) ++ ArraySeq(httpService, node, endpointSender)
 
   protected def startSelfOnce(): Future[Unit] = {
     // Eagerly load Swagger UI resources
@@ -216,7 +217,8 @@ object RestServer {
       node: Node,
       miner: ActorRefT[Miner.Command],
       blocksExporter: BlocksExporter,
-      walletServer: Option[WalletServer]
+      walletServer: Option[WalletServer],
+      wsService: Option[Service]
   )(implicit
       brokerConfig: BrokerConfig,
       apiConfig: ApiConfig,
@@ -225,7 +227,7 @@ object RestServer {
   ): RestServer = {
     val restPort = node.config.network.restPort
 
-    new RestServer(node, restPort, miner, blocksExporter, httpService, walletServer)
+    new RestServer(node, restPort, miner, blocksExporter, httpService, walletServer, wsService)
   }
 }
 // scalastyle:on parameter.number

@@ -81,7 +81,7 @@ trait Server extends Service {
   lazy val httpService = new HttpService(httpOptions)
 
   lazy val restServer: RestServer =
-    RestServer(httpService, node, miner, blocksExporter, walletApp.map(_.walletServer))(
+    RestServer(httpService, node, miner, blocksExporter, walletApp.map(_.walletServer), wsServer)(
       config.broker,
       apiConfig,
       config.network,
@@ -112,10 +112,7 @@ trait Server extends Service {
   }
 
   override lazy val subServices: ArraySeq[Service] = {
-    ArraySeq.from(walletService.toList) ++ ArraySeq.from(wsServer.toList) ++ ArraySeq(
-      restServer,
-      node
-    )
+    ArraySeq.from(walletService.toList) ++ ArraySeq(restServer, node)
   }
 
   override protected def startSelfOnce(): Future[Unit] = Future {
