@@ -87,8 +87,8 @@ object TxHandler {
   final case class ProcessedByMemPool(tx: TransactionTemplate, result: AddToMemPoolResult)
       extends SubmitToMemPoolResult {
     override def message: String = result match {
-      case AddedToMemPool =>
-        s"Tx ${tx.id.shortHex} successfully included into mempool"
+      case AddedToMemPool(seenAt) =>
+        s"Tx ${tx.id.shortHex} successfully included into mempool at ${seenAt.millis}"
       case MemPoolIsFull =>
         s"the mempool is full when trying to add the tx ${tx.id.shortHex}: ${tx.hex}"
       case DoubleSpending =>
@@ -132,7 +132,7 @@ object TxHandler {
     val chainIndex = txTemplate.chainIndex
     val grandPool  = blockFlow.getGrandPool()
     grandPool.add(chainIndex, txTemplate, TimeStamp.now()) match {
-      case MemPool.AddedToMemPool =>
+      case MemPool.AddedToMemPool(seenAt) =>
         for {
           _ <- mineTxForDev(blockFlow, chainIndex, publishBlock)
           addToMemPoolResult <-
@@ -140,11 +140,11 @@ object TxHandler {
               val intraChain = ChainIndex(chainIndex.from, chainIndex.from)
               for {
                 result <- mineTxForDev(blockFlow, intraChain, publishBlock).map(_ =>
-                  MemPool.AddedToMemPool
+                  MemPool.AddedToMemPool(seenAt)
                 )
               } yield result
             } else {
-              Right(MemPool.AddedToMemPool)
+              Right(MemPool.AddedToMemPool(seenAt))
             }
         } yield addToMemPoolResult
       case failed: MemPool.AddTxFailed =>
@@ -156,7 +156,8 @@ object TxHandler {
       blockFlow: BlockFlow,
       txValidation: TxValidation,
       tx: TransactionTemplate,
-      cacheOrphanTx: Boolean
+      cacheOrphanTx: Boolean,
+      timestamp: TimeStamp
   )(implicit brokerConfig: BrokerConfig): TxHandler.SubmitToMemPoolResult = {
     val chainIndex = tx.chainIndex
     assume(!brokerConfig.isIncomingChain(chainIndex))
@@ -169,13 +170,16 @@ object TxHandler {
     } else {
       txValidation.validateMempoolTxTemplate(tx, blockFlow) match {
         case Left(Right(NonExistInput)) if cacheOrphanTx =>
-          grandPool.orphanPool.add(tx, TimeStamp.now()) match {
-            case MemPool.AddedToMemPool =>
+          grandPool.orphanPool.add(tx, timestamp) match {
+            case MemPool.AddedToMemPool(_) =>
               TxHandler.ProcessedByMemPool(tx, MemPool.AddedToOrphanPool)
             case result => TxHandler.ProcessedByMemPool(tx, result)
           }
         case Right(_) =>
-          TxHandler.ProcessedByMemPool(tx, grandPool.add(chainIndex, tx, TimeStamp.now()))
+          TxHandler.ProcessedByMemPool(
+            tx,
+            grandPool.add(chainIndex, tx, timestamp)
+          )
         case Left(error) => TxHandler.FailedValidation(tx, error)
       }
     }
@@ -347,9 +351,15 @@ trait TxCoreHandler extends TxHandlerUtils {
       acknowledge: Boolean,
       cacheOrphanTx: Boolean
   ): Unit = {
-    TxHandler.validateAndAddTxToMemPool(blockFlow, nonCoinbaseValidation, tx, cacheOrphanTx) match {
-      case result @ TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool) =>
-        handleValidTx(tx)
+    TxHandler.validateAndAddTxToMemPool(
+      blockFlow,
+      nonCoinbaseValidation,
+      tx,
+      cacheOrphanTx,
+      TimeStamp.now()
+    ) match {
+      case result @ TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool(seenAt)) =>
+        handleValidTx(tx, seenAt)
         sendResponse(acknowledge, result)
       case result: TxHandler.SubmitToMemPoolResult =>
         log.debug(result.message)
@@ -365,18 +375,25 @@ trait TxCoreHandler extends TxHandlerUtils {
   }
 
   private[handler] def validateOrphanTx(tx: TransactionTemplate): Unit = {
-    TxHandler.validateAndAddTxToMemPool(blockFlow, nonCoinbaseValidation, tx, false) match {
+    TxHandler.validateAndAddTxToMemPool(
+      blockFlow,
+      nonCoinbaseValidation,
+      tx,
+      cacheOrphanTx = false,
+      TimeStamp.now()
+    ) match {
       case FailedValidation(_, Right(NonExistInput)) => ()
       case FailedValidation(_, _) | TxHandler.ProcessedByMemPool(_, MemPool.DoubleSpending) =>
         blockFlow.getGrandPool().orphanPool.removeInvalidTx(tx)
         log.debug(s"Remove invalid orphan tx ${tx.id.toHexString}: ${tx.hex}")
-      case TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool) => handleValidTx(tx)
-      case _: TxHandler.SubmitToMemPoolResult                       => ()
+      case TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool(seenAt)) =>
+        handleValidTx(tx, seenAt)
+      case _: TxHandler.SubmitToMemPoolResult => ()
     }
   }
 
-  private def handleValidTx(tx: TransactionTemplate): Unit = {
-    eventBus ! TxNotify(tx)
+  private def handleValidTx(tx: TransactionTemplate, seenAt: TimeStamp): Unit = {
+    eventBus ! TxNotify(tx, seenAt)
     outgoingTxBuffer.put(tx, ())
     val orphanPool = blockFlow.getGrandPool().orphanPool
     if (orphanPool.contains(tx.id)) {
@@ -458,6 +475,7 @@ trait BroadcastTxsHandler extends TxHandlerUtils {
 
 trait AutoMineHandler extends TxCoreHandler {
   def blockFlow: BlockFlow
+  def eventBus: ActorRefT[EventBus.Message]
   implicit def brokerConfig: BrokerConfig
   implicit def networkSetting: NetworkSetting
 
@@ -469,8 +487,10 @@ trait AutoMineHandler extends TxCoreHandler {
         case Right(_) =>
           TxHandler.addTxsToMemPoolAndMineForDev(blockFlow, tx, publishBlock) match {
             case Right(addToMemPoolResult) =>
-              if (addToMemPoolResult == AddedToMemPool) {
-                eventBus ! TxNotify(tx)
+              addToMemPoolResult match {
+                case AddedToMemPool(seenAt) =>
+                  eventBus ! TxNotify(tx, seenAt)
+                case _ =>
               }
               sendResponse(
                 acknowledge = true,
@@ -487,9 +507,10 @@ trait AutoMineHandler extends TxCoreHandler {
     val blockMessage = Message.serialize(NewBlock(block))
     val event        = InterCliqueManager.BroadCastBlock(block, blockMessage, DataOrigin.Local)
     publishEvent(event)
-
-    escapeIOError(blockFlow.getHeight(block)) { height =>
-      eventBus ! BlockNotify(block, height)
+    if (brokerConfig.contains(block.chainIndex.from)) {
+      escapeIOError(BlockNotify.from(block, blockFlow)) { blockNotify =>
+        eventBus ! blockNotify
+      }
     }
   }
 }

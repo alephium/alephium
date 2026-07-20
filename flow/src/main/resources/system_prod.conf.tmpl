@@ -22,6 +22,21 @@ alephium {
     max-inbound-connections-per-group = 64
     max-clique-from-same-ip = 2
 
+    ws {
+      enabled = false
+      max-connections = 100
+      max-requests-per-second = 100
+      max-frame-size = 16384 // increase with max-contract-event-addresses
+      max-message-size = 16384
+      max-write-queue-size = 262144
+      # Each websocket client connection is limited by number of subscriptions
+      max-subscriptions-per-connection = 50
+      # Each contract event subscription is limited by number of contract addresses
+      max-contract-event-addresses = 100 // increase with max-frame-size
+      # The frequency at which websocket server will ping the client to keep the connection alive.
+      ping-frequency = 30 second
+    }
+
     # The frequency at which peers will ping each other to check for liveness.
     ping-frequency = 300 second
 
@@ -76,7 +91,6 @@ alephium {
     coordinator-address    = "127.0.0.1:9973"
 
     rest-port = 12973
-    ws-port = 11973
     miner-api-port = 10973
   }
 

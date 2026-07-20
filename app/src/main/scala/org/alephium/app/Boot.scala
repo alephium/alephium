@@ -105,7 +105,9 @@ class BootUp extends StrictLogging {
 
   val shutdownTimeout: Duration = Duration.ofSecondsUnsafe(10)
   def stop(): Unit = {
+    logger.info("Shutting down Alephium...")
     Await.result(flowSystem.terminate(), shutdownTimeout.asScala)
+    logger.info("Shutdown complete")
     ()
   }
 

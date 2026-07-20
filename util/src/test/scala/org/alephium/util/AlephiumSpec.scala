@@ -76,7 +76,7 @@ object AlephiumSpec {
   }
 
   def clean(): Unit = {
-    cleanTasks.foreach(task => task())
+    cleanTasks.reverse.foreach(task => task())
     cleanTasks.clear()
 
     delete(Files.testRootPath(Env.Test))

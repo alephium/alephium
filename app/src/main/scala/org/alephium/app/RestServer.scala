@@ -20,8 +20,7 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
 import com.typesafe.scalalogging.StrictLogging
-import io.vertx.core.Vertx
-import io.vertx.core.http.{HttpMethod, HttpServer, HttpServerOptions}
+import io.vertx.core.http.{HttpMethod, HttpServer}
 import io.vertx.ext.web._
 import io.vertx.ext.web.handler.CorsHandler
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter
@@ -30,22 +29,25 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.flow.client.Node
 import org.alephium.flow.mining.Miner
-import org.alephium.http.{EndpointSender, ServerOptions, SwaggerUI}
+import org.alephium.flow.setting.NetworkSetting
+import org.alephium.http.{EndpointSender, HttpService, ServerOptions, SwaggerUI}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.NetworkId
 import org.alephium.util._
 import org.alephium.wallet.web.WalletServer
 
-// scalastyle:off method.length
 class RestServer(
     val node: Node,
     val port: Int,
     val miner: ActorRefT[Miner.Command],
     val blocksExporter: BlocksExporter,
-    val walletServer: Option[WalletServer]
+    val httpService: HttpService,
+    val walletServer: Option[WalletServer],
+    val wsService: Option[Service]
 )(implicit
     val brokerConfig: BrokerConfig,
     val apiConfig: ApiConfig,
+    val networkSetting: NetworkSetting,
     val executionContext: ExecutionContext
 ) extends EndpointsLogic
     with Documentation
@@ -147,51 +149,53 @@ class RestServer(
       metricsLogic
     ).map(route(_)) ++ swaggerUiRoute
 
-  val routes: AVector[Router => Route] =
+  lazy val routes: AVector[Router => Route] =
     walletServer.map(wallet => wallet.routes).getOrElse(AVector.empty) ++ blockFlowRoute
-
-  override def subServices: ArraySeq[Service] = ArraySeq(node, endpointSender)
-
-  val vertx          = Vertx.vertx()
-  private val router = Router.router(vertx)
-  vertx
-    .fileSystem()
-    .existsBlocking(
-      "META-INF/resources/webjars/swagger-ui/"
-    ) // Fix swagger ui being not found on the first call
-
-  private val httpServerOptions =
-    new HttpServerOptions()
-      .setMaxFormBufferedBytes(apiConfig.maxFormBufferedBytes)
-
-  private val server = vertx.createHttpServer(httpServerOptions).requestHandler(router)
-
-  // scalastyle:off magic.number
-  router
-    .route()
-    .handler(
-      CorsHandler
-        .create()
-        .allowedMethod(HttpMethod.GET)
-        .allowedMethod(HttpMethod.POST)
-        .allowedMethod(HttpMethod.PUT)
-        .allowedMethod(HttpMethod.HEAD)
-        .allowedMethod(HttpMethod.OPTIONS)
-        .allowedHeader("*")
-        .allowCredentials(true)
-        .maxAgeSeconds(1800)
-    )
-  // scalastyle:on magic.number
-
-  routes.foreach(route => route(router))
 
   private val httpBindingPromise: Promise[HttpServer] = Promise()
 
+  lazy val vertx: io.vertx.core.Vertx = httpService.vertx
+
+  override def subServices: ArraySeq[Service] =
+    ArraySeq.from(wsService.toList) ++ ArraySeq(httpService, node, endpointSender)
+
   protected def startSelfOnce(): Future[Unit] = {
-    for {
-      httpBinding <- server.listen(port, apiConfig.networkInterface.getHostAddress).asScala
-    } yield {
-      logger.info(s"Listening http request on ${httpBinding.actualPort}")
+    // Eagerly load Swagger UI resources
+    vertx
+      .fileSystem()
+      .existsBlocking("META-INF/resources/webjars/swagger-ui/")
+
+    val router = Router.router(vertx)
+
+    // scalastyle:off magic.number
+    router
+      .route()
+      .handler(
+        CorsHandler
+          .create()
+          .allowedMethod(HttpMethod.GET)
+          .allowedMethod(HttpMethod.POST)
+          .allowedMethod(HttpMethod.PUT)
+          .allowedMethod(HttpMethod.HEAD)
+          .allowedMethod(HttpMethod.OPTIONS)
+          .allowedHeader("*")
+          .allowCredentials(true)
+          .maxAgeSeconds(1800)
+      )
+    // scalastyle:on magic.number
+
+    routes.foreach { route =>
+      route(router)
+    }
+
+    httpService.httpServer.requestHandler(router)
+
+    val address = apiConfig.networkInterface.getHostAddress
+    val wsMsg   = if (networkSetting.ws.enabled) " including websocket endpoint '/ws'" else ""
+    httpService.listen(port, address).map { httpBinding =>
+      logger.info(
+        s"Listening to rest-http requests$wsMsg on /$address:${httpBinding.actualPort}"
+      )
       httpBindingPromise.success(httpBinding)
     }
   }
@@ -200,26 +204,30 @@ class RestServer(
     for {
       binding <- httpBindingPromise.future
       _       <- binding.close().asScala
-      _       <- server.close().asScala
-      _       <- vertx.close().asScala
     } yield {
       logger.info(s"http unbound")
       ()
     }
 }
 
+// scalastyle:off parameter.number
 object RestServer {
   def apply(
+      httpService: HttpService,
       node: Node,
       miner: ActorRefT[Miner.Command],
       blocksExporter: BlocksExporter,
-      walletServer: Option[WalletServer]
+      walletServer: Option[WalletServer],
+      wsService: Option[Service]
   )(implicit
       brokerConfig: BrokerConfig,
       apiConfig: ApiConfig,
+      networkSetting: NetworkSetting,
       executionContext: ExecutionContext
   ): RestServer = {
     val restPort = node.config.network.restPort
-    new RestServer(node, restPort, miner, blocksExporter, walletServer)
+
+    new RestServer(node, restPort, miner, blocksExporter, httpService, walletServer, wsService)
   }
 }
+// scalastyle:on parameter.number

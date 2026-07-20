@@ -18,6 +18,9 @@ package org.alephium.api.model
 
 import org.apache.pekko.util.ByteString
 
+import org.alephium.crypto.Byte64
+import org.alephium.protocol.{model => protocol}
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model.Transaction
 import org.alephium.serde._
 import org.alephium.util.AVector
@@ -29,7 +32,24 @@ final case class RichTransaction(
     generatedOutputs: AVector[Output],
     inputSignatures: AVector[ByteString],
     scriptSignatures: AVector[ByteString]
-)
+) {
+  def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, protocol.Transaction] = {
+    for {
+      unsignedTx <- unsigned.toProtocol()
+      inputSig   <- inputSignatures.mapE(deserialize[Byte64]).left.map(_.getMessage())
+      scriptSig  <- scriptSignatures.mapE(deserialize[Byte64]).left.map(_.getMessage())
+    } yield {
+      protocol.Transaction(
+        unsignedTx,
+        scriptExecutionOk,
+        contractInputs.map(_.unsafeToContractOutputRef()),
+        generatedOutputs.map(_.toProtocol()),
+        inputSig,
+        scriptSig
+      )
+    }
+  }
+}
 
 object RichTransaction {
   def from(
