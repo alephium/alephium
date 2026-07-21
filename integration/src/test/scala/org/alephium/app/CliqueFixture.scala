@@ -1042,23 +1042,14 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
     def startWs(): Future[Unit] = {
       implicit val ec: ExecutionContext = system.dispatcher
-      val newClients                    = scala.collection.mutable.ListBuffer.empty[WsClient]
-
-      def cleanupNew(): Future[Unit] =
-        Future.sequence(newClients.toList.map(closeWsClient)).map(_ => ())
-
-      FutureCollection
-        .foldSequentialE(servers)(()) { case (_, server) =>
-          startWsClient(server.config.network.restPort)
-            .flatMap { client =>
-              newClients += client
-              client.subscribeToBlock(0).map(_ => Right(()))
-            }
+      Future
+        .traverse(servers.toSeq) { server =>
+          for {
+            client <- startWsClient(server.config.network.restPort)
+            _      <- client.subscribeToBlock(0)
+          } yield client
         }
-        .map(_ => newClients.foreach(trackWsClient))
-        .recoverWith { case ex =>
-          cleanupNew().flatMap(_ => Future.failed(ex))
-        }
+        .map(_.foreach(trackWsClient))
     }
 
     private def trackWsClient(client: WsClient): Unit = {
