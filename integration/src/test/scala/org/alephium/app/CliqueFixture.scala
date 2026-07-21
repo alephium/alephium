@@ -1038,33 +1038,32 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       servers.map(_.stop()).foreach(_.futureValue is ())
     }
 
+    def startWsAndWaitConnection(): Unit = eventually { startWs().futureValue }
+
     def startWs(): Future[Unit] = {
       implicit val ec: ExecutionContext = system.dispatcher
-      Future
-        .sequence(
-          servers.map { server =>
-            startWsClient(server.config.network.restPort).flatMap { client =>
-              trackWsClient(client)
-              client.subscribeToBlock(0).map(_ => ()).recoverWith { case NonFatal(error) =>
-                untrackWsClient(client)
-                closeWsClient(client).flatMap(_ => Future.failed(error))
-              }
+      val newClients                    = scala.collection.mutable.ListBuffer.empty[WsClient]
+
+      def cleanupNew(): Future[Unit] =
+        Future.sequence(newClients.toList.map(closeWsClient)).map(_ => ())
+
+      FutureCollection
+        .foldSequentialE(servers)(()) { case (_, server) =>
+          startWsClient(server.config.network.restPort)
+            .flatMap { client =>
+              newClients += client
+              client.subscribeToBlock(0).map(_ => Right(()))
             }
-          }.toSeq
-        )
-        .map(_ => ())
+        }
+        .map(_ => newClients.foreach(trackWsClient))
+        .recoverWith { case ex =>
+          cleanupNew().flatMap(_ => Future.failed(ex))
+        }
     }
 
     private def trackWsClient(client: WsClient): Unit = {
       wsClients.synchronized {
         wsClients += client
-        ()
-      }
-    }
-
-    private def untrackWsClient(client: WsClient): Unit = {
-      wsClients.synchronized {
-        wsClients -= client
         ()
       }
     }

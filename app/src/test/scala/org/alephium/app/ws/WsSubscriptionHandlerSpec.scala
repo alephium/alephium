@@ -175,8 +175,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       WsSubscriptionHandler.apply(
         Vertx.vertx(),
         system,
-        config.network.ws.maxConnections,
-        AVector.empty,
+        new AtomicInteger(0),
         config.network.ws.maxRequestsPerSecond,
         config.network.ws.maxWriteQueueSize,
         config.network.ws.maxSubscriptionsPerConnection,
@@ -238,8 +237,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       WsSubscriptionHandler.apply(
         Vertx.vertx(),
         system,
-        config.network.ws.maxConnections,
-        AVector.empty,
+        new AtomicInteger(0),
         2,
         config.network.ws.maxWriteQueueSize,
         config.network.ws.maxSubscriptionsPerConnection,
@@ -311,8 +309,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       WsSubscriptionHandler.apply(
         Vertx.vertx(),
         system,
-        config.network.ws.maxConnections,
-        AVector.empty,
+        new AtomicInteger(0),
         config.network.ws.maxRequestsPerSecond,
         config.network.ws.maxWriteQueueSize,
         config.network.ws.maxSubscriptionsPerConnection,
@@ -617,8 +614,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       WsSubscriptionHandler.apply(
         Vertx.vertx(),
         system,
-        config.network.ws.maxConnections,
-        AVector.empty,
+        new AtomicInteger(0),
         config.network.ws.maxRequestsPerSecond,
         config.network.ws.maxWriteQueueSize,
         config.network.ws.maxSubscriptionsPerConnection,
@@ -719,8 +715,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       WsSubscriptionHandler.apply(
         Vertx.vertx(),
         system,
-        config.network.ws.maxConnections,
-        AVector.empty,
+        new AtomicInteger(0),
         config.network.ws.maxRequestsPerSecond,
         config.network.ws.maxWriteQueueSize,
         config.network.ws.maxSubscriptionsPerConnection,

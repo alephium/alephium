@@ -76,7 +76,7 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
   trait SweepFixture extends CliqueFixture {
     val clique = bootClique(nbOfNodes = 1)
     clique.start()
-    clique.startWs().futureValue is ()
+    clique.startWsAndWaitConnection()
 
     val group    = request[Group](getGroup(address), clique.masterRestPort)
     val restPort = clique.getRestPort(group.group)
