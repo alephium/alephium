@@ -349,7 +349,7 @@ class WsSubscriptionHandler(
         }
       }
     } else {
-      log.info(
+      log.debug(
         s"WsServer skipping $writeDescription write to $wsId: connection already closed"
       )
     }
@@ -474,7 +474,6 @@ class WsSubscriptionHandler(
         } match {
           case Success(consumer) =>
             subscriptionsState.addNewSubscription(wsId, params, consumer)
-            log.debug(s"WsServer subscribe id=$id accepted, sending success response to $wsId")
             respondAsyncAndForget(ws, Response.successful(id, subscriptionId.toHexString))
           case Failure(ex) =>
             respondAsyncAndForget(ws, Response.failed(id, Error.server(ex.getMessage)))
