@@ -16,19 +16,19 @@
 
 package org.alephium.ws
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
 
-import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.eventbus.{Message, MessageConsumer}
-import io.vertx.core.http.{ServerWebSocketHandshake, WebSocketFrameType}
+import io.vertx.core.http.WebSocketFrameType
 import org.apache.pekko.actor.{ActorSystem, Props}
 
-import org.alephium.api.model.ApiKey
 import org.alephium.json.Json._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.rpc.model.JsonRPC
@@ -44,8 +44,7 @@ object WsSubscriptionHandler {
   def apply(
       vertx: Vertx,
       system: ActorSystem,
-      maxConnections: Int,
-      apiKeys: AVector[ApiKey],
+      connectionSlots: AtomicInteger,
       maxRequestsPerSecond: Int,
       maxWriteQueueSize: Int,
       maxSubscriptionsPerConnection: Int,
@@ -59,8 +58,7 @@ object WsSubscriptionHandler {
         Props(
           new WsSubscriptionHandler(
             vertx,
-            maxConnections,
-            apiKeys,
+            connectionSlots,
             maxRequestsPerSecond,
             maxWriteQueueSize,
             maxSubscriptionsPerConnection,
@@ -91,8 +89,6 @@ object WsSubscriptionHandler {
 
   sealed trait Command         extends SubscriptionMsg
   sealed trait CommandResponse extends SubscriptionMsg
-
-  final case class Handshake(handshake: ServerWebSocketHandshake) extends Command
 
   final case class Connect(socket: ServerWsLike, handlersAttached: Boolean) extends Command
   object Connect {
@@ -130,7 +126,6 @@ object WsSubscriptionHandler {
   final case class Disconnect(id: WsId)                                   extends Command
   final private case class IncomingMessage(ws: ServerWsLike, msg: String) extends Command
   final private case class PongReceived(id: WsId)                         extends Command
-  final private case class ReleasePendingConnection(id: Long)             extends Command
 
   private case object KeepAlive
 
@@ -158,8 +153,7 @@ object WsSubscriptionHandler {
 @SuppressWarnings(Array("org.wartremover.warts.ToString"))
 class WsSubscriptionHandler(
     vertx: Vertx,
-    maxConnections: Int,
-    apiKeys: AVector[ApiKey],
+    connectionSlots: AtomicInteger,
     maxRequestsPerSecond: Int,
     maxWriteQueueSize: Int,
     maxSubscriptionsPerConnection: Int,
@@ -173,11 +167,9 @@ class WsSubscriptionHandler(
   implicit private val ec: ExecutionContextExecutor = context.dispatcher
   private val effectiveMaxRequestsPerSecond: Int    = math.max(1, maxRequestsPerSecond)
 
-  private val openedWsConnections           = mutable.Map.empty[WsId, ServerWsLike]
-  private val missedPongs                   = mutable.Map.empty[WsId, Int]
-  private val requestRates                  = mutable.Map.empty[WsId, RequestRate]
-  private val pendingWsConnections          = mutable.LinkedHashSet.empty[Long]
-  private var nextPendingConnectionId: Long = 0L
+  private val openedWsConnections = mutable.Map.empty[WsId, ServerWsLike]
+  private val missedPongs         = mutable.Map.empty[WsId, Int]
+  private val requestRates        = mutable.Map.empty[WsId, RequestRate]
 
   private val subscriptionsState = WsSubscriptionsState.empty[MessageConsumer[String]]()
 
@@ -216,7 +208,6 @@ class WsSubscriptionHandler(
   override def receive: Receive = {
     case KeepAlive =>
       openedWsConnections.foreachEntry(keepAlive)
-    case Handshake(hs) => handshake(hs)
     case Connect(ws, handlersAttached) =>
       connect(ws, handlersAttached)
     case IncomingMessage(ws, msg) =>
@@ -238,9 +229,10 @@ class WsSubscriptionHandler(
         }
       )
     case Disconnect(id) =>
-      val _         = openedWsConnections.remove(id)
-      val _         = missedPongs.remove(id)
-      val _         = requestRates.remove(id)
+      val wasConnected = openedWsConnections.remove(id).isDefined
+      val _            = missedPongs.remove(id)
+      val _            = requestRates.remove(id)
+      if (wasConnected) discard(connectionSlots.decrementAndGet())
       val customers = subscriptionsState.getConsumers(id)
       subscriptionsState.removeAllSubscriptions(id)
       Future
@@ -253,9 +245,6 @@ class WsSubscriptionHandler(
       if (openedWsConnections.contains(id)) {
         missedPongs.update(id, 0)
       }
-    case ReleasePendingConnection(id) =>
-      pendingWsConnections.remove(id)
-      ()
     case GetSubscriptions =>
       sender() ! WsImmutableSubscriptions(
         subscriptionsState.connections.toMap,
@@ -344,8 +333,8 @@ class WsSubscriptionHandler(
       onSuccess: => Unit,
       onFailure: Throwable => Unit
   )(implicit ec: ExecutionContext): Unit = {
+    val wsId = ws.textHandlerID()
     if (!ws.isClosed) {
-      val wsId = ws.textHandlerID()
       if (ws.writeQueueFull) {
         log.warning(
           s"WebSocket connection $wsId $writeDescription write queue is full, closing."
@@ -353,66 +342,20 @@ class WsSubscriptionHandler(
         closeAndDisconnect(wsId, ws)
       } else {
         val _ = ws.writeTextMessage(msg).onComplete {
-          case Success(_)  => onSuccess
-          case Failure(ex) => onFailure(ex)
+          case Success(_) =>
+            onSuccess
+          case Failure(ex) =>
+            onFailure(ex)
         }
       }
-    }
-  }
-
-  private def handshake(handshake: ServerWebSocketHandshake): Unit = {
-    discard {
-      if (handshake.path().equals("/ws")) {
-        if (!isAuthorized(handshake)) {
-          handshake.reject(HttpResponseStatus.UNAUTHORIZED.code())
-        } else {
-          val connectionsCount = openedWsConnections.size + pendingWsConnections.size
-          if (connectionsCount >= maxConnections) {
-            log.warning(s"WebSocket connections reached max limit $connectionsCount")
-            handshake.reject(HttpResponseStatus.SERVICE_UNAVAILABLE.code())
-          } else {
-            val pendingConnectionId = reservePendingConnection()
-            val _ = handshake
-              .accept()
-              .asScala
-              .failed
-              .foreach(_ => self ! ReleasePendingConnection(pendingConnectionId))
-            val _ = context.system.scheduler.scheduleOnce(
-              pingFrequency,
-              self,
-              ReleasePendingConnection(pendingConnectionId)
-            )
-          }
-        }
-      } else {
-        handshake.reject(HttpResponseStatus.BAD_REQUEST.code())
-      }
-    }
-  }
-
-  private def reservePendingConnection(): Long = {
-    val id = nextPendingConnectionId
-    nextPendingConnectionId += 1
-    pendingWsConnections.add(id)
-    id
-  }
-
-  private def releaseOldestPendingConnection(): Unit = {
-    pendingWsConnections.headOption.foreach(pendingWsConnections.remove)
-    ()
-  }
-
-  private def isAuthorized(handshake: ServerWebSocketHandshake): Boolean = {
-    val apiKeyHeader = Option(handshake.headers().get(ApiKeyHeader))
-    if (apiKeys.isEmpty) {
-      apiKeyHeader.isEmpty
     } else {
-      apiKeyHeader.exists(header => apiKeys.exists(_.value == header))
+      log.debug(
+        s"WsServer skipping $writeDescription write to $wsId: connection already closed"
+      )
     }
   }
 
   private def connect(ws: ServerWsLike, handlersAttached: Boolean): Unit = {
-    releaseOldestPendingConnection()
     missedPongs.update(ws.textHandlerID(), 0)
     if (!handlersAttached) {
       WsSubscriptionHandler.attachWebSocketHandlers(ws, maxWriteQueueSize)(message =>
@@ -427,7 +370,8 @@ class WsSubscriptionHandler(
   }
 
   private def handleMessage(ws: ServerWsLike, msg: String): Unit = {
-    if (allowRequest(ws.textHandlerID())) {
+    val wsId = ws.textHandlerID()
+    if (allowRequest(wsId)) {
       WsRequest.fromJsonString(msg, maxContractEventAddresses) match {
         case Right(WsRequest(id, UnsubscribeParams(subscriptionId))) =>
           val _ = self ! Unsubscribe(id, ws, subscriptionId)
@@ -514,6 +458,7 @@ class WsSubscriptionHandler(
       ws: ServerWsLike,
       params: WsSubscriptionParams
   ): Unit = {
+    val wsId           = ws.textHandlerID()
     val subscriptionId = params.subscriptionId
     validateSubscription(ws, subscriptionId) match {
       case Some(error) =>
@@ -528,7 +473,7 @@ class WsSubscriptionHandler(
             )
         } match {
           case Success(consumer) =>
-            subscriptionsState.addNewSubscription(ws.textHandlerID(), params, consumer)
+            subscriptionsState.addNewSubscription(wsId, params, consumer)
             respondAsyncAndForget(ws, Response.successful(id, subscriptionId.toHexString))
           case Failure(ex) =>
             respondAsyncAndForget(ws, Response.failed(id, Error.server(ex.getMessage)))

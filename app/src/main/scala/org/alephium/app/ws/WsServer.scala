@@ -17,12 +17,14 @@
 package org.alephium.app.ws
 
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.FiniteDuration
 
 import com.typesafe.scalalogging.StrictLogging
+import io.netty.handler.codec.http.HttpResponseStatus
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.{ServerWebSocket, WebSocketFrame}
@@ -32,9 +34,10 @@ import org.alephium.api.model.ApiKey
 import org.alephium.flow.client.Node
 import org.alephium.http.HttpService
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.util.{AVector, Duration, Service}
+import org.alephium.util.{discard, AVector, Duration, Service}
 import org.alephium.ws._
 import org.alephium.ws.WsParams.WsId
+import org.alephium.ws.WsUtils._
 
 final class WsServer(
     httpService: HttpService,
@@ -56,12 +59,13 @@ final class WsServer(
 
   def vertx: Vertx = httpService.vertx
 
+  private val connectionSlots = new AtomicInteger(0)
+
   lazy val subscriptionHandler =
     WsSubscriptionHandler.apply(
       vertx,
       system,
-      maxConnections,
-      apiKeys,
+      connectionSlots,
       maxRequestsPerSecond,
       maxWriteQueueSize,
       maxSubscriptionsPerConnection,
@@ -81,7 +85,29 @@ final class WsServer(
 
     httpService.httpServer
       .webSocketHandshakeHandler { handshake =>
-        subscriptionHandler ! WsSubscriptionHandler.Handshake(handshake)
+        // accept()/reject() must be called on the Vert.x event loop thread (here), not via the
+        // Akka actor, to ensure webSocketHandler fires with the correct event-loop context so
+        // that ws.textMessageHandler() registration takes effect (required on macOS/kqueue).
+        if (handshake.path() == "/ws") {
+          val apiKeyHeader = Option(handshake.headers().get(WsSubscriptionHandler.ApiKeyHeader))
+          val authorized =
+            if (apiKeys.isEmpty) {
+              apiKeyHeader.isEmpty
+            } else {
+              apiKeyHeader.exists(header => apiKeys.exists(_.value == header))
+            }
+          if (!authorized) {
+            discard(handshake.reject(HttpResponseStatus.UNAUTHORIZED.code()))
+          } else if (connectionSlots.getAndIncrement() >= maxConnections) {
+            connectionSlots.decrementAndGet()
+            discard(handshake.reject(HttpResponseStatus.SERVICE_UNAVAILABLE.code()))
+          } else {
+            // Slot claimed; release it if accept() fails before webSocketHandler fires
+            handshake.accept().asScala.failed.foreach(_ => connectionSlots.decrementAndGet())
+          }
+        } else {
+          discard(handshake.reject(HttpResponseStatus.BAD_REQUEST.code()))
+        }
       }
       .webSocketHandler { ws =>
         val serverWs = ServerWs(ws)

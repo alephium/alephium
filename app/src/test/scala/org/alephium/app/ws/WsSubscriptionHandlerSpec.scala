@@ -22,7 +22,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.WebSocketFrame
 import org.apache.pekko.actor.ActorSystem
@@ -172,17 +171,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
     }
 
     val subscriptionHandler =
-      WsSubscriptionHandler.apply(
-        Vertx.vertx(),
-        system,
-        config.network.ws.maxConnections,
-        AVector.empty,
-        config.network.ws.maxRequestsPerSecond,
-        config.network.ws.maxWriteQueueSize,
-        config.network.ws.maxSubscriptionsPerConnection,
-        config.network.ws.maxContractEventAddresses,
-        FiniteDuration(20, TimeUnit.MILLISECONDS)
-      )
+      makeSubscriptionHandler(system, pingFrequency = FiniteDuration(20, TimeUnit.MILLISECONDS))
     eventually(wsTimeout)(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val ws = new NonPongingServerWs("stale")
@@ -234,18 +223,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       }
     }
 
-    val subscriptionHandler =
-      WsSubscriptionHandler.apply(
-        Vertx.vertx(),
-        system,
-        config.network.ws.maxConnections,
-        AVector.empty,
-        2,
-        config.network.ws.maxWriteQueueSize,
-        config.network.ws.maxSubscriptionsPerConnection,
-        config.network.ws.maxContractEventAddresses,
-        FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
-      )
+    val subscriptionHandler = makeSubscriptionHandler(system, maxRequestsPerSecond = 2)
     eventually(wsTimeout)(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val ws = new CapturingServerWs("rate-limited")
@@ -307,18 +285,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
       }
     }
 
-    val subscriptionHandler =
-      WsSubscriptionHandler.apply(
-        Vertx.vertx(),
-        system,
-        config.network.ws.maxConnections,
-        AVector.empty,
-        config.network.ws.maxRequestsPerSecond,
-        config.network.ws.maxWriteQueueSize,
-        config.network.ws.maxSubscriptionsPerConnection,
-        config.network.ws.maxContractEventAddresses,
-        FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
-      )
+    val subscriptionHandler = makeSubscriptionHandler(system)
     eventually(wsTimeout)(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val ws = new BackpressuredServerWs("backpressured")
@@ -613,18 +580,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
 
   it should "support multiple subscriptions of multiple clients to multiple addresses of different event index" in new WsSubscriptionFixture
     with Eventually {
-    val subscriptionHandler =
-      WsSubscriptionHandler.apply(
-        Vertx.vertx(),
-        system,
-        config.network.ws.maxConnections,
-        AVector.empty,
-        config.network.ws.maxRequestsPerSecond,
-        config.network.ws.maxWriteQueueSize,
-        config.network.ws.maxSubscriptionsPerConnection,
-        config.network.ws.maxContractEventAddresses,
-        FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
-      )
+    val subscriptionHandler = makeSubscriptionHandler(system)
     eventually(wsTimeout)(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val websockets    = AVector(dummyServerWs(id = "dummy_0"), dummyServerWs(id = "dummy_1"))
@@ -715,18 +671,7 @@ class WsSubscriptionHandlerSpec extends AlephiumSpec with BeforeAndAfterAll with
 
   it should "support subscription, unsubscription and disconnection" in new WsSubscriptionFixture
     with Eventually {
-    val subscriptionHandler =
-      WsSubscriptionHandler.apply(
-        Vertx.vertx(),
-        system,
-        config.network.ws.maxConnections,
-        AVector.empty,
-        config.network.ws.maxRequestsPerSecond,
-        config.network.ws.maxWriteQueueSize,
-        config.network.ws.maxSubscriptionsPerConnection,
-        config.network.ws.maxContractEventAddresses,
-        FiniteDuration(config.network.ws.pingFrequency.millis, TimeUnit.MILLISECONDS)
-      )
+    val subscriptionHandler = makeSubscriptionHandler(system)
     eventually(wsTimeout)(testSubscriptionHandlerInitialized(subscriptionHandler))
 
     val ws = dummyServerWs("dummy")

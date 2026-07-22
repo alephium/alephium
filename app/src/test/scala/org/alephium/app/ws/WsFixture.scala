@@ -17,9 +17,11 @@
 package org.alephium.app.ws
 
 import java.util.UUID
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.{Failure, Success}
 
 import io.vertx.core.Vertx
@@ -317,6 +319,25 @@ trait WsSubscriptionFixture extends ServerFixture with WsFixture with ScalaFutur
     override def writePing(data: Buffer): Future[Unit]                       = Future.successful(())
     override def close(): Future[Unit]                                       = Future.successful(())
   }
+
+  protected def makeSubscriptionHandler(
+      system: ActorSystem,
+      maxRequestsPerSecond: Int = config.network.ws.maxRequestsPerSecond,
+      pingFrequency: FiniteDuration = FiniteDuration(
+        config.network.ws.pingFrequency.millis,
+        TimeUnit.MILLISECONDS
+      )
+  ): ActorRefT[SubscriptionMsg] =
+    WsSubscriptionHandler.apply(
+      Vertx.vertx(),
+      system,
+      new AtomicInteger(0),
+      maxRequestsPerSecond,
+      config.network.ws.maxWriteQueueSize,
+      config.network.ws.maxSubscriptionsPerConnection,
+      config.network.ws.maxContractEventAddresses,
+      pingFrequency
+    )
 
   protected def corId(n: Long): WsCorrelationId = n
 
