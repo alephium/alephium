@@ -16,43 +16,39 @@
 
 package org.alephium.wallet.api.model
 
-import org.alephium.api.model.Amount
+import org.alephium.api.model.{Amount, Balance}
 import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 
-final case class Balances(
+final case class WalletBalance(
     totalBalance: Amount,
     totalBalanceHint: Amount.Hint,
-    balances: AVector[Balances.AddressBalance]
+    balances: AVector[WalletBalance.WalletAddressBalance]
 )
 
-object Balances {
-  def from(totalBalance: Amount, balances: AVector[Balances.AddressBalance]): Balances = Balances(
+object WalletBalance {
+  def from(
+      totalBalance: Amount,
+      balances: AVector[WalletBalance.WalletAddressBalance]
+  ): WalletBalance = WalletBalance(
     totalBalance,
     totalBalance.hint,
     balances
   )
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  final case class AddressBalance(
+  final case class WalletAddressBalance(
       address: Address.Asset,
-      balance: Amount,
-      balanceHint: Amount.Hint,
-      lockedBalance: Amount,
-      lockedBalanceHint: Amount.Hint
+      balance: Balance
   )
 
-  object AddressBalance {
+  object WalletAddressBalance {
     @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
     def from(
         address: Address.Asset,
-        balance: Amount,
-        lockedBalance: Amount
-    ): AddressBalance = AddressBalance(
+        balance: Balance
+    ): WalletAddressBalance = WalletAddressBalance(
       address,
-      balance,
-      balance.hint,
-      lockedBalance,
-      lockedBalance.hint
+      balance
     )
   }
 }
