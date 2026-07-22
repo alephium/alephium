@@ -28,5 +28,13 @@ jobs:
       - name: Setup SBT on Linux/Mac
         if: runner.os != 'Windows'
         uses: sbt/setup-sbt@3e125ece5c3e5248e18da9ed8d2cce3d335ec8dd  # v1.1.14 (2025-10-05T20:19:35Z)
+      - name: Disable Windows Defender for build dirs
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE"
+          Add-MpPreference -ExclusionPath "$env:TEMP"
+          Add-MpPreference -ExclusionPath "$env:USERPROFILE\.sbt"
+          Add-MpPreference -ExclusionPath "$env:USERPROFILE\.ivy2"
       - run: sbt test
         shell: bash
