@@ -18,7 +18,7 @@ package org.alephium.crypto
 
 import java.math.BigInteger
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.serde.byteAVectorSerde
 import org.alephium.util.{AlephiumSpec, AVector}

@@ -71,13 +71,15 @@ class MemPoolSpec
     val pool       = MemPool.ofCapacity(mainGroup, 1)
     val tx0        = transactionGen().sample.get.toTemplate
     val chainIndex = ChainIndex.unsafe(0, 0)
-    pool.add(chainIndex, tx0, TimeStamp.now()) is MemPool.AddedToMemPool
+    val now0       = TimeStamp.now()
+    pool.add(chainIndex, tx0, now0) is MemPool.AddedToMemPool(now0)
     pool.isFull() is true
     pool.contains(tx0.id) is true
 
     val higherGasPrice = GasPrice(tx0.unsigned.gasPrice.value.addUnsafe(1))
     val tx1            = tx0.copy(unsigned = tx0.unsigned.copy(gasPrice = higherGasPrice))
-    pool.add(chainIndex, tx1, TimeStamp.now()) is MemPool.AddedToMemPool
+    val now1           = TimeStamp.now()
+    pool.add(chainIndex, tx1, now1) is MemPool.AddedToMemPool(now1)
     pool.isFull() is true
     pool.contains(tx0.id) is false
     pool.contains(tx1.id) is true
@@ -198,11 +200,11 @@ class MemPoolSpec
     blockFlow.recheckInputs(index2.from, AVector(tx2, tx3)) isE AVector(tx3)
 
     val currentTs = TimeStamp.now()
-    pool.add(index0, tx0, currentTs) is MemPool.AddedToMemPool
+    pool.add(index0, tx0, currentTs) is MemPool.AddedToMemPool(currentTs)
     pool.size is 1
-    pool.add(index1, tx1, currentTs) is MemPool.AddedToMemPool
+    pool.add(index1, tx1, currentTs) is MemPool.AddedToMemPool(currentTs)
     pool.size is 2
-    pool.add(index2, tx2, currentTs) is MemPool.AddedToMemPool
+    pool.add(index2, tx2, currentTs) is MemPool.AddedToMemPool(currentTs)
     pool.size is 3
     pool.add(index2, tx3, currentTs) is MemPool.DoubleSpending
     pool.size is 3

@@ -37,6 +37,7 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     io,
     crypto,
     api,
+    ws,
     rpc,
     app,
     benchmark,
@@ -77,8 +78,8 @@ lazy val util = project("util")
   .dependsOn(macros)
   .settings(
     libraryDependencies ++= Seq(
-      akka,
-      `akka-slf4j`,
+      pekko,
+      `pekko-slf4j`,
       bcprov,
       `scala-logging`,
       `scala-reflect`(scalaVersion.value)
@@ -102,11 +103,32 @@ lazy val rpc = project("rpc")
   .settings(
     libraryDependencies ++= Seq(
       `scala-logging`,
-      `akka-test`
+      `pekko-test`
     ),
     publish / skip := true
   )
   .dependsOn(json, util % "test->test;compile->compile")
+
+lazy val ws = project("ws")
+  .dependsOn(
+    api,
+    http,
+    json,
+    protocol,
+    rpc,
+    util
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      `scala-logging`,
+      vertx,
+      `tapir-core`,
+      `tapir-server`,
+      `tapir-openapi`,
+      `tapir-openapi-model`,
+      `tapir-vertx`
+    )
+  )
 
 lazy val api = project("api")
   .dependsOn(
@@ -131,6 +153,7 @@ lazy val app = mainProject("app")
   .dependsOn(
     json,
     api,
+    ws,
     rpc,
     http % "compile->compile;test->test",
     util % "test->test",
@@ -195,7 +218,6 @@ lazy val app = mainProject("app")
         run("chmod", "644", artifactTargetPath)
 
         expose(12973) // http
-        expose(11973) // ws
         expose(10973) // miner
         expose(9973)  // p2p
 
@@ -333,8 +355,8 @@ lazy val flow = project("flow")
   .dependsOn(conf, crypto, io, serde, util % "test->test")
   .settings(
     libraryDependencies ++= Seq(
-      akka,
-      `akka-slf4j`,
+      pekko,
+      `pekko-slf4j`,
       logback,
       `scala-logging`,
       weupnp,
@@ -514,7 +536,7 @@ val commonSettings = publishSettings ++ Seq(
   Test / envVars += "ALEPHIUM_ENV" -> "test",
   Test / testOptions += Tests.Argument("-oD"),
   libraryDependencies ++= Seq(
-    `akka-test`,
+    `pekko-test`,
     scalacheck,
     scalatest,
     scalatestplus
@@ -568,5 +590,5 @@ addCommandAlias(
 
 addCommandAlias(
   "integrationTest",
-  "integration/scalafmtCheck;integration/scalastyle;integration/test"
+  "integration/test:scalafmtCheck;integration/test:scalastyle;integration/test"
 )

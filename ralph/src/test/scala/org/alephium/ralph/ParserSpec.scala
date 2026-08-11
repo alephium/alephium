@@ -16,8 +16,8 @@
 
 package org.alephium.ralph
 
-import akka.util.ByteString
 import fastparse._
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.protocol.{Hash, PublicKey}

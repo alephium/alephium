@@ -22,36 +22,33 @@ class BlocksExportImportTest extends AlephiumActorSpec {
   it should "correcly export/import blocks" in new CliqueFixture {
     val filename = s"export-import-test-${TimeStamp.now().millis}"
 
-    val server = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1)
-
+    val server        = bootNode(publicPort = defaultMasterPort, brokerId = 0, brokerNum = 1)
     val blockMinedNum = 10
-    server.start().futureValue is ()
 
-    startWS(defaultWsMasterPort)
+    withStartedServer(server) { _ =>
+      withBlockSubscription(defaultRestMasterPort) { _ =>
+        withMining(defaultRestMasterPort) {
+          awaitNBlocks(blockMinedNum)
+        }
+      }
 
-    request[Boolean](startMining, defaultRestMasterPort) is true
+      unitRequest(exportBlocks(filename))
+    }
 
-    awaitNBlocks(blockMinedNum)
+    drainBlockNotifications()
 
-    request[Boolean](stopMining, defaultRestMasterPort) is true
+    val newPort = generatePort()
+    val newServer =
+      bootNode(publicPort = newPort, brokerId = 0, brokerNum = 1)
 
-    unitRequest(exportBlocks(filename))
+    withStartedServer(newServer) { _ =>
+      withBlockSubscription(restPort(newPort)) { _ =>
+        val file = rootPath.resolve(filename).toFile
 
-    server.stop().futureValue is ()
+        BlocksImporter.importBlocks(file, newServer.node).rightValue >= blockMinedNum is true
 
-    val newPort   = generatePort()
-    val newServer = bootNode(publicPort = newPort, brokerId = 0, brokerNum = 1)
-
-    newServer.start().futureValue is ()
-
-    startWS(wsPort(newPort))
-
-    val file = rootPath.resolve(filename).toFile
-
-    BlocksImporter.importBlocks(file, newServer.node).rightValue >= blockMinedNum is true
-
-    awaitNBlocks(blockMinedNum)
-
-    newServer.stop().futureValue is ()
+        awaitNBlocks(blockMinedNum)
+      }
+    }
   }
 }

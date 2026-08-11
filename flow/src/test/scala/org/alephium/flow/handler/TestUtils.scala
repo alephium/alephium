@@ -18,8 +18,8 @@ package org.alephium.flow.handler
 
 import java.nio.file.Path
 
-import akka.actor.ActorSystem
-import akka.testkit.TestProbe
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.testkit.TestProbe
 
 import org.alephium.io.IOUtils
 import org.alephium.protocol.config.BrokerConfig

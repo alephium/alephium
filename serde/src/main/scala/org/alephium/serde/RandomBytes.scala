@@ -18,7 +18,7 @@ package org.alephium.serde
 
 import scala.util.Random
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.util.{Bytes, Hex, SecureAndSlowRandom}
 

@@ -20,8 +20,8 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import scala.collection.mutable
 
-import akka.actor.{ActorRef, ActorSystem, Props, Stash, Terminated}
-import akka.io.{IO, Tcp}
+import org.apache.pekko.actor.{ActorRef, ActorSystem, Props, Stash, Terminated}
+import org.apache.pekko.io.{IO, Tcp}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.NetworkSetting

@@ -21,9 +21,9 @@ import java.math.BigInteger
 import scala.collection.mutable
 import scala.concurrent._
 
-import akka.util.ByteString
-import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
+import org.apache.pekko.util.ByteString
+import org.apache.pekko.util.Timeout
 
 import org.alephium.api._
 import org.alephium.api.{model => api}
@@ -945,7 +945,7 @@ class ServerUtils(implicit
     val message =
       TxHandler.AddToMemPool(AVector(tx), isIntraCliqueSyncing = false, isLocalTx = true)
     txHandler.ask(message).mapTo[TxHandler.SubmitToMemPoolResult].map {
-      case TxHandler.ProcessedByMemPool(_, AddedToMemPool) =>
+      case TxHandler.ProcessedByMemPool(_, AddedToMemPool(_)) =>
         Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
       case TxHandler.ProcessedByMemPool(_, AlreadyExisted) =>
         // succeed for idempotency reasons due to clients retrying submission

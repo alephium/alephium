@@ -19,9 +19,9 @@ package org.alephium.app
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
 
-import akka.actor.{Actor, ActorRef}
-import akka.io.Tcp
-import akka.util.ByteString
+import org.apache.pekko.actor.{Actor, ActorRef}
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.util.ByteString
 
 import org.alephium.api.model._
 import org.alephium.flow.mining.Miner
@@ -118,7 +118,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       val masterPortClique1 = clique1.masterTcpPort
 
       clique1.start()
-      clique1.startWs()
+      clique1.startWsAndWaitConnection()
       val selfClique1 = clique1.selfClique()
 
       clique1.startMining()
@@ -234,7 +234,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       )
 
       clique1.start()
-      clique1.startWs()
+      clique1.startWsAndWaitConnection()
 
       clique1.startMining()
       blockNotifyProbe.receiveN(10, Duration.ofMinutesUnsafe(2).asScala)

@@ -16,7 +16,7 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.api.{badRequest, model => api, Try}
 import org.alephium.crypto.SecP256K1PublicKey

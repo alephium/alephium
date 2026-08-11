@@ -16,8 +16,8 @@
 
 package org.alephium.flow.network
 
-import akka.actor.{ActorRef, Props, Stash}
-import akka.io.Tcp
+import org.apache.pekko.actor.{ActorRef, Props, Stash}
+import org.apache.pekko.io.Tcp
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers

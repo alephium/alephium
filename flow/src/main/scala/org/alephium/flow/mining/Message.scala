@@ -20,7 +20,7 @@ import java.math.BigInteger
 
 import scala.reflect.ClassTag
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.network.bootstrap.SimpleSerde

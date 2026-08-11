@@ -16,7 +16,7 @@
 
 package org.alephium.util
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 class DjbHashSpec extends AlephiumSpec {
   it should "hash correctly" in {

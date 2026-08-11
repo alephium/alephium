@@ -16,7 +16,7 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
@@ -51,7 +51,11 @@ final case class RichContractInput(
     address: Address.Contract,
     tokens: AVector[Token],
     outputRefTxId: TransactionId
-) extends RichInput
+) extends RichInput {
+  def unsafeToContractOutputRef(): ContractOutputRef = {
+    ContractOutputRef.unsafe(Hint.unsafe(hint), TxOutputRef.unsafeKey(key))
+  }
+}
 
 object RichInput {
   def from(

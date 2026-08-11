@@ -18,8 +18,8 @@ package org.alephium.flow.mining
 
 import java.net.InetSocketAddress
 
-import akka.actor.ActorRef
-import akka.testkit.{TestActor, TestProbe}
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.testkit.{TestActor, TestProbe}
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.{TestUtils, ViewHandler}

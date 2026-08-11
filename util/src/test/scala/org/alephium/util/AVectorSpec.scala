@@ -233,6 +233,29 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     }
   }
 
+  it should "distinct" in new Fixture {
+    forAll(vectorGen) { vc =>
+      checkEq(vc.distinct, vc.toArray.distinct)
+    }
+    AVector.empty[Int].distinct is AVector.empty[Int]
+    AVector(1, 2, 2, 3, 1, 4).distinct is AVector(1, 2, 3, 4)
+
+    // Test distinct on sliced vectors to ensure it only operates on active range
+    val full = AVector(0, 1, 2, 2, 3, 1, 4, 5, 5, 6)
+
+    // drop creates a sliced vector with non-zero start
+    val droppedFirst = full.drop(2) // [2, 2, 3, 1, 4, 5, 5, 6]
+    droppedFirst.distinct is AVector(2, 3, 1, 4, 5, 6)
+
+    // take creates a sliced vector with end < array length
+    val tookFirst = full.take(6) // [0, 1, 2, 2, 3, 1]
+    tookFirst.distinct is AVector(0, 1, 2, 3)
+
+    // drop + take creates a sliced vector with both non-zero start and end < array length
+    val sliced = full.drop(2).take(5) // [2, 2, 3, 1, 4]
+    sliced.distinct is AVector(2, 3, 1, 4)
+  }
+
   it should "reverse vector" in new Fixture {
     forAll(vectorGen) { vc => checkEq(vc.reverse, vc.toArray.reverse) }
   }
@@ -863,3 +886,4 @@ class SpecialAVectorSpec extends AlephiumSpec {
     avector.sortBy(_._2) isnot avector
   }
 }
+//scalastyle:on file.size.limit

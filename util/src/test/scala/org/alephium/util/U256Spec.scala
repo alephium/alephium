@@ -18,7 +18,7 @@ package org.alephium.util
 
 import java.math.BigInteger
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 

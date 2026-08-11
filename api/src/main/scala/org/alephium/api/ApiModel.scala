@@ -20,7 +20,7 @@ import java.net.InetSocketAddress
 
 import scala.util.{Failure, Success, Try}
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import upickle.core.Abort
 
 import org.alephium.api.{model => api}

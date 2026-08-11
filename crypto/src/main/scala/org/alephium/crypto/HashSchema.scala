@@ -18,7 +18,7 @@ package org.alephium.crypto
 
 import java.nio.charset.Charset
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.bouncycastle.crypto.Digest
 
 import org.alephium.serde._

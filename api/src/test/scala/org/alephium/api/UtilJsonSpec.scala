@@ -21,7 +21,7 @@ import java.net.InetSocketAddress
 
 import scala.reflect.ClassTag
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 

@@ -18,7 +18,7 @@ package org.alephium.api.model
 
 import java.math.BigInteger
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 final case class TargetToHashrate(
     target: ByteString

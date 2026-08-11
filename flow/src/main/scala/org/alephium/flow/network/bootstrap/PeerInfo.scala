@@ -30,7 +30,6 @@ final case class PeerInfo private (
     externalAddress: Option[InetSocketAddress],
     internalAddress: InetSocketAddress,
     restPort: Int,
-    wsPort: Int,
     minerApiPort: Int
 )
 
@@ -41,7 +40,6 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
       publicAddress: Option[InetSocketAddress],
       privateAddress: InetSocketAddress,
       restPort: Int,
-      wsPort: Int,
       minerApiPort: Int
   ): PeerInfo =
     new PeerInfo(
@@ -50,13 +48,28 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
       publicAddress,
       privateAddress,
       restPort,
-      wsPort,
       minerApiPort
     )
 
+  // Keep the legacy wsPort field in the wire format for bootstrap compatibility.
+  // WebSocket now shares restPort, so the legacy slot is ignored on read and filled
+  // with restPort on write.
+  private def unsafeWithLegacyWsPort(
+      id: Int,
+      groupNumPerBroker: Int,
+      publicAddress: Option[InetSocketAddress],
+      privateAddress: InetSocketAddress,
+      restPort: Int,
+      wsPort: Int,
+      minerApiPort: Int
+  ): PeerInfo = {
+    val _ = wsPort
+    unsafe(id, groupNumPerBroker, publicAddress, privateAddress, restPort, minerApiPort)
+  }
+
   val unsafeSerde: Serde[PeerInfo] =
     Serde.forProduct7(
-      unsafe,
+      unsafeWithLegacyWsPort,
       t =>
         (
           t.id,
@@ -64,7 +77,7 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
           t.externalAddress,
           t.internalAddress,
           t.restPort,
-          t.wsPort,
+          t.restPort,
           t.minerApiPort
         )
     )
@@ -77,7 +90,6 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
         Configs.validatePort(address.getPort)
       )
       _ <- Configs.validatePort(info.restPort)
-      _ <- Configs.validatePort(info.wsPort)
     } yield ()
   }
 
@@ -100,7 +112,6 @@ object PeerInfo extends SafeSerdeImpl[PeerInfo, GroupConfig] {
       networkSetting.externalAddressInferred,
       networkSetting.internalAddress,
       networkSetting.restPort,
-      networkSetting.wsPort,
       networkSetting.minerApiPort
     )
   }

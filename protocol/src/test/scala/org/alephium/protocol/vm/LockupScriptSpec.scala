@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.crypto.SecP256K1PublicKey
 import org.alephium.protocol.{Checksum, Hash}

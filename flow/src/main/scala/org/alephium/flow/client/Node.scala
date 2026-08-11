@@ -21,8 +21,8 @@ import java.nio.file.Path
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future}
 
-import akka.actor.{ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
+import org.apache.pekko.actor.{ActorSystem, Props}
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core._

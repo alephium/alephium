@@ -20,7 +20,7 @@ import java.util.Locale
 
 import scala.language.reflectiveCalls
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.model.dustUtxoAmount
 import org.alephium.protocol.vm._

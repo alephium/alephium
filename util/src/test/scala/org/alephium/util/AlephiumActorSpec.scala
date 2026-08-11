@@ -21,9 +21,10 @@ import scala.concurrent.duration.Duration
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
-import akka.testkit.{EventFilter, TestActorRef, TestKit}
 import com.typesafe.config.{Config, ConfigFactory}
+import org.apache.pekko
+import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
+import org.apache.pekko.testkit.{EventFilter, TestActorRef, TestKit}
 import org.scalactic.Equality
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, BeforeAndAfterEach}
@@ -77,7 +78,7 @@ trait AlephiumActorSpec extends AlephiumFutureSpec with BeforeAndAfterEach with 
   }
 
   def newTestActorRef[T <: Actor](props: Props, name: String): TestActorRef[T] = {
-    akka.testkit.TestActorRef[T](props.withDispatcher("akka.actor.default-dispatcher"), name)
+    pekko.testkit.TestActorRef[T](props.withDispatcher("pekko.actor.default-dispatcher"), name)
   }
 
   def expectErrorMsg[T](message: String)(f: => T)(implicit system: ActorSystem): T = {
@@ -93,10 +94,10 @@ object AlephiumActorSpec {
   def config(logLevel: String): Config =
     ConfigFactory.parseString(
       s"""
-         |akka {
+         |pekko {
          |  loglevel = "$logLevel"
-         |  loggers = ["akka.testkit.TestEventListener"]
-         |  logging-filter = "akka.event.slf4j.Slf4jLoggingFilter"
+         |  loggers = ["org.apache.pekko.testkit.TestEventListener"]
+         |  logging-filter = "org.apache.pekko.event.slf4j.Slf4jLoggingFilter"
          |
          |  io.tcp.trace-logging = off
          |

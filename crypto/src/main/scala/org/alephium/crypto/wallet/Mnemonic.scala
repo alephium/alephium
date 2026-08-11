@@ -22,7 +22,7 @@ import javax.crypto.spec.PBEKeySpec
 
 import scala.io.Source
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.crypto.Sha256
 import org.alephium.util.{AVector, Bits, SecureAndSlowRandom}

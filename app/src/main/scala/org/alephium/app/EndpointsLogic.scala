@@ -23,10 +23,10 @@ import java.util.concurrent.Callable
 
 import scala.concurrent._
 
-import akka.pattern.ask
-import akka.util.Timeout
 import io.prometheus.metrics.expositionformats.OpenMetricsTextFormatWriter
 import io.prometheus.metrics.model.registry.PrometheusRegistry
+import org.apache.pekko.pattern.ask
+import org.apache.pekko.util.Timeout
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.server.ServerEndpoint
 
@@ -1026,7 +1026,12 @@ object EndpointsLogic {
     SelfClique(
       cliqueInfo.id,
       cliqueInfo.peers.map(peer =>
-        PeerAddress(peer.internalAddress.getAddress, peer.restPort, peer.wsPort, peer.minerApiPort)
+        PeerAddress(
+          peer.internalAddress.getAddress,
+          peer.restPort,
+          peer.restPort,
+          peer.minerApiPort
+        )
       ),
       selfReady = selfReady,
       synced = synced

@@ -18,10 +18,10 @@ package org.alephium.flow.mining
 
 import scala.util.Random
 
-import akka.actor.ActorRef
-import akka.io.{IO, Tcp}
-import akka.testkit.{TestActor, TestProbe}
-import akka.util.ByteString
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.io.{IO, Tcp}
+import org.apache.pekko.testkit.{TestActor, TestProbe}
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}

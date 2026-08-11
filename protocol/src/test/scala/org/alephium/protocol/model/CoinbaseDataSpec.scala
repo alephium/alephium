@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import scala.util.Random
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}

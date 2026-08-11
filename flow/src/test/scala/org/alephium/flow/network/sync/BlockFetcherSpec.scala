@@ -16,8 +16,8 @@
 
 package org.alephium.flow.network.sync
 
-import akka.actor.Props
-import akka.testkit.TestActorRef
+import org.apache.pekko.actor.Props
+import org.apache.pekko.testkit.TestActorRef
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.BlockFlow

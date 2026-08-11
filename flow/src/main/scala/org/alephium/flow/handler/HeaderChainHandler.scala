@@ -16,9 +16,9 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.{ActorSystem, Props}
 import io.prometheus.metrics.core.datapoints.{CounterDataPoint, DistributionDataPoint}
 import io.prometheus.metrics.core.metrics.{Counter, Gauge}
+import org.apache.pekko.actor.{ActorSystem, Props}
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow

@@ -16,8 +16,8 @@
 
 package org.alephium.flow.network.bootstrap
 
-import akka.actor.{Props, Terminated}
-import akka.io.Tcp
+import org.apache.pekko.actor.{Props, Terminated}
+import org.apache.pekko.io.Tcp
 
 import org.alephium.crypto.{SecP256K1PrivateKey, SecP256K1PublicKey}
 import org.alephium.flow.network.Bootstrapper

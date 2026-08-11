@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import java.nio.charset.StandardCharsets
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.serde._

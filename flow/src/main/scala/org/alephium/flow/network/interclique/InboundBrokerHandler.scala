@@ -18,8 +18,8 @@ package org.alephium.flow.network.interclique
 
 import java.net.InetSocketAddress
 
-import akka.actor.Props
-import akka.io.Tcp
+import org.apache.pekko.actor.Props
+import org.apache.pekko.io.Tcp
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers

@@ -19,8 +19,8 @@ package org.alephium.flow.io
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, Queue}
 
-import akka.util.ByteString
 import com.typesafe.scalalogging.StrictLogging
+import org.apache.pekko.util.ByteString
 
 import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}

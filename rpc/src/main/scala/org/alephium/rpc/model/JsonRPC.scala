@@ -39,7 +39,7 @@ object JsonRPC extends StrictLogging {
     case ujson.Obj(_) | ujson.Arr(_) => true
     case _                           => false
   }
-  private def versionSet(json: ujson.Value): ujson.Value = {
+  private def withRpcVersion(json: ujson.Value): ujson.Value = {
     json match {
       case ujson.Obj(obj) => obj.addOne(versionKey -> ujson.Str(version))
       case other          => other
@@ -48,10 +48,10 @@ object JsonRPC extends StrictLogging {
 
   private def writerWithVersion[A](tmpWriter: Writer[A]): Writer[A] = writer[ujson.Value].comap {
     request =>
-      versionSet(writeJs(request)(tmpWriter))
+      withRpcVersion(writeJs(request)(tmpWriter))
   }
 
-  final case class Error(code: Int, message: String, data: Option[String])
+  final case class Error(code: Int, message: String, data: Option[String]) extends Throwable
   object Error {
     implicit val errorReadWriter: ReadWriter[Error] = {
       readwriter[ujson.Value].bimap[Error](
@@ -81,15 +81,23 @@ object JsonRPC extends StrictLogging {
       Error(code, message, None)
     }
 
-    // scalastyle:off magic.number
-    val ParseError: Error        = Error(-32700, "Parse error")
-    val InvalidRequest: Error    = Error(-32600, "Invalid Request")
-    val MethodNotFound: Error    = Error(-32601, "Method not found")
-    val InvalidParams: Error     = Error(-32602, "Invalid params")
-    val InternalError: Error     = Error(-32603, "Internal error")
-    val UnauthorizedError: Error = Error(-32604, "Unauthorized")
+    val ParseErrorCode: Int        = -32700
+    val InvalidRequestCode: Int    = -32600
+    val MethodNotFoundCode: Int    = -32601
+    val InvalidParamsCode: Int     = -32602
+    val InternalErrorCode: Int     = -32603
+    val UnauthorizedErrorCode: Int = -32604
+    val ServerErrorCode: Int       = -32000
 
-    def server(error: String): Error = Error(-32000, "Server error", Some(error))
+    // scalastyle:off magic.number
+    val ParseError: Error        = Error(ParseErrorCode, "Parse error")
+    val InvalidRequest: Error    = Error(InvalidRequestCode, "Invalid Request")
+    val MethodNotFound: Error    = Error(MethodNotFoundCode, "Method not found")
+    val InvalidParams: Error     = Error(InvalidParamsCode, "Invalid params")
+    val InternalError: Error     = Error(InternalErrorCode, "Internal error")
+    val UnauthorizedError: Error = Error(UnauthorizedErrorCode, "Unauthorized")
+
+    def server(error: String): Error = Error(ServerErrorCode, "Server error", Some(error))
     // scalastyle:on
   }
 
@@ -183,10 +191,14 @@ object JsonRPC extends StrictLogging {
 
   sealed trait Response
   object Response {
+    def failed(id: Long, error: Error): Failure                = Failure(error, Some(id))
     def failed[T <: WithId](request: T, error: Error): Failure = Failure(error, Some(request.id))
     def failed(error: Error): Failure                          = Failure(error, None)
     def failed(error: String): Failure                         = failed(Error.server(error))
     def successful[T <: WithId](request: T): Success           = Success(ujson.True, request.id)
+    def successful(id: Long): Success                          = Success(ujson.True, id)
+    def successful[R](id: Long, result: R)(implicit writer: Writer[R]): Success =
+      Success(writeJs(result), id)
     def successful[T <: WithId, R](request: T, result: R)(implicit writer: Writer[R]): Success =
       Success(writeJs(result), request.id)
 
@@ -195,12 +207,12 @@ object JsonRPC extends StrictLogging {
       def apply(result: ujson.Value, id: Long): Success = {
         new Success(dropNullValues(result), id)
       }
-      implicit val succesReadWriter: ReadWriter[Success] = readwriter[ujson.Value].bimap[Success](
+      implicit val successReadWriter: ReadWriter[Success] = readwriter[ujson.Value].bimap[Success](
         success =>
-          success.result match {
+          withRpcVersion(success.result match {
             case ujson.Null => ujson.Obj("id" -> writeJs(success.id))
             case _          => ujson.Obj("result" -> success.result, "id" -> writeJs(success.id))
-          },
+          }),
         json => Success(read[ujson.Value](json("result")), read[Long](json("id")))
       )
     }
@@ -208,11 +220,13 @@ object JsonRPC extends StrictLogging {
     object Failure {
       implicit val failureReadWriter: ReadWriter[Failure] = readwriter[ujson.Value].bimap[Failure](
         failure =>
-          failure.id match {
+          withRpcVersion(failure.id match {
             case Some(id) => ujson.Obj("error" -> writeJs(failure.error), "id" -> writeJs(id))
             case None     => ujson.Obj("error" -> writeJs(failure.error))
-          },
-        json => Failure(read[Error](json("error")), read[Option[Long]](json("id")))
+          }),
+        json => {
+          Failure(read[Error](json("error")), json.obj.get("id").map(read[Long](_)))
+        }
       )
     }
 
@@ -230,8 +244,8 @@ object JsonRPC extends StrictLogging {
 
     implicit val responseWriter: Writer[Response] = {
       writer[ujson.Value].comap {
-        case x @ Success(_, _) => versionSet(writeJs(x))
-        case x @ Failure(_, _) => versionSet(writeJs(x))
+        case x @ Success(_, _) => writeJs(x)
+        case x @ Failure(_, _) => writeJs(x)
       }
     }
   }

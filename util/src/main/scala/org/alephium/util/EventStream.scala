@@ -16,7 +16,7 @@
 
 package org.alephium.util
 
-import akka.actor._
+import org.apache.pekko.actor._
 
 trait EventStream extends EventStream.Publisher with EventStream.Subscriber
 

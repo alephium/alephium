@@ -23,9 +23,9 @@ import java.nio.channels.{DatagramChannel, SelectionKey}
 import scala.annotation.tailrec
 import scala.util.control.NonFatal
 
-import akka.actor.Props
-import akka.dispatch.{RequiresMessageQueue, UnboundedMessageQueueSemantics}
-import akka.util.ByteString
+import org.apache.pekko.actor.Props
+import org.apache.pekko.dispatch.{RequiresMessageQueue, UnboundedMessageQueueSemantics}
+import org.apache.pekko.util.ByteString
 
 import org.alephium.util.{ActorRefT, BaseActor, Duration, TimeStamp}
 

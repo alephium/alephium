@@ -19,7 +19,7 @@ package org.alephium.ralph
 import scala.collection.mutable
 import scala.util.Random
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash

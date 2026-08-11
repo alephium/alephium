@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets
 
 import scala.util.control.NonFatal
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.bouncycastle.math.ec.ECPoint
 
 import org.alephium.serde.RandomBytes

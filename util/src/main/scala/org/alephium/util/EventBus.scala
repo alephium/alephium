@@ -18,7 +18,7 @@ package org.alephium.util
 
 import scala.collection.mutable
 
-import akka.actor.{ActorRef, Props}
+import org.apache.pekko.actor.{ActorRef, Props}
 
 import org.alephium.util.EventStream.Subscriber
 

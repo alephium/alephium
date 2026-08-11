@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import scala.annotation.{switch, tailrec}
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.model.{minimalContractStorageDeposit, Address, ContractId, TokenId}
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}

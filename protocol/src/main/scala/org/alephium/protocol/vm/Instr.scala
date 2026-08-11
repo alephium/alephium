@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets
 
 import scala.annotation.switch
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.crypto
 import org.alephium.crypto.{Byte64, SecP256K1}

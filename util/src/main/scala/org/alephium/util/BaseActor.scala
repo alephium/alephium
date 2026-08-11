@@ -16,7 +16,7 @@
 
 package org.alephium.util
 
-import akka.actor._
+import org.apache.pekko.actor._
 import org.slf4j.{Logger, LoggerFactory}
 
 trait BaseActor extends Actor with ActorLogging {

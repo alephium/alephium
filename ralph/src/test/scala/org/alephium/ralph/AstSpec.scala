@@ -18,7 +18,7 @@ package org.alephium.ralph
 
 import scala.collection.mutable
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.vm.Val
 import org.alephium.util.{AlephiumSpec, AVector, DjbHash, Hex}

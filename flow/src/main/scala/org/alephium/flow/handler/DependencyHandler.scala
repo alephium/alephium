@@ -22,7 +22,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
 
-import akka.actor.{ActorSystem, Props}
+import org.apache.pekko.actor.{ActorSystem, Props}
 
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.model.DataOrigin

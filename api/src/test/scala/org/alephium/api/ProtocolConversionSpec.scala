@@ -20,7 +20,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalatest.{Assertion, EitherValues}
 
 import org.alephium.api.model._

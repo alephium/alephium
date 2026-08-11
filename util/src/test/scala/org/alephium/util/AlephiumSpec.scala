@@ -24,7 +24,7 @@ import scala.annotation.nowarn
 import scala.collection.mutable
 import scala.language.implicitConversions
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalacheck.Arbitrary._
 import org.scalactic.Equality
@@ -76,7 +76,7 @@ object AlephiumSpec {
   }
 
   def clean(): Unit = {
-    cleanTasks.foreach(task => task())
+    cleanTasks.reverse.foreach(task => task())
     cleanTasks.clear()
 
     delete(Files.testRootPath(Env.Test))

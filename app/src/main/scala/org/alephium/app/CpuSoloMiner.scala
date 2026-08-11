@@ -19,9 +19,9 @@ package org.alephium.app
 import java.net.InetSocketAddress
 import java.nio.file.Path
 
-import akka.actor.{ActorRef, ActorSystem}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import org.apache.pekko.actor.{ActorRef, ActorSystem}
 
 import org.alephium.flow.mining.{ExternalMinerMock, Miner}
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}

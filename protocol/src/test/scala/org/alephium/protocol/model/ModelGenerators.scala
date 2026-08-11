@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.{Random, Sorting}
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
 import org.scalatest.Assertion

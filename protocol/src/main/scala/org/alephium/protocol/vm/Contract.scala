@@ -21,7 +21,7 @@ import java.math.BigInteger
 import scala.annotation.switch
 import scala.collection.mutable
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.io.IOError
 import org.alephium.macros.HashSerde

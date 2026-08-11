@@ -18,8 +18,8 @@ package org.alephium.flow.network.broker
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{ActorSystem, Props}
-import akka.io.Tcp
+import org.apache.pekko.actor.{ActorSystem, Props}
+import org.apache.pekko.io.Tcp
 
 import org.alephium.flow.network.{DiscoveryServer, TcpController}
 import org.alephium.protocol.model.BrokerInfo

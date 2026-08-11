@@ -16,9 +16,9 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.Props
-import akka.testkit.{EventFilter, TestActorRef, TestProbe}
-import akka.util.Timeout
+import org.apache.pekko.actor.Props
+import org.apache.pekko.testkit.{EventFilter, TestActorRef, TestProbe}
+import org.apache.pekko.util.Timeout
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool
@@ -103,8 +103,8 @@ class ViewHandlerSpec extends ViewHandlerBaseSpec {
     val tx1       = block1.nonCoinbase.head.toTemplate
     val currentTs = TimeStamp.now()
     val mempool   = blockFlow.getMemPool(chainIndex)
-    blockFlow.getGrandPool().add(chainIndex, tx0, currentTs) is MemPool.AddedToMemPool
-    blockFlow.getGrandPool().add(chainIndex, tx1, currentTs) is MemPool.AddedToMemPool
+    blockFlow.getGrandPool().add(chainIndex, tx0, currentTs) is MemPool.AddedToMemPool(currentTs)
+    blockFlow.getGrandPool().add(chainIndex, tx1, currentTs) is MemPool.AddedToMemPool(currentTs)
     mempool.contains(tx0) is true
     mempool.contains(tx1) is true
     mempool.isReady(tx0.id) is true

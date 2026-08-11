@@ -20,9 +20,9 @@ import java.net.InetSocketAddress
 
 import scala.collection.mutable.{HashMap => MHashMap}
 
-import akka.actor.{Props, Terminated}
-import akka.io.{IO, Tcp}
-import akka.util.ByteString
+import org.apache.pekko.actor.{Props, Terminated}
+import org.apache.pekko.io.{IO, Tcp}
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.network.broker.{ConnectionHandler, ResetBackoffStrategy}
 import org.alephium.flow.setting.{AlephiumConfig, MiningSetting, NetworkSetting}

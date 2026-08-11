@@ -27,7 +27,6 @@ trait InfoFixture extends ModelGenerators {
     for {
       info         <- cliqueInfoGen
       restPort     <- portGen
-      wsPort       <- portGen
       minerApiPort <- portGen
     } yield {
       val peers = info.internalAddresses.mapWithIndex { (address, id) =>
@@ -37,7 +36,6 @@ trait InfoFixture extends ModelGenerators {
           Some(address),
           address,
           restPort,
-          wsPort,
           minerApiPort
         )
       }

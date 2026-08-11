@@ -16,11 +16,11 @@
 
 package org.alephium.flow.handler
 
-import akka.actor.{ActorSystem, Props}
-import akka.util.ByteString
 import io.prometheus.metrics.core.datapoints.{CounterDataPoint, DistributionDataPoint}
 import io.prometheus.metrics.core.metrics.{Counter, Gauge}
 import io.prometheus.metrics.model.registry.PrometheusRegistry
+import org.apache.pekko.actor.{ActorSystem, Props}
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxForkDepth, BlockFlow}
@@ -250,8 +250,8 @@ class BlockChainHandler(
   override def notifyBroker(broker: ActorRefT[ChainHandler.Event], block: Block): Unit = {
     broker ! BlockAdded(block.hash)
     if (brokerConfig.contains(block.chainIndex.from)) {
-      escapeIOError(blockFlow.getHeight(block)) { height =>
-        eventBus ! BlockNotify(block, height)
+      escapeIOError(BlockNotify.from(block, blockFlow)) { blockNotify =>
+        eventBus ! blockNotify
       }
     }
   }

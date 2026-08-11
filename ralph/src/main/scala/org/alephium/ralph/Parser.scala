@@ -18,8 +18,8 @@ package org.alephium.ralph
 
 import scala.collection.mutable.ArrayBuffer
 
-import akka.util.ByteString
 import fastparse._
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}

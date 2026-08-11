@@ -16,7 +16,7 @@
 
 package org.alephium.protocol
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.serde._
 import org.alephium.util.{Bytes, DjbHash, Hex}

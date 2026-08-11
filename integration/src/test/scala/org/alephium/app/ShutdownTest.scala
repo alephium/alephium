@@ -18,9 +18,9 @@ package org.alephium.app
 
 import java.net.InetSocketAddress
 
-import akka.actor.Terminated
-import akka.io.{IO, Tcp}
-import akka.testkit.TestProbe
+import org.apache.pekko.actor.Terminated
+import org.apache.pekko.io.{IO, Tcp}
+import org.apache.pekko.testkit.TestProbe
 
 import org.alephium.util._
 

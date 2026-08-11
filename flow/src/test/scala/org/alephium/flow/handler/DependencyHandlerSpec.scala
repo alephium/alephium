@@ -19,8 +19,8 @@ package org.alephium.flow.handler
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-import akka.actor.Props
-import akka.testkit.{TestActorRef, TestProbe}
+import org.apache.pekko.actor.Props
+import org.apache.pekko.testkit.{TestActorRef, TestProbe}
 
 import org.alephium.flow.{FlowFixture, GhostUncleFixture}
 import org.alephium.flow.core.maxSyncBlocksPerChain

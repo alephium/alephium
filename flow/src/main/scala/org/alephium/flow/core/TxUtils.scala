@@ -21,7 +21,7 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 
 import TxUtils._
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.core.BlockFlowState.{BlockCache, Confirmed, MemPooled, TxStatus}
 import org.alephium.flow.core.FlowUtils._

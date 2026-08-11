@@ -19,8 +19,8 @@ package org.alephium.flow.network.sync
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import akka.actor.{PoisonPill, Props}
-import akka.testkit.{EventFilter, TestActorRef, TestProbe}
+import org.apache.pekko.actor.{PoisonPill, Props}
+import org.apache.pekko.testkit.{EventFilter, TestActorRef, TestProbe}
 import org.scalacheck.Gen
 
 import org.alephium.flow.FlowFixture

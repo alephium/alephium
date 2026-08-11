@@ -21,8 +21,8 @@ import java.net.InetSocketAddress
 import scala.collection.mutable
 import scala.util.Random
 
-import akka.actor.{ActorSystem, Cancellable, Props, Terminated}
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.pekko.actor.{ActorSystem, Cancellable, Props, Terminated}
 
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.handler._

@@ -20,7 +20,7 @@ import java.math.BigInteger
 
 import scala.util.Random
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 

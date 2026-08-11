@@ -18,7 +18,7 @@ package org.alephium.ralph
 
 import scala.collection.mutable
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.crypto.Byte64

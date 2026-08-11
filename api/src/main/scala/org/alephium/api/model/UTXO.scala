@@ -16,7 +16,7 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.api.model.Token
 import org.alephium.protocol.model.{AssetOutput, ContractOutput, TxOutput, TxOutputRef}

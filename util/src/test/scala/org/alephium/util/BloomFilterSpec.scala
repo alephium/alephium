@@ -18,7 +18,7 @@ package org.alephium.util
 
 import scala.util.Random
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 class BloomFilterSpec extends AlephiumSpec {
   it should "check membership of hashes" in {

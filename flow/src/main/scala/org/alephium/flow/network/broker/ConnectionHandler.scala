@@ -21,10 +21,10 @@ import java.net.InetSocketAddress
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-import akka.actor.{Props, Terminated}
-import akka.io.Tcp
-import akka.util.ByteString
 import io.prometheus.metrics.core.metrics.Counter
+import org.apache.pekko.actor.{Props, Terminated}
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}

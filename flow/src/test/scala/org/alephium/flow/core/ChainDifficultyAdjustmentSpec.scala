@@ -21,7 +21,7 @@ import java.math.BigInteger
 import scala.collection.mutable
 import scala.util.Random
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.setting.{ConsensusSetting, ConsensusSettings}

@@ -16,7 +16,7 @@
 
 package org.alephium.serde
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 trait Deserializer[T] { self =>
   def _deserialize(input: ByteString): SerdeResult[Staging[T]]

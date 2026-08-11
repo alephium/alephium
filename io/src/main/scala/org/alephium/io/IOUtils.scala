@@ -51,21 +51,24 @@ object IOUtils {
   @inline
   def tryExecute[T](f: => T): IOResult[T] = {
     try Right(f)
-    catch error
+    catch {
+      case e: IOException       => Left(IOError.JavaIO(e))
+      case e: SecurityException => Left(IOError.JavaSecurity(e))
+      case e: RocksDBException  => Left(IOError.RocksDB(e))
+      case e: SerdeError        => Left(IOError.Serde(e))
+      case e: KeyNotFound       => Left(e)
+    }
   }
 
   @inline
   def tryExecuteF[T](f: => IOResult[T]): IOResult[T] = {
     try f
-    catch error
-  }
-
-  @inline
-  def error[T]: PartialFunction[Throwable, IOResult[T]] = {
-    case e: IOException       => Left(IOError.JavaIO(e))
-    case e: SecurityException => Left(IOError.JavaSecurity(e))
-    case e: RocksDBException  => Left(IOError.RocksDB(e))
-    case e: SerdeError        => Left(IOError.Serde(e))
-    case e: KeyNotFound       => Left(e)
+    catch {
+      case e: IOException       => Left(IOError.JavaIO(e))
+      case e: SecurityException => Left(IOError.JavaSecurity(e))
+      case e: RocksDBException  => Left(IOError.RocksDB(e))
+      case e: SerdeError        => Left(IOError.Serde(e))
+      case e: KeyNotFound       => Left(e)
+    }
   }
 }

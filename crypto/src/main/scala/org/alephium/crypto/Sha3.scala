@@ -16,7 +16,7 @@
 
 package org.alephium.crypto
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.SHA3Digest
 

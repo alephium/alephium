@@ -18,7 +18,7 @@ package org.alephium.benchmark
 
 import java.util.concurrent.TimeUnit
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 

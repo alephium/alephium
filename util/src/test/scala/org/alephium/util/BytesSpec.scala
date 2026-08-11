@@ -20,7 +20,7 @@ import java.nio.ByteBuffer
 
 import scala.language.postfixOps
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 class BytesSpec extends AlephiumSpec {
   it should "convert byte into positive int" in {

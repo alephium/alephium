@@ -16,7 +16,7 @@
 
 package org.alephium.app
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.api.model._
 import org.alephium.protocol._

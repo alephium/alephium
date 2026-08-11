@@ -19,7 +19,7 @@ package org.alephium.io
 import org.alephium.macros.EnumerationMacros
 import org.alephium.util.{AlephiumSpec, AVector}
 
-class RocksDBStorageSpec extends AlephiumSpec {
+class RocksDBStorageSpec extends AlephiumSpec with StorageFixture {
   import RocksDBSource.ColumnFamily
 
   behavior of "RocksDBStorage"
@@ -29,5 +29,14 @@ class RocksDBStorageSpec extends AlephiumSpec {
   it should "index all column family" in {
     val xs = EnumerationMacros.sealedInstancesOf[ColumnFamily]
     ColumnFamily.values is AVector.from(xs)
+  }
+
+  it should "close and destroy idempotently" in {
+    val storage = newDBStorage()
+
+    storage.close().isRight is true
+    storage.close().isRight is true
+    storage.dESTROY().isRight is true
+    storage.dESTROY().isRight is true
   }
 }

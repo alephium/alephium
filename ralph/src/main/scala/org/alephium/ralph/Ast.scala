@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{ALPHTokenId => ALPHTokenIdInstr, Contract => VmContract, _}

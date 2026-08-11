@@ -16,7 +16,7 @@
 
 package org.alephium.protocol
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.model.ContractId
 import org.alephium.util.Hex.HexStringSyntax

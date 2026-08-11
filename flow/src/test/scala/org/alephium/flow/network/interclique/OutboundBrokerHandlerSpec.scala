@@ -18,8 +18,8 @@ package org.alephium.flow.network.interclique
 
 import scala.util.Random
 
-import akka.io.Tcp
-import akka.testkit.{TestActorRef, TestProbe}
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.testkit.{TestActorRef, TestProbe}
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.handler.TestUtils

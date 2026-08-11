@@ -20,8 +20,8 @@ import java.net.InetSocketAddress
 
 import scala.util.Random
 
-import akka.actor.{ActorSystem, Props}
-import akka.testkit.{TestActorRef, TestProbe}
+import org.apache.pekko.actor.{ActorSystem, Props}
+import org.apache.pekko.testkit.{TestActorRef, TestProbe}
 import org.scalacheck.Gen
 
 import org.alephium.flow.io.StoragesFixture

@@ -16,7 +16,7 @@
 
 package org.alephium.flow.io
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteOptions}
 
 import org.alephium.flow.core.BlockHashChain

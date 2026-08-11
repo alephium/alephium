@@ -18,7 +18,7 @@ package org.alephium.app
 
 import scala.concurrent.ExecutionContext
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Minutes, Span}
 

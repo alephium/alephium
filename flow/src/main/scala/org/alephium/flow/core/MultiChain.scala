@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import scala.reflect.ClassTag
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.model.BlockState
 import org.alephium.io.{IOResult, IOUtils}

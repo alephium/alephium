@@ -18,7 +18,7 @@ package org.alephium.io
 
 import scala.jdk.CollectionConverters._
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteBatch, WriteOptions}
 
 object RocksDBColumn {

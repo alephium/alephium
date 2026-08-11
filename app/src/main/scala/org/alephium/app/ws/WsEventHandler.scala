@@ -1,0 +1,86 @@
+// Copyright 2018 The Alephium Authors
+// This file is part of the alephium project.
+//
+// The library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the library. If not, see <http://www.gnu.org/licenses/>.
+
+package org.alephium.app.ws
+
+import org.apache.pekko.actor.{ActorSystem, Props}
+
+import org.alephium.api.model.{
+  BlockAndEvents,
+  BlockEntry,
+  ContractEventByBlockHash,
+  TransactionTemplate,
+  Val
+}
+import org.alephium.flow.handler.AllHandlers.{BlockNotify, TxNotify}
+import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.model.Address
+import org.alephium.util.{ActorRefT, BaseActor, EventBus}
+import org.alephium.ws.WsParams.{WsBlockNotificationParams, WsTxNotificationParams}
+import org.alephium.ws.WsSubscriptionHandler.{NotificationPublished, SubscriptionMsg}
+
+object WsEventHandler {
+
+  def getSubscribedEventHandler(
+      eventBusRef: ActorRefT[EventBus.Message],
+      subscriptionHandlerRef: ActorRefT[SubscriptionMsg],
+      system: ActorSystem
+  )(implicit
+      networkConfig: NetworkConfig
+  ): ActorRefT[EventBus.Message] = {
+    val eventHandlerRef = ActorRefT.build[EventBus.Message](
+      system,
+      Props(new WsEventHandler(subscriptionHandlerRef))
+    )
+    eventBusRef.tell(EventBus.Subscribe, eventHandlerRef.ref)
+    eventHandlerRef
+  }
+}
+
+class WsEventHandler(subscriptionHandlerRef: ActorRefT[SubscriptionMsg])(implicit
+    val networkConfig: NetworkConfig
+) extends BaseActor {
+
+  def receive: Receive = {
+    case TxNotify(tx, seenAt) =>
+      val params = WsTxNotificationParams.from(TransactionTemplate.fromProtocol(tx, seenAt))
+      subscriptionHandlerRef ! NotificationPublished(params)
+    case BlockNotify(block, height, logStates, conflictedTxs) =>
+      BlockEntry.from(block, height, conflictedTxs) match {
+        case Right(blockEntry) =>
+          val contractEvents =
+            logStates.map { case (contractId, logState) =>
+              val contractAddress = Address.contract(contractId)
+              val eventIndex      = logState.index.toInt
+              val fields          = logState.fields.map(Val.from)
+              ContractEventByBlockHash(
+                logState.txId,
+                block.timestamp,
+                contractAddress,
+                eventIndex,
+                fields
+              )
+            }
+          val params = WsBlockNotificationParams.from(BlockAndEvents(blockEntry, contractEvents))
+          subscriptionHandlerRef ! NotificationPublished(params)
+        case Left(error) =>
+          log.error(
+            s"Failed to build BlockEntry from block ${block.hash.toHexString} at height $height due to: $error"
+          )
+      }
+  }
+
+}

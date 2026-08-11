@@ -19,9 +19,9 @@ package org.alephium.app
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.testkit.TestProbe
-import akka.util.ByteString
+import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
+import org.apache.pekko.testkit.TestProbe
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.api.ApiModelCodec
@@ -285,7 +285,9 @@ object ServerFixture {
 
     val txHandlerRef =
       system.actorOf(
-        AlephiumTestActors.const(TxHandler.ProcessedByMemPool(dummyTx.toTemplate, AddedToMemPool))
+        AlephiumTestActors.const(
+          TxHandler.ProcessedByMemPool(dummyTx.toTemplate, AddedToMemPool(TimeStamp.now()))
+        )
       )
     val txHandler   = ActorRefT[TxHandler.Command](txHandlerRef)
     val allHandlers = _allHandlers.copy(txHandler = txHandler)(config.broker)

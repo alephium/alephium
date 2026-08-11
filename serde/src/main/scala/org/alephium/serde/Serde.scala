@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.util.{AVector, Bytes, I256, TimeStamp, U256}
 import org.alephium.util.U32

@@ -16,7 +16,7 @@
 
 package org.alephium.util
 
-import akka.testkit.TestProbe
+import org.apache.pekko.testkit.TestProbe
 
 class EventBusSpec extends AlephiumActorSpec {
 

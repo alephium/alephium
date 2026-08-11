@@ -19,7 +19,7 @@ package org.alephium.app
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.api.{model => api}
 import org.alephium.api.{badRequest, failed, failedInIO, wrapResult, Try}

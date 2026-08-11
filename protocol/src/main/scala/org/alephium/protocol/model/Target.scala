@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import java.math.BigInteger
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate

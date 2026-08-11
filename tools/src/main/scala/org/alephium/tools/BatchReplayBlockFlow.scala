@@ -21,8 +21,8 @@ import java.nio.file.{Files, StandardCopyOption}
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Await
 
-import akka.actor.{ActorSystem, Props}
 import com.typesafe.scalalogging.StrictLogging
+import org.apache.pekko.actor.{ActorSystem, Props}
 
 import org.alephium.flow.client.Node
 import org.alephium.flow.core.BlockFlow

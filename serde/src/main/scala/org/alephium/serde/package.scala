@@ -22,7 +22,7 @@ import java.net.{InetAddress, InetSocketAddress, UnknownHostException}
 import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 import org.alephium.util._
 

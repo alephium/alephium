@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import scala.util.Random
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.crypto.{Blake2b, Blake3, Byte64, MerkleHashable}

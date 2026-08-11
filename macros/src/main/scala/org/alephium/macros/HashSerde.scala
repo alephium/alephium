@@ -39,7 +39,7 @@ object HashSerdeImpl {
             ) =>
           c.Expr[Any](
             q"""final case class $className $mods ( ..$fields ) extends ..$parents {
-              lazy val bytes: akka.util.ByteString = org.alephium.serde.serialize(this)
+              lazy val bytes: org.apache.pekko.util.ByteString = org.alephium.serde.serialize(this)
               lazy val hash: org.alephium.protocol.Hash = org.alephium.protocol.Hash.hash(bytes)
               def shortHex: String = hash.shortHex
               ..$body

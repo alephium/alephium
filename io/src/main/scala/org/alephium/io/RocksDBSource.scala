@@ -208,6 +208,9 @@ class RocksDBSource(val path: Path, val db: RocksDB, val cfHandles: AVector[Colu
   import IOUtils.tryExecute
   import RocksDBSource._
 
+  private var closed: Boolean    = false
+  private var destroyed: Boolean = false
+
   def handle(cf: ColumnFamily): ColumnFamilyHandle =
     cfHandles(ColumnFamily.values.indexWhere(_ == cf))
 
@@ -216,13 +219,23 @@ class RocksDBSource(val path: Path, val db: RocksDB, val cfHandles: AVector[Colu
       closeUnsafe()
     }
 
-  def closeUnsafe(): Unit = {
-    logger.info("Closing RocksDB")
-    // fsync the WAL files, as suggested by the doc of RocksDB.close()
-    db.write(new WriteOptions().setSync(true), new WriteBatch())
-    db.flushWal(true)
-    cfHandles.foreach(_.close())
-    db.close()
+  def closeUnsafe(): Unit = synchronized {
+    if (!closed) {
+      logger.info("Closing RocksDB")
+      // fsync the WAL files, as suggested by the doc of RocksDB.close()
+      val writeOptions = new WriteOptions().setSync(true)
+      val writeBatch   = new WriteBatch()
+      try {
+        db.write(writeOptions, writeBatch)
+        db.flushWal(true)
+      } finally {
+        writeBatch.close()
+        writeOptions.close()
+        cfHandles.foreach(_.close())
+        db.close()
+        closed = true
+      }
+    }
   }
 
   def dESTROY(): IOResult[Unit] =
@@ -231,9 +244,16 @@ class RocksDBSource(val path: Path, val db: RocksDB, val cfHandles: AVector[Colu
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def dESTROYUnsafe(): Unit = {
-    cfHandles.foreach(_.close())
-    db.close()
-    RocksDB.destroyDB(path.toString, new Options())
+  def dESTROYUnsafe(): Unit = synchronized {
+    if (!destroyed) {
+      closeUnsafe()
+      val options = new Options()
+      try {
+        RocksDB.destroyDB(path.toString, options)
+      } finally {
+        options.close()
+        destroyed = true
+      }
+    }
   }
 }

@@ -22,13 +22,13 @@ import java.nio.file.Path
 
 import scala.collection.immutable.ArraySeq
 
-import akka.actor.ActorRef
-import akka.io.Tcp
-import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.ValueReader
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.io.Tcp
+import org.apache.pekko.util.ByteString
 
 import org.alephium.conf._
 import org.alephium.flow.core.maxForkDepth
@@ -153,6 +153,18 @@ final case class MiningSetting(
     minTaskBroadcastInterval: Duration
 )
 
+final case class WsConfig(
+    enabled: Boolean,
+    maxConnections: Int,
+    maxRequestsPerSecond: Int,
+    maxFrameSize: Int,
+    maxMessageSize: Int,
+    maxWriteQueueSize: Int,
+    maxSubscriptionsPerConnection: Int,
+    maxContractEventAddresses: Int,
+    pingFrequency: Duration
+)
+
 final case class NetworkSetting(
     networkId: NetworkId,
     lemanHardForkTimestamp: TimeStamp,
@@ -162,6 +174,7 @@ final case class NetworkSetting(
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
     maxCliqueFromSameIp: Int,
+    ws: WsConfig,
     pingFrequency: Duration,
     retryTimeout: Duration,
     banDuration: Duration,
@@ -187,7 +200,6 @@ final case class NetworkSetting(
     coordinatorAddress: InetSocketAddress,
     externalAddress: Option[InetSocketAddress],
     restPort: Int,
-    wsPort: Int,
     minerApiPort: Int,
     connectionBuild: ActorRef => ActorRefT[Tcp.Command]
 ) extends NetworkConfig {
@@ -356,6 +368,7 @@ object AlephiumConfig {
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
       maxCliqueFromSameIp: Int,
+      ws: WsConfig,
       pingFrequency: Duration,
       retryTimeout: Duration,
       banDuration: Duration,
@@ -381,7 +394,6 @@ object AlephiumConfig {
       coordinatorAddress: InetSocketAddress,
       externalAddress: Option[InetSocketAddress],
       restPort: Int,
-      wsPort: Int,
       minerApiPort: Int
   ) {
     def toNetworkSetting(connectionBuild: ActorRef => ActorRefT[Tcp.Command]): NetworkSetting = {
@@ -395,6 +407,7 @@ object AlephiumConfig {
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
         maxCliqueFromSameIp,
+        ws,
         pingFrequency,
         retryTimeout,
         banDuration: Duration,
@@ -420,7 +433,6 @@ object AlephiumConfig {
         coordinatorAddress,
         externalAddress,
         restPort,
-        wsPort,
         minerApiPort,
         connectionBuild
       )

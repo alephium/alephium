@@ -18,7 +18,7 @@ package org.alephium.flow.mining
 
 import scala.util.Random
 
-import akka.testkit.TestProbe
+import org.apache.pekko.testkit.TestProbe
 import org.scalacheck.Gen
 
 import org.alephium.flow.AlephiumFlowActorSpec

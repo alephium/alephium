@@ -19,7 +19,7 @@ package org.alephium.api
 import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.EitherValues
 
@@ -254,14 +254,14 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode SelfClique" in {
     val cliqueId = CliqueId.generate
     val peerAddress =
-      PeerAddress(inetAddress, 9001, 9002, 9003)
+      PeerAddress(inetAddress, 9001, 9001, 9003)
     val selfClique =
       SelfClique(cliqueId, AVector(peerAddress), true, false)
     val jsonRaw =
       s"""
          |{
          |  "cliqueId": "${cliqueId.toHexString}",
-         |  "nodes": [{"address":"127.0.0.1","restPort":9001,"wsPort":9002,"minerApiPort":9003}],
+         |  "nodes": [{"address":"127.0.0.1","restPort":9001,"wsPort":9001,"minerApiPort":9003}],
          |  "selfReady": true,
          |  "synced": false
          |}""".stripMargin

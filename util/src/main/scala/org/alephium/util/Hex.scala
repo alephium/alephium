@@ -19,7 +19,7 @@ package org.alephium.util
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import org.bouncycastle.util.encoders.{Hex => BHex}
 
 object Hex {
@@ -47,7 +47,7 @@ object Hex {
     c.prefix.tree match {
       case Apply(_, List(Apply(_, List(Literal(Constant(s: String)))))) =>
         val bs = BHex.decode(s)
-        c.Expr(q"akka.util.ByteString($bs)")
+        c.Expr(q"org.apache.pekko.util.ByteString($bs)")
     }
   }
 }

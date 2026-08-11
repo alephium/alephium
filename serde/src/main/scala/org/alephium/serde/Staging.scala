@@ -16,7 +16,7 @@
 
 package org.alephium.serde
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 final case class Staging[+T](value: T, rest: ByteString) {
   def mapValue[B](f: T => B): Staging[B] = Staging(f(value), rest)

@@ -16,7 +16,7 @@
 
 package org.alephium.util
 
-import akka.actor.{Actor, Props}
+import org.apache.pekko.actor.{Actor, Props}
 
 object AlephiumTestActors {
   class ConstActor(message: Any) extends Actor {
