@@ -34,11 +34,11 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
       val balance = request[Balance](getBalance(activeAddress.toBase58), restPort)
       balance.balance.value is 0
 
-      val balances = request[Balances](walletBalances(walletName), restPort)
+      val balances = request[WalletBalance](walletBalances(walletName), restPort)
 
       // all other addresses are not swept
       addresses.filterNot(_.equals(activeAddress)).foreach { addr =>
-        balances.balances.find(_.address.equals(addr)).value.balance.value is ALPH.alph(1)
+        balances.balances.find(_.address.equals(addr)).value.balance.balance.value is ALPH.alph(1)
       }
     }
 
@@ -56,12 +56,12 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
     transfer.results.length is numberOfAddresses
 
     eventually {
-      val balances = request[Balances](walletBalances(walletName), restPort)
+      val balances = request[WalletBalance](walletBalances(walletName), restPort)
       balances.totalBalance.value is ALPH.alph(0)
 
       // all addresses are swept
       addresses.foreach { addr =>
-        balances.balances.find(_.address.equals(addr)).value.balance.value is ALPH.alph(0)
+        balances.balances.find(_.address.equals(addr)).value.balance.balance.value is ALPH.alph(0)
       }
     }
 
@@ -114,13 +114,13 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
         )
     }
 
-    val balances = request[Balances](walletBalances(walletName), restPort)
+    val balances = request[WalletBalance](walletBalances(walletName), restPort)
     balances.totalBalance.value is ALPH.alph(1) * numberOfAddresses
 
     request[Balance](getBalance(activeAddress.toBase58), restPort).balance.value is ALPH.alph(1)
 
     addresses.foreach { address =>
-      balances.balances.find(_.address.equals(address)).value.balance.value is ALPH.alph(1)
+      balances.balances.find(_.address.equals(address)).value.balance.balance.value is ALPH.alph(1)
     }
   }
 }

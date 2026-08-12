@@ -33,7 +33,7 @@ import org.alephium.util.{AVector, Duration, TimeStamp}
 trait BlockFlowClient {
   def fetchBalance(
       address: api.Address
-  ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]]
+  ): Future[Either[ApiError[_ <: StatusCode], api.Balance]]
   def prepareTransaction(
       fromPublicKey: PublicKey,
       destinations: AVector[Destination],
@@ -109,7 +109,7 @@ object BlockFlowClient {
 
     def fetchBalance(
         address: api.Address
-    ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]] =
+    ): Future[Either[ApiError[_ <: StatusCode], api.Balance]] =
       address.lockupScript match {
         case api.Address.CompleteLockupScript(_: LockupScript.P2C) =>
           Future.successful(
@@ -128,10 +128,8 @@ object BlockFlowClient {
     private def getBalance(
         address: api.Address,
         groupIndex: GroupIndex
-    ): Future[Either[ApiError[_ <: StatusCode], (Amount, Amount)]] = {
-      requestFromGroup(groupIndex, getBalance, (address, Some(true))).map(
-        _.map(res => (res.balance, res.lockedBalance))
-      )
+    ): Future[Either[ApiError[_ <: StatusCode], api.Balance]] = {
+      requestFromGroup(groupIndex, getBalance, (address, Some(true)))
     }
 
     def prepareTransaction(

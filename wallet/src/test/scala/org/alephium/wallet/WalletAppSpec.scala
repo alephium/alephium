@@ -55,6 +55,8 @@ class WalletAppSpec
     with HttpRouteFixture
     with IntegrationPatience {
 
+  import WalletAppSpec._
+
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 
   val blockFlowMock =
@@ -198,9 +200,14 @@ class WalletAppSpec
     }
 
     getBalance() check { response =>
-      response.as[Balances] is Balances.from(
+      response.as[WalletBalance] is WalletBalance.from(
         balanceAmount,
-        AVector(Balances.AddressBalance.from(address, balanceAmount, lockedAmount))
+        AVector(
+          WalletBalance.WalletAddressBalance.from(
+            address,
+            Balance.from(balanceAmount, lockedAmount, Some(tokens), Some(lockedTokens), 1)
+          )
+        )
       )
       response.code is StatusCode.Ok
     }
@@ -428,6 +435,9 @@ class WalletAppSpec
 
 object WalletAppSpec extends {
 
+  val tokens       = AVector(Token(TokenId.hash("token1"), U256.One))
+  val lockedTokens = AVector(Token(TokenId.hash("token2"), U256.Two))
+
   class BlockFlowServerMock(address: InetAddress, port: Int)(implicit
       val groupConfig: GroupConfig,
       val networkConfig: NetworkConfig
@@ -515,9 +525,6 @@ object WalletAppSpec extends {
     }
 
     router.route().path("/addresses/:address/balance").handler { ctx =>
-      val tokens       = AVector(Token(TokenId.hash("token1"), U256.One))
-      val lockedTokens = AVector(Token(TokenId.hash("token2"), U256.Two))
-
       complete(
         ctx,
         Balance
