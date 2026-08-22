@@ -61,6 +61,15 @@ object DependencyHandler {
 
   final case class FlowDataAlreadyExist(data: FlowData) extends EventStream.Event
 
+  sealed trait PendingEvictionReason
+  case object Expired         extends PendingEvictionReason
+  case object CapacityReached extends PendingEvictionReason
+
+  final case class PendingFlowDataEvicted(
+      hashes: AVector[BlockHash],
+      reason: PendingEvictionReason
+  ) extends EventStream.Event
+
   final case class PendingStatus(
       data: FlowData,
       event: ActorRefT[ChainHandler.Event],
@@ -146,7 +155,7 @@ trait DependencyHandlerState extends IOBaseActor with EventStream.Publisher {
         continue = false
       }
     }
-    toRemove.foreach(removePending)
+    evictPendings(toRemove, DependencyHandler.Expired)
   }
 
   val cacheSize =
@@ -154,7 +163,7 @@ trait DependencyHandlerState extends IOBaseActor with EventStream.Publisher {
   val pending = Cache.fifo[BlockHash, PendingStatus] {
     (map: LinkedHashMap[BlockHash, PendingStatus], eldest: JMap.Entry[BlockHash, PendingStatus]) =>
       if (map.size > cacheSize) {
-        removePending(eldest.getKey())
+        evictPendings(Seq(eldest.getKey()), DependencyHandler.CapacityReached)
       }
       val threshold = TimeStamp.now().minusUnsafe(networkSetting.dependencyExpiryPeriod)
       if (eldest.getValue().timestamp <= threshold) {
@@ -255,28 +264,52 @@ trait DependencyHandlerState extends IOBaseActor with EventStream.Publisher {
   }
 
   def removePending(hash: BlockHash): Unit = {
-    _removePending(hash)
-    readies -= hash
-    processing -= hash
+    removePendings(Seq(hash))
+    ()
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def _removePending(hash: BlockHash): Unit = {
-    pending.remove(hash)
+  private def _removePending(
+      hash: BlockHash,
+      removed: mutable.LinkedHashSet[BlockHash],
+      visited: mutable.HashSet[BlockHash]
+  ): Unit = {
+    if (visited.add(hash)) {
+      pending.remove(hash).foreach(_ => removed.addOne(hash))
+      readies -= hash
+      processing -= hash
 
-    missingIndex.remove(hash).foreach { newHashes =>
-      newHashes.foreach(_removePending)
-    }
+      missingIndex.remove(hash).foreach { newHashes =>
+        newHashes.foreach(_removePending(_, removed, visited))
+      }
 
-    missing.remove(hash).foreach { oldHashes =>
-      oldHashes.foreach { oldHash =>
-        missingIndex.get(oldHash).foreach { pending =>
-          pending -= hash
-          if (pending.isEmpty) {
-            missingIndex.remove(oldHash)
+      missing.remove(hash).foreach { oldHashes =>
+        oldHashes.foreach { oldHash =>
+          missingIndex.get(oldHash).foreach { pending =>
+            pending -= hash
+            if (pending.isEmpty) {
+              missingIndex.remove(oldHash)
+            }
           }
         }
       }
+    }
+  }
+
+  private def removePendings(hashes: Iterable[BlockHash]): AVector[BlockHash] = {
+    val removed = mutable.LinkedHashSet.empty[BlockHash]
+    val visited = mutable.HashSet.empty[BlockHash]
+    hashes.foreach(_removePending(_, removed, visited))
+    AVector.from(removed)
+  }
+
+  private def evictPendings(
+      hashes: Iterable[BlockHash],
+      reason: DependencyHandler.PendingEvictionReason
+  ): Unit = {
+    val removed = removePendings(hashes)
+    if (removed.nonEmpty) {
+      publishEvent(DependencyHandler.PendingFlowDataEvicted(removed, reason))
     }
   }
 }

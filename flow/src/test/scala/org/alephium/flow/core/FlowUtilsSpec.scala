@@ -345,6 +345,23 @@ class FlowUtilsSpec extends AlephiumSpec {
     FlowUtils.truncateTxs(txs, 3, GasBox.unsafe(gas * 2 - 1)) is txs.take(1)
   }
 
+  it should "truncate txs when total gas overflows Int" in new FlowFixture {
+    val tx  = transfer(blockFlow, ChainIndex.unsafe(0, 0)).nonCoinbase.head.toTemplate
+    val gas = GasBox.unsafe(maximalGasPerTx.value - 5000)
+
+    val highGasTx  = tx.copy(unsigned = tx.unsigned.copy(gasAmount = gas))
+    val txCount    = 860
+    val txs        = AVector.fill(txCount)(highGasTx)
+    val totalGas   = txs.fold(0L)(_ + _.unsigned.gasAmount.value.toLong)
+    val wrappedGas = txs.fold(0)(_ + _.unsigned.gasAmount.value)
+
+    totalGas > maximalGasPerBlock.value.toLong is true
+    wrappedGas is 732704
+    wrappedGas <= maximalGasPerBlock.value is true
+
+    FlowUtils.truncateTxs(txs, txCount, maximalGasPerBlock) is txs.take(2)
+  }
+
   it should "collect txs with respect to gas limit" in new FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val genesisKey = genesisKeys(chainIndex.from.value)._1

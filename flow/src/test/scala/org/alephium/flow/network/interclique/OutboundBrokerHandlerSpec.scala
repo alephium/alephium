@@ -16,8 +16,6 @@
 
 package org.alephium.flow.network.interclique
 
-import scala.util.Random
-
 import org.apache.pekko.io.Tcp
 import org.apache.pekko.testkit.{TestActorRef, TestProbe}
 
@@ -25,7 +23,7 @@ import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.protocol.{Generators, SignatureSchema}
-import org.alephium.protocol.message.{Hello, P2PV1, P2PV2}
+import org.alephium.protocol.message.{Hello, P2PV2}
 import org.alephium.protocol.model.InterBrokerInfo
 import org.alephium.util.ActorRefT
 
@@ -63,7 +61,7 @@ class OutboundBrokerHandlerSpec extends AlephiumFlowActorSpec {
     val blockFlowSynchronizer = TestProbe()
     val maxForkDepth          = 5
     val expectedRemoteBroker  = Generators.brokerInfoGen.sample.get
-    val selfP2PVersion        = if (Random.nextBoolean()) P2PV1 else P2PV2
+    val selfP2PVersion        = P2PV2
 
     lazy val (priKey, pubKey)               = SignatureSchema.secureGeneratePriPub()
     lazy val (allHandler, allHandlerProbes) = TestUtils.createAllHandlersProbe

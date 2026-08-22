@@ -70,23 +70,34 @@ class CliqueCoordinator(
       }
       if (isBrokerInfoFull) {
         log.debug(s"Broadcast clique info")
-        bootstrapper ! Bootstrapper.ForwardConnection
         val cliqueInfo = buildCliqueInfo()
         broadcast(BrokerConnector.Send(cliqueInfo))
         context become awaitAck(cliqueInfo)
       }
+    case Terminated(actor) =>
+      if (removeBrokerInfo(actor)) {
+        log.debug(s"Released broker reservation for closed connector $actor")
+      }
   }
 
-  def awaitAck(cliqueInfo: IntraCliqueInfo): Receive = { case Message.Ack(id) =>
-    log.debug(s"Broker $id is ready")
-    if (0 <= id && id < brokerConfig.brokerNum) {
-      setReady(id)
-      if (isAllReady) {
-        log.debug("All the brokers are ready")
-        broadcast(CliqueCoordinator.Ready)
-        context become awaitTerminated(cliqueInfo)
+  def awaitAck(cliqueInfo: IntraCliqueInfo): Receive = {
+    case Message.Ack(id) =>
+      log.debug(s"Broker $id is ready")
+      if (0 <= id && id < brokerConfig.brokerNum) {
+        setReady(id)
+        if (isAllReady) {
+          log.debug("All the brokers are ready")
+          bootstrapper ! Bootstrapper.ForwardConnection
+          broadcast(CliqueCoordinator.Ready)
+          context become awaitTerminated(cliqueInfo)
+        }
       }
-    }
+    case Terminated(actor) =>
+      if (removeBrokerInfo(actor)) {
+        log.debug(s"Broker connector $actor closed before acknowledgement, awaiting replacement")
+        resetReadys()
+        context become awaitBrokers
+      }
   }
 
   def awaitTerminated(cliqueInfo: IntraCliqueInfo): Receive = { case Terminated(actor) =>

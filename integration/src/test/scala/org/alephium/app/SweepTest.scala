@@ -18,7 +18,7 @@ package org.alephium.app
 
 import org.alephium.api.model._
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.nonCoinbaseMinGasFee
+import org.alephium.protocol.model.{dustUtxoAmount, nonCoinbaseMinGasFee}
 import org.alephium.util._
 import org.alephium.wallet.api.model._
 
@@ -27,7 +27,7 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
   it should "sweep amounts from the active address" in new SweepFixture {
     val transfer =
       request[TransferResults](sweepActiveAddress(walletName, transferAddress), restPort)
-    transfer.results.length is 1
+    transfer.results.length is sweepTransactionCount
 
     eventually {
       // active address is swept
@@ -38,7 +38,7 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
 
       // all other addresses are not swept
       addresses.filterNot(_.equals(activeAddress)).foreach { addr =>
-        balances.balances.find(_.address.equals(addr)).value.balance.value is ALPH.alph(1)
+        balances.balances.find(_.address.equals(addr)).value.balance.value is amountPerAddress
       }
     }
 
@@ -53,7 +53,7 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
   it should "sweep amounts from all addresses" in new SweepFixture {
     val transfer =
       request[TransferResults](sweepAllAddresses(walletName, transferAddress), restPort)
-    transfer.results.length is numberOfAddresses
+    transfer.results.length is sweepTransactionCount * numberOfAddresses
 
     eventually {
       val balances = request[Balances](walletBalances(walletName), restPort)
@@ -74,7 +74,16 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
   }
 
   trait SweepFixture extends CliqueFixture {
-    val clique = bootClique(nbOfNodes = 1)
+    val sweepTransactionCount = 5
+    val fundingOutputCount =
+      (sweepTransactionCount - 1) * ALPH.MaxTxInputNum + 1
+    val fundingOutputAmount = dustUtxoAmount.addUnsafe(nonCoinbaseMinGasFee)
+    val amountPerAddress    = fundingOutputAmount * fundingOutputCount
+
+    val clique = bootClique(
+      nbOfNodes = 1,
+      configOverrides = Map("alephium.api.default-utxos-limit" -> fundingOutputCount)
+    )
     clique.start()
     clique.startWsAndWaitConnection()
 
@@ -93,8 +102,11 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
     val activeAddress     = addressesResponse.activeAddress
     addresses.length is numberOfAddresses
 
-    val txs = addresses.map { address =>
-      transfer(publicKey, address.toBase58, transferAmount, privateKey, restPort)
+    val txs = addresses.flatMap { address =>
+      AVector
+        .fill(fundingOutputCount)(Destination(address, Some(Amount(fundingOutputAmount))))
+        .groupedWithRemainder(ALPH.MaxTxOutputNum - 1)
+        .map(destinations => transfer(publicKey, destinations, privateKey, restPort))
     }
 
     clique.startMining()
@@ -102,25 +114,20 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
     txs.foreach(confirmTx(_, restPort))
 
     eventually {
-      request[Balance](getBalance(address), restPort) is
-        Balance.from(
-          Amount(
-            initialBalance.balance.value - (transferAmount + nonCoinbaseMinGasFee) * numberOfAddresses
-          ),
-          Amount.Zero,
-          None,
-          None,
-          1
-        )
+      request[Balance](getBalance(address), restPort).balance.value < initialBalance.balance.value
     }
 
     val balances = request[Balances](walletBalances(walletName), restPort)
-    balances.totalBalance.value is ALPH.alph(1) * numberOfAddresses
-
-    request[Balance](getBalance(activeAddress.toBase58), restPort).balance.value is ALPH.alph(1)
+    balances.totalBalance.value is amountPerAddress * numberOfAddresses
 
     addresses.foreach { address =>
-      balances.balances.find(_.address.equals(address)).value.balance.value is ALPH.alph(1)
+      val balance = request[Balance](getBalance(address.toBase58), restPort)
+      balance.balance.value is amountPerAddress
+      balance.utxoNum is fundingOutputCount
+    }
+
+    addresses.foreach { address =>
+      balances.balances.find(_.address.equals(address)).value.balance.value is amountPerAddress
     }
   }
 }

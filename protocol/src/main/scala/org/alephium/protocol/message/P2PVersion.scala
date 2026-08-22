@@ -21,14 +21,14 @@ sealed trait P2PVersion
 object P2PVersion {
   def fromClientId(clientId: String): Option[P2PVersion] = {
     clientId.split("/") match {
-      case Array(_, _, _)           => Some(P2PV1)
-      case Array(_, _, _, "p2p-v1") => Some(P2PV1)
       case Array(_, _, _, "p2p-v2") => Some(P2PV2)
       case _                        => None
     }
   }
 }
 
+// Kept as a source-level marker for code that needs to identify legacy peers. Legacy peers are
+// no longer accepted by P2PVersion.fromClientId.
 case object P2PV1 extends P2PVersion {
   override def toString: String = "p2p-v1"
 }

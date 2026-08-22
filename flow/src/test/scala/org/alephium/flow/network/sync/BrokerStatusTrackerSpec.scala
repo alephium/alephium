@@ -20,12 +20,12 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.testkit.TestProbe
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.flow.network.MaxRequestNum
+import org.alephium.flow.network.MaxBlocksRequestNum
 import org.alephium.flow.network.sync.BrokerStatusTracker.BrokerStatus
 import org.alephium.flow.network.sync.SyncState.{BlockBatch, BlockDownloadTask}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.Generators
-import org.alephium.protocol.message.{P2PV1, P2PV2, P2PVersion}
+import org.alephium.protocol.message.{P2PV2, P2PVersion}
 import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector}
 
@@ -43,30 +43,18 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
   }
 
   it should "sample the right size" in new Fixture {
-    networkSetting.syncPeerSampleSizeV1 is 3
-
-    (1 until 4).foreach(_ => addNewBroker(P2PV1))
-    samplePeersSize(brokers.size, P2PV1) is 1
-    sampleV1PeersFromAllBrokers().toSeq.toMap.size is 1
-    samplePeers(P2PV1).toSeq.toMap.size is 1
-    samplePeers(P2PV2).isEmpty is true
-    (4 until 9).foreach(_ => addNewBroker(P2PV2))
-    samplePeersSize(brokers.size, P2PV1) is 2
-    sampleV1PeersFromAllBrokers().toSeq.toMap.size is 2
-    samplePeers(P2PV1).toSeq.toMap.size is 1
-    (9 until 1024).foreach(_ => addNewBroker(P2PV1))
-    samplePeersSize(brokers.size, P2PV1) is 3
-    sampleV1PeersFromAllBrokers().toSeq.toMap.size is 3
-    samplePeers(P2PV1).toSeq.toMap.size is 3
-
     networkSetting.syncPeerSampleSizeV2 is 5
-    samplePeers(P2PV2).toSeq.toMap.size is 2
-    (1 until 4).foreach(_ => addNewBroker(P2PV2))
-    samplePeers(P2PV2).toSeq.toMap.size is 2
     addNewBroker(P2PV2)
-    samplePeers(P2PV2).toSeq.toMap.size is 3
-    (9 until 1024).foreach(_ => addNewBroker(P2PV2))
-    samplePeers(P2PV2).toSeq.toMap.size is 5
+    samplePeersSize(brokers.size) is 1
+    samplePeers().toSeq.toMap.size is 1
+    (1 until 4).foreach(_ => addNewBroker(P2PV2))
+    samplePeersSize(brokers.size) is 2
+    samplePeers().toSeq.toMap.size is 2
+    (4 until 9).foreach(_ => addNewBroker(P2PV2))
+    samplePeers().toSeq.toMap.size is 3
+    samplePeersSize(1024) is 5
+    (9 until 25).foreach(_ => addNewBroker(P2PV2))
+    samplePeers().toSeq.toMap.size is 5
   }
 
   behavior of "BrokerStatus"
@@ -112,7 +100,7 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
     status.canDownload(task) is false
 
     status.updateTips(genChainTips(5))
-    status.requestNum = MaxRequestNum
+    status.requestNum = MaxBlocksRequestNum
     status.canDownload(task) is false
     status.requestNum = 0
 
@@ -131,7 +119,7 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
 
     status.clear()
     status.updateTips(genChainTips(Int.MaxValue))
-    val task1 = BlockDownloadTask(ChainIndex.unsafe(0, 0), 1, MaxRequestNum / 2, None)
+    val task1 = BlockDownloadTask(ChainIndex.unsafe(0, 0), 1, MaxBlocksRequestNum / 2, None)
     status.canDownload(task1) is true
     status.canDownload(task1) is true
     status.requestNum = 0

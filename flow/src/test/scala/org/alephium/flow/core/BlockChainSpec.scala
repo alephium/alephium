@@ -425,20 +425,23 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "test chain diffs with two chains of blocks" in new Fixture {
-    forAll(chainGenOf(4, genesis)) { longChain =>
-      forAll(chainGenOf(3, genesis)) { shortChain =>
-        val chain = buildBlockChain()
-        addBlocks(chain, shortChain)
-        addBlocks(chain, longChain)
+    val chainsGen = for {
+      longChain  <- chainGenOf(4, genesis)
+      shortChain <- chainGenOf(3, genesis)
+    } yield (longChain, shortChain)
 
-        val diff0 = chain.calHashDiff(longChain.last.hash, shortChain.last.hash).rightValue
-        diff0.toRemove is shortChain.map(_.hash).reverse
-        diff0.toAdd is longChain.map(_.hash)
+    forAll(chainsGen) { case (longChain, shortChain) =>
+      val chain = buildBlockChain()
+      addBlocks(chain, shortChain)
+      addBlocks(chain, longChain)
 
-        val diff1 = chain.calHashDiff(shortChain.last.hash, longChain.last.hash).rightValue
-        diff1.toRemove is longChain.map(_.hash).reverse
-        diff1.toAdd is shortChain.map(_.hash)
-      }
+      val diff0 = chain.calHashDiff(longChain.last.hash, shortChain.last.hash).rightValue
+      diff0.toRemove is shortChain.map(_.hash).reverse
+      diff0.toAdd is longChain.map(_.hash)
+
+      val diff1 = chain.calHashDiff(shortChain.last.hash, longChain.last.hash).rightValue
+      diff1.toRemove is longChain.map(_.hash).reverse
+      diff1.toAdd is shortChain.map(_.hash)
     }
   }
 

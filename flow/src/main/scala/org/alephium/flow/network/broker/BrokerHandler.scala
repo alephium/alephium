@@ -26,6 +26,12 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler._
 import org.alephium.flow.handler.TxHandler.SubmitToMemPoolResult
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.network.{
+  getRateLimiterWindowSize,
+  MaxFlowDataHashesPerChain,
+  MinFlowDataHashRequestNum,
+  SimpleRateLimiter
+}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.network.sync.SyncState.BlockDownloadTask
 import org.alephium.flow.setting.NetworkSetting
@@ -37,12 +43,16 @@ import org.alephium.protocol.model._
 import org.alephium.util._
 
 object BrokerHandler {
+  private[broker] def maxFlowDataHashRequestNum(chainNum: Int): Int = {
+    val scaled = MaxFlowDataHashesPerChain.toLong * chainNum.toLong
+    math.min(Int.MaxValue.toLong, math.max(MinFlowDataHashRequestNum.toLong, scaled)).toInt
+  }
+
   sealed trait Command
   case object HandShakeTimeout                                                  extends Command
   final case class Send(data: ByteString)                                       extends Command
   final case class Received(payload: Payload)                                   extends Command
   case object SendPing                                                          extends Command
-  final case class SyncLocators(hashes: AVector[AVector[BlockHash]])            extends Command
   final case class DownloadBlocks(hashes: AVector[BlockHash])                   extends Command
   final case class RelayBlock(hash: BlockHash)                                  extends Command
   final case class RelayTxs(txs: AVector[(ChainIndex, AVector[TransactionId])]) extends Command
@@ -75,6 +85,11 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
   def brokerConnectionHandler: ActorRefT[ConnectionHandler.Command]
   def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
 
+  private[broker] val maxFlowDataHashRequestNum =
+    BrokerHandler.maxFlowDataHashRequestNum(brokerConfig.chainNum)
+  private[broker] val flowDataHashRequestRateLimiter =
+    SimpleRateLimiter(maxFlowDataHashRequestNum, getRateLimiterWindowSize)
+
   override def receive: Receive = handShaking
 
   private def handleInvalidClientId(clientId: String): Unit = {
@@ -96,10 +111,7 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
           hello.clientId,
           p2pVersion
         )
-        p2pVersion match {
-          case P2PV1 => context become (exchangingV1 orElse pingPong)
-          case P2PV2 => context become (exchangingV2 orElse pingPong)
-        }
+        context become (exchangingV2 orElse pingPong)
       case None => handleInvalidClientId(hello.clientId)
     }
   }
@@ -110,8 +122,6 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
       case Left(error) =>
         log.error(s"IO error in $action: $error")
     }
-
-  def exchangingV1: Receive
 
   def exchangingV2: Receive
 
@@ -147,10 +157,12 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
           log.error("Unexpected BlocksResponse data")
       }
     case Received(BlocksRequest(requestId, hashes)) =>
-      poolAsync {
-        escapeIOError(hashes.mapE(blockflow.getHeaderVerifiedBlockBytes), "load blocks") {
-          blockBytes =>
-            send(BlocksResponse.fromBlockBytes(requestId, blockBytes))
+      if (acceptFlowDataHashRequest("block", hashes)) {
+        poolAsync {
+          escapeIOError(hashes.mapE(blockflow.getHeaderVerifiedBlockBytes), "load blocks") {
+            blockBytes =>
+              send(BlocksResponse.fromBlockBytes(requestId, blockBytes))
+          }
         }
       }
       ()
@@ -165,13 +177,37 @@ trait BrokerHandler extends HandshakeHandler with PingPongHandler with FlowDataH
       )
       handleFlowData(headers, dataOrigin, isBlock = false)
     case Received(HeadersRequest(requestId, hashes)) =>
-      escapeIOError(hashes.mapE(blockflow.getBlockHeader), "load headers") { headers =>
-        send(HeadersResponse(requestId, headers))
+      if (acceptFlowDataHashRequest("header", hashes)) {
+        escapeIOError(hashes.mapE(blockflow.getBlockHeader), "load headers") { headers =>
+          send(HeadersResponse(requestId, headers))
+        }
       }
     case Send(data) =>
       brokerConnectionHandler ! ConnectionHandler.Send(data)
   }
   // scalastyle:on method.length
+
+  private def acceptFlowDataHashRequest(
+      dataType: String,
+      hashes: AVector[BlockHash]
+  ): Boolean = {
+    if (hashes.length > maxFlowDataHashRequestNum) {
+      log.warning(
+        s"Rejected oversized $dataType hash request from $remoteAddress: ${hashes.length} hashes"
+      )
+      handleMisbehavior(MisbehaviorManager.Spamming(remoteAddress))
+      false
+    } else if (hashes.exists(hash => !brokerConfig.contains(ChainIndex.from(hash).from))) {
+      log.warning(s"Rejected $dataType hash request for an invalid group from $remoteAddress")
+      handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
+      false
+    } else if (!flowDataHashRequestRateLimiter.tryRequest(math.max(1, hashes.length))) {
+      log.info(s"Ignored $dataType hash request from $remoteAddress due to rate limiting")
+      false
+    } else {
+      true
+    }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def flowEvents: Receive = {
@@ -226,8 +262,7 @@ trait HandshakeHandler extends BaseHandler {
   import BrokerHandler._
 
   implicit def networkSetting: NetworkSetting
-  final lazy val selfP2PVersion: P2PVersion =
-    if (networkSetting.enableP2pV2) P2PV2 else P2PV1
+  final val selfP2PVersion: P2PVersion = P2PV2
 
   def remoteAddress: InetSocketAddress
   def brokerAlias: String
@@ -340,8 +375,16 @@ trait FlowDataHandler extends BaseHandler {
   def blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
   def networkSetting: NetworkSetting
 
+  protected def hasValidFlowDataDependencies[T <: FlowData](datas: AVector[T]): Boolean = {
+    datas.forall(_.blockDeps.length == brokerConfig.depsNum)
+  }
+
   def validateFlowData[T <: FlowData](datas: AVector[T], isBlock: Boolean): Boolean = {
-    if (!Validation.preValidate(datas)(blockflow.consensusConfigs)) {
+    if (!hasValidFlowDataDependencies(datas)) {
+      log.error(s"Received flow data with an invalid dependency length")
+      handleMisbehavior(MisbehaviorManager.InvalidFlowData(remoteAddress))
+      false
+    } else if (!Validation.preValidate(datas)(blockflow.consensusConfigs)) {
       log.warning(s"The data received does not contain minimal work")
       handleMisbehavior(MisbehaviorManager.InvalidPoW(remoteAddress))
       false
@@ -358,12 +401,7 @@ trait FlowDataHandler extends BaseHandler {
       datas: AVector[T],
       dataOrigin: DataOrigin
   ): Unit = {
-    if (networkSetting.enableP2pV2) {
-      blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(datas, dataOrigin)
-    } else {
-      val message = DependencyHandler.AddFlowData(datas, dataOrigin)
-      allHandlers.dependencyHandler ! message
-    }
+    blockFlowSynchronizer ! BlockFlowSynchronizer.AddFlowData(datas, dataOrigin)
   }
 
   def handleFlowData[T <: FlowData](

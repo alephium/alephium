@@ -226,6 +226,9 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
       ("alephium.broker.groups", 1)
     )
 
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[DependencyHandler.PendingFlowDataEvicted])
+
     val cacheSize = maxSyncBlocksPerChain * 2
     state.cacheSize is cacheSize
     val block0 = mineFromMemPool(blockFlow, ChainIndex.unsafe(0, 0))
@@ -239,6 +242,12 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     val block1 = block0.copy(header = block0.header.copy(nonce = Nonce.unsecureRandom()))
     state.addPendingData(block1, broker, origin, ArrayBuffer.empty)
     state.pending.contains(block0.hash) is false
+    listener.expectMsg(
+      DependencyHandler.PendingFlowDataEvicted(
+        AVector(block0.hash),
+        DependencyHandler.CapacityReached
+      )
+    )
   }
 
   it should "remove pending hashes based on expiry duration" in new Fixture {
@@ -299,6 +308,46 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     state.missingIndex.contains(blocks(2).hash) is false
     state.readies.toSet is Set(blocks(0).hash)
     state.processing.isEmpty is true
+  }
+
+  it should "publish recursively evicted pending hashes as one event" in new Fixture {
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[DependencyHandler.PendingFlowDataEvicted])
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val blockFlow1 = isolatedBlockFlow()
+    val blocks = (0 until 3).map { _ =>
+      val block = emptyBlock(blockFlow1, chainIndex)
+      addAndCheck(blockFlow1, block)
+      state.addPendingData(block, broker, origin, ArrayBuffer.empty)
+      block
+    }
+    val threshold = TimeStamp.now().minusUnsafe(config.network.dependencyExpiryPeriod)
+    val status    = state.pending.unsafe(blocks.head.hash)
+    state.pending.put(blocks.head.hash, status.copy(timestamp = threshold))
+
+    state.cleanPendings(state.pending.entries(), threshold)
+
+    state.pending.isEmpty is true
+    state.missing.isEmpty is true
+    state.missingIndex.isEmpty is true
+    listener.expectMsgPF() {
+      case DependencyHandler.PendingFlowDataEvicted(hashes, DependencyHandler.Expired) =>
+        hashes.toSet is blocks.map(_.hash).toSet
+    }
+    listener.expectNoMessage()
+  }
+
+  it should "not publish eviction events for explicit removals" in new Fixture {
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[DependencyHandler.PendingFlowDataEvicted])
+
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    state.addPendingData(block, broker, origin, ArrayBuffer.empty)
+    state.removePending(block.hash)
+
+    state.pending.isEmpty is true
+    listener.expectNoMessage()
   }
 
   it should "wait for ghost uncles" in new Fixture with GhostUncleFixture {

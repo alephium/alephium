@@ -84,6 +84,9 @@ package object serde {
   implicit def avectorSerde[T: ClassTag](implicit serde: Serde[T]): Serde[AVector[T]] =
     Serde.avectorSerde[T](serde)
 
+  def avectorSerde[T: ClassTag](maxLength: Int)(implicit serde: Serde[T]): Serde[AVector[T]] =
+    Serde.avectorSerde[T](maxLength, serde)
+
   implicit def arraySeqSerde[T: ClassTag](implicit serde: Serde[T]): Serde[ArraySeq[T]] =
     dynamicSizeSerde[ArraySeq[T], T](serde, ArraySeq.newBuilder)
 

@@ -119,6 +119,9 @@ trait WalletEndpoints
       .in(jsonBody[Sweep])
       .out(jsonBody[TransferResults])
       .summary("Transfer all unlocked ALPH from the active address to another address")
+      .description(
+        "Sweep transactions are submitted in batches of two. Each non-final batch must be confirmed before the next batch is submitted."
+      )
 
   val sweepAllAddresses: BaseEndpoint[(String, Sweep), TransferResults] =
     wallet.post
@@ -127,6 +130,9 @@ trait WalletEndpoints
       .out(jsonBody[TransferResults])
       .summary(
         "Transfer unlocked ALPH from all addresses (including all mining addresses if applicable) to another address"
+      )
+      .description(
+        "All transactions are prepared before submission. Normal wallets use one batch lane, while miner wallets use one lane per source group."
       )
 
   val getAddresses: BaseEndpoint[String, Addresses] =

@@ -469,6 +469,22 @@ object IndexedSerding {
   }
 }
 
+object TxPayload {
+  val MaxTxsPerMessage: Int = 5120
+
+  def validateHashes(
+      name: String,
+      hashes: AVector[(ChainIndex, AVector[TransactionId])]
+  )(implicit config: GroupConfig): Either[String, Unit] = {
+    val total = hashes.fold(0L) { case (sum, (_, txIds)) => sum + txIds.length }
+    Either.cond(
+      hashes.length <= config.chainNum && total <= MaxTxsPerMessage,
+      (),
+      s"Too many transaction hashes in $name payload"
+    )
+  }
+}
+
 final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId])])
     extends Payload.UnSolicited
     with IndexedPayload[AVector[TransactionId]] {
@@ -479,10 +495,19 @@ final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId]
 object NewTxHashes extends IndexedSerding[AVector[TransactionId], NewTxHashes] with Payload.Code {
   def name: String = codeName
 
-  def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
+  def checkDataPerChain(values: AVector[TransactionId]): Boolean =
+    values.length <= TxPayload.MaxTxsPerMessage
 
-  val baseSerde: Serde[AVector[TransactionId]] = avectorSerde[TransactionId]
-  implicit val serde: Serde[NewTxHashes]       = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
+  val baseSerde: Serde[AVector[TransactionId]] =
+    avectorSerde[TransactionId](TxPayload.MaxTxsPerMessage)
+  implicit private lazy val hashesSerde: Serde[AVector[(ChainIndex, AVector[TransactionId])]] =
+    avectorSerde[(ChainIndex, AVector[TransactionId])](TxPayload.MaxTxsPerMessage)
+  implicit val serde: Serde[NewTxHashes] = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
+
+  override def validate(
+      input: NewTxHashes
+  )(implicit config: GroupConfig): Either[String, Unit] =
+    super.validate(input).flatMap(_ => TxPayload.validateHashes(name, input.hashes))
 }
 
 final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[TransactionId])])
@@ -495,10 +520,19 @@ final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[
 object TxsRequest extends IndexedSerding[AVector[TransactionId], TxsRequest] with Payload.Code {
   def name: String = codeName
 
-  def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
+  def checkDataPerChain(values: AVector[TransactionId]): Boolean =
+    values.length <= TxPayload.MaxTxsPerMessage
 
-  val baseSerde: Serde[AVector[TransactionId]] = avectorSerde[TransactionId]
-  implicit val serde: Serde[TxsRequest]        = Serde.forProduct2(apply, p => (p.id, p.hashes))
+  val baseSerde: Serde[AVector[TransactionId]] =
+    avectorSerde[TransactionId](TxPayload.MaxTxsPerMessage)
+  implicit private lazy val hashesSerde: Serde[AVector[(ChainIndex, AVector[TransactionId])]] =
+    avectorSerde[(ChainIndex, AVector[TransactionId])](TxPayload.MaxTxsPerMessage)
+  implicit val serde: Serde[TxsRequest] = Serde.forProduct2(apply, p => (p.id, p.hashes))
+
+  override def validate(
+      input: TxsRequest
+  )(implicit config: GroupConfig): Either[String, Unit] =
+    super.validate(input).flatMap(_ => TxPayload.validateHashes(name, input.hashes))
 
   def apply(hashes: AVector[(ChainIndex, AVector[TransactionId])]): TxsRequest =
     TxsRequest(RequestId.random(), hashes)
@@ -509,9 +543,20 @@ final case class TxsResponse(id: RequestId, txs: AVector[TransactionTemplate])
   override def measure(): Unit = TxsResponse.payloadLabeled.inc()
 }
 
-object TxsResponse extends Payload.Serding[TxsResponse] with Payload.Code {
+object TxsResponse extends Payload.ValidatedSerding[TxsResponse] with Payload.Code {
+  implicit private val txsSerde: Serde[AVector[TransactionTemplate]] =
+    avectorSerde[TransactionTemplate](TxPayload.MaxTxsPerMessage)
   implicit val serde: Serde[TxsResponse] =
     Serde.forProduct2(apply, p => (p.id, p.txs))
+
+  override def validate(
+      input: TxsResponse
+  )(implicit config: GroupConfig): Either[String, Unit] =
+    Either.cond(
+      input.txs.length <= TxPayload.MaxTxsPerMessage,
+      (),
+      s"Too many transactions in $codeName payload"
+    )
 }
 
 final case class ChainState(tips: AVector[ChainTip]) extends Payload.UnSolicited {

@@ -188,8 +188,9 @@ class InterCliqueManager(
 
   def handleConnection: Receive = {
     case Tcp.Connected(remoteAddress, _) =>
-      if (checkForInConnection(networkSetting.maxInboundConnectionsPerGroup)) {
+      if (checkForInConnection(remoteAddress, networkSetting.maxInboundConnectionsPerGroup)) {
         log.info(s"Connected to $remoteAddress")
+        pendingInboundConnections.addOne(remoteAddress)
         val props =
           InboundBrokerHandler.props(
             selfCliqueInfo,
@@ -208,6 +209,9 @@ class InterCliqueManager(
       }
     case InterCliqueManager.HandShaked(broker, brokerInfo, connectionType, clientInfo, _) =>
       connecting.remove(brokerInfo.address)
+      if (connectionType == InboundConnection) {
+        pendingInboundConnections.remove(brokerInfo.address)
+      }
       val brokerState =
         BrokerState(brokerInfo, connectionType, broker, isSynced = false, clientInfo)
       handleNewBroker(brokerState)
@@ -264,6 +268,7 @@ class InterCliqueManager(
     case PeerDisconnected(peer) =>
       log.info(s"Peer disconnected: $peer")
       connecting.remove(peer)
+      pendingInboundConnections.remove(peer)
       publishEvent(DiscoveryServer.Unreachable(peer))
       removeBroker(peer)
       getMoreOutConnectionsIfNeeded()
@@ -385,6 +390,8 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   val connecting: Cache[InetSocketAddress, BrokerInfo] = Cache.fifo(
     networkSetting.maxOutboundConnectionsPerGroup * brokerConfig.groups
   )
+  private[network] val pendingInboundConnections =
+    collection.mutable.HashSet.empty[InetSocketAddress]
 
   def addBroker(brokerState: BrokerState): Unit = {
     val peerId = brokerState.info.peerId
@@ -447,7 +454,9 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   }
 
   def getInConnectionPerGroup(groupIndex: GroupIndex): Int = {
-    brokers.foldLeft(0) { case (count, (_, brokerState)) =>
+    // The remote groups are unknown before Hello, so every pending handshake is
+    // conservatively counted against every local group.
+    brokers.foldLeft(pendingInboundConnections.size) { case (count, (_, brokerState)) =>
       if (
         brokerState.connectionType == InboundConnection &&
         brokerState.info.contains(groupIndex)
@@ -470,6 +479,25 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
     brokerConfig.groupRange.exists { group =>
       getInConnectionPerGroup(GroupIndex.unsafe(group)) < maxInboundConnectionsPerGroup
     }
+  }
+
+  private def getInConnectionPerIp(peer: InetSocketAddress): Int = {
+    val ip = peer.getAddress
+    val connected = brokers.valuesIterator.count { brokerState =>
+      brokerState.connectionType == InboundConnection &&
+      brokerState.info.address.getAddress == ip
+    }
+    connected + pendingInboundConnections.count(_.getAddress == ip)
+  }
+
+  def checkForInConnection(
+      peer: InetSocketAddress,
+      maxInboundConnectionsPerGroup: Int
+  ): Boolean = {
+    val maxInboundConnectionsPerIp =
+      networkSetting.maxCliqueFromSameIp.toLong * brokerConfig.groups.toLong
+    checkForInConnection(maxInboundConnectionsPerGroup) &&
+    getInConnectionPerIp(peer).toLong < maxInboundConnectionsPerIp
   }
 
   def checkForOutConnection(
