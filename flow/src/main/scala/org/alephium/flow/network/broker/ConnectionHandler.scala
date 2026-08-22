@@ -28,7 +28,7 @@ import org.apache.pekko.util.ByteString
 
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.protocol.message.{Message, Payload}
+import org.alephium.protocol.message.{Message, MessageSerde, Payload}
 import org.alephium.serde.{SerdeError, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, BaseActor, EventStream}
 
@@ -63,6 +63,15 @@ object ConnectionHandler {
       val brokerHandler: ActorRefT[BrokerHandler.Command]
   )(implicit val groupConfig: GroupConfig, val networkSetting: NetworkSetting)
       extends ConnectionHandler[Payload] {
+    override protected def isInboundFrameSizeValid(data: ByteString): Boolean = {
+      MessageSerde.unwrap(data) match {
+        case Right((_, length, rest)) =>
+          val framePrefixLength = data.length - rest.length
+          length >= 0 && length.toLong + framePrefixLength <= maxBufferCapacity
+        case Left(_) => true
+      }
+    }
+
     override def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[Payload]]] = {
       tryDeserializePayload(data)
     }
@@ -121,8 +130,7 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
     downloadBytesTotal.labelValues(remoteAddress.getAddress.getHostAddress)
   def reading: Receive = { case Tcp.Received(data) =>
     downloadBytesTotalLabeled.inc(data.length.toDouble)
-    if (bufferInMessage(data)) {
-      processInMessageBuffer()
+    if (bufferInMessage(data) && processInMessageBuffer()) {
       connection ! Tcp.ResumeReading
     }
   }
@@ -259,32 +267,52 @@ trait ConnectionHandler[T] extends BaseActor with EventStream.Publisher {
   final private var inMessageBuffer = ByteString.empty
 
   def bufferInMessage(data: ByteString): Boolean = {
-    inMessageBuffer ++= data
-    if (inMessageBuffer.length > maxBufferCapacity) {
-      log.warning(s"Drop connection to [$remoteAddress] (inbound buffer overrun)")
-      handleInvalidMessage(MisbehaviorManager.SerdeError(remoteAddress))
-      context.stop(self)
+    val bufferedLength = inMessageBuffer.length.toLong + data.length
+    if (bufferedLength > maxBufferCapacity) {
+      closeForInboundOverrun("buffer")
       false
     } else {
-      true
+      val nextBuffer = inMessageBuffer ++ data
+      if (isInboundFrameSizeValid(nextBuffer)) {
+        inMessageBuffer = nextBuffer
+        true
+      } else {
+        closeForInboundOverrun("frame")
+        false
+      }
     }
   }
+
+  protected def isInboundFrameSizeValid(data: ByteString): Boolean = true
 
   def tryDeserialize(data: ByteString): SerdeResult[Option[Staging[T]]]
   def handleNewMessage(message: T): Unit
 
   @tailrec
-  final def processInMessageBuffer(): Unit = {
-    tryDeserialize(inMessageBuffer) match {
-      case Right(Some(Staging(message, rest))) =>
-        inMessageBuffer = rest
-        handleNewMessage(message)
-        processInMessageBuffer()
-      case Right(None) => ()
-      case Left(error) =>
-        log.error(s"Message deserialization error: $error")
-        handleInvalidMessage(MisbehaviorManager.SerdeError(remoteAddress))
+  final def processInMessageBuffer(): Boolean = {
+    if (!isInboundFrameSizeValid(inMessageBuffer)) {
+      closeForInboundOverrun("frame")
+      false
+    } else {
+      tryDeserialize(inMessageBuffer) match {
+        case Right(Some(Staging(message, rest))) =>
+          inMessageBuffer = rest
+          handleNewMessage(message)
+          processInMessageBuffer()
+        case Right(None) => true
+        case Left(error) =>
+          log.error(s"Message deserialization error: $error")
+          handleInvalidMessage(MisbehaviorManager.SerdeError(remoteAddress))
+          context.stop(self)
+          false
+      }
     }
+  }
+
+  private def closeForInboundOverrun(kind: String): Unit = {
+    log.warning(s"Drop connection to [$remoteAddress] (inbound $kind overrun)")
+    handleInvalidMessage(MisbehaviorManager.SerdeError(remoteAddress))
+    context.stop(self)
   }
 
   def handleInvalidMessage(message: MisbehaviorManager.SerdeError): Unit = {

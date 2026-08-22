@@ -22,7 +22,7 @@ import org.apache.pekko.actor.Cancellable
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxForkDepth, maxSyncBlocksPerChain, BlockFlow}
-import org.alephium.flow.handler.{AllHandlers, FlowHandler, TxHandler}
+import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network._
 import org.alephium.flow.network.broker.{
@@ -50,6 +50,14 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
       identity[TimeStamp](_),
       seenTxExpiryDuration
     )
+  private[interclique] val txsRequestMaxIdsPerWindow = BrokerHandler.maxTxsRequestIdsPerWindow(
+    networkSetting.txsRequestMaxIdsPerSecond,
+    getRateLimiterWindowSize
+  )
+  private[interclique] val txsRequestRateLimiter =
+    SimpleRateLimiter(txsRequestMaxIdsPerWindow, getRateLimiterWindowSize)
+  private[interclique] val pendingTxRequests =
+    Cache.fifo[RequestId, TxsRequest](BrokerHandler.MaxPendingTxRequests)
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 
@@ -79,51 +87,21 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
     }
   }
 
-  def exchangingV1: Receive = exchangingCommon orElse syncingV1 orElse flowEvents
-  def exchangingV2: Receive = exchangingV1 orElse syncingV2
+  def exchangingV2: Receive =
+    exchangingCommon orElse gossiping orElse syncingV2 orElse rejectLegacySync orElse flowEvents
 
-  private def tryUpdateSyncStatus(locators: AVector[AVector[BlockHash]]): Unit = {
-    // When our node is V2 but the peer is V1, since it is impossible to receive the
-    // chain state from V1, we need to update the sync state by checking the locators
-    if (!selfSynced && selfP2PVersion == P2PV2 && remoteP2PVersion == P2PV1) {
-      val result = locators.forallE { locatorsPerChain =>
-        if (locatorsPerChain.isEmpty) {
-          Right(true)
-        } else {
-          blockflow.contains(locatorsPerChain.last)
-        }
-      }
-      escapeIOError(result, "tryUpdateSyncStatus") { synced =>
-        if (synced) setSelfSynced()
-      }
-    }
+  private def rejectLegacySync: Receive = {
+    case BaseBrokerHandler.Received(_: InvRequest)  => rejectLegacySyncMessage("InvRequest")
+    case BaseBrokerHandler.Received(_: InvResponse) => rejectLegacySyncMessage("InvResponse")
   }
 
-  def syncingV1: Receive = {
-    case BaseBrokerHandler.SyncLocators(locators) =>
-      val showLocators = Utils.showFlow(locators)
-      log.debug(s"Send sync locators to $remoteAddress: $showLocators")
-      send(InvRequest(locators))
-    case BaseBrokerHandler.Received(InvRequest(requestId, locators)) =>
-      if (validate(locators)) {
-        log.debug(s"Received sync request from $remoteAddress: ${Utils.showFlow(locators)}")
-        allHandlers.flowHandler ! FlowHandler.GetSyncInventories(
-          requestId,
-          locators,
-          remoteBrokerInfo
-        )
-        tryUpdateSyncStatus(locators)
-      } else {
-        log.warning(s"Invalid locators from $remoteAddress: ${Utils.showFlow(locators)}")
-      }
-    case FlowHandler.SyncInventories(Some(requestId), inventories) =>
-      log.debug(s"Send sync response to $remoteAddress: ${Utils.showFlow(inventories)}")
-      if (inventories.sumBy(_.length) < brokerConfig.groups) {
-        setRemoteSynced()
-      }
-      send(InvResponse(requestId, inventories))
-    case BaseBrokerHandler.Received(InvResponse(_, hashes)) => handleInv(hashes)
-    case BaseBrokerHandler.Received(NewBlockHash(hash))     => handleNewBlockHash(hash)
+  private def rejectLegacySyncMessage(messageType: String): Unit = {
+    log.warning(s"Rejected legacy $messageType from $remoteAddress")
+    stop(MisbehaviorManager.InvalidClientVersion(remoteAddress))
+  }
+
+  def gossiping: Receive = {
+    case BaseBrokerHandler.Received(NewBlockHash(hash)) => handleNewBlockHash(hash)
     case BaseBrokerHandler.RelayBlock(hash) =>
       if (seenBlocks.contains(hash)) {
         log.debug(s"Remote broker already have the block ${hash.shortHex}")
@@ -134,13 +112,27 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
       }
     case BaseBrokerHandler.RelayTxs(txs)                 => handleRelayTxs(txs)
     case BaseBrokerHandler.Received(NewTxHashes(hashes)) => handleNewTxHashes(hashes)
-    case BaseBrokerHandler.DownloadTxs(txs) =>
-      log.debug(s"Download txs ${Utils.showChainIndexedDigest(txs)} from $remoteAddress")
-      send(TxsRequest(txs))
+    case BaseBrokerHandler.DownloadTxs(txs)              => handleDownloadTxs(txs)
     case BaseBrokerHandler.Received(TxsRequest(id, txs)) =>
       handleTxsRequest(id, txs)
     case BaseBrokerHandler.Received(TxsResponse(id, txs)) =>
       handleTxsResponse(id, txs)
+  }
+
+  private def handleDownloadTxs(txs: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
+    val chunks = BrokerHandler.chunkTxHashes(txs, MaxTxsRequestNum)
+    if (txs.length <= brokerConfig.chainNum && chunks.nonEmpty) {
+      chunks.foreach { hashes =>
+        val request = TxsRequest(hashes)
+        pendingTxRequests.put(request.id, request)
+        log.debug(
+          s"Download txs ${Utils.showChainIndexedDigest(hashes)} from $remoteAddress with ${request.id}"
+        )
+        send(request)
+      }
+    } else {
+      log.warning(s"Ignore invalid local tx download request for $remoteAddress")
+    }
   }
 
   private def handleRelayTxs(txs: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
@@ -162,37 +154,49 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
           acc :+ ((chainIndex, selected))
         }
     }
-    if (invs.nonEmpty) {
-      send(NewTxHashes(invs))
+    if (invs.length > brokerConfig.chainNum) {
+      log.warning(s"Ignore invalid local tx relay request for $remoteAddress")
+    } else if (invs.nonEmpty) {
+      BrokerHandler
+        .chunkTxHashes(invs, MaxTxsRequestNum)
+        .foreach(hashes => send(NewTxHashes(hashes)))
     }
   }
 
   private def handleNewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
-    log.debug(s"Received txs hashes ${Utils.showChainIndexedDigest(hashes)} from $remoteAddress")
-    // ignore the tx announcements before synced
-    if (selfSynced) {
-      val now = TimeStamp.now()
-      val result = hashes.mapE { case (chainIndex, txHashes) =>
-        if (!brokerConfig.contains(chainIndex.from)) {
-          Left(())
-        } else {
-          val invs = txHashes.filter { hash =>
-            val duplicated = seenTxs.contains(hash)
-            if (!duplicated) {
-              seenTxs.put(hash, now)
+    getTxHashesSize(hashes) match {
+      case None =>
+        log.warning(s"Rejected oversized tx announcements from $remoteAddress")
+        handleMisbehavior(MisbehaviorManager.Spamming(remoteAddress))
+      case Some(_) =>
+        log.debug(
+          s"Received txs hashes ${Utils.showChainIndexedDigest(hashes)} from $remoteAddress"
+        )
+        // ignore the tx announcements before synced
+        if (selfSynced) {
+          val now = TimeStamp.now()
+          val result = hashes.mapE { case (chainIndex, txHashes) =>
+            if (!brokerConfig.contains(chainIndex.from)) {
+              Left(())
+            } else {
+              val invs = txHashes.filter { hash =>
+                val duplicated = seenTxs.contains(hash)
+                if (!duplicated) {
+                  seenTxs.put(hash, now)
+                }
+                !duplicated
+              }
+              Right((chainIndex, invs))
             }
-            !duplicated
           }
-          Right((chainIndex, invs))
+          result match {
+            case Right(announcements) =>
+              allHandlers.txHandler ! TxHandler.TxAnnouncements(announcements)
+            case _ =>
+              log.debug(s"Received invalid tx hashes from $remoteAddress")
+              handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
+          }
         }
-      }
-      result match {
-        case Right(announcements) =>
-          allHandlers.txHandler ! TxHandler.TxAnnouncements(announcements)
-        case _ =>
-          log.debug(s"Received invalid tx hashes from $remoteAddress")
-          handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
-      }
     }
   }
 
@@ -200,51 +204,83 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
       id: RequestId,
       txs: AVector[(ChainIndex, AVector[TransactionId])]
   ): Unit = {
-    log.debug(
-      s"Received txs request ${Utils.showChainIndexedDigest(txs)} from $remoteAddress with $id"
-    )
-    val result = txs.foldE(AVector.empty[TransactionTemplate]) {
-      case (acc, (chainIndex, txHashes)) =>
-        if (!brokerConfig.contains(chainIndex.from)) {
-          Left(())
-        } else {
-          val txs = blockflow.getMemPool(chainIndex).getTxs(txHashes)
-          Right(acc ++ txs)
-        }
-    }
-    result match {
-      case Right(txs) => send(TxsResponse(id, txs))
-      case _ =>
+    getTxHashesSize(txs) match {
+      case None =>
+        log.warning(s"Rejected oversized txs request from $remoteAddress")
+        handleMisbehavior(MisbehaviorManager.Spamming(remoteAddress))
+      case Some(_) if txs.exists { case (chainIndex, _) =>
+            !brokerConfig.contains(chainIndex.from)
+          } =>
         log.debug(s"Received invalid txs request from $remoteAddress")
         handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
+      case Some(size) if !txsRequestRateLimiter.tryRequest(math.max(1, size)) =>
+        log.info(s"Ignored txs request from remote $remoteAddress due to rate limiting")
+      case Some(_) =>
+        log.debug(
+          s"Received txs request ${Utils.showChainIndexedDigest(txs)} from $remoteAddress with $id"
+        )
+        val result = txs.fold(AVector.empty[TransactionTemplate]) {
+          case (acc, (chainIndex, txHashes)) =>
+            acc ++ blockflow.getMemPool(chainIndex).getTxs(txHashes)
+        }
+        send(TxsResponse(id, result))
+    }
+  }
+
+  private def getTxHashesSize(
+      txs: AVector[(ChainIndex, AVector[TransactionId])]
+  ): Option[Int] = {
+    if (
+      txs.length > brokerConfig.chainNum ||
+      txs.exists(_._2.length > MaxTxsPerChainRequestNum)
+    ) {
+      None
+    } else {
+      val size = txs.fold(0L) { case (sum, (_, hashes)) => sum + hashes.length }
+      Option.when(size <= MaxTxsRequestNum)(size.toInt)
     }
   }
 
   private def handleTxsResponse(id: RequestId, txs: AVector[TransactionTemplate]): Unit = {
-    log.debug(
-      s"Received #${txs.length} txs ${Utils.showDigest(txs.map(_.id))} from $remoteAddress with $id"
-    )
-    if (txs.nonEmpty) {
-      if (txs.exists(tx => !brokerConfig.contains(tx.chainIndex.from))) {
-        handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
-      } else {
-        allHandlers.txHandler ! TxHandler.AddToMemPool(
-          txs,
-          isIntraCliqueSyncing = false,
-          isLocalTx = false
-        )
-      }
+    pendingTxRequests.remove(id) match {
+      case None =>
+        log.warning(s"Ignored unsolicited tx response from $remoteAddress with $id")
+        handleMisbehavior(MisbehaviorManager.InvalidResponse(remoteAddress))
+      case Some(request) =>
+        val requestedTxIds = request.hashes.flatMap(_._2).toSet
+        val responseIds    = txs.map(_.id)
+        val uniqueIds      = responseIds.toSet
+        if (
+          txs.length > MaxTxsRequestNum ||
+          uniqueIds.size != responseIds.length ||
+          !uniqueIds.subsetOf(requestedTxIds)
+        ) {
+          log.warning(s"Received invalid tx response from $remoteAddress with $id")
+          handleMisbehavior(MisbehaviorManager.InvalidResponse(remoteAddress))
+        } else {
+          log.debug(
+            s"Received #${txs.length} txs ${Utils.showDigest(responseIds)} from $remoteAddress with $id"
+          )
+          if (txs.nonEmpty) {
+            if (
+              txs.exists(tx => tx.chainIndexOpt.forall(index => !brokerConfig.contains(index.from)))
+            ) {
+              handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
+            } else {
+              allHandlers.txHandler ! TxHandler.AddToMemPool(
+                txs,
+                isIntraCliqueSyncing = false,
+                isLocalTx = false
+              )
+            }
+          }
+        }
     }
   }
 
   private def handleBlockAnnouncement(hash: BlockHash): Unit = {
-    // If the current client version is V0 and the sync protocol V2 enable version is V1, we need to handle the following three cases:
-    // 1. V0 < V1, which means the client will sync using protocol V1, and both `selfChainTips` and `remoteChainTips` will be empty.
-    // 2. V0 >= V1 and the peer’s client version is also greater than V1, but the client syncs using sync protocol V1.
-    //    This means we won’t receive the `UpdateSelfChainTips` command from `BlockFlowSynchronizer`, and in this case,
-    //    we need to send the hash to the `BlockFlowSynchronizer`.
-    // 3. V0 >= V1 and the client syncs using sync protocol V2. We will only need to handle the
-    //    announcement if the local chain height satisfies the conditions.
+    // Before the first chain-state exchange, always forward announcements. Afterwards, only
+    // forward announcements from peers close enough to our local height.
     val command = BlockFlowSynchronizer.BlockAnnouncement(hash)
     if (selfChainTips.isEmpty || remoteChainTips.isEmpty) {
       blockFlowSynchronizer ! command
@@ -307,24 +343,6 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
     }
   }
 
-  def validate(locators: AVector[AVector[BlockHash]]): Boolean = {
-    locators.forall(_.forall(validateBlockHash))
-  }
-
-  private def handleInv(hashes: AVector[AVector[BlockHash]]): Unit = {
-    if (hashes.forall(_.isEmpty)) {
-      setSelfSynced()
-    } else {
-      val showHashes = Utils.showFlow(hashes)
-      if (validate(hashes)) {
-        log.debug(s"Received inv response $showHashes from $remoteAddress")
-        blockFlowSynchronizer ! BlockFlowSynchronizer.SyncInventories(hashes)
-      } else {
-        log.warning(s"Invalid inv response from $remoteAddress: $showHashes")
-      }
-    }
-  }
-
   override def postStop(): Unit = {
     super.postStop()
     checkPendingRequestTask.foreach(_.cancel())
@@ -335,6 +353,45 @@ trait BrokerHandler extends BaseBrokerHandler with SyncV2Handler {
 object BrokerHandler {
   val seenTxExpiryDuration: Duration = Duration.ofMinutesUnsafe(5)
   val newBlockHashHeightDiff: Int    = maxSyncBlocksPerChain
+  // Production batches tx downloads every 500 ms, so this retains over one minute of requests.
+  val MaxPendingTxRequests: Int = 128
+
+  private[interclique] def maxTxsRequestIdsPerWindow(
+      maxIdsPerSecond: Int,
+      windowSize: Duration
+  ): Int = {
+    val limit = BigInt(maxIdsPerSecond) * windowSize.millis / 1000
+    limit.max(BigInt(1)).min(BigInt(Int.MaxValue)).toInt
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.While"))
+  private[interclique] def chunkTxHashes(
+      txs: AVector[(ChainIndex, AVector[TransactionId])],
+      maxIds: Int
+  ): AVector[AVector[(ChainIndex, AVector[TransactionId])]] = {
+    require(maxIds > 0)
+
+    var chunks      = AVector.empty[AVector[(ChainIndex, AVector[TransactionId])]]
+    var current     = AVector.empty[(ChainIndex, AVector[TransactionId])]
+    var currentSize = 0
+
+    txs.foreach { case (chainIndex, txIds) =>
+      var offset = 0
+      while (offset < txIds.length) {
+        val length = math.min(maxIds - currentSize, txIds.length - offset)
+        current = current :+ (chainIndex -> txIds.slice(offset, offset + length))
+        currentSize += length
+        offset += length
+        if (currentSize == maxIds) {
+          chunks = chunks :+ current
+          current = AVector.empty
+          currentSize = 0
+        }
+      }
+    }
+
+    if (current.nonEmpty) chunks :+ current else chunks
+  }
 
   def showChainState(tips: AVector[ChainTip]): String = {
     tips
@@ -461,14 +518,14 @@ trait SyncV2Handler { _: BrokerHandler =>
     if (!selfSynced && selfChainTips.nonEmpty) {
       val synced = selfChainTips.forall { selfTip =>
         val remoteTip = remoteChainTips(selfTip.chainIndex)
-        remoteTip.exists(selfTip.weight >= _.weight)
+        remoteTip.exists(SyncState.compareChainTips(selfTip, _) >= 0)
       }
       if (synced) setSelfSynced()
     }
     if (!remoteSynced && remoteChainTips.nonEmpty) {
       val synced = remoteChainTips.forall { remoteTip =>
         val selfTip = selfChainTips(remoteTip.chainIndex)
-        selfTip.exists(remoteTip.weight >= _.weight)
+        selfTip.exists(SyncState.compareChainTips(remoteTip, _) >= 0)
       }
       if (synced) setRemoteSynced()
     }
@@ -524,6 +581,7 @@ trait SyncV2Handler { _: BrokerHandler =>
   ): Unit = {
     val isValid =
       tasks.length == blockss.length &&
+        blockss.forall(hasValidFlowDataDependencies) &&
         tasks.forallWithIndex { case (task, index) =>
           val blocks = blockss(index)
           blocks.length >= task.size && blocks.forall(b =>
@@ -533,7 +591,7 @@ trait SyncV2Handler { _: BrokerHandler =>
     if (isValid) {
       val result = tasks.mapWithIndex { case (task, index) =>
         val blocks  = blockss(index)
-        val isValid = SyncV2Handler.validateBlocks(blocks, task.size, task.toHeader)
+        val isValid = SyncV2Handler.validateBlocks(blocks, task.size, task.expectedToHash)
         (task, blocks, isValid)
       }
       blockFlowSynchronizer ! BlockFlowSynchronizer.UpdateBlockDownloaded(result)
@@ -574,16 +632,52 @@ trait SyncV2Handler { _: BrokerHandler =>
     }
   }
 
-  private[interclique] val rateLimiter = SimpleRateLimiter.default
+  private[interclique] val headersRequestRateLimiter =
+    SimpleRateLimiter(MaxBlocksRequestNum, getRateLimiterWindowSize)
+  private[interclique] val blocksRequestRateLimiter =
+    SimpleRateLimiter(MaxBlocksRequestNum, getRateLimiterWindowSize)
+
+  private def isValidHeightRange(
+      heights: AVector[(ChainIndex, BlockHeightRange)],
+      maxHeightsPerRange: Int
+  ): Boolean = {
+    heights.forall { case (_, range) => range.isValid(maxHeightsPerRange) }
+  }
+
+  private def handleInvalidFlowDataRequest(
+      id: RequestId,
+      heights: AVector[(ChainIndex, BlockHeightRange)],
+      name: String
+  ): Unit = {
+    log.error(
+      s"Received invalid ${name}Request from $remoteAddress: " +
+        s"${BrokerHandler.showIndexedHeights(heights)}, id: ${id.value.v}"
+    )
+    stopOnError(MisbehaviorManager.InvalidFlowData(remoteAddress))
+  }
+
+  private def tryAcquireFlowDataRequestBudget(
+      heights: AVector[(ChainIndex, BlockHeightRange)],
+      dataType: String,
+      rateLimiter: SimpleRateLimiter
+  ): Boolean = {
+    val size    = heights.fold(0L) { case (sum, (_, range)) => sum + range.length }
+    val allowed = size <= Int.MaxValue && rateLimiter.tryRequest(size.toInt)
+    if (!allowed) {
+      log.info(
+        s"Ignored $dataType download request from remote $remoteAddress due to rate limiting"
+      )
+    }
+    allowed
+  }
 
   private def handleBlocksRequest(
       id: RequestId,
       chains: AVector[(ChainIndex, BlockHeightRange)]
   ): Unit = {
-    val size = chains.sumBy(_._2.length)
-    if (!rateLimiter.tryRequest(size)) {
-      log.info(s"Ignored block download request from remote $remoteAddress due to rate limiting")
-    } else {
+    if (!isValidHeightRange(chains, SyncState.BatchSize)) {
+      handleInvalidFlowDataRequest(id, chains, "BlocksAndUnclesByHeights")
+    } else if (tryAcquireFlowDataRequestBudget(chains, "block", blocksRequestRateLimiter)) {
       handleFlowDataRequest(
         id,
         chains,
@@ -618,16 +712,20 @@ trait SyncV2Handler { _: BrokerHandler =>
       id: RequestId,
       heights: AVector[(ChainIndex, BlockHeightRange)]
   ): Unit = {
-    handleFlowDataRequest(
-      id,
-      heights,
-      (
-          chainIndex,
-          range
-      ) => blockflow.getHeaderChain(chainIndex).getHeadersByHeights(range.heights),
-      HeadersByHeightsResponse.apply,
-      "HeadersByHeights"
-    )
+    if (!isValidHeightRange(heights, SyncState.SkeletonSize)) {
+      handleInvalidFlowDataRequest(id, heights, "HeadersByHeights")
+    } else if (tryAcquireFlowDataRequestBudget(heights, "header", headersRequestRateLimiter)) {
+      handleFlowDataRequest(
+        id,
+        heights,
+        (
+            chainIndex,
+            range
+        ) => blockflow.getHeaderChain(chainIndex).getHeadersByHeights(range.heights),
+        HeadersByHeightsResponse.apply,
+        "HeadersByHeights"
+      )
+    }
   }
 
   private def handleHeadersResponse(
@@ -656,6 +754,7 @@ trait SyncV2Handler { _: BrokerHandler =>
   ): Unit = {
     val isValid =
       headerss.length == chains.length &&
+        headerss.forall(hasValidFlowDataDependencies) &&
         headerss.forallWithIndex { case (headers, index) =>
           val chainIndex = chains(index)._1
           headers.nonEmpty && headers.forall(h =>
@@ -934,21 +1033,21 @@ object SyncV2Handler {
    *
    * @param blocks The vector of blocks to validate
    * @param mainChainBlockSize The expected number of blocks in the main chain
-   * @param toHeaderOpt Optional target header that the chain should connect to
+   * @param expectedToHash Optional target hash that the chain should connect to
    * @return true if the blocks form a valid chain of the expected size, false otherwise
    */
   // format: on
   def validateBlocks(
       blocks: AVector[Block],
       mainChainBlockSize: Int,
-      toHeaderOpt: Option[BlockHeader]
+      expectedToHash: Option[BlockHash]
   ): Boolean = {
     assume(mainChainBlockSize > 0)
 
     if (blocks.length < mainChainBlockSize) {
       false
     } else {
-      val startHash        = toHeaderOpt.map(_.hash).getOrElse(blocks.last.hash)
+      val startHash        = expectedToHash.getOrElse(blocks.last.hash)
       var nextBlockToCheck = startHash
       var remainingBlocks  = mainChainBlockSize
 

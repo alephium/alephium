@@ -16,13 +16,13 @@
 
 package org.alephium.app
 
+import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.protocol.ALPH
 import org.alephium.util.AlephiumActorSpec
 
 class ConfigTest extends AlephiumActorSpec {
   it should "load testnet genesis" in new CliqueFixture {
-    val clique    = bootClique(nbOfNodes = 1)
-    val theConfig = clique.servers.head.config
+    val theConfig = AlephiumConfig.load(newConfig)
     theConfig.genesisBlocks(0)(0).coinbase.outputsLength is 1
     theConfig.genesisBlocks(1)(1).coinbase.outputsLength is 2
     theConfig.genesisBlocks(2)(2).coinbase.outputsLength is 1
@@ -31,6 +31,5 @@ class ConfigTest extends AlephiumActorSpec {
     val specialTx = theConfig.genesisBlocks(3)(3).coinbase
     specialTx.unsigned.fixedOutputs.head.lockTime is ALPH.LaunchTimestamp
     specialTx.unsigned.fixedOutputs.last.lockTime is ALPH.LaunchTimestamp.plusHoursUnsafe(3 * 24)
-    clique.stop()
   }
 }

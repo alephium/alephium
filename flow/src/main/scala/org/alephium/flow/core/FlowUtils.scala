@@ -670,10 +670,10 @@ object FlowUtils {
       maximalGas: GasBox
   ): AVector[TransactionTemplate] = {
     @tailrec
-    def iter(gasSum: Int, index: Int): Int = {
+    def iter(gasSum: Long, index: Int): Int = {
       if (index < txs.length) {
-        val newSum = gasSum + txs(index).unsigned.gasAmount.value
-        if (newSum > 0 && newSum <= maximalGas.value) iter(newSum, index + 1) else index
+        val newSum = gasSum + txs(index).unsigned.gasAmount.value.toLong
+        if (newSum > 0 && newSum <= maximalGas.value.toLong) iter(newSum, index + 1) else index
       } else {
         index
       }

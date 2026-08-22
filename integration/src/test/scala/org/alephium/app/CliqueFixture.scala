@@ -43,7 +43,7 @@ import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.{Job, Miner}
 import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.flow.setting.AlephiumConfig
+import org.alephium.flow.setting.{AlephiumConfig, Allocation, GenesisSetting}
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
@@ -330,7 +330,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         ("alephium.consensus.danube.block-target-time", "1 seconds"),
         ("alephium.consensus.danube.uncle-dependency-gap-time", "1 seconds"),
         ("alephium.consensus.num-zeros-at-least-in-hash", "8"),
-        ("alephium.consensus.num-zeros-at-least-in-hash-testnet-patch", "8"),
         ("alephium.mining.batch-delay", "200 milli"),
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
@@ -338,9 +337,21 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       implicit override lazy val config: AlephiumConfig = {
         val minerAddresses =
           genesisKeys.map(p => Address.Asset(LockupScript.p2pkh(p._2)))
+        val testGenesis = GenesisSetting(
+          AVector(
+            Allocation(
+              Address.asset(address).rightValue,
+              Allocation.Amount(genesisBalance),
+              Duration.zero
+            )
+          )
+        )
 
         val tmp0 = AlephiumConfig.load(newConfig)
-        val tmp1 = tmp0.copy(mining = tmp0.mining.copy(minerAddresses = Some(minerAddresses)))
+        val tmp1 = tmp0.copy(
+          genesis = testGenesis,
+          mining = tmp0.mining.copy(minerAddresses = Some(minerAddresses))
+        )
         bootstrap match {
           case Some(address) =>
             tmp1.copy(discovery = tmp1.discovery.copy(bootstrap = ArraySeq(address)))

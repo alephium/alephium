@@ -67,6 +67,9 @@ alephium {
     dependency-expiry-period = 5 minute
     update-synced-frequency = 5 second
 
+    # Maximum number of transaction IDs a peer may request per second, averaged over the
+    # network request-limiter window.
+    txs-request-max-ids-per-second = 1000
     txs-broadcast-delay = 5 second
 
     upnp {

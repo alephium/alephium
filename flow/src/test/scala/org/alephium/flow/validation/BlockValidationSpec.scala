@@ -505,6 +505,27 @@ class BlockValidationSpec extends AlephiumSpec {
     test(maximalTxsInOneBlock / 4)(rhoneValidator)
   }
 
+  it should "reject total gas that overflows Int" in new Fixture {
+    val block = transfer(blockFlow, chainIndex)
+    val tx    = block.nonCoinbase.head
+    val gas   = GasBox.unsafe(getMaximalGasPerTx(HardFork.Rhone).value - 5000)
+
+    val highGasTx    = tx.copy(unsigned = tx.unsigned.copy(gasAmount = gas))
+    val txCount      = 860
+    val transactions = AVector.fill(txCount)(highGasTx) :+ block.coinbase
+
+    transactions.length <= maximalTxsInOneBlock is true
+
+    val totalGas = transactions.fold(0L)(_ + _.unsigned.gasAmount.value.toLong)
+    totalGas > getMaximalGasPerBlock(HardFork.Rhone).value.toLong is true
+
+    val wrappedTotalGas = transactions.fold(0)(_ + _.unsigned.gasAmount.value)
+    wrappedTotalGas is 752704
+    wrappedTotalGas <= getMaximalGasPerBlock(HardFork.Rhone).value is true
+
+    block.copy(transactions = transactions).fail(TooMuchGasUsed)(checkTotalGas(_, HardFork.Rhone))
+  }
+
   it should "check double spending in a same tx" in new Fixture {
     val invalidTx = doubleSpendingTx(blockFlow, chainIndex)
     val block     = mineWithTxs(blockFlow, chainIndex)((_, _) => AVector(invalidTx))

@@ -27,6 +27,15 @@ class SimpleRateLimiterSpec extends AlephiumSpec {
     limiter.tryRequest(1) is false
   }
 
+  it should "reject negative and overflowing request sizes" in {
+    val limiter = SimpleRateLimiter(maxRequests = 5, windowSize = Duration.ofSecondsUnsafe(2))
+    limiter.tryRequest(-1) is false
+    limiter.tryRequest(4) is true
+    limiter.tryRequest(Int.MaxValue) is false
+    limiter.tryRequest(1) is true
+    limiter.tryRequest(1) is false
+  }
+
   it should "resets after time window" in {
     val limiter = SimpleRateLimiter(maxRequests = 3, windowSize = Duration.ofMillisUnsafe(500))
     limiter.tryRequest(2) is true

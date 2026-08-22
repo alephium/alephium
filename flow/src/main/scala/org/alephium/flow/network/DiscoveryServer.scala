@@ -34,6 +34,8 @@ import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo, Net
 import org.alephium.util._
 
 object DiscoveryServer {
+  private[network] val MaxUnverifiedNeighbors = 2
+
   def props(
       bindAddress: InetSocketAddress,
       misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
@@ -246,7 +248,7 @@ class DiscoveryServer(
       case Pong(id, peerInfo) =>
         handlePong(id, peerInfo)
       case FindNode(targetId) =>
-        val neighbors = getNeighbors(targetId)
+        val neighbors = getNeighborsForResponse(remote, targetId)
         send(remote, Neighbors(neighbors))
       case Neighbors(peers) =>
         peers.foreach { peerInfo =>

@@ -16,7 +16,6 @@
 
 package org.alephium.flow.network
 
-import org.alephium.flow.setting.NetworkSetting
 import org.alephium.util.{Duration, TimeStamp}
 
 final class SimpleRateLimiter(maxRequests: Int, windowSize: Duration) {
@@ -24,21 +23,26 @@ final class SimpleRateLimiter(maxRequests: Int, windowSize: Duration) {
   private var _windowStart  = TimeStamp.now()
 
   def tryRequest(size: Int): Boolean = {
-    val now = TimeStamp.now()
-    now -- _windowStart match {
-      case Some(diff) =>
-        if (diff.millis >= windowSize.millis) {
-          _requestCount = 0
-          _windowStart = now
-        }
-      case None =>
-    }
-
-    if (_requestCount + size <= maxRequests) {
-      _requestCount += size
-      true
-    } else {
+    if (size < 0) {
       false
+    } else {
+      val now = TimeStamp.now()
+      now -- _windowStart match {
+        case Some(diff) =>
+          if (diff.millis >= windowSize.millis) {
+            _requestCount = 0
+            _windowStart = now
+          }
+        case None =>
+      }
+
+      val updatedRequestCount = _requestCount.toLong + size.toLong
+      if (updatedRequestCount <= maxRequests.toLong) {
+        _requestCount = updatedRequestCount.toInt
+        true
+      } else {
+        false
+      }
     }
   }
 
@@ -51,8 +55,4 @@ final class SimpleRateLimiter(maxRequests: Int, windowSize: Duration) {
 object SimpleRateLimiter {
   def apply(maxRequests: Int, windowSize: Duration): SimpleRateLimiter =
     new SimpleRateLimiter(maxRequests, windowSize)
-
-  def default(implicit networkSetting: NetworkSetting): SimpleRateLimiter = {
-    SimpleRateLimiter(MaxRequestNum, getRateLimiterWindowSize)
-  }
 }

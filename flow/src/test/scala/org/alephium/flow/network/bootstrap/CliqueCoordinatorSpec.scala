@@ -16,7 +16,10 @@
 
 package org.alephium.flow.network.bootstrap
 
-import org.apache.pekko.testkit.{SocketUtil, TestProbe}
+import scala.concurrent.duration.DurationInt
+
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.testkit.{SocketUtil, TestActorRef, TestProbe}
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.Bootstrapper
@@ -24,6 +27,17 @@ import org.alephium.protocol.SignatureSchema
 import org.alephium.util.ActorRefT
 
 class CliqueCoordinatorSpec extends AlephiumFlowActorSpec {
+  private def peerInfo(id: Int): PeerInfo = {
+    val address = SocketUtil.temporaryServerAddress()
+    PeerInfo.unsafe(id, brokerConfig.groupNumPerBroker, Some(address), address, 0, 0)
+  }
+
+  private def addBroker(coordinator: ActorRef, id: Int): TestProbe = {
+    val probe = TestProbe()
+    coordinator.tell(peerInfo(id), probe.ref)
+    probe
+  }
+
   it should "await all the brokers" in {
     val bootstrapper                              = TestProbe()
     val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.secureGeneratePriPub()
@@ -47,11 +61,12 @@ class CliqueCoordinatorSpec extends AlephiumFlowActorSpec {
       intraCliqueInfo.priKey is discoveryPrivateKey
     })
 
-    bootstrapper.expectMsg(Bootstrapper.ForwardConnection)
+    bootstrapper.expectNoMessage(100.millis)
 
     probs.foreach { case (id, probe) =>
       coordinator.tell(Message.Ack(id), probe.ref)
     }
+    bootstrapper.expectMsg(Bootstrapper.ForwardConnection)
     probs.values.foreach(_.expectMsgType[CliqueCoordinator.Ready.type])
 
     watch(coordinator)
@@ -61,6 +76,52 @@ class CliqueCoordinatorSpec extends AlephiumFlowActorSpec {
       intraCliqueInfo.priKey is discoveryPrivateKey
     }
 
+    expectTerminated(coordinator)
+  }
+
+  it should "release disconnected brokers before bootstrap is ready" in {
+    val bootstrapper                              = TestProbe()
+    val (discoveryPrivateKey, discoveryPublicKey) = SignatureSchema.secureGeneratePriPub()
+    val coordinator = TestActorRef[CliqueCoordinator](
+      CliqueCoordinator.props(ActorRefT(bootstrapper.ref), discoveryPrivateKey, discoveryPublicKey)
+    )
+    val remoteIds = (0 until brokerConfig.brokerNum).filter(_ != brokerConfig.brokerId)
+    remoteIds.length is 2
+    val firstId  = remoteIds.head
+    val secondId = remoteIds.last
+
+    val disconnectedBeforeBroadcast = addBroker(coordinator, firstId)
+    system.stop(disconnectedBeforeBroadcast.ref)
+    eventually(coordinator.underlyingActor.brokerInfos(firstId).isEmpty is true)
+
+    val first  = addBroker(coordinator, firstId)
+    val second = addBroker(coordinator, secondId)
+    first.expectMsgType[BrokerConnector.Send]
+    second.expectMsgType[BrokerConnector.Send]
+    bootstrapper.expectNoMessage(100.millis)
+
+    coordinator.tell(Message.Ack(firstId), first.ref)
+    system.stop(second.ref)
+    eventually(
+      coordinator.underlyingActor.brokerInfos(secondId).isEmpty &&
+        !coordinator.underlyingActor.readys(firstId) is true
+    )
+
+    val secondReplacement = addBroker(coordinator, secondId)
+    val updatedCliqueInfo = first.expectMsgType[BrokerConnector.Send].intraCliqueInfo
+    secondReplacement.expectMsg(BrokerConnector.Send(updatedCliqueInfo))
+    bootstrapper.expectNoMessage(100.millis)
+
+    coordinator.tell(Message.Ack(firstId), first.ref)
+    coordinator.tell(Message.Ack(secondId), secondReplacement.ref)
+    bootstrapper.expectMsg(Bootstrapper.ForwardConnection)
+    first.expectMsg(CliqueCoordinator.Ready)
+    secondReplacement.expectMsg(CliqueCoordinator.Ready)
+
+    watch(coordinator)
+    system.stop(first.ref)
+    system.stop(secondReplacement.ref)
+    bootstrapper.expectMsg(Bootstrapper.SendIntraCliqueInfo(updatedCliqueInfo))
     expectTerminated(coordinator)
   }
 }

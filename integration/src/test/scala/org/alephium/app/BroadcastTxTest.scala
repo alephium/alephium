@@ -18,6 +18,8 @@ package org.alephium.app
 
 import java.net.InetSocketAddress
 
+import org.scalatest.time.{Seconds, Span}
+
 import org.alephium.api.model._
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{Address, BrokerInfo, GroupIndex}
@@ -83,6 +85,9 @@ class BroadcastTxTest extends AlephiumActorSpec {
   }
 
   it should "broadcast sequential txs between inter clique node" in new CliqueFixture {
+    implicit override val patienceConfig: PatienceConfig =
+      PatienceConfig(timeout = Span(120, Seconds), interval = Span(2, Seconds))
+
     // increase these values for stress testing
     val numCliques = 4
     val numTxs     = 32

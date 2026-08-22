@@ -79,15 +79,15 @@ object Injected {
 }
 
 class InterCliqueSyncTest extends AlephiumActorSpec {
-  it should "boot and sync two cliques of 2 nodes using protocol v1" in new Fixture {
+  it should "boot and sync two cliques of 2 nodes using protocol v2" in new Fixture {
     test(2, 2)
   }
 
-  it should "boot and sync two cliques of 1 and 2 nodes using protocol v1" in new Fixture {
+  it should "boot and sync two cliques of 1 and 2 nodes using protocol v2" in new Fixture {
     test(1, 2)
   }
 
-  it should "boot and sync two cliques of 2 and 1 nodes using protocol v1" in new Fixture {
+  it should "boot and sync two cliques of 2 and 1 nodes using protocol v2" in new Fixture {
     test(2, 1)
   }
 
@@ -112,8 +112,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       val clique1 =
         bootClique(
           nbOfNodes = nbOfNodesClique1,
-          connectionBuild = clique1ConnectionBuild,
-          configOverrides = Map(("alephium.network.enable-p2p-v2", false))
+          connectionBuild = clique1ConnectionBuild
         )
       val masterPortClique1 = clique1.masterTcpPort
 
@@ -129,8 +128,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
         bootClique(
           nbOfNodes = nbOfNodesClique2,
           bootstrap = Some(new InetSocketAddress("127.0.0.1", masterPortClique1)),
-          connectionBuild = clique2ConnectionBuild,
-          configOverrides = Map(("alephium.network.enable-p2p-v2", false))
+          connectionBuild = clique2ConnectionBuild
         )
       val masterPortClique2 = clique2.masterTcpPort
 
@@ -184,16 +182,8 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     // scalastyle:on method.length
   }
 
-  it should "test p2p protocol v2, v2 cliques: 4" in new P2PV1V2SyncFixture {
-    test(Seq.fill(4)(P2PV2))
-  }
-
-  it should "test p2p protocol v2, v1 cliques: 1, v2 cliques: 3" in new P2PV1V2SyncFixture {
-    test(Seq(P2PV2, P2PV2, P2PV2, P2PV1))
-  }
-
-  it should "test p2p protocol v2, v1 cliques: 2, v2 cliques: 2" in new P2PV1V2SyncFixture {
-    test(Seq(P2PV2, P2PV2, P2PV1, P2PV1))
+  it should "sync four p2p v2 cliques" in new P2PV2CliquesSyncFixture {
+    test()
   }
 
   trait SyncFixtureBase extends CliqueFixture {
@@ -222,16 +212,11 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     }
   }
 
-  trait P2PV1V2SyncFixture extends SyncFixtureBase {
+  trait P2PV2CliquesSyncFixture extends SyncFixtureBase {
     // scalastyle:off method.length
-    def test(p2pVersions: Seq[P2PVersion]) = {
-      assume(p2pVersions.length == 4)
-
-      val fromTs = TimeStamp.now()
-      val clique1 = bootClique(
-        1,
-        configOverrides = Map(("alephium.network.enable-p2p-v2", p2pVersions.head == P2PV2))
-      )
+    def test() = {
+      val fromTs  = TimeStamp.now()
+      val clique1 = bootClique(1)
 
       clique1.start()
       clique1.startWsAndWaitConnection()
@@ -240,11 +225,10 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       blockNotifyProbe.receiveN(10, Duration.ofMinutesUnsafe(2).asScala)
       clique1.stopMining()
 
-      val remainCliques = (1 until 4).map { index =>
+      val remainCliques = (1 until 4).map { _ =>
         val clique = bootClique(
           1,
-          Some(new InetSocketAddress("127.0.0.1", clique1.masterTcpPort)),
-          configOverrides = Map(("alephium.network.enable-p2p-v2", p2pVersions(index) == P2PV2))
+          Some(new InetSocketAddress("127.0.0.1", clique1.masterTcpPort))
         )
         clique.startWithoutCheckSyncState()
         clique

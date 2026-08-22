@@ -23,7 +23,7 @@ import java.util.concurrent.Callable
 
 import scala.concurrent._
 
-import io.prometheus.metrics.expositionformats.OpenMetricsTextFormatWriter
+import io.prometheus.metrics.expositionformats.PrometheusTextFormatWriter
 import io.prometheus.metrics.model.registry.PrometheusRegistry
 import org.apache.pekko.pattern.ask
 import org.apache.pekko.util.Timeout
@@ -890,7 +890,7 @@ trait EndpointsLogic extends Endpoints {
     Future.successful {
       val output = new ByteArrayOutputStream()
       try {
-        OpenMetricsTextFormatWriter
+        PrometheusTextFormatWriter
           .create()
           .write(
             output,

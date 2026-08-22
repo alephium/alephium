@@ -118,7 +118,10 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       case (previousTip, tipHash) =>
         getStateUnsafe(tipHash) match {
           case BlockState(tipHeight, tipWeight) =>
-            if (tipWeight > previousTip.weight) {
+            if (
+              BlockHashPool
+                .compareWeight(tipHash, tipWeight, previousTip.hash, previousTip.weight) > 0
+            ) {
               ChainTip(tipHash, tipHeight, tipWeight)
             } else {
               previousTip

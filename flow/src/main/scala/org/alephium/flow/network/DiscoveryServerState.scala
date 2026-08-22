@@ -103,6 +103,19 @@ trait DiscoveryServerState extends SessionManager {
     getNeighbors(target, target)
   }
 
+  def getNeighborsForResponse(
+      remote: InetSocketAddress,
+      target: CliqueId
+  ): AVector[BrokerInfo] = {
+    val neighbors        = getNeighbors(target)
+    val sourceIsVerified = table.valuesIterator.exists(_.info.address == remote)
+    if (sourceIsVerified) {
+      neighbors
+    } else {
+      neighbors.takeUpto(DiscoveryServer.MaxUnverifiedNeighbors)
+    }
+  }
+
   def getNeighbors(filterId: CliqueId, target: CliqueId): AVector[BrokerInfo] = {
     val candidates = AVector.from(table.values.map(_.info).filter(_.cliqueId != filterId))
     candidates

@@ -80,35 +80,54 @@ class BrokerConnector(
     ActorRefT(context.actorOf(connectionProps(remoteAddress, connection)))
   context watch connectionHandler.ref
 
-  override def receive: Receive = { case Received(peer: Message.Peer) =>
+  override def receive: Receive = receivePeerInfo orElse handleConnectionTermination
+
+  private def receivePeerInfo: Receive = { case Received(peer: Message.Peer) =>
     cliqueCoordinator ! peer.info
     context become forwardCliqueInfo
   }
 
-  def forwardCliqueInfo: Receive = { case Send(cliqueInfo) =>
-    val data = Message.serialize(Message.Clique(cliqueInfo))
-    connectionHandler ! ConnectionHandler.Send(data)
+  def forwardCliqueInfo: Receive = receiveCliqueInfo orElse handleConnectionTermination
+
+  private def receiveCliqueInfo: Receive = { case Send(cliqueInfo) =>
+    sendCliqueInfo(cliqueInfo)
     context become awaitAck
   }
 
-  def awaitAck: Receive = { case Received(ack) =>
-    cliqueCoordinator ! ack
-    context become forwardReady
+  private def sendCliqueInfo(cliqueInfo: IntraCliqueInfo): Unit = {
+    val data = Message.serialize(Message.Clique(cliqueInfo))
+    connectionHandler ! ConnectionHandler.Send(data)
   }
 
-  def forwardReady: Receive = {
+  def awaitAck: Receive = receiveAck orElse handleConnectionTermination
+
+  private def receiveAck: Receive = {
+    case Received(ack: Message.Ack) =>
+      cliqueCoordinator ! ack
+      context become forwardReady
+    case Send(cliqueInfo) =>
+      sendCliqueInfo(cliqueInfo)
+  }
+
+  def forwardReady: Receive = forwardReadyMessage orElse handleConnectionTermination
+
+  private def forwardReadyMessage: Receive = {
     case CliqueCoordinator.Ready =>
       log.debug("Clique is ready")
       val data = Message.serialize(Message.Ready)
       connectionHandler ! ConnectionHandler.Send(data)
-    case Terminated(_) =>
-      log.debug(s"Connection to broker is closed")
-      context stop self
+    case Send(cliqueInfo) =>
+      sendCliqueInfo(cliqueInfo)
+      context become awaitAck
+  }
+
+  private def handleConnectionTermination: Receive = { case Terminated(_) =>
+    log.debug("Connection to broker is closed")
+    context.stop(self)
   }
 
   override def unhandled(message: Any): Unit = {
-    super.unhandled(message)
-    log.error(s"Unexpected message $message, shutdown the system")
-    terminateSystem()
+    log.warning(s"Unexpected bootstrap message $message, closing the connection")
+    context.stop(self)
   }
 }

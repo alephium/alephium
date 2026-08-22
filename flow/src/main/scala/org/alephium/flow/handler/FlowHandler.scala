@@ -28,26 +28,11 @@ object FlowHandler {
   def props(blockFlow: BlockFlow): Props = Props(new FlowHandler(blockFlow))
 
   sealed trait Command
-  case object GetSyncLocators extends Command
-  final case class GetSyncInventories(
-      id: RequestId,
-      locators: AVector[AVector[BlockHash]],
-      peerBrokerInfo: BrokerGroupInfo
-  ) extends Command
   case object GetIntraSyncInventories extends Command
   case object GetChainState           extends Command
 
   final case class SyncInventories(id: Option[RequestId], hashes: AVector[AVector[BlockHash]])
       extends Command
-  final case class SyncLocators(
-      hashes: AVector[(ChainIndex, AVector[BlockHash])]
-  ) extends Command {
-    def filterFor(another: BrokerGroupInfo): AVector[AVector[BlockHash]] = {
-      hashes
-        .filter { case (chainIndex, _) => another.contains(chainIndex.from) }
-        .map { case (_, locators) => locators }
-    }
-  }
   final case class UpdateChainState(tips: AVector[ChainTip]) extends Command {
     def filterFor(
         another: BrokerGroupInfo
@@ -64,18 +49,6 @@ class FlowHandler(blockFlow: BlockFlow) extends IOBaseActor with Stash {
   override def receive: Receive = handleSync
 
   def handleSync: Receive = {
-    case GetSyncLocators =>
-      escapeIOError(blockFlow.getSyncLocators()) { locators =>
-        sender() ! SyncLocators(locators)
-      }
-    case GetSyncInventories(requestId, locators, peerBrokerInfo) =>
-      val requester = sender()
-      poolAsync {
-        escapeIOError(blockFlow.getSyncInventories(locators, peerBrokerInfo)) { inventories =>
-          requester ! SyncInventories(Some(requestId), inventories)
-        }
-      }
-      ()
     case GetIntraSyncInventories =>
       escapeIOError(blockFlow.getIntraSyncInventories()) { inventories =>
         sender() ! SyncInventories(None, inventories)
