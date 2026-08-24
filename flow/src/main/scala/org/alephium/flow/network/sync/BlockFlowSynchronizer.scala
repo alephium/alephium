@@ -16,6 +16,7 @@
 
 package org.alephium.flow.network.sync
 
+import java.math.BigInteger
 import java.net.InetSocketAddress
 
 import scala.collection.mutable
@@ -24,7 +25,7 @@ import scala.util.Random
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.pekko.actor.{ActorSystem, Cancellable, Props, Terminated}
 
-import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
+import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow, BlockHashPool}
 import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network._
@@ -32,9 +33,9 @@ import org.alephium.flow.network.broker.{BrokerHandler, ChainTipInfo, Misbehavio
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.{P2PV1, P2PV2, P2PVersion}
+import org.alephium.protocol.message.P2PVersion
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector, TimeStamp}
+import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp}
 import org.alephium.util.EventStream.Publisher
 
 // scalastyle:off file.size.limit
@@ -49,16 +50,14 @@ object BlockFlowSynchronizer {
     system.eventStream.subscribe(actor.ref, classOf[InterCliqueManager.HandShaked])
     system.eventStream.subscribe(actor.ref, classOf[ChainHandler.FlowDataValidationEvent])
     system.eventStream.subscribe(actor.ref, classOf[DependencyHandler.FlowDataAlreadyExist])
+    system.eventStream.subscribe(actor.ref, classOf[DependencyHandler.PendingFlowDataEvicted])
     actor
   }
 
   sealed trait Command
-  sealed trait V1Command                                                extends Command
-  sealed trait V2Command                                                extends Command
-  case object Sync                                                      extends Command
-  final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends V1Command
-  case object CleanDownloading                                          extends Command
-  final case class BlockAnnouncement(hash: BlockHash)                   extends Command
+  sealed trait V2Command                              extends Command
+  case object Sync                                    extends Command
+  final case class BlockAnnouncement(hash: BlockHash) extends Command
   final case class UpdateChainState(tips: AVector[ChainTip], remoteNearlySynced: Boolean)
       extends V2Command
   final case class UpdateAncestors(chains: AVector[(ChainIndex, Int)]) extends V2Command
@@ -69,7 +68,8 @@ object BlockFlowSynchronizer {
   final case class UpdateBlockDownloaded(
       result: AVector[(SyncState.BlockDownloadTask, AVector[Block], Boolean)]
   ) extends V2Command
-  case object ContinueDownload extends V2Command
+  case object ContinueDownload                            extends V2Command
+  private[sync] case object RecoverFromDependencyEviction extends V2Command
   final case class AddFlowData[T <: FlowData](datas: AVector[T], dataOrigin: DataOrigin)
       extends Command
 }
@@ -79,35 +79,23 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     val brokerConfig: BrokerConfig
 ) extends IOBaseActor
     with Publisher
-    with DownloadTracker
     with BlockFetcher
     with BrokerStatusTracker
     with InterCliqueManager.NodeSyncStatus
-    with BlockFlowSynchronizerV1
     with BlockFlowSynchronizerV2 {
   import BlockFlowSynchronizer._
   import BrokerStatusTracker._
 
   override def preStart(): Unit = {
     super.preStart()
-    schedule(self, CleanDownloading, networkSetting.syncCleanupFrequency)
     scheduleSync()
   }
 
-  override def receive: Receive = if (networkSetting.enableP2pV2) v2 else v1
-
-  private def v1: Receive = common orElse handleV1 orElse updateNodeSyncStatus
-  private def v2: Receive = common orElse handleV2 orElse updateNodeSyncStatus
+  override def receive: Receive = common orElse handleV2 orElse updateNodeSyncStatus
 
   def common: Receive = {
-    case InterCliqueManager.HandShaked(broker, remoteBrokerInfo, _, _, p2pVersion) =>
-      addBroker(broker, remoteBrokerInfo, p2pVersion)
-
-    case CleanDownloading =>
-      val sizeDelta = cleanupSyncing(networkSetting.syncExpiryPeriod)
-      if (sizeDelta > 0) {
-        log.debug(s"Clean up #$sizeDelta hashes from syncing pool")
-      }
+    case InterCliqueManager.HandShaked(broker, remoteBrokerInfo, _, clientInfo, p2pVersion) =>
+      addBroker(broker, remoteBrokerInfo, clientInfo, p2pVersion)
 
     case BlockAnnouncement(hash) =>
       // When the node is synced, it should download new blocks only through block announcements.
@@ -117,16 +105,27 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     case AddFlowData(datas, dataOrigin) =>
       // When the node is synced, it should download new blocks only through block announcements.
       // Ignoring them may trigger a new round of synchronization using v2.
-      if (!isSyncingUsingV2 || isNearSynced) {
-        val message = DependencyHandler.AddFlowData(datas, dataOrigin)
+      val accepted = if (!isSyncingUsingV2 || isNearSynced) {
+        requestedDependencyHashes.subtractAll(datas.map(_.hash))
+        datas
+      } else {
+        datas.filter(data => requestedDependencyHashes.remove(data.hash))
+      }
+      if (accepted.nonEmpty) {
+        val message = DependencyHandler.AddFlowData(accepted, dataOrigin)
         allHandlers.dependencyHandler.tell(message, sender())
       }
   }
 
-  def addBroker(broker: BrokerActor, brokerInfo: BrokerInfo, p2pVersion: P2PVersion): Unit = {
+  def addBroker(
+      broker: BrokerActor,
+      brokerInfo: BrokerInfo,
+      clientInfo: String,
+      p2pVersion: P2PVersion
+  ): Unit = {
     log.debug(s"HandShaked with ${brokerInfo.address}")
     context.watch(broker.ref)
-    brokers += broker -> BrokerStatus(brokerInfo, p2pVersion)
+    brokers += broker -> BrokerStatus(brokerInfo, p2pVersion, clientInfo)
   }
 
   def removeBroker(broker: BrokerActor): Unit = {
@@ -145,67 +144,19 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     scheduleOnce(self, Sync, frequency)
   }
 
-  private[sync] def sampleV1Peers(): AVector[(BrokerActor, BrokerStatus)] = {
-    if (networkSetting.enableP2pV2) {
-      samplePeers(P2PV1)
-    } else {
-      sampleV1PeersFromAllBrokers()
-    }
-  }
 }
 
-trait BlockFlowSynchronizerV1 { _: BlockFlowSynchronizer =>
-  import BlockFlowSynchronizer._
-
-  protected def handleV1Base: Receive = {
-    case flowLocators: FlowHandler.SyncLocators =>
-      sampleV1Peers().foreach { case (actor, broker) =>
-        actor ! BrokerHandler.SyncLocators(flowLocators.filterFor(broker.info))
-      }
-    case SyncInventories(hashes) =>
-      val blockHashes = getDownloadBlockHashes(hashes)
-      if (blockHashes.nonEmpty) {
-        sender() ! BrokerHandler.DownloadBlocks(blockHashes)
-      }
-  }
-
-  protected def handleSyncCommandV1(): Unit = {
-    log.debug("Sync V1: Send chain state to the network")
-    allHandlers.flowHandler ! FlowHandler.GetSyncLocators
-  }
-
-  def handleV1: Receive = handleV1Base orElse {
-    case Sync =>
-      if (brokers.nonEmpty) {
-        handleSyncCommandV1()
-      }
-      scheduleSync()
-    case event: ChainHandler.FlowDataValidationEvent =>
-      onBlockProcessedV1(event.data.hash)
-    case Terminated(actor)                         => removeBroker(ActorRefT(actor))
-    case _: DependencyHandler.FlowDataAlreadyExist => ()
-    case _: V2Command                              => ()
-  }
-}
-
-trait BlockFlowSynchronizerV2 extends SyncState with BlockFlowSynchronizerV1 {
+trait BlockFlowSynchronizerV2 extends SyncState {
   _: BlockFlowSynchronizer =>
   protected def handleSyncCommandV2(): Unit = {
     log.debug("Sync V2: Send chain state to the network")
     allHandlers.flowHandler ! FlowHandler.GetChainState
   }
 
-  @inline private def trySyncUsingV1(): Unit = {
-    val hardFork = networkSetting.getHardFork(TimeStamp.now())
-    if (!hardFork.isDanubeEnabled()) {
-      handleSyncCommandV1()
-    }
-  }
-
   private[sync] val nearlySyncedRemoteBrokers = mutable.Set.empty[BrokerStatusTracker.BrokerActor]
 
   private def sendChainStateToPeers(chainState: FlowHandler.UpdateChainState): Unit = {
-    val peers = samplePeers(P2PV2)
+    val peers = samplePeers()
     peers.foreach { case (actor, broker) =>
       actor ! BrokerHandler.SendChainState(chainState.filterFor(broker.info))
     }
@@ -219,11 +170,12 @@ trait BlockFlowSynchronizerV2 extends SyncState with BlockFlowSynchronizerV1 {
     nearlySyncedRemoteBrokers.clear()
   }
 
-  def handleV2: Receive = handleV1Base orElse {
+  def handleV2: Receive = {
     case BlockFlowSynchronizer.Sync =>
       if (brokers.nonEmpty) {
         handleSyncCommandV2()
-        if (!isSyncingUsingV2) trySyncUsingV1()
+        auditMissingDependencies()
+        auditStalledValidation()
       }
       scheduleSync()
 
@@ -248,10 +200,21 @@ trait BlockFlowSynchronizerV2 extends SyncState with BlockFlowSynchronizerV1 {
 
     case event: ChainHandler.FlowDataValidationEvent =>
       onBlockProcessedV2(event)
-      onBlockProcessedV1(event.data.hash)
 
     case DependencyHandler.FlowDataAlreadyExist(data) =>
       onBlockProcessed(data)
+
+    case event: DependencyHandler.PendingFlowDataEvicted =>
+      handlePendingFlowDataEvicted(event)
+
+    case DependencyHandler.Pendings(hashes) =>
+      handleDependencyPendings(hashes)
+
+    case dependencies: DependencyHandler.MissingDependencies =>
+      handleMissingDependencies(dependencies)
+
+    case BlockFlowSynchronizer.RecoverFromDependencyEviction =>
+      recoverFromDependencyEviction()
 
     case Terminated(actor) => onBrokerTerminated(ActorRefT(actor))
   }
@@ -266,7 +229,23 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private[sync] val bestChainTips    = FlattenIndexedArray.empty[(BrokerActor, ChainTip)]
   private[sync] val selfChainTips    = FlattenIndexedArray.empty[ChainTip]
   private[sync] val syncingChains    = FlattenIndexedArray.empty[SyncStatePerChain]
-  private var _isNearSynced          = false
+  private[sync] var activeSyncTarget: Option[RemoteSyncTarget] = None
+  private var _isNearSynced                                    = false
+
+  private[sync] val evictedPendingHashes = mutable.HashSet.empty[BlockHash]
+  private[sync] var dependencyEvictionRecoveryTask: Option[Cancellable] = None
+  private[sync] val auditedValidatingHashes        = mutable.HashSet.empty[BlockHash]
+  private[sync] var dependencyAuditInFlight        = false
+  private[sync] var nextDependencyAuditAt          = TimeStamp.zero
+  private[sync] var missingDependencyQueryInFlight = false
+  private[sync] var nextMissingDependencyQueryAt   = TimeStamp.zero
+  private[sync] val requestedDependencyHashes      = mutable.HashSet.empty[BlockHash]
+  private[sync] val dependencyFetchPeers =
+    mutable.HashMap.empty[BlockHash, mutable.HashSet[BrokerActor]]
+
+  private[sync] val invalidSyncTargets = mutable.LinkedHashSet.empty[RemoteSyncTargetId]
+  private[sync] val deferredSyncTargets =
+    mutable.LinkedHashMap.empty[RemoteSyncTargetId, TimeStamp]
 
   private[sync] def isNearSynced: Boolean = _isNearSynced
 
@@ -336,7 +315,6 @@ trait SyncState { _: BlockFlowSynchronizer =>
       batchId: BlockBatch
   ): Boolean = {
     brokers.view
-      .filter(_._2.version == P2PV2)
       .forall(_._2.missOrUnableDownload(chainIndex, batchId))
   }
 
@@ -349,6 +327,9 @@ trait SyncState { _: BlockFlowSynchronizer =>
       )
       val misbehavior = MisbehaviorManager.InvalidFlowData(remoteAddress(state.originBroker))
       publishEvent(misbehavior)
+      markActiveSyncTargetDeferred(
+        s"no connected broker could provide ${state.chainIndex.prettyString} batch $batchId"
+      )
       context.stop(state.originBroker.ref)
     }
   }
@@ -362,18 +343,82 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
 
     getBrokerStatus(brokerActor).foreach(_.updateTips(tips))
-    tips.foreach { chainTip =>
-      val chainIndex = chainTip.chainIndex
-      bestChainTips(chainIndex) match {
-        case Some((_, current)) =>
-          if (chainTip.weight > current.weight) {
-            bestChainTips(chainIndex) = (brokerActor, chainTip)
-          }
-        case None => bestChainTips(chainIndex) = (brokerActor, chainTip)
-      }
-    }
+    recomputeBestChainTips()
 
     _isNearSynced = checkIsNearSynced
+  }
+
+  private[sync] def recomputeBestChainTips(): Unit = {
+    bestChainTips.reset()
+    brokerConfig.chainIndexes.foreach { chainIndex =>
+      val selected = brokers.view
+        .flatMap { case (broker, status) =>
+          status.getChainTip(chainIndex).map(broker -> _)
+        }
+        .reduceOption { (current, candidate) =>
+          if (compareChainTips(candidate._2, current._2) > 0) candidate else current
+        }
+      bestChainTips(chainIndex) = selected
+    }
+  }
+
+  private[sync] def remoteSyncTargets: AVector[RemoteSyncTarget] = {
+    val targets = brokers
+      .groupBy(_._2.info.cliqueId)
+      .iterator
+      .flatMap { case (cliqueId, cliqueBrokers) =>
+        val chains = AVector.from(brokerConfig.chainIndexes.iterator.flatMap { chainIndex =>
+          cliqueBrokers.view
+            .flatMap { case (broker, status) =>
+              status.getChainTip(chainIndex).map(tip => (chainIndex, broker, tip))
+            }
+            .reduceOption { (current, candidate) =>
+              if (compareChainTips(candidate._3, current._3) > 0) candidate else current
+            }
+        })
+        if (chains.nonEmpty) Some(RemoteSyncTarget(cliqueId, chains)) else None
+      }
+      .toSeq
+    AVector.from(targets)
+  }
+
+  private[sync] def selectSyncTarget(): Option[SelectedSyncTarget] = {
+    selectSyncTarget(TimeStamp.now())
+  }
+
+  private[sync] def selectSyncTarget(now: TimeStamp): Option[SelectedSyncTarget] = {
+    deferredSyncTargets.filterInPlace { case (_, expiresAt) => expiresAt > now }
+    remoteSyncTargets.toIterable
+      .filter { target =>
+        !invalidSyncTargets.contains(target.id) && !deferredSyncTargets.contains(target.id)
+      }
+      .flatMap { target =>
+        val usefulChains = target.chains.filter { case (chainIndex, _, remoteTip) =>
+          selfChainTips(chainIndex).exists(compareChainTips(remoteTip, _) > 0)
+        }
+        if (usefulChains.isEmpty) {
+          None
+        } else {
+          val workAdvantage = usefulChains.fold(BigInteger.ZERO) {
+            case (acc, (chainIndex, _, remoteTip)) =>
+              selfChainTips(chainIndex).fold(acc) { selfTip =>
+                acc.add(remoteTip.weight.value.subtract(selfTip.weight.value))
+              }
+          }
+          Some(SelectedSyncTarget(target, usefulChains, workAdvantage))
+        }
+      }
+      .reduceOption { (current, candidate) =>
+        val workComparison = candidate.workAdvantage.compareTo(current.workAdvantage)
+        if (
+          workComparison > 0 ||
+          (workComparison == 0 && candidate.target.cliqueId > current.target.cliqueId)
+        ) {
+          candidate
+        } else {
+          current
+        }
+      }
   }
 
   private def checkIsNearSynced: Boolean = {
@@ -382,10 +427,6 @@ trait SyncState { _: BlockFlowSynchronizer =>
         (bestTip.height - selfTip.height) < maxSyncBlocksPerChain
       }
     }
-  }
-
-  private def hasBestChainTips: Boolean = {
-    brokerConfig.chainIndexes.forall(bestChainTips.contains)
   }
 
   def handleSelfChainState(chainTips: AVector[ChainTip]): Unit = {
@@ -411,17 +452,273 @@ trait SyncState { _: BlockFlowSynchronizer =>
         onBlockProcessed(block)
       } else {
         log.info(s"Block ${block.hash.toHexString} is invalid, resync")
+        if (syncingChains(block.chainIndex).exists(_.validating.contains(block.hash))) {
+          invalidateActiveSyncTarget(s"${block.hash.shortHex} failed validation")
+        }
         resync()
       }
     }
   }
 
   protected[this] def onBlockProcessed(data: FlowData): Unit = {
-    syncingChains(data.chainIndex).foreach { chainState =>
-      chainState.handleFinalizedBlock(data.hash)
+    onBlockProcessed(data.chainIndex, data.hash)
+  }
+
+  private def onBlockProcessed(chainIndex: ChainIndex, hash: BlockHash): Unit = {
+    syncingChains(chainIndex).foreach { chainState =>
+      chainState.handleFinalizedBlock(hash)
       tryValidateMoreBlocksFromChain(chainState)
       tryMoveOn(chainState)
     }
+  }
+
+  private def hasEvictedValidatingBlocks: Boolean = {
+    syncingChains.exists(_.validating.exists(evictedPendingHashes.contains))
+  }
+
+  private def scheduleDependencyRecovery(hashes: AVector[BlockHash], reason: String): Unit = {
+    val active = hashes.filter { hash =>
+      syncingChains(ChainIndex.from(hash)).exists(_.validating.contains(hash))
+    }
+    if (isSyncingUsingV2 && active.nonEmpty) {
+      evictedPendingHashes.addAll(active)
+      if (dependencyEvictionRecoveryTask.isEmpty) {
+        log.warning(s"Schedule a Sync V2 retry because $reason")
+        dependencyEvictionRecoveryTask = Some(
+          scheduleCancellableOnce(
+            self,
+            BlockFlowSynchronizer.RecoverFromDependencyEviction,
+            networkSetting.syncExpiryPeriod
+          )
+        )
+      }
+    }
+  }
+
+  private[sync] def handlePendingFlowDataEvicted(
+      event: DependencyHandler.PendingFlowDataEvicted
+  ): Unit = {
+    scheduleDependencyRecovery(
+      event.hashes,
+      s"${event.hashes.length} pending flow data entries were evicted due to ${event.reason}"
+    )
+  }
+
+  private[sync] def auditStalledValidation(): Unit = {
+    auditStalledValidation(TimeStamp.now())
+  }
+
+  private[sync] def auditStalledValidation(now: TimeStamp): Unit = {
+    if (
+      isSyncingUsingV2 &&
+      !dependencyAuditInFlight &&
+      dependencyEvictionRecoveryTask.isEmpty &&
+      now >= nextDependencyAuditAt
+    ) {
+      syncingChains.foreach { state =>
+        if (state.isValidationStalled(now, networkSetting.dependencyExpiryPeriod)) {
+          auditedValidatingHashes.addAll(state.validating)
+        }
+      }
+      if (auditedValidatingHashes.nonEmpty) {
+        dependencyAuditInFlight = true
+        nextDependencyAuditAt = now.plusUnsafe(networkSetting.syncExpiryPeriod)
+        allHandlers.dependencyHandler.tell(DependencyHandler.GetPendings, self)
+      }
+    }
+  }
+
+  private[sync] def missingDependencyRetryPeriod: Duration = {
+    val rateLimiterWindow = getRateLimiterWindowSize
+    if (networkSetting.syncExpiryPeriod > rateLimiterWindow) {
+      networkSetting.syncExpiryPeriod
+    } else {
+      rateLimiterWindow
+    }
+  }
+
+  private[sync] def auditMissingDependencies(): Unit = {
+    auditMissingDependencies(TimeStamp.now())
+  }
+
+  private[sync] def auditMissingDependencies(now: TimeStamp): Unit = {
+    if (
+      isSyncingUsingV2 &&
+      !missingDependencyQueryInFlight &&
+      dependencyEvictionRecoveryTask.isEmpty &&
+      now >= nextMissingDependencyQueryAt
+    ) {
+      val roots = mutable.LinkedHashSet.empty[BlockHash]
+      syncingChains.foreach { state =>
+        if (state.isValidationStalled(now, missingDependencyRetryPeriod)) {
+          roots.addAll(state.validating)
+        }
+      }
+      if (roots.nonEmpty) {
+        missingDependencyQueryInFlight = true
+        nextMissingDependencyQueryAt = now.plusUnsafe(missingDependencyRetryPeriod)
+        requestedDependencyHashes.clear()
+        allHandlers.dependencyHandler.tell(
+          DependencyHandler.GetMissingDependencies(
+            AVector.from(roots),
+            MaxMissingDependenciesPerQuery
+          ),
+          self
+        )
+      }
+    }
+  }
+
+  private def isActivelyValidating(hash: BlockHash): Boolean = {
+    syncingChains(ChainIndex.from(hash)).exists(_.validating.contains(hash))
+  }
+
+  private[sync] def handleMissingDependencies(
+      dependencies: DependencyHandler.MissingDependencies
+  ): Unit = {
+    if (missingDependencyQueryInFlight) {
+      missingDependencyQueryInFlight = false
+      val activeRoots  = dependencies.roots.filter(isActivelyValidating)
+      val pendingRoots = dependencies.pendingRoots.toSet
+      val absentRoots  = activeRoots.filterNot(pendingRoots.contains)
+      val missing      = dependencies.hashes
+      val missingSet   = missing.toSet
+      dependencyFetchPeers.filterInPlace { case (hash, _) => missingSet.contains(hash) }
+      requestedDependencyHashes.filterInPlace(missingSet.contains)
+
+      escapeIOError(absentRoots.partitionE(blockflow.contains)) { case (stored, dropped) =>
+        stored.foreach(hash => onBlockProcessed(ChainIndex.from(hash), hash))
+        if (dropped.nonEmpty) {
+          deferActiveSyncTarget(
+            s"${dropped.length} validating blocks disappeared from the dependency cache"
+          )
+        } else if (missing.nonEmpty) {
+          requestMissingDependencies(missing)
+        }
+      }
+    }
+  }
+
+  private def requestMissingDependencies(hashes: AVector[BlockHash]): Unit = {
+    val targetCliqueId = activeSyncTarget.map(_.cliqueId)
+    val assignments    = mutable.HashMap.empty[BrokerActor, Int]
+    val selected       = mutable.ArrayBuffer.empty[(BlockHash, BrokerActor, Boolean)]
+    var unavailable: Option[BlockHash] = None
+
+    hashes.foreach { hash =>
+      if (unavailable.isEmpty) {
+        val attempted = dependencyFetchPeers.getOrElse(hash, mutable.HashSet.empty)
+        val candidates = if (attempted.size >= BlockFetcher.MaxDownloadTimes) {
+          Seq.empty
+        } else {
+          brokers.zipWithIndex.filter { case ((broker, status), _) =>
+            status.info.contains(ChainIndex.from(hash).from) && !attempted.contains(broker)
+          }
+        }
+        candidates.minByOption { case ((broker, status), index) =>
+          val targetPriority = if (targetCliqueId.contains(status.info.cliqueId)) 0 else 1
+          (targetPriority, assignments.getOrElse(broker, 0), index)
+        } match {
+          case Some(((broker, _), _)) =>
+            assignments.updateWith(broker)(_.map(_ + 1).orElse(Some(1)))
+            selected.addOne((hash, broker, ChainIndex.from(hash).relateTo(brokerConfig)))
+          case None => unavailable = Some(hash)
+        }
+      }
+    }
+
+    unavailable match {
+      case Some(hash) =>
+        deferActiveSyncTarget(s"dependency ${hash.shortHex} is unavailable after bounded retries")
+      case None =>
+        val requests = mutable.HashMap.empty[(BrokerActor, Boolean), mutable.ArrayBuffer[BlockHash]]
+        selected.foreach { case (hash, broker, isBlock) =>
+          dependencyFetchPeers.getOrElseUpdate(hash, mutable.HashSet.empty).addOne(broker)
+          requestedDependencyHashes.addOne(hash)
+          SyncState.addToMap(requests, broker -> isBlock, hash)
+        }
+        requests.foreachEntry {
+          case ((broker, true), requested) =>
+            broker ! BrokerHandler.DownloadBlocks(AVector.from(requested))
+          case ((broker, false), requested) =>
+            broker ! BrokerHandler.DownloadHeaders(AVector.from(requested))
+        }
+    }
+  }
+
+  private[sync] def handleDependencyPendings(pendingHashes: AVector[BlockHash]): Unit = {
+    if (dependencyAuditInFlight) {
+      dependencyAuditInFlight = false
+      val pending = pendingHashes.toSet
+      val missing = AVector.from(auditedValidatingHashes.filterNot(pending.contains))
+      auditedValidatingHashes.clear()
+      escapeIOError(missing.partitionE(blockflow.contains)) { case (stored, dropped) =>
+        stored.foreach(hash => onBlockProcessed(ChainIndex.from(hash), hash))
+        scheduleDependencyRecovery(
+          dropped,
+          s"${dropped.length} stalled validating blocks disappeared from the dependency cache"
+        )
+      }
+    }
+  }
+
+  private[sync] def recoverFromDependencyEviction(): Unit = {
+    dependencyEvictionRecoveryTask.foreach(_.cancel())
+    dependencyEvictionRecoveryTask = None
+    if (isSyncingUsingV2 && hasEvictedValidatingBlocks) {
+      log.warning(
+        s"Switch Sync V2 target after ${evictedPendingHashes.size} pending flow data entries were evicted"
+      )
+      deferActiveSyncTarget(
+        s"${evictedPendingHashes.size} active pending flow data entries were evicted"
+      )
+    } else {
+      evictedPendingHashes.clear()
+    }
+  }
+
+  private def rememberInvalidSyncTarget(targetId: RemoteSyncTargetId): Unit = {
+    if (invalidSyncTargets.size >= MaxQuarantinedSyncTargets) {
+      invalidSyncTargets.headOption.foreach(invalidSyncTargets.subtractOne)
+    }
+    invalidSyncTargets.addOne(targetId)
+    ()
+  }
+
+  private def rememberDeferredSyncTarget(
+      targetId: RemoteSyncTargetId,
+      expiresAt: TimeStamp
+  ): Unit = {
+    if (
+      deferredSyncTargets.size >= MaxQuarantinedSyncTargets &&
+      !deferredSyncTargets.contains(targetId)
+    ) {
+      deferredSyncTargets.headOption.foreach { case (oldest, _) =>
+        deferredSyncTargets.remove(oldest)
+      }
+    }
+    deferredSyncTargets.put(targetId, expiresAt)
+    ()
+  }
+
+  private[sync] def invalidateActiveSyncTarget(reason: String): Unit = {
+    activeSyncTarget.foreach { target =>
+      log.warning(s"Reject Sync V2 target ${target.id}: $reason")
+      rememberInvalidSyncTarget(target.id)
+    }
+  }
+
+  private[sync] def markActiveSyncTargetDeferred(reason: String): Unit = {
+    activeSyncTarget.foreach { target =>
+      val expiresAt = TimeStamp.now().plusUnsafe(networkSetting.dependencyExpiryPeriod)
+      log.warning(s"Defer Sync V2 target ${target.id} until $expiresAt: $reason")
+      rememberDeferredSyncTarget(target.id, expiresAt)
+    }
+  }
+
+  private[sync] def deferActiveSyncTarget(reason: String): Unit = {
+    markActiveSyncTargetDeferred(reason)
+    resync()
   }
 
   private[sync] def isSynced: Boolean = {
@@ -446,19 +743,12 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   private def tryStartSync(): Unit = {
-    if (hasBestChainTips) {
-      val chains = mutable.ArrayBuffer.empty[(ChainIndex, BrokerActor, ChainTip, ChainTip)]
-      brokerConfig.chainIndexes.foreach { chainIndex =>
-        for {
-          selfTip <- selfChainTips(chainIndex)
-          bestTip <- bestChainTips(chainIndex)
-        } yield {
-          if (bestTip._2.weight > selfTip.weight) {
-            chains.addOne((chainIndex, bestTip._1, bestTip._2, selfTip))
-          }
-        }
-      }
-      if (chains.nonEmpty) startSync(chains)
+    selectSyncTarget().foreach { selected =>
+      val chains = AVector.from(selected.chains.iterator.flatMap {
+        case (chainIndex, broker, remoteTip) =>
+          selfChainTips(chainIndex).map(selfTip => (chainIndex, broker, remoteTip, selfTip))
+      })
+      if (chains.nonEmpty) startSync(selected.target, chains)
     }
   }
 
@@ -467,10 +757,14 @@ trait SyncState { _: BlockFlowSynchronizer =>
   // 2. Start constructing the header chain skeletons from `h + 1` using the origin peer
   // 3. Download blocks from all nodes to fill in the header chain skeletons. If no one can
   //    fill in the skeleton it's assumed invalid and the origin peer is dropped
-  def startSync(chains: collection.Seq[(ChainIndex, BrokerActor, ChainTip, ChainTip)]): Unit = {
+  def startSync(
+      target: RemoteSyncTarget,
+      chains: AVector[(ChainIndex, BrokerActor, ChainTip, ChainTip)]
+  ): Unit = {
     assume(!isSyncingUsingV2)
     isSyncingUsingV2 = true
-    log.debug("Start syncing")
+    activeSyncTarget = Some(target)
+    log.debug(s"Start syncing from clique ${target.cliqueId}")
 
     val requestsPerBroker = mutable.HashMap
       .empty[BrokerActor, mutable.ArrayBuffer[(ChainIndex, ChainTip, ChainTip)]]
@@ -605,7 +899,20 @@ trait SyncState { _: BlockFlowSynchronizer =>
   }
 
   private def clearSyncingState(): Unit = {
+    continueDownloadTask.foreach(_.cancel())
+    continueDownloadTask = None
+    dependencyEvictionRecoveryTask.foreach(_.cancel())
+    dependencyEvictionRecoveryTask = None
+    evictedPendingHashes.clear()
+    auditedValidatingHashes.clear()
+    dependencyAuditInFlight = false
+    nextDependencyAuditAt = TimeStamp.zero
+    missingDependencyQueryInFlight = false
+    nextMissingDependencyQueryAt = TimeStamp.zero
+    requestedDependencyHashes.clear()
+    dependencyFetchPeers.clear()
     syncingChains.reset()
+    activeSyncTarget = None
     isSyncingUsingV2 = false
     brokers.foreach(_._2.clear())
   }
@@ -619,11 +926,13 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private[sync] def needToStartNextSyncRound(): Boolean = {
     // Only start the next round of sync if the best tip is better than the best tip being used for syncing
     // This helps avoid re-downloading the latest blocks while they are still cached in the `DependencyHandler`
-    brokerConfig.chainIndexes.exists { chainIndex =>
-      (for {
-        usedBestTip   <- syncingChains(chainIndex).map(_.bestTip)
-        latestBestTip <- bestChainTips(chainIndex).map(_._2)
-      } yield latestBestTip.weight > usedBestTip.weight).getOrElse(false)
+    selectSyncTarget().exists { selected =>
+      selected.chains.exists { case (chainIndex, _, latestBestTip) =>
+        syncingChains(chainIndex) match {
+          case Some(state) => compareChainTips(latestBestTip, state.bestTip) > 0
+          case None => selfChainTips(chainIndex).exists(compareChainTips(latestBestTip, _) > 0)
+        }
+      }
     }
   }
 
@@ -637,28 +946,14 @@ trait SyncState { _: BlockFlowSynchronizer =>
     }
   }
 
-  private def updateBestChainTips(terminatedBroker: BrokerActor): Unit = {
-    assume(getBrokerStatus(terminatedBroker).isEmpty)
-    bestChainTips.foreach { case (brokerActor, chainTip) =>
-      if (brokerActor == terminatedBroker) {
-        val selected = brokers.view
-          .flatMap { case (newBroker, status) =>
-            status.getChainTip(chainTip.chainIndex).map(chainTip => (newBroker, chainTip))
-          }
-          .maxByOption(_._2.weight)
-        bestChainTips(chainTip.chainIndex) = selected
-      }
-    }
-  }
-
   def onBrokerTerminated(broker: BrokerActor): Unit = {
     val status = getBrokerStatus(broker)
     removeBroker(broker)
+    recomputeBestChainTips()
     status.foreach(onBrokerTerminated(broker, _))
   }
 
   private def onBrokerTerminated(broker: BrokerActor, status: BrokerStatus): Unit = {
-    updateBestChainTips(broker)
     if (isSyncingUsingV2) {
       val needToResync = syncingChains.exists(_.isOriginPeer(broker))
       if (needToResync) {
@@ -682,10 +977,39 @@ trait SyncState { _: BlockFlowSynchronizer =>
 object SyncState {
   import BrokerStatusTracker.BrokerActor
 
-  val SkeletonSize: Int                  = 16
-  val BatchSize: Int                     = 128
-  val MaxQueueSize: Int                  = SkeletonSize * BatchSize
-  val MaxValidationBlocksWhenSynced: Int = 5
+  val SkeletonSize: Int                   = 16
+  val BatchSize: Int                      = 128
+  val MaxQueueSize: Int                   = SkeletonSize * BatchSize
+  val MaxValidationBlocksWhenSynced: Int  = 5
+  val MaxMissingDependenciesPerQuery: Int = MaxRequestNum
+  val MaxQuarantinedSyncTargets: Int      = 1024
+
+  @inline def compareChainTips(tip0: ChainTip, tip1: ChainTip): Int = {
+    BlockHashPool.compareWeight(tip0.hash, tip0.weight, tip1.hash, tip1.weight)
+  }
+
+  final case class RemoteSyncTarget(
+      cliqueId: CliqueId,
+      chains: AVector[(ChainIndex, BrokerActor, ChainTip)]
+  ) {
+    lazy val id: RemoteSyncTargetId = {
+      RemoteSyncTargetId(
+        cliqueId,
+        chains.map { case (chainIndex, _, tip) => chainIndex -> tip.hash }
+      )
+    }
+  }
+
+  final case class RemoteSyncTargetId(
+      cliqueId: CliqueId,
+      tips: AVector[(ChainIndex, BlockHash)]
+  )
+
+  final case class SelectedSyncTarget(
+      target: RemoteSyncTarget,
+      chains: AVector[(ChainIndex, BrokerActor, ChainTip)],
+      workAdvantage: BigInteger
+  )
 
   def addToMap[K, V](map: mutable.HashMap[K, mutable.ArrayBuffer[V]], key: K, value: V): Unit = {
     map.get(key) match {
@@ -705,13 +1029,26 @@ object SyncState {
       chainIndex: ChainIndex,
       fromHeight: Int,
       toHeight: Int,
-      toHeader: Option[BlockHeader]
+      toHeader: Option[BlockHeader],
+      toHash: Option[BlockHash]
   ) {
-    def heightRange: BlockHeightRange = BlockHeightRange.from(fromHeight, toHeight, 1)
-    def size: Int                     = toHeight - fromHeight + 1
-    def id: BlockBatch                = BlockBatch(fromHeight, toHeight)
+    def heightRange: BlockHeightRange     = BlockHeightRange.from(fromHeight, toHeight, 1)
+    def size: Int                         = toHeight - fromHeight + 1
+    def id: BlockBatch                    = BlockBatch(fromHeight, toHeight)
+    def expectedToHash: Option[BlockHash] = toHash.orElse(toHeader.map(_.hash))
 
     override def toString: String = s"${chainIndex.from.value}->${chainIndex.to.value}:$id"
+  }
+
+  object BlockDownloadTask {
+    def apply(
+        chainIndex: ChainIndex,
+        fromHeight: Int,
+        toHeight: Int,
+        toHeader: Option[BlockHeader]
+    ): BlockDownloadTask = {
+      new BlockDownloadTask(chainIndex, fromHeight, toHeight, toHeader, None)
+    }
   }
 
   def showTasks(tasks: AVector[BlockDownloadTask]): String = {
@@ -737,6 +1074,7 @@ object SyncState {
       mutable.SortedMap.empty[BlockBatch, AVector[DownloadedBlock]]
     private[sync] val pendingQueue = mutable.LinkedHashMap.empty[BlockHash, DownloadedBlock]
     private[sync] var validating   = mutable.Set.empty[BlockHash]
+    private[sync] var lastValidationProgressAt = TimeStamp.now()
 
     private def addNewTask(task: BlockDownloadTask): Unit = {
       batchIds.addOne(task.id)
@@ -759,7 +1097,7 @@ object SyncState {
         // If the skeleton's finished, download any remaining blocks directly from the `originBroker`
         nextFromHeight = bestTip.height + 1
         skeletonHeightRange = None
-        val task = BlockDownloadTask(chainIndex, from, bestTip.height, None)
+        val task = BlockDownloadTask(chainIndex, from, bestTip.height, None, Some(bestTip.hash))
         logger.debug(s"Trying to download latest blocks $task, chain index: $chainIndex")
         addNewTask(task)
         None
@@ -832,6 +1170,7 @@ object SyncState {
         )
         val hashes = selected.map(_.block.hash)
         validating.addAll(hashes)
+        lastValidationProgressAt = TimeStamp.now()
         pendingQueue.subtractAll(hashes)
         acc.addAll(selected)
       }
@@ -840,8 +1179,14 @@ object SyncState {
     def isSkeletonFilled: Boolean = batchIds.forall(downloadedBlocks.contains)
 
     def handleFinalizedBlock(hash: BlockHash): Unit = {
-      validating.remove(hash)
+      if (validating.remove(hash)) {
+        lastValidationProgressAt = TimeStamp.now()
+      }
       ()
+    }
+
+    def isValidationStalled(now: TimeStamp, timeout: Duration): Boolean = {
+      validating.nonEmpty && lastValidationProgressAt.plusUnsafe(timeout) <= now
     }
 
     def tryMoveOn(): Option[BlockHeightRange] = {
@@ -885,16 +1230,18 @@ object SyncState {
     def isTaskQueueEmpty: Boolean = taskQueue.isEmpty
 
     def isSynced(selfTip: ChainTip): Boolean = {
-      selfTip.weight >= bestTip.weight || (
+      compareChainTips(selfTip, bestTip) >= 0 || (
         // When syncing different chains from different nodes, it is possible that a block has already
         // been downloaded and sent to the `DependencyHandler`, but due to dependencies not being ready,
-        // it cannot be added to the blockchain. This means that `selfTip.weight >= bestTip.weight` does not hold.
-        // In this case, if all tasks have already been downloaded and sent to the `DependencyHandler`,
-        // we consider the chain to be synced and start the next round of sync.
+        // it cannot be added to the blockchain. This means that the self tip has not reached the best
+        // tip yet.
+        // In this case, wait until every downloaded block has also completed dependency validation
+        // before considering the chain synced and starting the next round.
         nextFromHeight > bestTip.height &&
           skeletonHeightRange.isEmpty &&
           batchIds.isEmpty &&
-          pendingQueue.isEmpty
+          pendingQueue.isEmpty &&
+          validating.isEmpty
       )
     }
 

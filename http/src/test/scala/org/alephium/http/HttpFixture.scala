@@ -16,13 +16,15 @@
 
 package org.alephium.http
 
+import scala.concurrent.Await
+
 import org.scalatest.Assertion
 import sttp.client3._
 import sttp.client3.HttpClientFutureBackend
 import sttp.model.{Method, Uri}
 
 import org.alephium.json.Json._
-import org.alephium.util.AlephiumFutureSpec
+import org.alephium.util.{AlephiumFutureSpec, AlephiumSpec, Duration, discard}
 
 object HttpFixture {
   implicit class RichResponse[T](val response: Response[T]) extends AnyVal {
@@ -47,6 +49,9 @@ trait HttpFixture {
   type HttpRequest = RequestT[Identity, Either[String, String], Any]
 
   val backend = HttpClientFutureBackend()
+  AlephiumSpec.addCleanTask(() =>
+    discard(Await.result(backend.close(), Duration.ofSecondsUnsafe(10).asScala))
+  )
 
   def httpRequest[T, R](
       method: Method,

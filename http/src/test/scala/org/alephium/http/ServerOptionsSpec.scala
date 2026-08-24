@@ -16,7 +16,7 @@
 
 package org.alephium.http
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 import sttp.tapir.server.interceptor.metrics.MetricsRequestInterceptor
 
@@ -24,9 +24,10 @@ import org.alephium.util.AlephiumSpec
 
 class ServerOptionsSpec extends AlephiumSpec {
   "ServerOptions" should "enable metrics based on the config" in {
+    val executionContext = ExecutionContext.parasitic
     def checkMetrics(enableMetrics: Boolean) = {
       ServerOptions
-        .serverOptions(enableMetrics)
+        .serverOptions(enableMetrics, executionContext)
         .interceptors
         .exists(
           _.isInstanceOf[MetricsRequestInterceptor[Future]]
@@ -35,5 +36,14 @@ class ServerOptionsSpec extends AlephiumSpec {
 
     checkMetrics(true)
     checkMetrics(false)
+  }
+
+  it should "run endpoint logic on the configured execution context" in {
+    val executionContext = ExecutionContext.parasitic
+    val fallbackExecutionContext =
+      ExecutionContext.fromExecutor((command: Runnable) => command.run())
+    ServerOptions
+      .serverOptions(false, executionContext)
+      .executionContextOr(fallbackExecutionContext) is executionContext
   }
 }

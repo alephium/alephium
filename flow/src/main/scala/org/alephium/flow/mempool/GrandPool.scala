@@ -17,6 +17,7 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.model.MempoolTxMetadata
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionId, TransactionTemplate}
@@ -43,13 +44,30 @@ class GrandPool(val mempools: AVector[MemPool], val orphanPool: OrphanPool)(impl
     transactions.sumBy(add(index, _, timeStamp).addedCount)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def add(
       index: ChainIndex,
       tx: TransactionTemplate,
       timestamp: TimeStamp
+  ): MemPool.AddToMemPoolResult = add(index, tx, timestamp, None)
+
+  private[flow] def add(
+      index: ChainIndex,
+      tx: TransactionTemplate,
+      timestamp: TimeStamp,
+      metadata: MempoolTxMetadata
+  ): MemPool.AddToMemPoolResult = add(index, tx, timestamp, Some(metadata))
+
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+  private def add(
+      index: ChainIndex,
+      tx: TransactionTemplate,
+      timestamp: TimeStamp,
+      metadataOpt: Option[MempoolTxMetadata]
   ): MemPool.AddToMemPoolResult = {
-    val result = getMemPool(index.from).add(index, tx, timestamp)
+    val result = metadataOpt match {
+      case Some(metadata) => getMemPool(index.from).add(index, tx, timestamp, metadata)
+      case None           => getMemPool(index.from).add(index, tx, timestamp)
+    }
     if (index.isIntraGroup) {
       result
     } else {

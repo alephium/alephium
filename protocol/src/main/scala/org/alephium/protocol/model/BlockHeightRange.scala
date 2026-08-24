@@ -20,20 +20,35 @@ import org.alephium.serde.{intSerde, Serde}
 import org.alephium.util.AVector
 
 final case class BlockHeightRange private (from: Int, to: Int, step: Int) {
-  lazy val length: Int           = ((to - from) / step) + 1
+  private lazy val validLength: Option[Int] = {
+    if (from >= 0 && to >= from && step >= 1) {
+      val length = ((to.toLong - from.toLong) / step.toLong) + 1
+      Option.when(length <= Int.MaxValue)(length.toInt)
+    } else {
+      None
+    }
+  }
+
+  lazy val length: Int           = validLength.getOrElse(0)
   lazy val heights: AVector[Int] = AVector.tabulate(length)(at)
 
-  def isValid(): Boolean = from >= 0 && to >= from && step >= 1
+  def isValid(): Boolean = validLength.nonEmpty
+
+  def isValid(maxLength: Int): Boolean = {
+    maxLength >= 1 && validLength.exists(_ <= maxLength)
+  }
 
   def at(index: Int): Int = {
-    assume(index < length)
-    from + index * step
+    assume(index >= 0 && index < length)
+    (from.toLong + index.toLong * step.toLong).toInt
   }
 }
 
 object BlockHeightRange {
   implicit val serde: Serde[BlockHeightRange] =
-    Serde.forProduct3(apply, v => (v.from, v.to, v.step))
+    Serde
+      .forProduct3[Int, Int, Int, BlockHeightRange](apply, v => (v.from, v.to, v.step))
+      .validate(range => Either.cond(range.isValid(), (), s"Invalid block height range: $range"))
 
   def from(from: Int, to: Int, step: Int): BlockHeightRange = {
     val range = BlockHeightRange(from, to, step)

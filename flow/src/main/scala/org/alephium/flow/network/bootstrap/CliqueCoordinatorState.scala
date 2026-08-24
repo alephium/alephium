@@ -56,6 +56,19 @@ trait CliqueCoordinatorState {
     }
   }
 
+  def removeBrokerInfo(actor: ActorRef): Boolean = {
+    val id = brokerConnectors.indexWhere(_.contains(actor))
+    if (id == -1) {
+      false
+    } else {
+      brokerInfos(id) = None
+      brokerConnectors(id) = None
+      readys(id) = false
+      closeds(id) = false
+      true
+    }
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def broadcast[T](message: T): Unit = {
     brokerConnectors.zipWithIndex.foreach { case (opt, idx) =>
@@ -84,6 +97,11 @@ trait CliqueCoordinatorState {
   }
   def isAllReady: Boolean     = readys.forall(identity)
   def setReady(id: Int): Unit = readys(id) = true
+  def resetReadys(): Unit = {
+    readys.indices.foreach { id =>
+      readys(id) = id == brokerConfig.brokerId
+    }
+  }
 
   val closeds: Array[Boolean] = {
     val result = Array.fill(brokerNum)(false)

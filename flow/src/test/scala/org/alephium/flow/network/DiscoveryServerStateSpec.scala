@@ -33,7 +33,7 @@ import org.alephium.protocol.Generators
 import org.alephium.protocol.config._
 import org.alephium.protocol.message.DiscoveryMessage
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, Duration, TimeStamp}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, TimeStamp}
 
 class DiscoveryServerStateSpec extends AlephiumActorSpec {
   import DiscoveryMessage._
@@ -242,6 +242,24 @@ class DiscoveryServerStateSpec extends AlephiumActorSpec {
     val bucket0 =
       peers0.map(p => peerInfo.cliqueId.hammingDist(p.cliqueId)).toIterable.toList
     bucket0 is bucket0.sorted
+  }
+
+  it should "limit neighbor responses to unverified sources" in new Fixture {
+    val peers = AVector.tabulate(state.maxSentPeers + 1) { index =>
+      BrokerInfo.unsafe(
+        CliqueId.generate,
+        brokerId = 0,
+        brokerNum = 1,
+        address = new InetSocketAddress("127.0.0.1", 21000 + index)
+      )
+    }
+    state.cacheBrokers(peers)
+
+    val target           = CliqueId.generate
+    val unverifiedRemote = new InetSocketAddress("127.0.0.2", 21000)
+    state.getNeighborsForResponse(unverifiedRemote, target).length is
+      DiscoveryServer.MaxUnverifiedNeighbors
+    state.getNeighborsForResponse(peers.head.address, target).length is state.maxSentPeers
   }
 
   it should "return neighbors" in new Fixture {

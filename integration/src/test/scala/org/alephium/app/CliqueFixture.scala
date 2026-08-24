@@ -17,6 +17,7 @@
 package org.alephium.app
 
 import java.net.{InetAddress, InetSocketAddress}
+import java.util.concurrent.TimeUnit
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
@@ -32,7 +33,7 @@ import org.apache.pekko.io.Tcp
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.Timeout
 import org.scalatest.Assertion
-import org.scalatest.time.{Seconds, Span}
+import org.scalatest.time.{Millis, Seconds, Span}
 import sttp.model.StatusCode
 
 import org.alephium.api.ApiModelCodec
@@ -43,7 +44,7 @@ import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mining.{Job, Miner}
 import org.alephium.flow.network.DiscoveryServer
 import org.alephium.flow.network.broker.MisbehaviorManager
-import org.alephium.flow.setting.AlephiumConfig
+import org.alephium.flow.setting.{AlephiumConfig, Allocation, GenesisSetting}
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
@@ -73,7 +74,15 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     with RichBlockFlowT { Fixture =>
   implicit val system: ActorSystem = spec.system
 
-  private lazy val vertx = Vertx.vertx()
+  private lazy val vertx = {
+    val instance = Vertx.vertx()
+    AlephiumSpec.addCleanTask(() =>
+      discard(
+        instance.close().toCompletionStage.toCompletableFuture.get(10, TimeUnit.SECONDS)
+      )
+    )
+    instance
+  }
   private lazy val wsClientFactory =
     WsClientFactory(
       vertx,
@@ -81,7 +90,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
 
   implicit override val patienceConfig: PatienceConfig =
-    PatienceConfig(timeout = Span(60, Seconds), interval = Span(2, Seconds))
+    PatienceConfig(timeout = Span(60, Seconds), interval = Span(250, Millis))
   implicit lazy val apiConfig: ApiConfig = ApiConfig.load(newConfig)
 
   lazy val blockflowFetchMaxAge = apiConfig.blockflowFetchMaxAge
@@ -129,6 +138,18 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       }
       read[T](body)
     }
+  }
+
+  def requestAsync[T: Reader](request: Int => HttpRequest, port: Int): Future[T] = {
+    request(port)
+      .send(backend)
+      .map { response =>
+        val body = response.body match {
+          case Right(value) => value
+          case Left(value)  => value
+        }
+        read[T](body)
+      }(system.dispatcher)
   }
 
   def requestFailed(
@@ -204,6 +225,18 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def confirmTx(tx: SubmitTxResult, restPort: Int): Assertion = eventually {
     val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
     checkConfirmations(txStatus)
+  }
+
+  def confirmTxs(txs: Iterable[SubmitTxResult], restPort: Int): Assertion = {
+    val txsSeq = txs.toSeq
+    eventually {
+      implicit val ec: ExecutionContext = system.dispatcher
+      val statuses = Future
+        .traverse(txsSeq)(tx => requestAsync[TxStatus](getTransactionStatus(tx), restPort))
+        .futureValue
+      statuses.foreach(checkConfirmations)
+      succeed
+    }
   }
 
   def confirmTx(tx: TransferResult, restPort: Int): Assertion = eventually {
@@ -330,7 +363,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         ("alephium.consensus.danube.block-target-time", "1 seconds"),
         ("alephium.consensus.danube.uncle-dependency-gap-time", "1 seconds"),
         ("alephium.consensus.num-zeros-at-least-in-hash", "8"),
-        ("alephium.consensus.num-zeros-at-least-in-hash-testnet-patch", "8"),
         ("alephium.mining.batch-delay", "200 milli"),
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")
@@ -338,9 +370,21 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       implicit override lazy val config: AlephiumConfig = {
         val minerAddresses =
           genesisKeys.map(p => Address.Asset(LockupScript.p2pkh(p._2)))
+        val testGenesis = GenesisSetting(
+          AVector(
+            Allocation(
+              Address.asset(address).rightValue,
+              Allocation.Amount(genesisBalance),
+              Duration.zero
+            )
+          )
+        )
 
         val tmp0 = AlephiumConfig.load(newConfig)
-        val tmp1 = tmp0.copy(mining = tmp0.mining.copy(minerAddresses = Some(minerAddresses)))
+        val tmp1 = tmp0.copy(
+          genesis = testGenesis,
+          mining = tmp0.mining.copy(minerAddresses = Some(minerAddresses))
+        )
         bootstrap match {
           case Some(address) =>
             tmp1.copy(discovery = tmp1.discovery.copy(bootstrap = ArraySeq(address)))
@@ -408,7 +452,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     val server: Server = new Server {
       val flowSystem: ActorSystem =
         ActorSystem(s"flow-${Random.nextInt()}", platformEnv.newConfig)
-      implicit lazy val executionContext: ExecutionContext = flowSystem.dispatcher
+      implicit lazy val executionContext: ExecutionContext =
+        flowSystem.dispatchers.lookup(Server.ApiDispatcher)
 
       lazy val defaultNetwork = platformEnv.config.network
       lazy val network        = defaultNetwork.copy(connectionBuild = connectionBuild)
@@ -1020,23 +1065,33 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     def getServer(fromGroup: Int): Server = servers(fromGroup % brokers)
     def getRestPort(fromGroup: Int): Int  = getServer(fromGroup).config.network.restPort
 
-    def startWithoutCheckSyncState(): Unit = {
-      servers.map(_.start()).foreach(_.futureValue is ())
+    def startWithoutCheckSyncStateAsync(): Future[Unit] = {
+      implicit val ec: ExecutionContext = system.dispatcher
+      Future.traverse(servers.toSeq)(_.start()).map(_ => ())
     }
 
+    def startWithoutCheckSyncState(): Unit = startWithoutCheckSyncStateAsync().futureValue
+
     def start(): Unit = {
-      servers.map(_.start()).foreach(_.futureValue is ())
-      servers.foreach { server =>
-        eventually(
-          request[SelfClique](getSelfClique, server.config.network.restPort).synced is true
-        )
+      startWithoutCheckSyncState()
+      eventually {
+        implicit val ec: ExecutionContext = system.dispatcher
+        val states = Future
+          .traverse(servers.toSeq) { server =>
+            requestAsync[SelfClique](getSelfClique, server.config.network.restPort)
+          }
+          .futureValue
+        states.foreach(_.synced is true)
       }
     }
 
-    def stop(): Unit = {
+    def stopAsync(): Future[Unit] = {
       closeWsClients()
-      servers.map(_.stop()).foreach(_.futureValue is ())
+      implicit val ec: ExecutionContext = system.dispatcher
+      Future.traverse(servers.toSeq)(_.stop()).map(_ => ())
     }
+
+    def stop(): Unit = stopAsync().futureValue
 
     def startWsAndWaitConnection(): Unit = eventually { startWs().futureValue }
 

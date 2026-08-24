@@ -131,7 +131,9 @@ trait FlowUtils
           logger.debug(s"Normal update for #$mainGroup mempool: #$removed removed")
         }
       case Reorg(toRemove, toAdd) =>
-        val (removed, added) = getMemPool(mainGroup).reorg(toRemove, toAdd)
+        val hardFork = networkConfig.getHardFork(TimeStamp.now())
+        val (removed, added) =
+          getMemPool(mainGroup).reorg(toRemove, toAdd, getMaximalGasPerBlock(hardFork))
         logger.info(s"Reorg for #$mainGroup mempool: #$removed removed, #$added added")
     }
   }
@@ -670,10 +672,10 @@ object FlowUtils {
       maximalGas: GasBox
   ): AVector[TransactionTemplate] = {
     @tailrec
-    def iter(gasSum: Int, index: Int): Int = {
+    def iter(gasSum: Long, index: Int): Int = {
       if (index < txs.length) {
-        val newSum = gasSum + txs(index).unsigned.gasAmount.value
-        if (newSum > 0 && newSum <= maximalGas.value) iter(newSum, index + 1) else index
+        val newSum = gasSum + txs(index).unsigned.gasAmount.value.toLong
+        if (newSum > 0 && newSum <= maximalGas.value.toLong) iter(newSum, index + 1) else index
       } else {
         index
       }

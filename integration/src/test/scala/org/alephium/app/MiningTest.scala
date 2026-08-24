@@ -96,7 +96,7 @@ class MiningTest extends AlephiumActorSpec {
       Thread.sleep(100)
       tx
     }
-    txs.foreach(tx => confirmTx(tx, restPort))
+    confirmTxs(txs, restPort)
 
     eventually {
       request[Balance](getBalance(address), restPort) is

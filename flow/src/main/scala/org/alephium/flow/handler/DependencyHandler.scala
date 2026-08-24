@@ -54,12 +54,27 @@ object DependencyHandler {
   final case class AddFlowData[T <: FlowData](datas: AVector[T], origin: DataOrigin) extends Command
   final case class Invalid(data: BlockHash)                                          extends Command
   final case object GetPendings                                                      extends Command
+  final case class GetMissingDependencies(roots: AVector[BlockHash], maxSize: Int)   extends Command
   case object CleanPendings                                                          extends Command
 
   sealed trait Event
   final case class Pendings(datas: AVector[BlockHash]) extends Event
+  final case class MissingDependencies(
+      roots: AVector[BlockHash],
+      pendingRoots: AVector[BlockHash],
+      hashes: AVector[BlockHash]
+  ) extends Event
 
   final case class FlowDataAlreadyExist(data: FlowData) extends EventStream.Event
+
+  sealed trait PendingEvictionReason
+  case object Expired         extends PendingEvictionReason
+  case object CapacityReached extends PendingEvictionReason
+
+  final case class PendingFlowDataEvicted(
+      hashes: AVector[BlockHash],
+      reason: PendingEvictionReason
+  ) extends EventStream.Event
 
   final case class PendingStatus(
       data: FlowData,
@@ -104,6 +119,8 @@ class DependencyHandler(
       uponInvalidData(hash)
     case GetPendings =>
       sender() ! Pendings(AVector.from(pending.keys()))
+    case GetMissingDependencies(roots, maxSize) =>
+      sender() ! getMissingDependencies(roots, maxSize)
     case CleanPendings =>
       val threshold = TimeStamp.now().minusUnsafe(networkSetting.dependencyExpiryPeriod)
       cleanPendings(pending.entries(), threshold)
@@ -146,7 +163,7 @@ trait DependencyHandlerState extends IOBaseActor with EventStream.Publisher {
         continue = false
       }
     }
-    toRemove.foreach(removePending)
+    evictPendings(toRemove, DependencyHandler.Expired)
   }
 
   val cacheSize =
@@ -154,7 +171,7 @@ trait DependencyHandlerState extends IOBaseActor with EventStream.Publisher {
   val pending = Cache.fifo[BlockHash, PendingStatus] {
     (map: LinkedHashMap[BlockHash, PendingStatus], eldest: JMap.Entry[BlockHash, PendingStatus]) =>
       if (map.size > cacheSize) {
-        removePending(eldest.getKey())
+        evictPendings(Seq(eldest.getKey()), DependencyHandler.CapacityReached)
       }
       val threshold = TimeStamp.now().minusUnsafe(networkSetting.dependencyExpiryPeriod)
       if (eldest.getValue().timestamp <= threshold) {
@@ -166,6 +183,43 @@ trait DependencyHandlerState extends IOBaseActor with EventStream.Publisher {
   val missingIndex = mutable.HashMap.empty[BlockHash, ArrayBuffer[BlockHash]]
   val readies      = mutable.HashSet.empty[BlockHash]
   val processing   = mutable.HashSet.empty[BlockHash]
+
+  def getMissingDependencies(
+      roots: AVector[BlockHash],
+      maxSize: Int
+  ): DependencyHandler.MissingDependencies = {
+    val pendingRoots = roots.filter(pending.contains)
+    val result       = mutable.LinkedHashSet.empty[BlockHash]
+    val visited      = mutable.HashSet.empty[BlockHash]
+    val queue        = mutable.Queue.from(pendingRoots)
+
+    while (queue.nonEmpty && result.size < maxSize) {
+      val hash = queue.dequeue()
+      if (visited.add(hash)) {
+        missing.get(hash).foreach { dependencies =>
+          dependencies.foreach { dependency =>
+            if (result.size < maxSize) {
+              if (
+                pending.contains(dependency) ||
+                readies.contains(dependency) ||
+                processing.contains(dependency)
+              ) {
+                if (missing.contains(dependency)) queue.enqueue(dependency)
+              } else {
+                result.addOne(dependency)
+              }
+            }
+          }
+        }
+      }
+    }
+
+    DependencyHandler.MissingDependencies(
+      roots,
+      pendingRoots,
+      AVector.from(result)
+    )
+  }
 
   private def getDeps(flowData: FlowData): IOResult[(AVector[BlockHash], AVector[BlockHash])] = {
     val (deps, uncles) = flowData match {
@@ -255,28 +309,52 @@ trait DependencyHandlerState extends IOBaseActor with EventStream.Publisher {
   }
 
   def removePending(hash: BlockHash): Unit = {
-    _removePending(hash)
-    readies -= hash
-    processing -= hash
+    removePendings(Seq(hash))
+    ()
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def _removePending(hash: BlockHash): Unit = {
-    pending.remove(hash)
+  private def _removePending(
+      hash: BlockHash,
+      removed: mutable.LinkedHashSet[BlockHash],
+      visited: mutable.HashSet[BlockHash]
+  ): Unit = {
+    if (visited.add(hash)) {
+      pending.remove(hash).foreach(_ => removed.addOne(hash))
+      readies -= hash
+      processing -= hash
 
-    missingIndex.remove(hash).foreach { newHashes =>
-      newHashes.foreach(_removePending)
-    }
+      missingIndex.remove(hash).foreach { newHashes =>
+        newHashes.foreach(_removePending(_, removed, visited))
+      }
 
-    missing.remove(hash).foreach { oldHashes =>
-      oldHashes.foreach { oldHash =>
-        missingIndex.get(oldHash).foreach { pending =>
-          pending -= hash
-          if (pending.isEmpty) {
-            missingIndex.remove(oldHash)
+      missing.remove(hash).foreach { oldHashes =>
+        oldHashes.foreach { oldHash =>
+          missingIndex.get(oldHash).foreach { pending =>
+            pending -= hash
+            if (pending.isEmpty) {
+              missingIndex.remove(oldHash)
+            }
           }
         }
       }
+    }
+  }
+
+  private def removePendings(hashes: Iterable[BlockHash]): AVector[BlockHash] = {
+    val removed = mutable.LinkedHashSet.empty[BlockHash]
+    val visited = mutable.HashSet.empty[BlockHash]
+    hashes.foreach(_removePending(_, removed, visited))
+    AVector.from(removed)
+  }
+
+  private def evictPendings(
+      hashes: Iterable[BlockHash],
+      reason: DependencyHandler.PendingEvictionReason
+  ): Unit = {
+    val removed = removePendings(hashes)
+    if (removed.nonEmpty) {
+      publishEvent(DependencyHandler.PendingFlowDataEvicted(removed, reason))
     }
   }
 }
