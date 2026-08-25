@@ -1,6 +1,7 @@
--J-Xms512M
--J-Xmx3g
+-J-Xms1g
+-J-Xmx6g
 -J-Xss2m
+-J-XX:+UseG1GC
 -J-XX:+UseStringDeduplication
 -J-XX:+OptimizeStringConcat
 -J-XX:+UseNUMA
