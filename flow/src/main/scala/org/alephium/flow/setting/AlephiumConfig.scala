@@ -49,14 +49,9 @@ final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) exten
 final case class ConsensusSetting(
     blockTargetTime: Duration,
     uncleDependencyGapTime: Duration,
-    genesisNumZerosAtLeastInHash: Int,
     numZerosAtLeastInHash: Int,
     emission: Emission
 ) extends ConsensusConfig {
-  override val genesisMaxMiningTarget: Target =
-    Target.unsafe(
-      BigInteger.ONE.shiftLeft(256 - genesisNumZerosAtLeastInHash).subtract(BigInteger.ONE)
-    )
   val maxMiningTarget: Target =
     Target.unsafe(
       BigInteger.ONE
@@ -193,6 +188,7 @@ final case class NetworkSetting(
     syncExpiryPeriod: Duration,
     dependencyExpiryPeriod: Duration,
     updateSyncedFrequency: Duration,
+    txsRequestMaxIdsPerSecond: Int,
     txsBroadcastDelay: Duration,
     upnp: UpnpSettings,
     bindAddress: InetSocketAddress,
@@ -236,6 +232,13 @@ final case class DiscoverySetting(
     maxCliqueFromSameIp: Int
 ) extends DiscoveryConfig
 
+final case class MemPoolAdmissionLimits(
+    enabled: Boolean,
+    maxGasPerChainInBlocks: Int,
+    maxTransactionsPerFeePayerPercent: Int,
+    maxGasPerFeePayerPercentOfBlock: Int
+)
+
 final case class MemPoolSetting(
     mempoolCapacityPerChain: Int,
     txMaxNumberPerBlock: Int,
@@ -244,6 +247,7 @@ final case class MemPoolSetting(
     batchBroadcastTxsFrequency: Duration,
     batchDownloadTxsFrequency: Duration,
     cleanOrphanTxFrequency: Duration,
+    admissionLimits: MemPoolAdmissionLimits,
     autoMineForDev: Boolean // for dev only
 )
 
@@ -302,40 +306,18 @@ object AlephiumConfig {
       rhone: TempConsensusSetting,
       danube: TempConsensusSetting,
       blockCacheCapacityPerChain: Int,
-      numZerosAtLeastInHash: Int,
-      numZerosAtLeastInHashTestnetPatch: Option[Int]
+      numZerosAtLeastInHash: Int
   ) {
-    def toConsensusSettings(groupConfig: GroupConfig, networkId: NetworkId): ConsensusSettings = {
+    def toConsensusSettings(groupConfig: GroupConfig): ConsensusSettings = {
       val mainnetEmission = Emission.mainnet(groupConfig, mainnet.blockTargetTime)
       val rhoneEmission =
         Emission.rhone(groupConfig, mainnet.blockTargetTime, rhone.blockTargetTime)
       val danubeEmission =
         Emission.danube(groupConfig, mainnet.blockTargetTime, danube.blockTargetTime)
-      val effectiveNumZerosAtLeastInHash =
-        numZerosAtLeastInHashTestnetPatch match {
-          case Some(value) if networkId.networkType != NetworkId.TestNet =>
-            throw new IllegalArgumentException(
-              "alephium.consensus.num-zeros-at-least-in-hash-testnet-patch is only supported on testnet."
-            )
-          case Some(value) => value
-          case None        => numZerosAtLeastInHash
-        }
       ConsensusSettings(
-        mainnet.toConsensusSetting(
-          mainnetEmission,
-          numZerosAtLeastInHash,
-          effectiveNumZerosAtLeastInHash
-        ),
-        rhone.toConsensusSetting(
-          rhoneEmission,
-          numZerosAtLeastInHash,
-          effectiveNumZerosAtLeastInHash
-        ),
-        danube.toConsensusSetting(
-          danubeEmission,
-          numZerosAtLeastInHash,
-          effectiveNumZerosAtLeastInHash
-        ),
+        mainnet.toConsensusSetting(mainnetEmission, numZerosAtLeastInHash),
+        rhone.toConsensusSetting(rhoneEmission, numZerosAtLeastInHash),
+        danube.toConsensusSetting(danubeEmission, numZerosAtLeastInHash),
         blockCacheCapacityPerChain
       )
     }
@@ -344,15 +326,10 @@ object AlephiumConfig {
       blockTargetTime: Duration,
       uncleDependencyGapTime: Duration
   ) {
-    def toConsensusSetting(
-        emission: Emission,
-        genesisNumZerosAtLeastInHash: Int,
-        numZerosAtLeastInHash: Int
-    ): ConsensusSetting = {
+    def toConsensusSetting(emission: Emission, numZerosAtLeastInHash: Int): ConsensusSetting = {
       ConsensusSetting(
         blockTargetTime,
         uncleDependencyGapTime,
-        genesisNumZerosAtLeastInHash,
         numZerosAtLeastInHash,
         emission
       )
@@ -387,6 +364,7 @@ object AlephiumConfig {
       syncExpiryPeriod: Duration,
       dependencyExpiryPeriod: Duration,
       updateSyncedFrequency: Duration,
+      txsRequestMaxIdsPerSecond: Int,
       txsBroadcastDelay: Duration,
       upnp: UpnpSettings,
       bindAddress: InetSocketAddress,
@@ -426,6 +404,7 @@ object AlephiumConfig {
         syncExpiryPeriod,
         dependencyExpiryPeriod,
         updateSyncedFrequency,
+        txsRequestMaxIdsPerSecond,
         txsBroadcastDelay,
         upnp,
         bindAddress,
@@ -474,7 +453,7 @@ object AlephiumConfig {
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
       parseMiners(mining.minerAddresses)(broker).map { minerAddresses =>
-        val consensusExtracted = consensus.toConsensusSettings(broker, network.networkId)
+        val consensusExtracted = consensus.toConsensusSettings(broker)
         val networkExtracted   = network.toNetworkSetting(ActorRefT.apply)
         val discoveryRefined = if (network.networkId == NetworkId.AlephiumTestNet) {
           if (discovery.bootstrap.isEmpty) {
@@ -535,6 +514,31 @@ object AlephiumConfig {
   def load(config: Config): AlephiumConfig = load(config, "alephium")
 
   def sanityCheck(config: AlephiumConfig): AlephiumConfig = {
+    if (!config.network.enableP2pV2) {
+      throw new IllegalArgumentException("P2P V1 is no longer supported")
+    }
+
+    if (config.network.txsRequestMaxIdsPerSecond <= 0) {
+      throw new IllegalArgumentException("Transaction request rate limit must be positive")
+    }
+
+    val mempool         = config.mempool
+    val admissionLimits = mempool.admissionLimits
+    if (mempool.mempoolCapacityPerChain <= 0) {
+      throw new IllegalArgumentException("Mempool capacity per chain must be positive")
+    }
+    if (admissionLimits.maxGasPerChainInBlocks <= 0) {
+      throw new IllegalArgumentException("Mempool gas capacity per chain must be positive")
+    }
+    checkPercentage(
+      admissionLimits.maxTransactionsPerFeePayerPercent,
+      "Mempool transaction limit per fee payer"
+    )
+    checkPercentage(
+      admissionLimits.maxGasPerFeePayerPercentOfBlock,
+      "Mempool gas limit per fee payer"
+    )
+
     val isMainNet = config.network.networkId == NetworkId.AlephiumMainNet
     if (isMainNet && config.network.lemanHardForkTimestamp != TimeStamp.unsafe(1680170400000L)) {
       throw new IllegalArgumentException("Invalid timestamp for leman hard fork")
@@ -549,5 +553,11 @@ object AlephiumConfig {
     }
 
     config
+  }
+
+  private def checkPercentage(value: Int, name: String): Unit = {
+    if (value <= 0 || value > 100) {
+      throw new IllegalArgumentException(s"$name must be between 1 and 100 percent")
+    }
   }
 }

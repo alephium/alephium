@@ -16,22 +16,34 @@
 
 package org.alephium.http
 
+import scala.concurrent.ExecutionContext
+
 import sttp.tapir.server.vertx.VertxFutureServerOptions
 
 import org.alephium.api.DecodeFailureHandler
 
 object ServerOptions extends DecodeFailureHandler {
-  def serverOptions(enableMetrics: Boolean): VertxFutureServerOptions = {
+  def serverOptions(
+      enableMetrics: Boolean,
+      executionContext: ExecutionContext
+  ): VertxFutureServerOptions = {
     val customiseInterceptors = VertxFutureServerOptions.customiseInterceptors
       .decodeFailureHandler(
         myDecodeFailureHandler
       )
-    if (enableMetrics) {
-      customiseInterceptors
-        .metricsInterceptor(Metrics.prometheus.metricsInterceptor())
-        .options
-    } else {
-      customiseInterceptors.options
-    }
+    val options =
+      if (enableMetrics) {
+        customiseInterceptors
+          .metricsInterceptor(Metrics.prometheus.metricsInterceptor())
+          .options
+      } else {
+        customiseInterceptors.options
+      }
+    VertxFutureServerOptions(
+      options.uploadDirectory,
+      options.deleteFile,
+      options.interceptors,
+      Some(executionContext)
+    )
   }
 }

@@ -97,6 +97,10 @@ object TxHandler {
         s"Tx ${tx.id.toHexString} is already included"
       case AddedToOrphanPool =>
         s"Tx ${tx.id.toHexString} is added to orphan pool"
+      case FeePayerLimitExceeded(FeePayerLimitReason.TransactionCount) =>
+        s"Tx ${tx.id.toHexString} exceeds the mempool transaction limit for its fee payer"
+      case FeePayerLimitExceeded(FeePayerLimitReason.Gas) =>
+        s"Tx ${tx.id.toHexString} exceeds the mempool gas limit for its fee payer"
     }
   }
   final case class FailedValidation(tx: TransactionTemplate, error: TxValidationError)
@@ -124,32 +128,23 @@ object TxHandler {
   val PersistenceDuration: Duration = Duration.ofSecondsUnsafe(30)
   // scalastyle:on magic.number
 
-  def addTxsToMemPoolAndMineForDev(
+  def mineMempoolTxForDev(
       blockFlow: BlockFlow,
       txTemplate: TransactionTemplate,
+      seenAt: TimeStamp,
       publishBlock: Block => Unit
   )(implicit groupConfig: GroupConfig): Either[String, AddToMemPoolResult] = {
     val chainIndex = txTemplate.chainIndex
-    val grandPool  = blockFlow.getGrandPool()
-    grandPool.add(chainIndex, txTemplate, TimeStamp.now()) match {
-      case MemPool.AddedToMemPool(seenAt) =>
-        for {
-          _ <- mineTxForDev(blockFlow, chainIndex, publishBlock)
-          addToMemPoolResult <-
-            if (!chainIndex.isIntraGroup) {
-              val intraChain = ChainIndex(chainIndex.from, chainIndex.from)
-              for {
-                result <- mineTxForDev(blockFlow, intraChain, publishBlock).map(_ =>
-                  MemPool.AddedToMemPool(seenAt)
-                )
-              } yield result
-            } else {
-              Right(MemPool.AddedToMemPool(seenAt))
-            }
-        } yield addToMemPoolResult
-      case failed: MemPool.AddTxFailed =>
-        Right(failed)
-    }
+    for {
+      _ <- mineTxForDev(blockFlow, chainIndex, publishBlock)
+      addToMemPoolResult <-
+        if (!chainIndex.isIntraGroup) {
+          val intraChain = ChainIndex(chainIndex.from, chainIndex.from)
+          mineTxForDev(blockFlow, intraChain, publishBlock).map(_ => MemPool.AddedToMemPool(seenAt))
+        } else {
+          Right(MemPool.AddedToMemPool(seenAt))
+        }
+    } yield addToMemPoolResult
   }
 
   private[handler] def validateAndAddTxToMemPool(
@@ -168,18 +163,27 @@ object TxHandler {
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
       TxHandler.ProcessedByMemPool(tx, DoubleSpending)
     } else {
-      txValidation.validateMempoolTxTemplate(tx, blockFlow) match {
+      txValidation.prepareMempoolTxTemplate(tx, blockFlow) match {
         case Left(Right(NonExistInput)) if cacheOrphanTx =>
           grandPool.orphanPool.add(tx, timestamp) match {
             case MemPool.AddedToMemPool(_) =>
               TxHandler.ProcessedByMemPool(tx, MemPool.AddedToOrphanPool)
             case result => TxHandler.ProcessedByMemPool(tx, result)
           }
-        case Right(_) =>
-          TxHandler.ProcessedByMemPool(
-            tx,
-            grandPool.add(chainIndex, tx, timestamp)
-          )
+        case Right(context) =>
+          val metadata = context.metadata
+          mempool.checkFeePayerLimits(chainIndex, tx, metadata) match {
+            case Some(result) => TxHandler.ProcessedByMemPool(tx, result)
+            case None =>
+              txValidation.validatePreparedMempoolTxTemplate(tx, context) match {
+                case Right(validatedMetadata) =>
+                  TxHandler.ProcessedByMemPool(
+                    tx,
+                    grandPool.add(chainIndex, tx, timestamp, validatedMetadata)
+                  )
+                case Left(error) => TxHandler.FailedValidation(tx, error)
+              }
+          }
         case Left(error) => TxHandler.FailedValidation(tx, error)
       }
     }
@@ -386,6 +390,8 @@ trait TxCoreHandler extends TxHandlerUtils {
       case FailedValidation(_, _) | TxHandler.ProcessedByMemPool(_, MemPool.DoubleSpending) =>
         blockFlow.getGrandPool().orphanPool.removeInvalidTx(tx)
         log.debug(s"Remove invalid orphan tx ${tx.id.toHexString}: ${tx.hex}")
+      case TxHandler.ProcessedByMemPool(_, _: MemPool.FeePayerLimitExceeded) =>
+        blockFlow.getGrandPool().orphanPool.removeInvalidTx(tx)
       case TxHandler.ProcessedByMemPool(tx, MemPool.AddedToMemPool(seenAt)) =>
         handleValidTx(tx, seenAt)
       case _: TxHandler.SubmitToMemPoolResult => ()
@@ -481,11 +487,15 @@ trait AutoMineHandler extends TxCoreHandler {
 
   def addTxsToMemPoolAndMineForDev(txs: AVector[TransactionTemplate]): Unit = {
     txs.foreach { tx =>
-      nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
-        case Left(error) =>
-          sendResponse(acknowledge = true, FailedValidation(tx, error))
-        case Right(_) =>
-          TxHandler.addTxsToMemPoolAndMineForDev(blockFlow, tx, publishBlock) match {
+      TxHandler.validateAndAddTxToMemPool(
+        blockFlow,
+        nonCoinbaseValidation,
+        tx,
+        cacheOrphanTx = false,
+        TimeStamp.now()
+      ) match {
+        case TxHandler.ProcessedByMemPool(_, AddedToMemPool(seenAt)) =>
+          TxHandler.mineMempoolTxForDev(blockFlow, tx, seenAt, publishBlock) match {
             case Right(addToMemPoolResult) =>
               addToMemPoolResult match {
                 case AddedToMemPool(seenAt) =>
@@ -499,6 +509,7 @@ trait AutoMineHandler extends TxCoreHandler {
             case Left(error) =>
               sendResponse(acknowledge = true, TxHandler.FailedInternally(tx, error))
           }
+        case result => sendResponse(acknowledge = true, result)
       }
     }
   }

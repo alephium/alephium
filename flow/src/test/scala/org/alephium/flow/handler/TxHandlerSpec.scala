@@ -32,15 +32,22 @@ import org.alephium.flow.mempool.MemPool.{
   AddedToOrphanPool,
   AlreadyExisted,
   DoubleSpending,
+  FeePayerLimitExceeded,
+  FeePayerLimitReason,
   MemPoolIsFull
 }
 import org.alephium.flow.model.PersistedTxId
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.BrokerHandler
-import org.alephium.flow.validation.{InvalidGasPrice, NonExistInput, TxValidation}
+import org.alephium.flow.validation.{
+  InvalidGasPrice,
+  NonExistInput,
+  TxScriptExeFailed,
+  TxValidation
+}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.GasPrice
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
@@ -100,6 +107,39 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     addTx(orphanTx, true) is ProcessedByMemPool(orphanTx.toTemplate, MemPool.AddedToOrphanPool)
     addTx(orphanTx, true) is ProcessedByMemPool(orphanTx.toTemplate, MemPool.AlreadyExisted)
     addTx(orphanTx, false) is FailedValidation(orphanTx.toTemplate, Right(NonExistInput))
+  }
+
+  it should "reject a capped fee payer before stateful script validation" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
+    val txValidation                            = TxValidation.build
+    val tx                                      = outOfGasTxTemplate
+    val context = txValidation.prepareMempoolTxTemplate(tx, blockFlow).rightValue
+    txValidation.validatePreparedMempoolTxTemplate(tx, context).leftValue isE
+      TxScriptExeFailed(org.alephium.protocol.vm.OutOfGas)
+
+    val oversizedGas =
+      context.metadata.maximalGasPerBlock.value *
+        (config.mempool.admissionLimits.maxGasPerFeePayerPercentOfBlock + 1) / 100
+    val occupyingTx0 = transactionGen()
+      .retryUntil(_.chainIndex == tx.chainIndex)
+      .sample
+      .get
+      .toTemplate
+    val occupyingTx = occupyingTx0.copy(unsigned =
+      occupyingTx0.unsigned.copy(gasAmount = GasBox.unsafeTest(oversizedGas))
+    )
+    blockFlow
+      .getGrandPool()
+      .add(tx.chainIndex, occupyingTx, TimeStamp.now(), context.metadata)
+      .addedCount is 1
+
+    TxHandler.validateAndAddTxToMemPool(
+      blockFlow,
+      txValidation,
+      tx,
+      cacheOrphanTx = false,
+      TimeStamp.now()
+    ) is ProcessedByMemPool(tx, FeePayerLimitExceeded(FeePayerLimitReason.Gas))
   }
 
   it should "broadcast valid transactions for single-broker clique" in new Fixture {
@@ -685,7 +725,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "return an error if the mempool is full" in new Fixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.broker-num", 1),
-      ("alephium.mempool.mempool-capacity-per-chain", 1)
+      ("alephium.mempool.mempool-capacity-per-chain", 1),
+      ("alephium.mempool.admission-limits.enabled", false)
     )
 
     val mempool        = blockFlow.getGrandPool().getMemPool(chainIndex.from)

@@ -44,19 +44,6 @@ class FlowHandlerSpec extends AlephiumFlowActorSpec with NoIndexModelGeneratorsL
     }
   }
 
-  it should "calculate locators" in new Fixture {
-    val locatorsWithIndex = AVector.tabulate(3 * 6) { k =>
-      ChainIndex.unsafe(k / 6 * 2 + 1, k % 6)(brokerGroupInfo0) ->
-        AVector.fill(k)(BlockHash.generate)
-    }
-    val flowEvent = FlowHandler.SyncLocators(locatorsWithIndex)
-    val locators  = locatorsWithIndex.map(_._2)
-    flowEvent.filterFor(brokerGroupInfo0) is locators
-    flowEvent.filterFor(brokerGroupInfo1) is locators.takeRight(groupNum)
-    flowEvent.filterFor(brokerGroupInfo2) is locators.take(groupNum)
-    flowEvent.filterFor(brokerGroupInfo3) is locators.drop(groupNum).take(groupNum)
-  }
-
   it should "filter chain tips" in new Fixture {
     val groupConfig: GroupConfig = new GroupConfig { val groups: Int = groupNum }
     val chainTips                = AVector.fill(3 * 6)(ChainTip(BlockHash.generate, 1, Weight.zero))

@@ -22,6 +22,7 @@ import org.apache.pekko.util.ByteString
 
 import org.alephium.crypto.{ED25519, ED25519PublicKey, SecP256R1, SecP256R1PublicKey}
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView, FlowUtils}
+import org.alephium.flow.model.MempoolTxMetadata
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALPH, Hash, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
@@ -33,36 +34,35 @@ import org.alephium.util.{AVector, EitherF, TimeStamp, U256}
 // scalastyle:off number.of.methods file.size.limit
 trait TxValidation {
   import ValidationStatus._
+  import TxValidation.MempoolTxValidationContext
 
   implicit def groupConfig: GroupConfig
   implicit def networkConfig: NetworkConfig
   implicit def logConfig: LogConfig
 
-  private def validateTxTemplate(
+  private def prepareTxTemplate(
       tx: TransactionTemplate,
       chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv
-  ): TxValidationResult[Unit] = {
+  ): TxValidationResult[MempoolTxValidationContext] = {
     tx.unsigned.scriptOpt match {
       case Some(script) =>
-        validateScriptTxTemplate(tx, script, chainIndex, groupView, blockEnv)
+        prepareScriptTxTemplate(tx, script, chainIndex, groupView, blockEnv)
       case None =>
-        validateNonScriptTxTemplate(tx, chainIndex, groupView, blockEnv)
+        prepareNonScriptTxTemplate(tx, chainIndex, groupView, blockEnv)
     }
   }
 
-  private def validateScriptTxTemplate(
+  private def prepareScriptTxTemplate(
       tx: TransactionTemplate,
       script: StatefulScript,
       chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv
-  ): TxValidationResult[Unit] = {
-    val txIndex = 0 // Always 0 for tx template validation
+  ): TxValidationResult[MempoolTxValidationContext] = {
     for {
       preOutputs <- fromGetPreOutputs(groupView.getPreAssetOutputs(tx.unsigned.inputs))
-      // the tx might fail afterwards
       failedTx <- FlowUtils
         .convertFailedScriptTx(preOutputs, tx, script)
         .toRight(Right(InvalidRemainingBalancesForFailedScriptTx))
@@ -73,18 +73,40 @@ trait TxValidation {
         blockEnv.getHardFork(),
         isCoinbase = false
       )
-      _ <- checkStatefulExceptTxScript(failedTx, blockEnv, preOutputs.as[TxOutput], None, txIndex)
-      // the tx should succeed
+    } yield MempoolTxValidationContext(
+      tx.id,
+      chainIndex,
+      groupView,
+      blockEnv,
+      preOutputs,
+      failedTx
+    )
+  }
+
+  private def validatePreparedScriptTxTemplate(
+      tx: TransactionTemplate,
+      script: StatefulScript,
+      context: MempoolTxValidationContext
+  ): TxValidationResult[MempoolTxMetadata] = {
+    val txIndex = 0 // Always 0 for tx template validation
+    for {
+      _ <- checkStatefulExceptTxScript(
+        context.statelessTx,
+        context.blockEnv,
+        context.preOutputs.as[TxOutput],
+        None,
+        txIndex
+      )
       _ <- validateSuccessfulScriptTxTemplate(
         tx,
         script,
-        chainIndex,
-        groupView,
-        blockEnv,
-        preOutputs,
+        context.chainIndex,
+        context.groupView,
+        context.blockEnv,
+        context.preOutputs,
         txIndex
       )
-    } yield ()
+    } yield context.metadata
   }
 
   def validateSuccessfulScriptTxTemplate(
@@ -136,12 +158,12 @@ trait TxValidation {
     }
   }
 
-  private def validateNonScriptTxTemplate(
+  private def prepareNonScriptTxTemplate(
       tx: TransactionTemplate,
       chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
       blockEnv: BlockEnv
-  ): TxValidationResult[Unit] = {
+  ): TxValidationResult[MempoolTxValidationContext] = {
     assume(tx.unsigned.scriptOpt.isEmpty)
     val fullTx = FlowUtils.convertNonScriptTx(tx)
     for {
@@ -153,16 +175,51 @@ trait TxValidation {
         isCoinbase = false
       )
       preOutputs <- fromGetPreOutputs(groupView.getPreAssetOutputs(tx.unsigned.inputs))
-      _ <- checkStateful(
-        chainIndex,
-        fullTx,
-        groupView.worldState,
-        preOutputs.as[TxOutput],
-        None,
-        blockEnv,
-        0 // Always 0 for tx template validation
-      )
-    } yield ()
+    } yield MempoolTxValidationContext(
+      tx.id,
+      chainIndex,
+      groupView,
+      blockEnv,
+      preOutputs,
+      fullTx
+    )
+  }
+
+  private def validatePreparedNonScriptTxTemplate(
+      context: MempoolTxValidationContext
+  ): TxValidationResult[MempoolTxMetadata] = {
+    checkStateful(
+      context.chainIndex,
+      context.statelessTx,
+      context.groupView.worldState,
+      context.preOutputs.as[TxOutput],
+      None,
+      context.blockEnv,
+      0 // Always 0 for tx template validation
+    ).map(_ => context.metadata)
+  }
+
+  private[flow] def prepareMempoolTxTemplate(
+      tx: TransactionTemplate,
+      flow: BlockFlow
+  ): TxValidationResult[MempoolTxValidationContext] = {
+    for {
+      chainIndex <- getChainIndex(tx)
+      blockEnv   <- from(flow.getDryrunBlockEnv(chainIndex))
+      groupView  <- from(flow.getMutableGroupViewIncludePool(chainIndex.from))
+      context    <- prepareTxTemplate(tx, chainIndex, groupView, blockEnv)
+    } yield context
+  }
+
+  private[flow] def validatePreparedMempoolTxTemplate(
+      tx: TransactionTemplate,
+      context: MempoolTxValidationContext
+  ): TxValidationResult[MempoolTxMetadata] = {
+    assume(tx.id == context.txId)
+    tx.unsigned.scriptOpt match {
+      case Some(script) => validatePreparedScriptTxTemplate(tx, script, context)
+      case None         => validatePreparedNonScriptTxTemplate(context)
+    }
   }
 
   def validateMempoolTxTemplate(
@@ -170,15 +227,8 @@ trait TxValidation {
       flow: BlockFlow
   ): TxValidationResult[Unit] = {
     for {
-      chainIndex <- getChainIndex(tx)
-      blockEnv   <- from(flow.getDryrunBlockEnv(chainIndex))
-      groupView  <- from(flow.getMutableGroupViewIncludePool(chainIndex.from))
-      _ <- validateTxTemplate(
-        tx,
-        chainIndex,
-        groupView,
-        blockEnv
-      )
+      context <- prepareMempoolTxTemplate(tx, flow)
+      _       <- validatePreparedMempoolTxTemplate(tx, context)
     } yield ()
   }
 
@@ -380,6 +430,21 @@ trait TxValidation {
 // Note: only non-coinbase transactions are validated here
 object TxValidation {
   import ValidationStatus._
+
+  final private[flow] case class MempoolTxValidationContext(
+      txId: TransactionId,
+      chainIndex: ChainIndex,
+      groupView: BlockFlowGroupView[WorldState.Cached],
+      blockEnv: BlockEnv,
+      preOutputs: AVector[AssetOutput],
+      statelessTx: Transaction
+  ) {
+    val metadata: MempoolTxMetadata =
+      MempoolTxMetadata(
+        Some(preOutputs.head.lockupScript),
+        getMaximalGasPerBlock(blockEnv.getHardFork())
+      )
+  }
 
   def build(implicit
       groupConfig: GroupConfig,

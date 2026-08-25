@@ -371,9 +371,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       block: Block,
       hardFork: HardFork
   ): BlockValidationResult[Unit] = {
-    val totalGas   = block.transactions.fold(0)(_ + _.unsigned.gasAmount.value)
+    val totalGas   = block.transactions.fold(0L)(_ + _.unsigned.gasAmount.value.toLong)
     val maximalGas = getMaximalGasPerBlock(hardFork)
-    if (totalGas <= maximalGas.value) validBlock(()) else invalidBlock(TooMuchGasUsed)
+    if (totalGas <= maximalGas.value.toLong) validBlock(()) else invalidBlock(TooMuchGasUsed)
   }
 
   private[validation] def checkCoinbase(

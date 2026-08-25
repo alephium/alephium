@@ -109,18 +109,28 @@ class Broker(bootstrapper: ActorRefT[Bootstrapper.Command])(implicit
   def awaitCliqueInfo(connectionHandler: ActorRefT[ConnectionHandler.Command]): Receive = {
     case Broker.Received(clique: Message.Clique) =>
       log.debug(s"Received clique info from master")
-      val message = Message.serialize(Message.Ack(brokerConfig.brokerId))
-      connectionHandler ! ConnectionHandler.Send(message)
+      acknowledgeClique(connectionHandler)
       context become awaitReady(connectionHandler, clique.info)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def awaitReady(
       connection: ActorRefT[ConnectionHandler.Command],
       cliqueInfo: IntraCliqueInfo
-  ): Receive = { case Broker.Received(Message.Ready) =>
-    log.debug(s"Clique is ready")
-    connection ! ConnectionHandler.CloseConnection
-    context become awaitClose(cliqueInfo)
+  ): Receive = {
+    case Broker.Received(clique: Message.Clique) =>
+      log.debug("Received updated clique info from master")
+      acknowledgeClique(connection)
+      context become awaitReady(connection, clique.info)
+    case Broker.Received(Message.Ready) =>
+      log.debug(s"Clique is ready")
+      connection ! ConnectionHandler.CloseConnection
+      context become awaitClose(cliqueInfo)
+  }
+
+  private def acknowledgeClique(connection: ActorRefT[ConnectionHandler.Command]): Unit = {
+    val message = Message.serialize(Message.Ack(brokerConfig.brokerId))
+    connection ! ConnectionHandler.Send(message)
   }
 
   def awaitClose(cliqueInfo: IntraCliqueInfo): Receive = { case Terminated(_) =>

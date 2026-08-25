@@ -61,9 +61,8 @@ class BootUp extends StrictLogging {
 //    System.exit(-1)
 //  }
 
-  @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
   implicit val executionContext: ExecutionContext =
-    ExecutionContext.fromExecutor(new java.util.concurrent.ForkJoinPool(4))
+    flowSystem.dispatchers.lookup(Server.ApiDispatcher)
 
   val server: Server = Server(rootPath, flowSystem)
 

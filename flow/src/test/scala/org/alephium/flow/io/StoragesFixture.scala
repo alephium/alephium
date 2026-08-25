@@ -36,12 +36,20 @@ object StoragesFixture {
   def buildStorages(
       rootPath: Path
   )(implicit groupConfig: GroupConfig, nodeSetting: NodeSetting): Storages = {
-    if (!Files.exists(rootPath)) rootPath.toFile.mkdir()
+    if (!Files.exists(rootPath)) {
+      rootPath.toFile.mkdir()
+    }
 
     val postFix   = Hash.random.toHexString
     val dbFolders = s"db-$postFix"
+    val writeOptions =
+      if (nodeSetting.dbSyncWrite) {
+        RocksDBSource.ProdSettings.syncWrite
+      } else {
+        RocksDBSource.ProdSettings.writeOptions
+      }
     val storages: Storages =
-      Storages.createUnsafe(rootPath, dbFolders, RocksDBSource.ProdSettings.syncWrite)
+      Storages.createUnsafe(rootPath, dbFolders, writeOptions)
     AlephiumSpec.addCleanTask(() => storages.dESTROYUnsafe())
     storages
   }

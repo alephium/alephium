@@ -238,7 +238,7 @@ trait ViewHandlerState extends IOBaseActor {
       assume(minerAddressesOpt.isDefined)
       val minerAddresses = minerAddressesOpt.get
       val subscribers    = AVector.from(this.subscribers)
-      poolAsync {
+      ioAsync {
         escapeIOError(ViewHandler.prepareTemplates(blockFlow, minerAddresses)) { templates =>
           subscribers.foreach(_ ! ViewHandler.NewTemplates(templates))
         }
@@ -271,7 +271,7 @@ trait ViewHandlerState extends IOBaseActor {
   def updateSubscribersDanube(chainIndex: ChainIndex): Unit = {
     if (minerAddressesOpt.nonEmpty && subscribers.nonEmpty) {
       val minerAddress = minerAddressesOpt.get(chainIndex.to.value)
-      poolAsync {
+      ioAsync {
         escapeIOError(blockFlow.prepareBlockFlow(chainIndex, minerAddress)) { template =>
           subscribers.foreach(_ ! ViewHandler.NewTemplate(template, lazyBroadcast = true))
         }
@@ -322,7 +322,7 @@ trait BlockFlowUpdaterPreDanubeState extends IOBaseActor {
       log.debug("Skip updating pre-danube best deps due to pending updates")
     }
     if (preDanubeUpdateState.tryUpdate()) {
-      poolAsync[ViewHandler.Command] {
+      ioAsync[ViewHandler.Command] {
         val now          = TimeStamp.now()
         val hardForkSoon = blockFlow.networkConfig.getHardFork(now.plusSecondsUnsafe(10))
         val updateResult = if (hardForkSoon.isDanubeEnabled()) {
@@ -401,7 +401,7 @@ trait BlockFlowUpdaterDanubeState extends IOBaseActor {
     if (statePerChain.tryUpdate()) {
       val minerAddress   = minerAddressesOpt.map(_.apply(chainIndex.to.value))
       val allSubscribers = AVector.from(subscribers)
-      poolAsync[ViewHandler.Command] {
+      ioAsync[ViewHandler.Command] {
         val result = for {
           rebuildTemplates <- blockFlow.updateViewPerChainIndexDanube(chainIndex)
           needToUpdate = brokerConfig.contains(chainIndex.from)

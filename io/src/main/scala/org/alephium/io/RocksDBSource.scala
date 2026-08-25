@@ -166,7 +166,7 @@ object RocksDBSource {
 
   def openUnsafe(path: Path): RocksDBSource = {
     val (databaseOptions, columnOptions) = AEnv.resolve() match {
-      case AEnv.Test =>
+      case AEnv.Test | AEnv.Integration =>
         (TestSettings.databaseOptions(), (_: Boolean) => TestSettings.columnOptions())
       case _ => (ProdSettings.databaseOptions(), ProdSettings.columnOptions(_))
     }

@@ -128,17 +128,22 @@ object Payload {
   sealed trait Serding[T <: Payload] extends FixUnused[T] {
     protected def serde: Serde[T]
 
+    protected def deserializer(implicit config: GroupConfig): Deserializer[T] = {
+      val _ = config
+      serde
+    }
+
     def serialize(t: T): ByteString = serde.serialize(t)
 
     def _deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Staging[T]] =
-      serde._deserialize(input)
+      deserializer._deserialize(input)
   }
 
   sealed trait ValidatedSerding[T <: Payload] extends Serding[T] {
     override def _deserialize(
         input: ByteString
     )(implicit config: GroupConfig): SerdeResult[Staging[T]] = {
-      serde._deserialize(input).flatMap { case Staging(message, rest) =>
+      deserializer._deserialize(input).flatMap { case Staging(message, rest) =>
         validate(message) match {
           case Right(_)    => Right(Staging(message, rest))
           case Left(error) => Left(SerdeError.validation(error))
@@ -147,6 +152,29 @@ object Payload {
     }
 
     def validate(t: T)(implicit config: GroupConfig): Either[String, Unit]
+  }
+
+  private[message] def vectorDeserializer[A, P](
+      valuesDeserializer: Deserializer[AVector[A]],
+      create: AVector[A] => P
+  ): Deserializer[P] = new Deserializer[P] {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[P]] = {
+      valuesDeserializer._deserialize(input).map { case Staging(values, rest) =>
+        Staging(create(values), rest)
+      }
+    }
+  }
+
+  private[message] def solicitedVectorDeserializer[A, P](
+      valuesDeserializer: Deserializer[AVector[A]],
+      create: (RequestId, AVector[A]) => P
+  ): Deserializer[P] = new Deserializer[P] {
+    override def _deserialize(input: ByteString): SerdeResult[Staging[P]] = {
+      for {
+        idResult     <- _decode[RequestId](input)
+        valuesResult <- valuesDeserializer._deserialize(idResult.rest)
+      } yield Staging(create(idResult.value, valuesResult.value), valuesResult.rest)
+    }
   }
 
   object Code {
@@ -320,6 +348,17 @@ object BlocksResponse extends Payload.Serding[BlocksResponse] with Payload.Code 
     }
   }
 
+  override protected def deserializer(implicit
+      config: GroupConfig
+  ): Deserializer[BlocksResponse] = {
+    val blocksSerde =
+      avectorSerde[Block](FlowDataPayloadLimits.maxHashesPerRequest(config.chainNum))
+    Payload.solicitedVectorDeserializer(
+      blocksSerde,
+      (id: RequestId, blocks: AVector[Block]) => BlocksResponse(id, Left(blocks))
+    )
+  }
+
   def fromBlocks(id: RequestId, blocks: AVector[Block]): BlocksResponse =
     BlocksResponse(id, Left(blocks))
   def fromBlockBytes(id: RequestId, blockBytes: AVector[ByteString]): BlocksResponse =
@@ -334,6 +373,14 @@ final case class BlocksRequest(id: RequestId, locators: AVector[BlockHash])
 object BlocksRequest extends Payload.Serding[BlocksRequest] with Payload.Code {
   implicit val serde: Serde[BlocksRequest] = Serde.forProduct2(apply, p => (p.id, p.locators))
 
+  override protected def deserializer(implicit
+      config: GroupConfig
+  ): Deserializer[BlocksRequest] = {
+    val locatorsSerde =
+      avectorSerde[BlockHash](FlowDataPayloadLimits.maxHashesPerRequest(config.chainNum))
+    Payload.solicitedVectorDeserializer(locatorsSerde, BlocksRequest.apply)
+  }
+
   def apply(locators: AVector[BlockHash]): BlocksRequest = {
     BlocksRequest(RequestId.random(), locators)
   }
@@ -346,6 +393,14 @@ final case class HeadersResponse(id: RequestId, headers: AVector[BlockHeader])
 
 object HeadersResponse extends Payload.Serding[HeadersResponse] with Payload.Code {
   implicit val serde: Serde[HeadersResponse] = Serde.forProduct2(apply, p => (p.id, p.headers))
+
+  override protected def deserializer(implicit
+      config: GroupConfig
+  ): Deserializer[HeadersResponse] = {
+    val headersSerde =
+      avectorSerde[BlockHeader](FlowDataPayloadLimits.maxHashesPerRequest(config.chainNum))
+    Payload.solicitedVectorDeserializer(headersSerde, HeadersResponse.apply)
+  }
 }
 
 final case class HeadersRequest(id: RequestId, locators: AVector[BlockHash])
@@ -355,6 +410,14 @@ final case class HeadersRequest(id: RequestId, locators: AVector[BlockHash])
 
 object HeadersRequest extends Payload.Serding[HeadersRequest] with Payload.Code {
   implicit val serde: Serde[HeadersRequest] = Serde.forProduct2(apply, p => (p.id, p.locators))
+
+  override protected def deserializer(implicit
+      config: GroupConfig
+  ): Deserializer[HeadersRequest] = {
+    val locatorsSerde =
+      avectorSerde[BlockHash](FlowDataPayloadLimits.maxHashesPerRequest(config.chainNum))
+    Payload.solicitedVectorDeserializer(locatorsSerde, HeadersRequest.apply)
+  }
 
   def apply(locators: AVector[BlockHash]): HeadersRequest = {
     HeadersRequest(RequestId.random(), locators)
@@ -369,6 +432,13 @@ final case class InvRequest(id: RequestId, locators: AVector[AVector[BlockHash]]
 object InvRequest extends Payload.Serding[InvRequest] with Payload.Code {
   implicit val serde: Serde[InvRequest] = Serde.forProduct2(apply, p => (p.id, p.locators))
 
+  override protected def deserializer(implicit config: GroupConfig): Deserializer[InvRequest] = {
+    val maxHashes = FlowDataPayloadLimits.maxHashesPerRequest(config.chainNum)
+    val locatorsSerde =
+      FlowDataPayloadLimits.nestedSerde[BlockHash](config.chainNum, maxHashes, maxHashes)
+    Payload.solicitedVectorDeserializer(locatorsSerde, InvRequest.apply)
+  }
+
   def apply(locators: AVector[AVector[BlockHash]]): InvRequest = {
     InvRequest(RequestId.random(), locators)
   }
@@ -381,6 +451,13 @@ final case class InvResponse(id: RequestId, hashes: AVector[AVector[BlockHash]])
 
 object InvResponse extends Payload.Serding[InvResponse] with Payload.Code {
   implicit val serde: Serde[InvResponse] = Serde.forProduct2(apply, p => (p.id, p.hashes))
+
+  override protected def deserializer(implicit config: GroupConfig): Deserializer[InvResponse] = {
+    val maxHashes = FlowDataPayloadLimits.maxHashesPerRequest(config.chainNum)
+    val hashesSerde =
+      FlowDataPayloadLimits.nestedSerde[BlockHash](config.chainNum, maxHashes, maxHashes)
+    Payload.solicitedVectorDeserializer(hashesSerde, InvResponse.apply)
+  }
 }
 
 final case class NewBlock(block: Either[Block, ByteString]) extends Payload.UnSolicited {
@@ -422,6 +499,13 @@ final case class NewInv(hashes: AVector[AVector[BlockHash]]) extends Payload.UnS
 
 object NewInv extends Payload.Serding[NewInv] with Payload.Code {
   implicit val serde: Serde[NewInv] = Serde.forProduct1(apply, _.hashes)
+
+  override protected def deserializer(implicit config: GroupConfig): Deserializer[NewInv] = {
+    val maxHashes = FlowDataPayloadLimits.maxHashesPerRequest(config.chainNum)
+    val hashesSerde =
+      FlowDataPayloadLimits.nestedSerde[BlockHash](config.chainNum, maxHashes, maxHashes)
+    Payload.vectorDeserializer(hashesSerde, NewInv.apply)
+  }
 }
 
 final case class NewBlockHash(hash: BlockHash) extends Payload.UnSolicited {
@@ -469,6 +553,22 @@ object IndexedSerding {
   }
 }
 
+object TxPayload {
+  val MaxTxsPerMessage: Int = 5120
+
+  def validateHashes(
+      name: String,
+      hashes: AVector[(ChainIndex, AVector[TransactionId])]
+  )(implicit config: GroupConfig): Either[String, Unit] = {
+    val total = hashes.fold(0L) { case (sum, (_, txIds)) => sum + txIds.length }
+    Either.cond(
+      hashes.length <= config.chainNum && total <= MaxTxsPerMessage,
+      (),
+      s"Too many transaction hashes in $name payload"
+    )
+  }
+}
+
 final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId])])
     extends Payload.UnSolicited
     with IndexedPayload[AVector[TransactionId]] {
@@ -479,10 +579,19 @@ final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId]
 object NewTxHashes extends IndexedSerding[AVector[TransactionId], NewTxHashes] with Payload.Code {
   def name: String = codeName
 
-  def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
+  def checkDataPerChain(values: AVector[TransactionId]): Boolean =
+    values.length <= TxPayload.MaxTxsPerMessage
 
-  val baseSerde: Serde[AVector[TransactionId]] = avectorSerde[TransactionId]
-  implicit val serde: Serde[NewTxHashes]       = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
+  val baseSerde: Serde[AVector[TransactionId]] =
+    avectorSerde[TransactionId](TxPayload.MaxTxsPerMessage)
+  implicit private lazy val hashesSerde: Serde[AVector[(ChainIndex, AVector[TransactionId])]] =
+    avectorSerde[(ChainIndex, AVector[TransactionId])](TxPayload.MaxTxsPerMessage)
+  implicit val serde: Serde[NewTxHashes] = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
+
+  override def validate(
+      input: NewTxHashes
+  )(implicit config: GroupConfig): Either[String, Unit] =
+    super.validate(input).flatMap(_ => TxPayload.validateHashes(name, input.hashes))
 }
 
 final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[TransactionId])])
@@ -495,10 +604,19 @@ final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[
 object TxsRequest extends IndexedSerding[AVector[TransactionId], TxsRequest] with Payload.Code {
   def name: String = codeName
 
-  def checkDataPerChain(values: AVector[TransactionId]): Boolean = true
+  def checkDataPerChain(values: AVector[TransactionId]): Boolean =
+    values.length <= TxPayload.MaxTxsPerMessage
 
-  val baseSerde: Serde[AVector[TransactionId]] = avectorSerde[TransactionId]
-  implicit val serde: Serde[TxsRequest]        = Serde.forProduct2(apply, p => (p.id, p.hashes))
+  val baseSerde: Serde[AVector[TransactionId]] =
+    avectorSerde[TransactionId](TxPayload.MaxTxsPerMessage)
+  implicit private lazy val hashesSerde: Serde[AVector[(ChainIndex, AVector[TransactionId])]] =
+    avectorSerde[(ChainIndex, AVector[TransactionId])](TxPayload.MaxTxsPerMessage)
+  implicit val serde: Serde[TxsRequest] = Serde.forProduct2(apply, p => (p.id, p.hashes))
+
+  override def validate(
+      input: TxsRequest
+  )(implicit config: GroupConfig): Either[String, Unit] =
+    super.validate(input).flatMap(_ => TxPayload.validateHashes(name, input.hashes))
 
   def apply(hashes: AVector[(ChainIndex, AVector[TransactionId])]): TxsRequest =
     TxsRequest(RequestId.random(), hashes)
@@ -509,9 +627,20 @@ final case class TxsResponse(id: RequestId, txs: AVector[TransactionTemplate])
   override def measure(): Unit = TxsResponse.payloadLabeled.inc()
 }
 
-object TxsResponse extends Payload.Serding[TxsResponse] with Payload.Code {
+object TxsResponse extends Payload.ValidatedSerding[TxsResponse] with Payload.Code {
+  implicit private val txsSerde: Serde[AVector[TransactionTemplate]] =
+    avectorSerde[TransactionTemplate](TxPayload.MaxTxsPerMessage)
   implicit val serde: Serde[TxsResponse] =
     Serde.forProduct2(apply, p => (p.id, p.txs))
+
+  override def validate(
+      input: TxsResponse
+  )(implicit config: GroupConfig): Either[String, Unit] =
+    Either.cond(
+      input.txs.length <= TxPayload.MaxTxsPerMessage,
+      (),
+      s"Too many transactions in $codeName payload"
+    )
 }
 
 final case class ChainState(tips: AVector[ChainTip]) extends Payload.UnSolicited {
@@ -520,6 +649,11 @@ final case class ChainState(tips: AVector[ChainTip]) extends Payload.UnSolicited
 
 object ChainState extends Payload.ValidatedSerding[ChainState] with Payload.Code {
   implicit val serde: Serde[ChainState] = Serde.forProduct1(ChainState.apply, c => c.tips)
+
+  override protected def deserializer(implicit config: GroupConfig): Deserializer[ChainState] = {
+    val tipsSerde = avectorSerde[ChainTip](config.chainNum)
+    Payload.vectorDeserializer(tipsSerde, ChainState.apply)
+  }
 
   override def validate(t: ChainState)(implicit config: GroupConfig): Either[String, Unit] = {
     if (t.tips.forall(_.height >= 0)) {
@@ -547,6 +681,16 @@ object HeadersByHeightsRequest
   implicit val serde: Serde[HeadersByHeightsRequest] =
     Serde.forProduct2(apply, v => (v.id, v.data))
 
+  override protected def deserializer(implicit
+      config: GroupConfig
+  ): Deserializer[HeadersByHeightsRequest] = {
+    val dataVectorSerde =
+      avectorSerde[(ChainIndex, BlockHeightRange)](
+        FlowDataPayloadLimits.MaxHeaderHeightsPerSyncRequest
+      )(implicitly, dataSerde)
+    Payload.solicitedVectorDeserializer(dataVectorSerde, HeadersByHeightsRequest.apply)
+  }
+
   def checkDataPerChain(range: BlockHeightRange): Boolean = range.isValid()
 
   def apply(data: AVector[(ChainIndex, BlockHeightRange)]): HeadersByHeightsRequest =
@@ -563,6 +707,17 @@ object HeadersByHeightsResponse
     with Payload.Code {
   implicit val serde: Serde[HeadersByHeightsResponse] =
     Serde.forProduct2(apply, v => (v.id, v.headers))
+
+  override protected def deserializer(implicit
+      config: GroupConfig
+  ): Deserializer[HeadersByHeightsResponse] = {
+    val headersSerde = FlowDataPayloadLimits.nestedSerde[BlockHeader](
+      FlowDataPayloadLimits.MaxHeaderHeightsPerSyncRequest,
+      FlowDataPayloadLimits.MaxHeadersPerHeightRange,
+      FlowDataPayloadLimits.MaxHeadersPerSyncResponse
+    )
+    Payload.solicitedVectorDeserializer(headersSerde, HeadersByHeightsResponse.apply)
+  }
 }
 
 final case class BlocksAndUnclesByHeightsRequest(
@@ -582,6 +737,19 @@ object BlocksAndUnclesByHeightsRequest
   implicit val serde: Serde[BlocksAndUnclesByHeightsRequest] =
     Serde.forProduct2(apply, v => (v.id, v.data))
 
+  override protected def deserializer(implicit
+      config: GroupConfig
+  ): Deserializer[BlocksAndUnclesByHeightsRequest] = {
+    val dataVectorSerde =
+      avectorSerde[(ChainIndex, BlockHeightRange)](
+        FlowDataPayloadLimits.MaxBlockHeightsPerSyncRequest
+      )(implicitly, dataSerde)
+    Payload.solicitedVectorDeserializer(
+      dataVectorSerde,
+      BlocksAndUnclesByHeightsRequest.apply
+    )
+  }
+
   def checkDataPerChain(range: BlockHeightRange): Boolean = range.isValid()
 
   def apply(data: AVector[(ChainIndex, BlockHeightRange)]): BlocksAndUnclesByHeightsRequest =
@@ -598,4 +766,15 @@ object BlocksAndUnclesByHeightsResponse
     with Payload.Code {
   implicit val serde: Serde[BlocksAndUnclesByHeightsResponse] =
     Serde.forProduct2(apply, v => (v.id, v.blocks))
+
+  override protected def deserializer(implicit
+      config: GroupConfig
+  ): Deserializer[BlocksAndUnclesByHeightsResponse] = {
+    val blocksSerde = FlowDataPayloadLimits.nestedSerde[Block](
+      FlowDataPayloadLimits.MaxBlockHeightsPerSyncRequest,
+      FlowDataPayloadLimits.MaxBlocksPerSyncResponse,
+      FlowDataPayloadLimits.MaxBlocksPerSyncResponse
+    )
+    Payload.solicitedVectorDeserializer(blocksSerde, BlocksAndUnclesByHeightsResponse.apply)
+  }
 }

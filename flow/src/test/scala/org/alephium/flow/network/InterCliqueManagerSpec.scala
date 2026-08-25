@@ -16,6 +16,8 @@
 
 package org.alephium.flow.network
 
+import java.net.InetSocketAddress
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
@@ -31,10 +33,11 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager.{BrokerState, SyncedResult}
 import org.alephium.flow.network.broker._
 import org.alephium.protocol.Generators
-import org.alephium.protocol.message.{Message, NewBlock, P2PV1}
+import org.alephium.protocol.message.{Message, NewBlock, P2PV2}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex, TransactionId}
 import org.alephium.util._
 
+// scalastyle:off file.size.limit
 class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with ScalaFutures {
   override def actorSystemConfig = AlephiumActorSpec.debugConfig
   implicit val timeout: Timeout  = Timeout(Duration.ofSecondsUnsafe(2).asScala)
@@ -46,7 +49,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
       connectionType: ConnectionType = InboundConnection
   )(implicit system: ActorSystem): Unit = {
     val event =
-      InterCliqueManager.HandShaked(broker, brokerInfo, connectionType, clientInfo, P2PV1)
+      InterCliqueManager.HandShaked(broker, brokerInfo, connectionType, clientInfo, P2PV2)
     system.eventStream.publish(event)
   }
 
@@ -106,6 +109,116 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   it should "check for unknown incoming connections" in new Fixture {
     interCliqueManagerActor.checkForInConnection(0) is false
     interCliqueManagerActor.checkForInConnection(1) is true
+  }
+
+  it should "count pending inbound handshakes against inbound connection limit" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.max-inbound-connections-per-group", 1)
+    )
+    val remote0 = socketAddressGen.sample.get
+    connectInbound(remote0)
+    eventually {
+      interCliqueManagerActor.pendingInboundConnections.contains(remote0) is true
+      interCliqueManagerActor.checkForInConnection(1) is false
+    }
+
+    val remote1     = socketAddressGen.retryUntil(_ != remote0).sample.get
+    val connection1 = connectInbound(remote1)
+    connection1.expectMsg(Tcp.Close)
+    interCliqueManagerActor.pendingInboundConnections.contains(remote1) is false
+  }
+
+  it should "limit pending inbound handshakes from the same IP" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      "alephium.network.max-inbound-connections-per-group" -> 100,
+      "alephium.network.max-clique-from-same-ip"           -> 1
+    )
+
+    val pendingLimit = brokerConfig.groups
+    val connections = AVector.tabulate(pendingLimit) { index =>
+      connectInbound(new InetSocketAddress("127.0.0.1", 19000 + index))
+    }
+    connections.foreach(_.expectMsgType[Tcp.Register])
+    eventually(interCliqueManagerActor.pendingInboundConnections.size is pendingLimit)
+
+    val rejectedRemote     = new InetSocketAddress("127.0.0.1", 20000)
+    val rejectedConnection = connectInbound(rejectedRemote)
+    rejectedConnection.expectMsg(Tcp.Close)
+    interCliqueManagerActor.pendingInboundConnections.contains(rejectedRemote) is false
+  }
+
+  it should "release a pending inbound handshake when the connection closes" in new Fixture {
+    val remote     = socketAddressGen.sample.get
+    val connection = connectInbound(remote)
+    eventually(interCliqueManagerActor.pendingInboundConnections.contains(remote) is true)
+
+    val register = connection.expectMsgType[Tcp.Register]
+    connection.send(register.handler, Tcp.ErrorClosed("test"))
+    eventually {
+      interCliqueManagerActor.pendingInboundConnections.contains(remote) is false
+    }
+  }
+
+  it should "release pending inbound handshakes on peer disconnection" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.max-inbound-connections-per-group", 1)
+    )
+
+    val remote0 = socketAddressGen.sample.get
+    connectInbound(remote0)
+    eventually(interCliqueManagerActor.pendingInboundConnections.contains(remote0) is true)
+
+    interCliqueManager ! InterCliqueManager.PeerDisconnected(remote0)
+    eventually {
+      interCliqueManagerActor.pendingInboundConnections.contains(remote0) is false
+      interCliqueManagerActor.checkForInConnection(1) is true
+    }
+
+    val remote1 = socketAddressGen.retryUntil(_ != remote0).sample.get
+    connectInbound(remote1)
+    eventually(interCliqueManagerActor.pendingInboundConnections.contains(remote1) is true)
+  }
+
+  it should "release a pending inbound handshake after a successful handshake" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.max-inbound-connections-per-group", 1)
+    )
+
+    val remote = socketAddressGen.sample.get
+    connectInbound(remote)
+    eventually(interCliqueManagerActor.pendingInboundConnections.contains(remote) is true)
+
+    val brokerInfo = BrokerInfo.unsafe(
+      cliqueIdGen.sample.get,
+      brokerConfig.brokerId,
+      brokerConfig.brokerNum,
+      remote
+    )
+    publishHandShaked(TestProbe().ref, brokerInfo, InboundConnection)
+    eventually {
+      interCliqueManagerActor.pendingInboundConnections.contains(remote) is false
+      interCliqueManagerActor.brokers.contains(brokerInfo.peerId) is true
+    }
+  }
+
+  it should "release a pending inbound handshake after a handshake timeout" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      "alephium.network.max-inbound-connections-per-group" -> 1,
+      "alephium.network.retry-timeout"                     -> "200 ms"
+    )
+
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.RequestTimeout])
+
+    val remote = socketAddressGen.sample.get
+    connectInbound(remote)
+    eventually(interCliqueManagerActor.pendingInboundConnections.contains(remote) is true)
+
+    listener.expectMsg(MisbehaviorManager.RequestTimeout(remote))
+    eventually {
+      interCliqueManagerActor.pendingInboundConnections.contains(remote) is false
+      interCliqueManagerActor.checkForInConnection(1) is true
+    }
   }
 
   it should "not accept too many connections from a same IP" in new Fixture {
@@ -680,6 +793,12 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
         .futureValue
         .map(_.address)
 
+    def connectInbound(remote: InetSocketAddress): TestProbe = {
+      val connection = TestProbe()
+      connection.send(interCliqueManager, Tcp.Connected(remote, socketAddressGen.sample.get))
+      connection
+    }
+
     def irrelevantBrokerInfo(connectionType: ConnectionType = InboundConnection): BrokerState = {
       val broker = brokerInfoGen.retryUntil(!_.intersect(brokerConfig)).sample.get
       BrokerState(broker, connectionType, TestProbe().ref, false, clientInfo)
@@ -700,3 +819,4 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     }
   }
 }
+// scalastyle:on file.size.limit
