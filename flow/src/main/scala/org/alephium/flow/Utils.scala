@@ -52,13 +52,20 @@ object Utils {
     }
 
   val PoolDispatcher = "pekko.actor.pool-dispatcher"
+  val BlockingIODispatcher = "pekko.actor.blocking-io-dispatcher"
 
   trait BaseActorWithPoolExecutor extends BaseActor {
     implicit lazy val poolEC: ExecutionContext =
       context.system.dispatchers.lookup(Utils.PoolDispatcher)
+    lazy val blockingIOEC: ExecutionContext =
+      context.system.dispatchers.lookup(Utils.BlockingIODispatcher)
 
     def poolAsync[T](f: => T): Future[T] = {
       Future[T](f)(poolEC)
+    }
+
+    def ioAsync[T](f: => T): Future[T] = {
+      Future[T](f)(blockingIOEC)
     }
   }
 }

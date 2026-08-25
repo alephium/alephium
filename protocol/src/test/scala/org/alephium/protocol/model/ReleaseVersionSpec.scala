@@ -33,6 +33,9 @@ class ReleaseVersionSpec extends AlephiumSpec {
 
     val releaseV = "v0.1.1-rc1"
     ReleaseVersion.from(releaseV) is Some(ReleaseVersion(0, 1, 1))
+
+    ReleaseVersion.from("4.7.0-test2") is Some(ReleaseVersion(4, 7, 0))
+    ReleaseVersion.from("v4.7.0-test2") is Some(ReleaseVersion(4, 7, 0))
   }
 
   // scalastyle:off no.equal

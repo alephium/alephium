@@ -131,6 +131,8 @@ trait Server extends Service {
 }
 
 object Server {
+  val ApiDispatcher = "pekko.actor.api-dispatcher"
+
   def apply(rootPath: Path, flowSystem: ActorSystem)(implicit
       config: AlephiumConfig,
       apiConfig: ApiConfig,

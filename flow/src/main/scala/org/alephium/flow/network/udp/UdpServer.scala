@@ -16,21 +16,53 @@
 
 package org.alephium.flow.network.udp
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteBuffer
 import java.nio.channels.{DatagramChannel, SelectionKey}
 
 import scala.annotation.tailrec
 import scala.util.control.NonFatal
 
+import io.prometheus.metrics.core.metrics.Counter
 import org.apache.pekko.actor.Props
 import org.apache.pekko.dispatch.{RequiresMessageQueue, UnboundedMessageQueueSemantics}
 import org.apache.pekko.util.ByteString
 
-import org.alephium.util.{ActorRefT, BaseActor, Duration, TimeStamp}
+import org.alephium.flow.network.FixedWindowRateLimiter
+import org.alephium.util.{ActorRefT, BaseActor, Cache, Duration, TimeStamp}
 
 object UdpServer {
   def props(): Props = Props(new UdpServer())
+
+  private[udp] val InboundRateLimitWindow     = Duration.ofSecondsUnsafe(10)
+  private[udp] val MaxInboundPacketsPerIp     = 256
+  private[udp] val MaxInboundPacketsGlobal    = 4096
+  private[udp] val MaxTrackedInboundSourceIps = 4096
+  private[udp] val inboundPacketsDroppedByLimit = Counter
+    .builder()
+    .name("alephium_discovery_udp_packets_dropped_total")
+    .help("Number of inbound discovery UDP packets dropped")
+    .labelNames("reason")
+    .register()
+
+  final private[udp] class InboundPacketRateLimiter {
+    private val global =
+      FixedWindowRateLimiter(MaxInboundPacketsGlobal, InboundRateLimitWindow)
+    private val perIp =
+      Cache.fifo[InetAddress, FixedWindowRateLimiter](MaxTrackedInboundSourceIps)
+
+    def tryRequest(remote: InetSocketAddress): Boolean = {
+      val sourceLimiter = perIp.get(remote.getAddress) match {
+        case Some(limiter) => limiter
+        case None =>
+          val limiter =
+            FixedWindowRateLimiter(MaxInboundPacketsPerIp, InboundRateLimitWindow)
+          perIp.put(remote.getAddress, limiter)
+          limiter
+      }
+      sourceLimiter.tryRequest(1) && global.tryRequest(1)
+    }
+  }
 
   sealed trait Command
   final case class Bind(address: InetSocketAddress)                     extends Command
@@ -73,7 +105,9 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
     }
   }
 
-  val buffer: ByteBuffer = ByteBuffer.allocateDirect(128 * 1024) // 128KB
+  val buffer: ByteBuffer                    = ByteBuffer.allocateDirect(128 * 1024) // 128KB
+  private[udp] val inboundPacketRateLimiter = new InboundPacketRateLimiter()
+
   def listening: Receive = {
     case Send(message, remote) =>
       try {
@@ -102,9 +136,13 @@ class UdpServer() extends BaseActor with RequiresMessageQueue[UnboundedMessageQu
     buffer.clear()
     channel.receive(buffer) match {
       case sender: InetSocketAddress =>
-        buffer.flip()
-        val data = ByteString(buffer)
-        discoveryServer ! UdpServer.Received(data, sender)
+        if (inboundPacketRateLimiter.tryRequest(sender)) {
+          buffer.flip()
+          val data = ByteString(buffer)
+          discoveryServer ! UdpServer.Received(data, sender)
+        } else {
+          inboundPacketsDroppedByLimit.labelValues("rate_limit").inc()
+        }
         if (readsLeft > 0) read(readsLeft - 1)
       case _ => () // null means no data received
     }

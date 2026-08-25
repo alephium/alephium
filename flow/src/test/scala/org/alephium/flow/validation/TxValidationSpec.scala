@@ -1497,6 +1497,18 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       .leftValue isE TxScriptExeFailed(OutOfGas)
   }
 
+  it should "reuse prepared mempool inputs and expose the fee payer" in new FlowFixture {
+    val chainIndex   = ChainIndex.unsafe(0, 0)
+    val tx           = transfer(blockFlow, chainIndex).nonCoinbase.head.toTemplate
+    val txValidator  = TxValidation.build
+    val context      = txValidator.prepareMempoolTxTemplate(tx, blockFlow).rightValue
+    val expectedInfo = context.metadata
+
+    expectedInfo.feePayer.value is getGenesisLockupScript(chainIndex)
+    expectedInfo.maximalGasPerBlock is getMaximalGasPerBlock(context.blockEnv.getHardFork())
+    txValidator.validatePreparedMempoolTxTemplate(tx, context) isE expectedInfo
+  }
+
   trait GroupedLockupScriptFixture extends Fixture {
     val groupIndex = GroupIndex.unsafe(0)
     def lockup: LockupScript.GroupedAsset

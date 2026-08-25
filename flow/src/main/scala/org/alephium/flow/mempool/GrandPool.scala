@@ -16,10 +16,20 @@
 
 package org.alephium.flow.mempool
 
+import scala.collection.mutable
+
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.model.MempoolTxMetadata
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionId, TransactionTemplate}
+import org.alephium.protocol.model.{
+  ChainIndex,
+  GroupIndex,
+  Transaction,
+  TransactionId,
+  TransactionTemplate
+}
+import org.alephium.protocol.vm.GasBox
 import org.alephium.util.{AVector, OptionF, TimeStamp}
 
 class GrandPool(val mempools: AVector[MemPool], val orphanPool: OrphanPool)(implicit
@@ -43,13 +53,30 @@ class GrandPool(val mempools: AVector[MemPool], val orphanPool: OrphanPool)(impl
     transactions.sumBy(add(index, _, timeStamp).addedCount)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def add(
       index: ChainIndex,
       tx: TransactionTemplate,
       timestamp: TimeStamp
+  ): MemPool.AddToMemPoolResult = add(index, tx, timestamp, None)
+
+  private[flow] def add(
+      index: ChainIndex,
+      tx: TransactionTemplate,
+      timestamp: TimeStamp,
+      metadata: MempoolTxMetadata
+  ): MemPool.AddToMemPoolResult = add(index, tx, timestamp, Some(metadata))
+
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+  private def add(
+      index: ChainIndex,
+      tx: TransactionTemplate,
+      timestamp: TimeStamp,
+      metadataOpt: Option[MempoolTxMetadata]
   ): MemPool.AddToMemPoolResult = {
-    val result = getMemPool(index.from).add(index, tx, timestamp)
+    val sourcePool = getMemPool(index.from)
+    val outcome    = sourcePool.addAndCollectEvicted(index, tx, timestamp, metadataOpt)
+    removeMirroredTransactions(index.from, outcome.evicted)
+    val result = outcome.result
     if (index.isIntraGroup) {
       result
     } else {
@@ -58,6 +85,51 @@ class GrandPool(val mempools: AVector[MemPool], val orphanPool: OrphanPool)(impl
       }
       result
     }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.While"))
+  private def removeMirroredTransactions(
+      initialGroup: GroupIndex,
+      transactions: AVector[TransactionTemplate]
+  ): Unit = {
+    val pending = mutable.Queue.empty[(GroupIndex, TransactionTemplate)]
+    transactions.foreach(transaction => pending.enqueue(initialGroup -> transaction))
+    val visited = mutable.HashSet.empty[(GroupIndex, TransactionId)]
+
+    while (pending.nonEmpty) {
+      val (removedFrom, transaction) = pending.dequeue()
+      if (visited.add(removedFrom -> transaction.id)) {
+        transaction.chainIndexOpt.foreach { chainIndex =>
+          if (
+            !chainIndex.isIntraGroup &&
+            removedFrom == chainIndex.from &&
+            brokerConfig.contains(chainIndex.to)
+          ) {
+            getMemPool(chainIndex.to).removeUnusedTxAndCollect(transaction).foreach { removed =>
+              pending.enqueue(chainIndex.to -> removed)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  def reorg(
+      mainGroup: GroupIndex,
+      toRemove: AVector[(ChainIndex, AVector[Transaction])],
+      toAdd: AVector[(ChainIndex, AVector[Transaction])],
+      maximalGasPerBlock: GasBox
+  ): (Int, Int) = {
+    val outcome = getMemPool(mainGroup).reorgAndCollectEvicted(toRemove, toAdd, maximalGasPerBlock)
+    val confirmedTxIds = mutable.HashSet.empty[TransactionId]
+    toRemove.foreach { case (_, transactions) =>
+      transactions.foreach(transaction => confirmedTxIds.add(transaction.id))
+    }
+    removeMirroredTransactions(
+      mainGroup,
+      outcome.evicted.filterNot(transaction => confirmedTxIds.contains(transaction.id))
+    )
+    (outcome.removed, outcome.added)
   }
 
   def getOutTxsWithTimestamp(): AVector[(TimeStamp, TransactionTemplate)] = {

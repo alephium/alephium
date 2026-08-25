@@ -19,8 +19,10 @@ package org.alephium.flow.mempool
 import scala.util.Random
 
 import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.model.MempoolTxMetadata
+import org.alephium.flow.setting.MemPoolAdmissionLimits
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.GasPrice
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util.{AVector, Duration, LockFixture, TimeStamp, UnsecureRandom}
 
 class MemPoolSpec
@@ -32,6 +34,33 @@ class MemPoolSpec
 
   val mainGroup      = GroupIndex.unsafe(0)
   val emptyTxIndexes = TxIndexes.emptyMemPool(mainGroup)
+  val admissionLimits = MemPoolAdmissionLimits(
+    enabled = true,
+    maxGasPerChainInBlocks = 4,
+    maxTransactionsPerFeePayerPercent = 25,
+    maxGasPerFeePayerPercentOfBlock = 20
+  )
+
+  private def admissionTx(
+      index: ChainIndex,
+      gas: Int,
+      gasPriceDelta: Int = 0
+  ): TransactionTemplate = {
+    val tx = transactionGen().retryUntil(_.chainIndex == index).sample.get.toTemplate
+    tx.copy(unsigned =
+      tx.unsigned.copy(
+        gasAmount = GasBox.unsafeTest(gas),
+        gasPrice = GasPrice(nonCoinbaseMinGasPrice.value + gasPriceDelta)
+      )
+    )
+  }
+
+  private def admissionMetadata(
+      payer: LockupScript.Asset,
+      maximalGasPerBlock: Int = 1000
+  ): MempoolTxMetadata = {
+    MempoolTxMetadata(Some(payer), GasBox.unsafeTest(maximalGasPerBlock))
+  }
 
   it should "initialize an empty pool" in {
     val pool = MemPool.empty(mainGroup)
@@ -88,6 +117,157 @@ class MemPoolSpec
     pool.isFull() is true
     pool.contains(tx0.id) is false
     pool.contains(tx1.id) is true
+  }
+
+  it should "enforce the transaction limit per fee payer" in {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val pool       = MemPool.ofCapacity(mainGroup, 20, admissionLimits)
+    val payer      = assetLockupGen(chainIndex.from).sample.get
+    val metadata   = admissionMetadata(payer)
+    val txs        = AVector.tabulate(6)(_ => admissionTx(chainIndex, gas = 1))
+    val timestamp  = TimeStamp.now()
+
+    txs.take(5).foreach(tx => pool.add(chainIndex, tx, timestamp, metadata).addedCount is 1)
+    pool.getFeePayerUsage(chainIndex, payer) is MemPool.UsageSnapshot(5, 5L, 0)
+    pool.add(chainIndex, txs.last, timestamp, metadata) is
+      MemPool.FeePayerLimitExceeded(MemPool.FeePayerLimitReason.TransactionCount)
+
+    pool.removeUnusedTx(txs.head)
+    pool.add(chainIndex, txs.last, timestamp, metadata).addedCount is 1
+    pool.getFeePayerUsage(chainIndex, payer) is MemPool.UsageSnapshot(5, 5L, 0)
+
+    pool.clear()
+    pool.getFeePayerUsage(chainIndex, payer) is MemPool.UsageSnapshot.empty
+    pool.getChainUsage(chainIndex) is MemPool.UsageSnapshot.empty
+  }
+
+  it should "allow a single oversized transaction per fee payer" in {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val pool       = MemPool.ofCapacity(mainGroup, 20, admissionLimits)
+    val payer      = assetLockupGen(chainIndex.from).sample.get
+    val metadata   = admissionMetadata(payer)
+    val timestamp  = TimeStamp.now()
+    val largeTx    = admissionTx(chainIndex, gas = 500)
+    val normalTx   = admissionTx(chainIndex, gas = 1, gasPriceDelta = 1)
+
+    pool.add(chainIndex, largeTx, timestamp, metadata).addedCount is 1
+    pool.getFeePayerUsage(chainIndex, payer) is MemPool.UsageSnapshot(1, 500L, 1)
+    pool.add(chainIndex, normalTx, timestamp, metadata) is
+      MemPool.FeePayerLimitExceeded(MemPool.FeePayerLimitReason.Gas)
+
+    pool.removeUnusedTx(largeTx)
+    pool.getFeePayerUsage(chainIndex, payer) is MemPool.UsageSnapshot.empty
+    pool.add(chainIndex, normalTx, timestamp, metadata).addedCount is 1
+    pool.add(chainIndex, largeTx, timestamp, metadata) is
+      MemPool.FeePayerLimitExceeded(MemPool.FeePayerLimitReason.Gas)
+  }
+
+  it should "enforce the normal gas limit per fee payer" in {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val pool       = MemPool.ofCapacity(mainGroup, 20, admissionLimits)
+    val payer      = assetLockupGen(chainIndex.from).sample.get
+    val metadata   = admissionMetadata(payer)
+    val timestamp  = TimeStamp.now()
+    val tx0        = admissionTx(chainIndex, gas = 100)
+    val tx1        = admissionTx(chainIndex, gas = 100)
+    val tx2        = admissionTx(chainIndex, gas = 1, gasPriceDelta = 10)
+
+    pool.add(chainIndex, tx0, timestamp, metadata).addedCount is 1
+    pool.add(chainIndex, tx1, timestamp, metadata).addedCount is 1
+    pool.getFeePayerUsage(chainIndex, payer) is MemPool.UsageSnapshot(2, 200L, 0)
+    pool.add(chainIndex, tx2, timestamp, metadata) is
+      MemPool.FeePayerLimitExceeded(MemPool.FeePayerLimitReason.Gas)
+  }
+
+  it should "enforce per-chain gas limits without affecting other chains" in {
+    val chain0    = ChainIndex.unsafe(0, 0)
+    val chain1    = ChainIndex.unsafe(0, 1)
+    val pool      = MemPool.ofCapacity(mainGroup, 20, 10, admissionLimits)
+    val timestamp = TimeStamp.now()
+    val chain0Txs = AVector.tabulate(4) { index =>
+      val payer = assetLockupGen(chain0.from).sample.get
+      val tx    = admissionTx(chain0, gas = 1000, gasPriceDelta = index)
+      pool.add(chain0, tx, timestamp, admissionMetadata(payer)).addedCount is 1
+      tx
+    }
+    val chain1Tx = admissionTx(chain1, gas = 1)
+    pool
+      .add(
+        chain1,
+        chain1Tx,
+        timestamp,
+        admissionMetadata(assetLockupGen(chain1.from).sample.get)
+      )
+      .addedCount is 1
+
+    pool.getChainUsage(chain0) is MemPool.UsageSnapshot(4, 4000L, 4)
+    pool.getChainUsage(chain1) is MemPool.UsageSnapshot(1, 1L, 0)
+
+    val replacement = admissionTx(chain0, gas = 1000, gasPriceDelta = 10)
+    pool
+      .add(
+        chain0,
+        replacement,
+        timestamp,
+        admissionMetadata(assetLockupGen(chain0.from).sample.get)
+      )
+      .addedCount is 1
+    pool.contains(chain0Txs.head) is false
+    pool.contains(chain1Tx) is true
+    pool.getChainUsage(chain0) is MemPool.UsageSnapshot(4, 4000L, 4)
+  }
+
+  it should "enforce per-chain transaction limits without affecting other chains" in {
+    val chain0    = ChainIndex.unsafe(0, 0)
+    val chain1    = ChainIndex.unsafe(0, 1)
+    val pool      = MemPool.ofCapacity(mainGroup, 8, 4, admissionLimits)
+    val timestamp = TimeStamp.now()
+    val chain0Txs = AVector.tabulate(4) { index =>
+      val payer = assetLockupGen(chain0.from).sample.get
+      val tx    = admissionTx(chain0, gas = 1, gasPriceDelta = index)
+      pool.add(chain0, tx, timestamp, admissionMetadata(payer)).addedCount is 1
+      tx
+    }
+    val chain1Tx = admissionTx(chain1, gas = 1)
+    pool
+      .add(
+        chain1,
+        chain1Tx,
+        timestamp,
+        admissionMetadata(assetLockupGen(chain1.from).sample.get)
+      )
+      .addedCount is 1
+
+    val replacement = admissionTx(chain0, gas = 1, gasPriceDelta = 10)
+    pool
+      .add(
+        chain0,
+        replacement,
+        timestamp,
+        admissionMetadata(assetLockupGen(chain0.from).sample.get)
+      )
+      .addedCount is 1
+    pool.contains(chain0Txs.head) is false
+    pool.contains(chain1Tx) is true
+    pool.getChainUsage(chain0) is MemPool.UsageSnapshot(4, 4L, 0)
+
+    val lowFeeTx = admissionTx(chain0, gas = 1)
+    pool.add(
+      chain0,
+      lowFeeTx,
+      timestamp,
+      admissionMetadata(assetLockupGen(chain0.from).sample.get)
+    ) is MemPool.MemPoolIsFull
+  }
+
+  it should "not charge incoming cross-group transactions to source-chain limits" in {
+    val chainIndex = ChainIndex.unsafe(1, 0)
+    val pool       = MemPool.ofCapacity(mainGroup, 20, admissionLimits)
+    val tx         = admissionTx(chainIndex, gas = 1000)
+    val metadata   = MempoolTxMetadata(None, GasBox.unsafeTest(1000))
+
+    pool.add(chainIndex, tx, TimeStamp.now(), metadata).addedCount is 1
+    pool.getChainUsage(chainIndex) is MemPool.UsageSnapshot.empty
   }
 
   trait Fixture {

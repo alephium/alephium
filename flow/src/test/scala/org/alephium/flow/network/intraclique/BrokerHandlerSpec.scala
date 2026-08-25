@@ -26,10 +26,10 @@ import org.scalacheck.Gen
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils, TxHandler}
-import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.network.{CliqueManager, MaxTxsRequestNum}
 import org.alephium.flow.network.broker.{InboundBrokerHandler => BaseInboundBrokerHandler}
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
-import org.alephium.flow.network.broker.ConnectionHandler
+import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.Generators
@@ -53,7 +53,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
       Generators.socketAddressGen.sample.get
     )
     watch(brokerHandler)
-    brokerHandlerActor.handleHandshakeInfo(invalidBrokerInfo, clientInfo, P2PV1)
+    brokerHandlerActor.handleHandshakeInfo(invalidBrokerInfo, clientInfo, P2PV2)
     expectTerminated(brokerHandler)
   }
 
@@ -64,13 +64,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     config.broker.groupNumPerBroker is 1
     config.broker.brokerId is 1
 
-    val brokerInfo = BrokerInfo.unsafe(
-      cliqueInfo.id,
-      0,
-      config.broker.brokerNum,
-      Generators.socketAddressGen.sample.get
-    )
-    brokerHandlerActor.handleHandshakeInfo(brokerInfo, clientInfo, P2PV1)
+    completeHandshake(remoteBrokerId = 0)
 
     val blocks0 = AVector.tabulate(groups0) { _ =>
       blockGenOf(GroupIndex.unsafe(0)).sample.get
@@ -87,6 +81,32 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     brokerHandler ! BaseBrokerHandler.Received(NewInv(hashes2))
     expect[HeadersRequest].locators is (hashes2(0) ++ hashes2(2))
     expect[BlocksRequest].locators is (hashes2(1))
+  }
+
+  it should "reject a short intra-clique inventory" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-id", 1))
+
+    completeHandshake(remoteBrokerId = 0)
+    val hashes = AVector.fill(groups0 - 1)(AVector.empty[BlockHash])
+    expectInvalidInventory(hashes)
+  }
+
+  it should "reject an oversized intra-clique inventory" in new Fixture {
+    override val configValues: Map[String, Any] = Map(("alephium.broker.broker-id", 1))
+
+    completeHandshake(remoteBrokerId = 0)
+    val hashes = AVector.fill(groups0 + 1)(AVector.empty[BlockHash])
+    expectInvalidInventory(hashes)
+  }
+
+  it should "keep inventory extraction total for invalid broker metadata" in new Fixture {
+    val invalidBrokerInfo = BrokerInfo.unsafe(
+      cliqueInfo.id,
+      brokerId = 0,
+      brokerNum = 0,
+      address = Generators.socketAddressGen.sample.get
+    )
+    BrokerHandler.extractToSync(blockFlow, AVector.empty, invalidBrokerInfo).isLeft is true
   }
 
   it should "send inventories to broker" in new Fixture {
@@ -124,6 +144,53 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     expectTerminated(brokerHandler)
   }
 
+  it should "reject an empty-input transaction response without throwing" in new Fixture
+    with ModelGenerators {
+    brokerConfig.brokerId is 0
+    brokerConfig.brokerNum is 3
+    val validIndexesGen =
+      chainIndexGen.retryUntil(index => index.from.value != 0 && index.to.value == 0)
+    val tx        = transactionGen(chainIndexGen = validIndexesGen).sample.get.toTemplate
+    val invalidTx = tx.copy(unsigned = tx.unsigned.copy(inputs = AVector.empty))
+
+    watch(brokerHandler)
+    brokerHandler ! BaseBrokerHandler.Received(
+      TxsResponse(RequestId.unsafe(0), AVector(invalidTx))
+    )
+    expectTerminated(brokerHandler)
+  }
+
+  it should "reject an unexpected transaction response id" in new Fixture with ModelGenerators {
+    val validIndexesGen =
+      chainIndexGen.retryUntil(index => index.from.value != 0 && index.to.value == 0)
+    val tx       = transactionGen(chainIndexGen = validIndexesGen).sample.get.toTemplate
+    val listener = TestProbe()
+
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+    brokerHandler ! BaseBrokerHandler.Received(TxsResponse(RequestId.unsafe(1), AVector(tx)))
+
+    listener.expectMsg(MisbehaviorManager.InvalidResponse(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler)
+    allHandlerProbes.txHandler.expectNoMessage()
+  }
+
+  it should "reject an oversized transaction response" in new Fixture with ModelGenerators {
+    val validIndexesGen =
+      chainIndexGen.retryUntil(index => index.from.value != 0 && index.to.value == 0)
+    val tx       = transactionGen(chainIndexGen = validIndexesGen).sample.get.toTemplate
+    val txs      = AVector.fill(MaxTxsRequestNum + 1)(tx)
+    val listener = TestProbe()
+
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(brokerHandler)
+    brokerHandler ! BaseBrokerHandler.Received(TxsResponse(RequestId.unsafe(0), txs))
+
+    listener.expectMsg(MisbehaviorManager.Spamming(brokerHandlerActor.remoteAddress))
+    expectTerminated(brokerHandler)
+    allHandlerProbes.txHandler.expectNoMessage()
+  }
+
   trait Fixture extends FlowFixture {
     val connectionHandler = TestProbe()
     lazy val cliqueInfo   = Generators.cliqueInfoGen.sample.get
@@ -142,6 +209,29 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
       )
     )
     lazy val brokerHandlerActor = brokerHandler.underlyingActor
+
+    def completeHandshake(remoteBrokerId: Int): BrokerInfo = {
+      val brokerInfo = BrokerInfo.unsafe(
+        cliqueInfo.id,
+        remoteBrokerId,
+        config.broker.brokerNum,
+        Generators.socketAddressGen.sample.get
+      )
+      brokerHandlerActor.handleHandshakeInfo(brokerInfo, clientInfo, P2PV2)
+      brokerInfo
+    }
+
+    def expectInvalidInventory(hashes: AVector[AVector[BlockHash]]): Unit = {
+      val listener = TestProbe()
+      system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.InvalidGroup])
+      watch(brokerHandler)
+
+      brokerHandler ! BaseBrokerHandler.Received(NewInv(hashes))
+
+      listener.expectMsg(MisbehaviorManager.InvalidGroup(brokerHandlerActor.remoteAddress))
+      expectTerminated(brokerHandler)
+      connectionHandler.expectNoMessage()
+    }
 
     def expect[T <: Payload]: T = {
       connectionHandler.expectMsgPF() { case ConnectionHandler.Send(data) =>
@@ -192,5 +282,5 @@ class TestBrokerHandler(
     with BrokerHandler {
   context.watch(brokerConnectionHandler.ref)
 
-  override def receive: Receive = exchangingV1
+  override def receive: Receive = exchangingV2
 }

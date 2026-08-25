@@ -33,9 +33,19 @@ class BlockHeightRangeSpec extends AlephiumSpec with NumericHelpers {
       BlockHeightRange(-1, 2, 1),
       BlockHeightRange(2, 1, 1),
       BlockHeightRange(1, 2, 0),
-      BlockHeightRange(1, 2, -1)
+      BlockHeightRange(1, 2, -1),
+      BlockHeightRange(0, Int.MaxValue, 1)
     )
-    invalidRanges.foreach(_.isValid() is false)
+    invalidRanges.foreach { range =>
+      range.isValid() is false
+      range.length is 0
+      range.heights is AVector.empty[Int]
+      deserialize[BlockHeightRange](serialize(range)).isLeft is true
+    }
+
+    val maxLength = 100
+    BlockHeightRange.from(1, maxLength, 1).isValid(maxLength) is true
+    BlockHeightRange.from(1, maxLength + 1, 1).isValid(maxLength) is false
   }
 
   it should "test block height range" in {

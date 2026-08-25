@@ -1291,6 +1291,7 @@
           "Wallets"
         ],
         "summary": "Transfer all unlocked ALPH from the active address to another address",
+        "description": "Sweep transactions are submitted in batches of two. Each non-final batch must be confirmed before the next batch is submitted.",
         "operationId": "postWalletsWallet_nameSweep-active-address",
         "parameters": [
           {
@@ -1438,6 +1439,7 @@
           "Wallets"
         ],
         "summary": "Transfer unlocked ALPH from all addresses (including all mining addresses if applicable) to another address",
+        "description": "All transactions are prepared before submission. Normal wallets use one batch lane, while miner wallets use one lane per source group.",
         "operationId": "postWalletsWallet_nameSweep-all-addresses",
         "parameters": [
           {

@@ -46,6 +46,74 @@ import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex, Time
 
 class AlephiumConfigSpec extends AlephiumSpec {
   import ConfigUtils._
+
+  it should "reject disabling p2p v2" in {
+    val fixture = new AlephiumConfigFixture {
+      override val configValues: Map[String, Any] =
+        Map(("alephium.network.enable-p2p-v2", false))
+    }
+
+    intercept[IllegalArgumentException](AlephiumConfig.load(fixture.buildNewConfig())).getMessage is
+      "P2P V1 is no longer supported"
+  }
+
+  it should "load and validate the transaction request rate limit" in {
+    val customFixture = new AlephiumConfigFixture {
+      override val configValues: Map[String, Any] =
+        Map(("alephium.network.txs-request-max-ids-per-second", 1234))
+    }
+    AlephiumConfig
+      .load(customFixture.buildNewConfig())
+      .network
+      .txsRequestMaxIdsPerSecond is 1234
+
+    val invalidFixture = new AlephiumConfigFixture {
+      override val configValues: Map[String, Any] =
+        Map(("alephium.network.txs-request-max-ids-per-second", 0))
+    }
+    intercept[IllegalArgumentException](
+      AlephiumConfig.load(invalidFixture.buildNewConfig())
+    ).getMessage is "Transaction request rate limit must be positive"
+  }
+
+  it should "load and validate mempool admission limits" in {
+    val defaultConfig = AlephiumConfig.load(new AlephiumConfigFixture {}.buildNewConfig())
+    defaultConfig.mempool.admissionLimits is MemPoolAdmissionLimits(
+      enabled = true,
+      maxGasPerChainInBlocks = 4,
+      maxTransactionsPerFeePayerPercent = 25,
+      maxGasPerFeePayerPercentOfBlock = 20
+    )
+
+    def checkInvalid(key: String, value: Int, expectedMessage: String): Unit = {
+      val fixture = new AlephiumConfigFixture {
+        override val configValues: Map[String, Any] = Map(key -> value)
+      }
+      val message = intercept[IllegalArgumentException](
+        AlephiumConfig.load(fixture.buildNewConfig())
+      ).getMessage
+      if (message != expectedMessage) {
+        fail(s"Expected '$expectedMessage', got '$message'")
+      }
+    }
+
+    checkInvalid(
+      "alephium.mempool.admission-limits.max-gas-per-chain-in-blocks",
+      0,
+      "Mempool gas capacity per chain must be positive"
+    )
+    checkInvalid(
+      "alephium.mempool.admission-limits.max-transactions-per-fee-payer-percent",
+      0,
+      "Mempool transaction limit per fee payer must be between 1 and 100 percent"
+    )
+    checkInvalid(
+      "alephium.mempool.admission-limits.max-gas-per-fee-payer-percent-of-block",
+      101,
+      "Mempool gas limit per fee payer must be between 1 and 100 percent"
+    )
+  }
+
   it should "load alephium config" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", "12"),
@@ -65,6 +133,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.syncPeerSampleSizeV1 is 3
     config.network.syncPeerSampleSizeV2 is 5
     config.network.enableP2pV2 is true
+    config.network.txsRequestMaxIdsPerSecond is 1000
   }
 
   it should "load mainnet config" in {
@@ -90,6 +159,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
       "634cb950-2c637231-2a7b9072-077cd3d3-c9844184-ecb22a45-d63f3b36-d392ac97-2c9d4d28-08906609-ced88aaa-b7f0541b-5f78e23c-c7a2b25d-6b8cdade-6fedfc7f"
     config.network.getHardFork(TimeStamp.now()) is HardFork.Danube
     config.network.enableP2pV2 is true
+    config.network.txsRequestMaxIdsPerSecond is 1000
 
     config.node.assetTrieCacheMaxByteSize is 200_000_000
     config.node.contractTrieCacheMaxByteSize is 20_000_000
@@ -137,39 +207,22 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.danubeHardForkTimestamp is TimeStamp.unsafe(1752573600000L)
   }
 
-  it should "allow a separate post-genesis mining floor on testnet without changing genesis" in {
+  it should "use the testnet mining floor for genesis and later blocks" in {
     val fixture = new AlephiumConfigFixture {
-      override val configValues: Map[String, Any] = Map(
-        ("alephium.network.network-id", 1),
-        ("alephium.consensus.num-zeros-at-least-in-hash", 24),
-        ("alephium.consensus.num-zeros-at-least-in-hash-testnet-patch", 19)
-      )
+      override val configValues: Map[String, Any] =
+        Map(("alephium.network.network-id", 1))
     }
 
-    val overrideConfig = AlephiumConfig.load(fixture.buildNewConfig())
+    val testnetConfig = AlephiumConfig.load(fixture.buildNewConfig())
 
-    overrideConfig.consensus.danube.genesisNumZerosAtLeastInHash is 24
-    overrideConfig.consensus.danube.numZerosAtLeastInHash is 19
-    (overrideConfig.consensus.danube.genesisMaxMiningTarget !=
-      overrideConfig.consensus.danube.maxMiningTarget) is true
-    overrideConfig.consensus.danube.minMiningDiff is
-      overrideConfig.consensus.danube.maxMiningTarget.getDifficulty()
-    overrideConfig.genesisBlocks.forall(
-      _.forall(_.header.target == overrideConfig.consensus.mainnet.genesisMaxMiningTarget)
+    testnetConfig.consensus.danube.numZerosAtLeastInHash is 19
+    testnetConfig.consensus.danube.genesisMaxMiningTarget is
+      testnetConfig.consensus.danube.maxMiningTarget
+    testnetConfig.consensus.danube.minMiningDiff is
+      testnetConfig.consensus.danube.maxMiningTarget.getDifficulty()
+    testnetConfig.genesisBlocks.forall(
+      _.forall(_.header.target == testnetConfig.consensus.mainnet.maxMiningTarget)
     ) is true
-  }
-
-  it should "reject the post-genesis mining floor override on mainnet" in {
-    val fixture = new AlephiumConfigFixture {
-      override val configValues: Map[String, Any] = Map(
-        ("alephium.network.network-id", 0),
-        ("alephium.consensus.num-zeros-at-least-in-hash", 37),
-        ("alephium.consensus.num-zeros-at-least-in-hash-testnet-patch", 19)
-      )
-    }
-
-    intercept[IllegalArgumentException](AlephiumConfig.load(fixture.buildNewConfig())).getMessage is
-      "alephium.consensus.num-zeros-at-least-in-hash-testnet-patch is only supported on testnet."
   }
 
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {

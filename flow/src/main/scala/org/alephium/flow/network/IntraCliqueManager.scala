@@ -174,9 +174,11 @@ class IntraCliqueManager(
         val needToSend =
           txs.view.filter(p => info.isIncomingChain(p._1)).map(_._2).fold(AVector.empty)(_ ++ _)
         if (needToSend.nonEmpty) {
-          log.debug(s"Send txs ${Utils.showTxs(needToSend)} to broker $info")
-          val txsMessage = Message.serialize(TxsResponse(RequestId.unsafe(0), needToSend))
-          broker ! BrokerHandler.Send(txsMessage)
+          needToSend.groupedWithRemainder(MaxTxsRequestNum).foreach { chunk =>
+            log.debug(s"Send txs ${Utils.showTxs(chunk)} to broker $info")
+            val txsMessage = Message.serialize(TxsResponse(RequestId.unsafe(0), chunk))
+            broker ! BrokerHandler.Send(txsMessage)
+          }
         }
       }
     case Terminated(actor) => handleTerminated(actor, brokers)

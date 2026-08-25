@@ -56,6 +56,7 @@ alephium {
     dependency-expiry-period = 2 minute
     update-synced-frequency = 5 second
 
+    txs-request-max-ids-per-second = 1000
     txs-broadcast-delay = 5 second
 
     upnp {
@@ -104,6 +105,12 @@ alephium {
     clean-orphan-tx-frequency = 5 seconds
     batch-broadcast-txs-frequency = 500 milli
     batch-download-txs-frequency = 500 milli
+    admission-limits {
+      enabled = true
+      max-gas-per-chain-in-blocks = 4
+      max-transactions-per-fee-payer-percent = 25
+      max-gas-per-fee-payer-percent-of-block = 20
+    }
     auto-mine-for-dev = false
   }
 
@@ -134,11 +141,30 @@ alephium {
 
 pekko {
   actor {
+    api-dispatcher {
+      type = Dispatcher
+      executor = "thread-pool-executor"
+      thread-pool-executor {
+        fixed-pool-size = 4
+      }
+      throughput = 1
+    }
+
+    blocking-io-dispatcher {
+      type = Dispatcher
+      executor = "thread-pool-executor"
+      thread-pool-executor {
+        fixed-pool-size = 4
+      }
+      throughput = 1
+    }
+
     pool-dispatcher {
       type = Dispatcher
       executor = "thread-pool-executor"
       thread-pool-executor {
         core-pool-size-min = 4
+        core-pool-size-factor = 1.0
         core-pool-size-max = 32
       }
       throughput = 1

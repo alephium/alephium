@@ -19,14 +19,14 @@ package org.alephium.flow.network.sync
 import scala.collection.mutable
 import scala.util.Random
 
-import org.alephium.flow.network.{MaxRequestNum, SimpleRateLimiter}
+import org.alephium.flow.network.{MaxBlocksInFlightPerPeer, RateLimiter, SyncPeerProfile}
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.SyncState.{BlockBatch, BlockDownloadTask}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.message.{P2PV1, P2PVersion}
+import org.alephium.protocol.message.P2PVersion
 import org.alephium.protocol.model._
-import org.alephium.util.{ActorRefT, AVector}
+import org.alephium.util.{ActorRefT, AVector, Duration}
 
 object BrokerStatusTracker {
   type BrokerActor = ActorRefT[BrokerHandler.Command]
@@ -34,8 +34,9 @@ object BrokerStatusTracker {
   final class BrokerStatus(
       val info: BrokerInfo,
       val version: P2PVersion,
+      val syncPeerProfile: SyncPeerProfile,
       private[sync] val tips: FlattenIndexedArray[ChainTip],
-      private[sync] val rateLimiter: SimpleRateLimiter
+      private[sync] val rateLimiter: RateLimiter
   ) {
     private[sync] var requestNum   = 0
     private[sync] val pendingTasks = mutable.Set.empty[BlockDownloadTask]
@@ -48,10 +49,25 @@ object BrokerStatusTracker {
       tips(chainIndex)
 
     def canDownload(task: BlockDownloadTask)(implicit groupConfig: GroupConfig): Boolean = {
-      requestNum < MaxRequestNum &&
+      canDownloadWithoutRateLimit(task) && rateLimiter.tryRequest(task.size)
+    }
+
+    private[sync] def timeUntilDownloadAvailable(
+        task: BlockDownloadTask
+    )(implicit groupConfig: GroupConfig): Option[Duration] = {
+      if (canDownloadWithoutRateLimit(task)) {
+        rateLimiter.timeUntilAvailable(task.size)
+      } else {
+        None
+      }
+    }
+
+    private def canDownloadWithoutRateLimit(
+        task: BlockDownloadTask
+    )(implicit groupConfig: GroupConfig): Boolean = {
+      requestNum.toLong + task.size.toLong <= MaxBlocksInFlightPerPeer.toLong &&
       !pendingTasks.contains(task) &&
-      !missOrUnableDownload(task.chainIndex, task.id) &&
-      rateLimiter.tryRequest(task.size)
+      !missOrUnableDownload(task.chainIndex, task.id)
     }
     def addPendingTask(task: BlockDownloadTask): Unit = {
       requestNum += task.size
@@ -117,16 +133,35 @@ object BrokerStatusTracker {
       requestNum = 0
       pendingTasks.clear()
       missedBlocks.clear()
-      rateLimiter.clear()
     }
   }
 
   object BrokerStatus {
+    def apply(info: BrokerInfo, version: P2PVersion, clientInfo: String)(implicit
+        groupConfig: GroupConfig,
+        networkSetting: NetworkSetting
+    ): BrokerStatus = {
+      apply(info, version, SyncPeerProfile.fromClientId(clientInfo))
+    }
+
+    def apply(info: BrokerInfo, version: P2PVersion, syncPeerProfile: SyncPeerProfile)(implicit
+        groupConfig: GroupConfig,
+        networkSetting: NetworkSetting
+    ): BrokerStatus = {
+      new BrokerStatus(
+        info,
+        version,
+        syncPeerProfile,
+        FlattenIndexedArray.empty,
+        syncPeerProfile.newBlockRateLimiter()
+      )
+    }
+
     def apply(info: BrokerInfo, version: P2PVersion)(implicit
         groupConfig: GroupConfig,
         networkSetting: NetworkSetting
     ): BrokerStatus = {
-      new BrokerStatus(info, version, FlattenIndexedArray.empty, SimpleRateLimiter.default)
+      apply(info, version, SyncPeerProfile.Legacy)
     }
   }
 }
@@ -141,24 +176,18 @@ trait BrokerStatusTracker {
   def getBrokerStatus(broker: BrokerActor): Option[BrokerStatus] =
     brokers.find(_._1 == broker).map(_._2)
 
-  def samplePeersSize(brokerSize: Int, p2pVersion: P2PVersion): Int = {
-    val syncPeerSampleSize = if (p2pVersion == P2PV1) {
-      networkSetting.syncPeerSampleSizeV1
-    } else {
-      networkSetting.syncPeerSampleSizeV2
-    }
+  def samplePeersSize(brokerSize: Int): Int = {
     val peerSize = Math.sqrt(brokerSize.toDouble).toInt
-    Math.min(peerSize, syncPeerSampleSize)
+    Math.min(peerSize, networkSetting.syncPeerSampleSizeV2)
   }
 
   private def samplePeers(
-      filtered: scala.collection.Seq[(BrokerActor, BrokerStatus)],
-      version: P2PVersion
+      filtered: scala.collection.Seq[(BrokerActor, BrokerStatus)]
   ): AVector[(BrokerActor, BrokerStatus)] = {
     if (filtered.isEmpty) {
       AVector.empty
     } else {
-      val peerSize   = samplePeersSize(filtered.size, version)
+      val peerSize   = samplePeersSize(filtered.size)
       val startIndex = Random.nextInt(filtered.size)
       AVector.tabulate(peerSize) { k =>
         filtered((startIndex + k) % filtered.size)
@@ -166,12 +195,5 @@ trait BrokerStatusTracker {
     }
   }
 
-  def sampleV1PeersFromAllBrokers(): AVector[(BrokerActor, BrokerStatus)] = {
-    samplePeers(brokers, P2PV1)
-  }
-
-  def samplePeers(version: P2PVersion): AVector[(BrokerActor, BrokerStatus)] = {
-    val filtered = brokers.filter(_._2.version == version)
-    samplePeers(filtered, version)
-  }
+  def samplePeers(): AVector[(BrokerActor, BrokerStatus)] = samplePeers(brokers)
 }

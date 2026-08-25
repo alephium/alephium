@@ -102,4 +102,13 @@ class BlockChainWithStateSpec extends AlephiumFlowSpec with NoIndexModelGenerato
     }
     chain.maxWeightTipUnsafe is ChainTip(tip._1.hash, 1, tip._2)
   }
+
+  it should "break equal-weight tip ties by hash" in new Fixture {
+    val chain  = buildGenesis()
+    val blocks = AVector.fill(5)(blockGen.sample.get)
+    blocks.foreach(block => addAndCheck(chain, block, Weight(1)))
+    val expected = blocks.map(_.hash).max(chain.blockHashOrdering)
+
+    chain.maxWeightTipUnsafe is ChainTip(expected, 1, Weight(1))
+  }
 }

@@ -16,18 +16,17 @@
 
 package org.alephium.flow.network.interclique
 
-import scala.util.Random
-
 import org.apache.pekko.io.Tcp
 import org.apache.pekko.testkit.{TestActorRef, TestProbe}
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.handler.TestUtils
+import org.alephium.flow.network.SyncPeerProfile
 import org.alephium.flow.network.broker.BrokerHandler
-import org.alephium.protocol.{Generators, SignatureSchema}
-import org.alephium.protocol.message.{Hello, P2PV1, P2PV2}
+import org.alephium.protocol.{Generators, Signature}
+import org.alephium.protocol.message.Hello
 import org.alephium.protocol.model.InterBrokerInfo
-import org.alephium.util.ActorRefT
+import org.alephium.util.{ActorRefT, TimeStamp}
 
 class OutboundBrokerHandlerSpec extends AlephiumFlowActorSpec {
   it should "connect to remote broker with valid broker info" in new Fixture {
@@ -35,7 +34,7 @@ class OutboundBrokerHandlerSpec extends AlephiumFlowActorSpec {
       expectedRemoteBroker.address,
       Generators.socketAddressGen.sample.get
     )
-    val hello = Hello.unsafe(expectedRemoteBroker.interBrokerInfo, priKey, selfP2PVersion)
+    val hello = helloWithVersion(expectedRemoteBroker.interBrokerInfo)
     brokerHandler ! BrokerHandler.Received(hello)
     brokerHandlerActor.pingPongTickOpt is a[Some[_]]
   }
@@ -52,7 +51,7 @@ class OutboundBrokerHandlerSpec extends AlephiumFlowActorSpec {
       expectedRemoteBroker.brokerId,
       expectedRemoteBroker.brokerNum
     )
-    val hello = Hello.unsafe(wrongBroker, priKey, selfP2PVersion)
+    val hello = helloWithVersion(wrongBroker)
     brokerHandler ! BrokerHandler.Received(hello)
     handlerProbe.expectTerminated(brokerHandler.ref)
   }
@@ -63,9 +62,7 @@ class OutboundBrokerHandlerSpec extends AlephiumFlowActorSpec {
     val blockFlowSynchronizer = TestProbe()
     val maxForkDepth          = 5
     val expectedRemoteBroker  = Generators.brokerInfoGen.sample.get
-    val selfP2PVersion        = if (Random.nextBoolean()) P2PV1 else P2PV2
 
-    lazy val (priKey, pubKey)               = SignatureSchema.secureGeneratePriPub()
     lazy val (allHandler, allHandlerProbes) = TestUtils.createAllHandlersProbe
     lazy val brokerHandler = TestActorRef[OutboundBrokerHandler](
       OutboundBrokerHandler.props(
@@ -78,5 +75,10 @@ class OutboundBrokerHandlerSpec extends AlephiumFlowActorSpec {
       )
     )
     lazy val brokerHandlerActor = brokerHandler.underlyingActor
+
+    def helloWithVersion(brokerInfo: InterBrokerInfo): Hello = {
+      val clientId = s"scala-alephium/${SyncPeerProfile.FastSyncMinVersion}/Linux/p2p-v2"
+      Hello.unsafe(clientId, TimeStamp.now(), brokerInfo, Signature.zero)
+    }
   }
 }

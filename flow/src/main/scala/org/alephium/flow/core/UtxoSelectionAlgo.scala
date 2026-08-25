@@ -123,7 +123,7 @@ object UtxoSelectionAlgo extends StrictLogging {
         case Right(_) =>
           ascendingResult
         case Left(err) =>
-          logger.info(s"Select with ascending order returns $err, try descending order instead")
+          logger.debug(s"Select with ascending order returns $err, try descending order instead")
 
           val descendingOrderSelector: BuildWithOrder =
             BuildWithOrder(providedGas, AssetDescendingOrder)

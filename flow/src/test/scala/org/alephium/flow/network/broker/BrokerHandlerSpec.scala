@@ -25,19 +25,28 @@ import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler._
 import org.alephium.flow.model.DataOrigin
+import org.alephium.flow.network.{MaxFlowDataHashesPerChain, MinFlowDataHashRequestNum}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.{InvalidHeaderFlow, InvalidTestnetMiner}
 import org.alephium.protocol.{Generators, Signature, SignatureSchema}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BlockHash, BrokerInfo, ChainIndex, CliqueId, HardFork}
+import org.alephium.protocol.model.{
+  BlockHash,
+  BrokerInfo,
+  ChainIndex,
+  CliqueId,
+  HardFork,
+  ReleaseVersion
+}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, TimeStamp}
 
 class BrokerHandlerSpec extends AlephiumActorSpec {
   it should "handshake with new connection" in new Fixture {
     receivedHandshakeMessage()
     brokerHandlerActor.pingPongTickOpt is a[Some[_]]
+    brokerHandlerActor.remoteReleaseVersion is Some(ReleaseVersion.current)
   }
 
   it should "stop when handshake timeout" in new Fixture {
@@ -171,24 +180,47 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     connectionHandler.expectMsg(ConnectionHandler.Send(Message.serialize(response)))
   }
 
-  it should "handle blocks response: p2pv1" in new Fixture {
-    override val configValues: Map[String, Any] = Map(("alephium.network.enable-p2p-v2", false))
-    networkConfig.enableP2pV2 is false
-    receivedHandshakeMessage()
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val block      = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block)
-    val response = BlocksResponse.fromBlocks(RequestId.random(), AVector(block))
-    brokerHandler ! BrokerHandler.Received(response)
-    eventually {
-      allHandlerProbes.dependencyHandler.expectMsg(
-        DependencyHandler.AddFlowData(AVector(block), DataOrigin.Local)
-      )
-      blockFlowSynchronizer.expectNoMessage()
-    }
+  it should "scale flow data hash request limits with chain count" in {
+    BrokerHandler.maxFlowDataHashRequestNum(1) is MinFlowDataHashRequestNum
+    BrokerHandler.maxFlowDataHashRequestNum(16) is MinFlowDataHashRequestNum
+    BrokerHandler.maxFlowDataHashRequestNum(64) is (MaxFlowDataHashesPerChain * 64)
   }
 
-  it should "handle blocks response: p2pv2" in new Fixture {
+  it should "reject oversized block and header hash requests" in new Fixture {
+    receivedHandshakeMessage()
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block)
+    val hashes = AVector.fill(brokerHandlerActor.maxFlowDataHashRequestNum + 1)(block.hash)
+
+    brokerHandler ! BrokerHandler.Received(BlocksRequest(RequestId.random(), hashes))
+    listener.expectMsg(MisbehaviorManager.Spamming(remoteAddress))
+    connectionHandler.expectNoMessage()
+
+    brokerHandler ! BrokerHandler.Received(HeadersRequest(RequestId.random(), hashes))
+    listener.expectMsg(MisbehaviorManager.Spamming(remoteAddress))
+    connectionHandler.expectNoMessage()
+  }
+
+  it should "share rate limiting between block and header hash requests" in new Fixture {
+    receivedHandshakeMessage()
+    val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    addAndCheck(blockFlow, block)
+    brokerHandlerActor.flowDataHashRequestRateLimiter
+      .tryRequest(brokerHandlerActor.maxFlowDataHashRequestNum - 1) is true
+
+    val headersRequest = HeadersRequest(AVector(block.hash))
+    brokerHandler ! BrokerHandler.Received(headersRequest)
+    connectionHandler.expectMsg(
+      ConnectionHandler.Send(
+        Message.serialize(HeadersResponse(headersRequest.id, AVector(block.header)))
+      )
+    )
+
+    brokerHandler ! BrokerHandler.Received(BlocksRequest(AVector(block.hash)))
+    connectionHandler.expectNoMessage()
+  }
+
+  it should "handle blocks response" in new Fixture {
     networkConfig.enableP2pV2 is true
     receivedHandshakeMessage()
     val chainIndex = ChainIndex.unsafe(0, 0)
@@ -215,16 +247,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     blockFlowSynchronizer.expectNoMessage()
   }
 
-  it should "use sync protocol v1" in new Fixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.enable-p2p-v2", false))
-    brokerHandlerActor.selfP2PVersion is P2PV1
-    brokerHandlerActor.handShakeMessage.asInstanceOf[Hello].clientId.endsWith("p2p-v1")
-  }
-
-  it should "use sync protocol v2" in new Fixture {
-    override val configValues: Map[String, Any] =
-      Map(("alephium.network.enable-p2p-v2", true))
+  it should "advertise sync protocol v2" in new Fixture {
     brokerHandlerActor.selfP2PVersion is P2PV2
     brokerHandlerActor.handShakeMessage.asInstanceOf[Hello].clientId.endsWith("p2p-v2")
   }
@@ -309,8 +332,7 @@ class TestBrokerHandler(
   override val handShakeMessage: Payload =
     Hello.unsafe(brokerInfo.interBrokerInfo, priKey, selfP2PVersion)
 
-  override def exchangingV1: Receive = exchangingCommon orElse flowEvents
-  override def exchangingV2: Receive = exchangingV1
+  override def exchangingV2: Receive = exchangingCommon orElse flowEvents
 
   override def dataOrigin: DataOrigin = DataOrigin.Local
 

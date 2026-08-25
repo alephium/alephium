@@ -19,7 +19,15 @@ package org.alephium.flow.mempool
 import scala.util.Random
 
 import org.alephium.flow.FlowFixture
-import org.alephium.protocol.model.{ChainIndex, GroupIndex, ModelGenerators}
+import org.alephium.flow.model.MempoolTxMetadata
+import org.alephium.protocol.model.{
+  nonCoinbaseMinGasPrice,
+  ChainIndex,
+  GroupIndex,
+  ModelGenerators,
+  Transaction
+}
+import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}
 
 class GrandPoolSpec extends AlephiumSpec {
@@ -40,6 +48,87 @@ class GrandPoolSpec extends AlephiumSpec {
   it should "add cross-group transactions" in new SingleBrokerFixture {
     val chainIndex = chainIndexGen.retryUntil(!_.isIntraGroup).sample.get
     testXGroupTx(chainIndex)
+  }
+
+  it should "remove cross-group mirrors when admission evicts the source transaction" in new Fixture
+    with ModelGenerators {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.mempool.mempool-capacity-per-chain", 1)
+    )
+
+    val chainIndex = chainIndexGen.retryUntil(!_.isIntraGroup).sample.get
+    val rawTx0 = transactionGen()
+      .retryUntil(_.chainIndex == chainIndex)
+      .sample
+      .get
+      .toTemplate
+    val tx0 = rawTx0.copy(unsigned = rawTx0.unsigned.copy(gasPrice = nonCoinbaseMinGasPrice))
+    val tx1 = transactionGen()
+      .retryUntil { candidate =>
+        candidate.chainIndex == chainIndex &&
+        candidate.unsigned.inputs.forall(input =>
+          tx0.unsigned.inputs.forall(_.outputRef != input.outputRef)
+        )
+      }
+      .sample
+      .get
+      .toTemplate
+    val higherFeeTx = tx1.copy(unsigned =
+      tx1.unsigned.copy(gasPrice = GasPrice(nonCoinbaseMinGasPrice.value.addOneUnsafe()))
+    )
+    val metadata = MempoolTxMetadata(None, GasBox.unsafeTest(Int.MaxValue))
+    val now      = TimeStamp.now()
+
+    pool.add(chainIndex, tx0, now, metadata).addedCount is 1
+    pool.getMemPool(chainIndex.from).contains(tx0) is true
+    pool.getMemPool(chainIndex.to).contains(tx0) is true
+
+    pool.add(chainIndex, higherFeeTx, now, metadata).addedCount is 1
+    pool.getMemPool(chainIndex.from).contains(tx0) is false
+    pool.getMemPool(chainIndex.to).contains(tx0) is false
+    pool.getMemPool(chainIndex.from).contains(higherFeeTx) is true
+    pool.getMemPool(chainIndex.to).contains(higherFeeTx) is true
+    pool.size is 2
+  }
+
+  it should "clean admission-evicted mirrors during reorg without removing confirmed mirrors" in new Fixture
+    with ModelGenerators {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.mempool.mempool-capacity-per-chain", 1)
+    )
+
+    val chainIndex = chainIndexGen.retryUntil(!_.isIntraGroup).sample.get
+    val rawTx0      = transactionGen().retryUntil(_.chainIndex == chainIndex).sample.get
+    val tx0 = rawTx0.copy(unsigned = rawTx0.unsigned.copy(gasPrice = nonCoinbaseMinGasPrice))
+    val rawTx1 = transactionGen()
+      .retryUntil { candidate =>
+        candidate.chainIndex == chainIndex &&
+        candidate.unsigned.inputs.forall(input =>
+          tx0.unsigned.inputs.forall(_.outputRef != input.outputRef)
+        )
+      }
+      .sample
+      .get
+    val higherFeeTx = rawTx1.copy(unsigned =
+      rawTx1.unsigned.copy(gasPrice = GasPrice(nonCoinbaseMinGasPrice.value.addOneUnsafe()))
+    )
+    val metadata = MempoolTxMetadata(None, GasBox.unsafeTest(Int.MaxValue))
+    val changes  = AVector.fill(groupConfig.depsNum)(chainIndex -> AVector.empty[Transaction])
+    val toAdd    = changes.replace(0, chainIndex -> AVector(higherFeeTx))
+
+    pool.add(chainIndex, tx0.toTemplate, TimeStamp.now(), metadata).addedCount is 1
+    pool.reorg(chainIndex.from, changes, toAdd, metadata.maximalGasPerBlock)
+    pool.getMemPool(chainIndex.from).contains(tx0.id) is false
+    pool.getMemPool(chainIndex.to).contains(tx0.id) is false
+
+    val confirmedPool = GrandPool.empty
+    confirmedPool.add(chainIndex, tx0.toTemplate, TimeStamp.now(), metadata).addedCount is 1
+    val toRemove = changes.replace(0, chainIndex -> AVector(tx0))
+    confirmedPool.reorg(chainIndex.from, toRemove, toAdd, metadata.maximalGasPerBlock)
+    confirmedPool.getMemPool(chainIndex.from).contains(tx0.id) is false
+    confirmedPool.getMemPool(chainIndex.to).contains(tx0.id) is true
   }
 
   behavior of "Multi Broker"

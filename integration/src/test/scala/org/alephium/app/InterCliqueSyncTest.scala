@@ -19,6 +19,8 @@ package org.alephium.app
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
 
+import scala.concurrent.{ExecutionContext, Future}
+
 import org.apache.pekko.actor.{Actor, ActorRef}
 import org.apache.pekko.io.Tcp
 import org.apache.pekko.util.ByteString
@@ -79,15 +81,25 @@ object Injected {
 }
 
 class InterCliqueSyncTest extends AlephiumActorSpec {
-  it should "boot and sync two cliques of 2 nodes using protocol v1" in new Fixture {
+  private def startCliques(cliques: Seq[CliqueFixture#Clique]): Unit = {
+    implicit val ec: ExecutionContext = system.dispatcher
+    discard(Future.traverse(cliques)(_.startWithoutCheckSyncStateAsync()).futureValue)
+  }
+
+  private def stopCliques(cliques: Seq[CliqueFixture#Clique]): Unit = {
+    implicit val ec: ExecutionContext = system.dispatcher
+    discard(Future.traverse(cliques)(_.stopAsync()).futureValue)
+  }
+
+  it should "boot and sync two cliques of 2 nodes using protocol v2" in new Fixture {
     test(2, 2)
   }
 
-  it should "boot and sync two cliques of 1 and 2 nodes using protocol v1" in new Fixture {
+  it should "boot and sync two cliques of 1 and 2 nodes using protocol v2" in new Fixture {
     test(1, 2)
   }
 
-  it should "boot and sync two cliques of 2 and 1 nodes using protocol v1" in new Fixture {
+  it should "boot and sync two cliques of 2 and 1 nodes using protocol v2" in new Fixture {
     test(2, 1)
   }
 
@@ -112,8 +124,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       val clique1 =
         bootClique(
           nbOfNodes = nbOfNodesClique1,
-          connectionBuild = clique1ConnectionBuild,
-          configOverrides = Map(("alephium.network.enable-p2p-v2", false))
+          connectionBuild = clique1ConnectionBuild
         )
       val masterPortClique1 = clique1.masterTcpPort
 
@@ -129,47 +140,49 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
         bootClique(
           nbOfNodes = nbOfNodesClique2,
           bootstrap = Some(new InetSocketAddress("127.0.0.1", masterPortClique1)),
-          connectionBuild = clique2ConnectionBuild,
-          configOverrides = Map(("alephium.network.enable-p2p-v2", false))
+          connectionBuild = clique2ConnectionBuild
         )
       val masterPortClique2 = clique2.masterTcpPort
 
       clique2.start()
       val selfClique2 = clique2.selfClique()
 
-      clique2.servers.foreach { server =>
-        eventually {
-          val interCliquePeers =
-            request[Seq[InterCliquePeerInfo]](
-              getInterCliquePeerInfo,
-              restPort(server.config.network.bindAddress.getPort)
-            ).head
+      eventually {
+        implicit val ec: ExecutionContext = system.dispatcher
+        val peerStates = Future
+          .traverse(clique2.servers.toSeq) { server =>
+            val serverRestPort = restPort(server.config.network.bindAddress.getPort)
+            for {
+              interCliquePeers <-
+                requestAsync[Seq[InterCliquePeerInfo]](getInterCliquePeerInfo, serverRestPort)
+              discoveredNeighbors <- requestAsync[Seq[BrokerInfo]](
+                getDiscoveredNeighbors,
+                serverRestPort
+              )
+            } yield (interCliquePeers.head, discoveredNeighbors)
+          }
+          .futureValue
+
+        peerStates.foreach { case (interCliquePeers, discoveredNeighbors) =>
           interCliquePeers.cliqueId is selfClique1.cliqueId
           interCliquePeers.isSynced is true
-
-          val discoveredNeighbors =
-            request[Seq[BrokerInfo]](
-              getDiscoveredNeighbors,
-              restPort(server.config.network.bindAddress.getPort)
-            )
           discoveredNeighbors.length is (nbOfNodesClique1 + nbOfNodesClique2)
         }
       }
 
       val toTs = TimeStamp.now()
       eventually {
-        val blockflow1 = selfClique1.nodes.flatMap { peer =>
-          request[BlocksPerTimeStampRange](
-            blockflowFetch(fromTs, toTs),
-            peer.restPort
-          ).blocks
+        implicit val ec: ExecutionContext = system.dispatcher
+        def fetchBlocks(selfClique: SelfClique) = {
+          Future
+            .traverse(selfClique.nodes.toSeq) { peer =>
+              requestAsync[BlocksPerTimeStampRange](blockflowFetch(fromTs, toTs), peer.restPort)
+            }
+            .map(_.flatMap(_.blocks.toSeq))
         }
-        val blockflow2 = selfClique2.nodes.flatMap { peer =>
-          request[BlocksPerTimeStampRange](
-            blockflowFetch(fromTs, toTs),
-            peer.restPort
-          ).blocks
-        }
+
+        val (blockflow1, blockflow2) =
+          fetchBlocks(selfClique1).zip(fetchBlocks(selfClique2)).futureValue
 
         blockflow1.length is blockflow2.length
 
@@ -178,60 +191,66 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
 
       eventually(request[SelfClique](getSelfClique, restPort(masterPortClique2)).synced is true)
 
-      clique1.stop()
-      clique2.stop()
+      stopCliques(Seq(clique1, clique2))
     }
     // scalastyle:on method.length
   }
 
-  it should "test p2p protocol v2, v2 cliques: 4" in new P2PV1V2SyncFixture {
-    test(Seq.fill(4)(P2PV2))
-  }
-
-  it should "test p2p protocol v2, v1 cliques: 1, v2 cliques: 3" in new P2PV1V2SyncFixture {
-    test(Seq(P2PV2, P2PV2, P2PV2, P2PV1))
-  }
-
-  it should "test p2p protocol v2, v1 cliques: 2, v2 cliques: 2" in new P2PV1V2SyncFixture {
-    test(Seq(P2PV2, P2PV2, P2PV1, P2PV1))
+  it should "sync four p2p v2 cliques" in new P2PV2CliquesSyncFixture {
+    test()
   }
 
   trait SyncFixtureBase extends CliqueFixture {
-    def checkBlocks(
-        bootstrapClique: Clique,
-        selfClique: Clique,
+    private def fetchBlocks(
+        clique: Clique,
         fromTs: TimeStamp,
         toTs: TimeStamp
+    ): Future[Seq[AVector[BlockEntry]]] = {
+      implicit val ec: ExecutionContext = system.dispatcher
+      Future
+        .traverse(clique.servers.toSeq) { server =>
+          requestAsync[BlocksPerTimeStampRange](blockflowFetch(fromTs, toTs), server.restPort)
+        }
+        .map(_.flatMap(_.blocks.toSeq))
+    }
+
+    private def checkBlocks(
+        blockflow1: Seq[AVector[BlockEntry]],
+        blockflow2: Seq[AVector[BlockEntry]]
     ) = {
-      val blockflow1 = bootstrapClique.selfClique().nodes.flatMap { peer =>
-        request[BlocksPerTimeStampRange](
-          blockflowFetch(fromTs, toTs),
-          peer.restPort
-        ).blocks
-      }
-      val blockflow2 = selfClique.selfClique().nodes.flatMap { peer =>
-        request[BlocksPerTimeStampRange](
-          blockflowFetch(fromTs, toTs),
-          peer.restPort
-        ).blocks
-      }
-
       blockflow1.length is blockflow2.length
-
       blockflow1.map(_.toSet).toSet is blockflow2.map(_.toSet).toSet
+    }
+
+    def awaitSyncedWithSameBlocks(
+        bootstrapClique: Clique,
+        cliques: Seq[Clique],
+        fromTs: TimeStamp,
+        toTs: TimeStamp
+    ): Unit = eventually {
+      implicit val ec: ExecutionContext = system.dispatcher
+      val result = (for {
+        bootstrapBlocks <- fetchBlocks(bootstrapClique, fromTs, toTs)
+        cliqueStates <- Future.traverse(cliques) { clique =>
+          for {
+            blocks <- fetchBlocks(clique, fromTs, toTs)
+            state  <- requestAsync[SelfClique](getSelfClique, clique.masterRestPort)
+          } yield (blocks, state)
+        }
+      } yield (bootstrapBlocks, cliqueStates)).futureValue
+
+      result._2.foreach { case (blocks, state) =>
+        checkBlocks(result._1, blocks)
+        state.synced is true
+      }
     }
   }
 
-  trait P2PV1V2SyncFixture extends SyncFixtureBase {
+  trait P2PV2CliquesSyncFixture extends SyncFixtureBase {
     // scalastyle:off method.length
-    def test(p2pVersions: Seq[P2PVersion]) = {
-      assume(p2pVersions.length == 4)
-
-      val fromTs = TimeStamp.now()
-      val clique1 = bootClique(
-        1,
-        configOverrides = Map(("alephium.network.enable-p2p-v2", p2pVersions.head == P2PV2))
-      )
+    def test() = {
+      val fromTs  = TimeStamp.now()
+      val clique1 = bootClique(1)
 
       clique1.start()
       clique1.startWsAndWaitConnection()
@@ -240,32 +259,28 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       blockNotifyProbe.receiveN(10, Duration.ofMinutesUnsafe(2).asScala)
       clique1.stopMining()
 
-      val remainCliques = (1 until 4).map { index =>
-        val clique = bootClique(
+      val remainCliques = (1 until 4).map { _ =>
+        bootClique(
           1,
-          Some(new InetSocketAddress("127.0.0.1", clique1.masterTcpPort)),
-          configOverrides = Map(("alephium.network.enable-p2p-v2", p2pVersions(index) == P2PV2))
+          Some(new InetSocketAddress("127.0.0.1", clique1.masterTcpPort))
         )
-        clique.startWithoutCheckSyncState()
-        clique
       }
+      startCliques(remainCliques)
 
       val toTs = TimeStamp.now()
-      remainCliques.foreach { clique =>
-        eventually { checkBlocks(clique1, clique, fromTs, toTs) }
+      awaitSyncedWithSameBlocks(clique1, remainCliques, fromTs, toTs)
 
-        eventually(
-          request[SelfClique](getSelfClique, restPort(clique.masterTcpPort)).synced is true
-        )
-      }
-
-      clique1.stop()
-      remainCliques.foreach(_.stop())
+      stopCliques(clique1 +: remainCliques)
     }
     // scalastyle:on method.length
   }
 
   trait P2PV2SyncFixture extends SyncFixtureBase {
+    private val configOverrides = Map[String, Any](
+      "alephium.network.enable-p2p-v2"          -> true,
+      "alephium.network.stable-sync-frequency" -> "2 seconds"
+    )
+
     val chainStateMessageCount = new AtomicInteger(0)
     val otherSyncMessageCount  = new AtomicInteger(0)
     val injection: PartialFunction[Payload, Payload] = {
@@ -287,7 +302,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
         1,
         None,
         Injected.payload(injection, _),
-        Map(("alephium.network.enable-p2p-v2", true))
+        configOverrides
       )
       clique1.start()
 
@@ -296,37 +311,30 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
           1,
           Some(new InetSocketAddress("127.0.0.1", clique1.masterTcpPort)),
           Injected.payload(injection, _),
-          Map(("alephium.network.enable-p2p-v2", true))
+          configOverrides
         )
       }
 
       if (mining) {
+        clique1.startWsAndWaitConnection()
         clique1.startMining()
-        Thread.sleep(60 * 1000)
+        awaitNBlocks(128)
         clique1.stopMining()
       }
 
-      remainCliques.foreach { clique =>
-        clique.startWithoutCheckSyncState()
-      }
+      startCliques(remainCliques)
 
       val toTs = TimeStamp.now()
-      remainCliques.foreach { clique =>
-        eventually { checkBlocks(clique1, clique, fromTs, toTs) }
-
-        eventually(
-          request[SelfClique](getSelfClique, restPort(clique.masterTcpPort)).synced is true
-        )
-      }
+      awaitSyncedWithSameBlocks(clique1, remainCliques, fromTs, toTs)
 
       chainStateMessageCount.set(0)
       otherSyncMessageCount.set(0)
-      Thread.sleep(30 * 1000)
-      chainStateMessageCount.get > 0 is true
-      otherSyncMessageCount.get() is 0
+      eventually {
+        chainStateMessageCount.get > 0 is true
+        otherSyncMessageCount.get() is 0
+      }
 
-      clique1.stop()
-      remainCliques.foreach(_.stop())
+      stopCliques(clique1 +: remainCliques)
     }
   }
 
@@ -473,11 +481,9 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     bootstrapClique.startWithoutCheckSyncState()
 
     val cliques0 = AVector.from(0 until 3).map { _ =>
-      val clique =
-        bootClique(1, Some(new InetSocketAddress("127.0.0.1", bootstrapClique.masterTcpPort)))
-      clique.startWithoutCheckSyncState()
-      clique
+      bootClique(1, Some(new InetSocketAddress("127.0.0.1", bootstrapClique.masterTcpPort)))
     }
+    startCliques(cliques0.toSeq)
 
     eventually {
       cliques0.foreach { clique =>
@@ -487,14 +493,25 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
 
     bootstrapClique.startMining()
     cliques0.foreach(_.startMining())
-    Thread.sleep(30 * 1000)
+    eventually {
+      request[BlocksPerTimeStampRange](
+        blockflowFetch(fromTs, TimeStamp.now()),
+        bootstrapClique.masterRestPort
+      ).blocks.flatMap(identity).length >= 64 is true
+    }
     cliques0.foreach { clique =>
       clique.servers.head.miner ! Miner.Stop
     }
-    Thread.sleep(30 * 1000)
-    bootstrapClique.servers.head.miner ! Miner.Stop
 
-    val toTs = TimeStamp.now()
+    val blocks = eventually {
+      val currentBlocks = request[BlocksPerTimeStampRange](
+        blockflowFetch(fromTs, TimeStamp.now()),
+        bootstrapClique.masterRestPort
+      ).blocks.flatMap(identity)
+      currentBlocks.exists(_.ghostUncles.nonEmpty) is true
+      currentBlocks
+    }
+    bootstrapClique.servers.head.miner ! Miner.Stop
 
     val clique1 = bootClique(
       1,
@@ -502,28 +519,20 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     )
     clique1.startWithoutCheckSyncState()
 
-    val blocks = bootstrapClique.selfClique().nodes.flatMap { peer =>
-      request[BlocksPerTimeStampRange](
-        blockflowFetch(fromTs, toTs),
-        peer.restPort
-      ).blocks.flatMap(identity)
-    }
-    blocks.filter(_.ghostUncles.nonEmpty).nonEmpty is true
-
     val allCliques = cliques0 :+ clique1
     blocks.foreach { block =>
       eventually {
-        allCliques.foreach { clique =>
-          val response =
-            request[BlockEntry](getBlock(block.hash.toHexString), clique.masterRestPort)
-          response is block
-        }
+        implicit val ec: ExecutionContext = system.dispatcher
+        Future
+          .traverse(allCliques.toSeq) { clique =>
+            requestAsync[BlockEntry](getBlock(block.hash.toHexString), clique.masterRestPort)
+          }
+          .futureValue
+          .foreach(_ is block)
       }
       ()
     }
 
-    bootstrapClique.stop()
-    clique1.stop()
-    cliques0.foreach(_.stop())
+    stopCliques(Seq(bootstrapClique, clique1) ++ cliques0.toSeq)
   }
 }
