@@ -41,7 +41,6 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         config.blockTargetTime,
         config.uncleDependencyGapTime,
         18,
-        18,
         config.emission
       )
     val consensusConfigs: ConsensusSettings = {

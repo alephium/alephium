@@ -43,7 +43,8 @@ class WalletServer(
     with WalletDocumentation
     with VertxFutureServerInterpreter {
 
-  override val vertxFutureServerOptions = ServerOptions.serverOptions(enableHttpMetrics)
+  override val vertxFutureServerOptions =
+    ServerOptions.serverOptions(enableHttpMetrics, executionContext)
 
   val routes: AVector[Router => Route] = AVector(
     createWalletLogic,
@@ -80,16 +81,30 @@ object WalletServer {
     def internalServerError        = InternalServerError(walletError.message)
     def unauthorized               = Unauthorized(walletError.message)
     def notFound(filename: String) = NotFound(filename)
+    def sweepSubmissionFailed(
+        error: ApiError[_ <: StatusCode]
+    ): ApiError[_ <: StatusCode] = error match {
+      case _: Unauthorized        => Unauthorized(walletError.message)
+      case _: BadRequest          => BadRequest(walletError.message)
+      case _: PreconditionFailed  => PreconditionFailed(walletError.message)
+      case _: ServiceUnavailable  => ServiceUnavailable(walletError.message)
+      case _: InternalServerError => InternalServerError(walletError.message)
+      case _: NotFound            => NotFound(walletError.message)
+      case _: GatewayTimeout      => GatewayTimeout(walletError.message)
+    }
 
     walletError match {
-      case _: InvalidWalletName         => badRequest
-      case _: CannotCreateEncryptedFile => badRequest
-      case BlockFlowClientError(error)  => error
-      case _: UnknownAddress            => badRequest
-      case InvalidWalletFile            => badRequest
-      case UnexpectedError              => internalServerError
-      case WalletNotFound(file)         => notFound(file.getName())
-      case _: OtherError                => badRequest
+      case _: InvalidWalletName               => badRequest
+      case _: CannotCreateEncryptedFile       => badRequest
+      case SweepSubmissionFailed(error, _, _) => sweepSubmissionFailed(error)
+      case BlockFlowClientError(error)        => error
+      case _: UnknownAddress                  => badRequest
+      case InvalidWalletFile                  => badRequest
+      case UnexpectedError                    => internalServerError
+      case _: SweepConfirmationTimeout        => GatewayTimeout(walletError.message)
+      case _: SweepTransactionConflicted      => badRequest
+      case WalletNotFound(file)               => notFound(file.getName())
+      case _: OtherError                      => badRequest
 
       case WalletLocked              => unauthorized
       case InvalidPassword           => unauthorized

@@ -50,6 +50,10 @@ sealed trait TransactionAbstract {
   // this might only works for validated tx
   def chainIndex(implicit config: GroupConfig): ChainIndex = ChainIndex(fromGroup, toGroup)
 
+  def chainIndexOpt(implicit config: GroupConfig): Option[ChainIndex] = {
+    Option.when(unsigned.inputs.nonEmpty)(chainIndex)
+  }
+
   def gasFeeUnsafe: U256 = unsigned.gasPrice * unsigned.gasAmount
 
   def outputsLength: Int

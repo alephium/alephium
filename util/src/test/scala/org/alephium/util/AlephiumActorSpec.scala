@@ -118,7 +118,17 @@ object AlephiumActorSpec {
          |      executor = "thread-pool-executor"
          |      thread-pool-executor {
          |        core-pool-size-min = 4
+         |        core-pool-size-factor = 1.0
          |        core-pool-size-max = 32
+         |      }
+         |      throughput = 1
+         |    }
+         |
+         |    blocking-io-dispatcher {
+         |      type = Dispatcher
+         |      executor = "thread-pool-executor"
+         |      thread-pool-executor {
+         |        fixed-pool-size = 4
          |      }
          |      throughput = 1
          |    }

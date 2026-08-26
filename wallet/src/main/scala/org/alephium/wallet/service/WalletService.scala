@@ -20,12 +20,14 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.{Timer, TimerTask}
+import java.util.concurrent.{Executors, ScheduledExecutorService, ThreadFactory, TimeUnit}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.Try
+import scala.util.control.NonFatal
 
 import sttp.model.StatusCode
 
@@ -123,6 +125,7 @@ trait WalletService extends Service {
   def revealMnemonic(wallet: String, password: String): Either[WalletError, Mnemonic]
 }
 
+// scalastyle:off number.of.methods
 object WalletService {
 
   sealed trait WalletError {
@@ -191,13 +194,158 @@ object WalletService {
 
   final case class OtherError(message: String) extends WalletError
 
+  private def sweepFailureMessage(
+      reason: String,
+      submittedTxIds: AVector[TransactionId],
+      possiblySubmittedTxIds: AVector[TransactionId]
+  ): String = {
+    val submitted = Option.when(submittedTxIds.nonEmpty)(
+      s"Submitted sweep transaction ids: ${submittedTxIds.map(_.toHexString).mkString(", ")}"
+    )
+    val possiblySubmitted = Option.when(possiblySubmittedTxIds.nonEmpty)(
+      s"Sweep transaction ids with unknown submission status: " +
+        possiblySubmittedTxIds.map(_.toHexString).mkString(", ")
+    )
+    (AVector(reason) ++ AVector.from(submitted) ++ AVector.from(possiblySubmitted)).mkString(". ")
+  }
+
+  final case class SweepSubmissionFailed(
+      apiError: ApiError[_ <: StatusCode],
+      submittedTxIds: AVector[TransactionId],
+      possiblySubmittedTxIds: AVector[TransactionId]
+  ) extends WalletError {
+    val message: String =
+      sweepFailureMessage(apiError.detail, submittedTxIds, possiblySubmittedTxIds)
+  }
+
+  final case class SweepTransactionConflicted(
+      txId: TransactionId,
+      submittedTxIds: AVector[TransactionId],
+      possiblySubmittedTxIds: AVector[TransactionId]
+  ) extends WalletError {
+    val message: String = sweepFailureMessage(
+      s"Sweep transaction ${txId.toHexString} is conflicted",
+      submittedTxIds,
+      possiblySubmittedTxIds
+    )
+  }
+
+  object SweepTransactionConflicted {
+    def apply(txId: TransactionId): SweepTransactionConflicted =
+      new SweepTransactionConflicted(txId, AVector.empty, AVector.empty)
+  }
+
+  final case class SweepConfirmationTimeout(
+      txIds: AVector[TransactionId],
+      submittedTxIds: AVector[TransactionId],
+      possiblySubmittedTxIds: AVector[TransactionId]
+  ) extends WalletError {
+    val message: String = sweepFailureMessage(
+      s"Timed out waiting for sweep transaction confirmation: " +
+        txIds.map(_.toHexString).mkString(", "),
+      submittedTxIds,
+      possiblySubmittedTxIds
+    )
+  }
+
+  object SweepConfirmationTimeout {
+    def apply(txIds: AVector[TransactionId]): SweepConfirmationTimeout =
+      new SweepConfirmationTimeout(txIds, AVector.empty, AVector.empty)
+  }
+
+  final private[service] case class SweepBatchSettings(
+      batchSize: Int,
+      confirmationPollInterval: Duration,
+      confirmationTimeout: Duration
+  )
+
+  final private case class PreparedSweepTransaction(
+      txId: TransactionId,
+      unsignedTx: String,
+      signature: Signature,
+      fromGroup: GroupIndex,
+      toGroup: GroupIndex
+  )
+
+  final private case class QueuedSweepTransaction(
+      index: Int,
+      transaction: PreparedSweepTransaction
+  )
+
+  final private case class SubmittedSweepTransaction(
+      index: Int,
+      txId: TransactionId,
+      fromGroup: GroupIndex,
+      toGroup: GroupIndex
+  ) {
+    def result: (TransactionId, GroupIndex, GroupIndex) = (txId, fromGroup, toGroup)
+  }
+
+  final private case class SweepPostResult(
+      queued: QueuedSweepTransaction,
+      result: Either[WalletError, SubmittedSweepTransaction],
+      submissionUnknown: Boolean
+  )
+
+  final private case class SweepFailure(
+      cause: WalletError,
+      submitted: AVector[SubmittedSweepTransaction],
+      possiblySubmitted: AVector[QueuedSweepTransaction]
+  ) {
+    def addSubmitted(
+        transactions: AVector[SubmittedSweepTransaction]
+    ): SweepFailure = copy(submitted = transactions ++ submitted)
+
+    def toWalletError: WalletError = {
+      val submittedTxIds = submitted.sortBy(_.index).map(_.txId).distinct
+      val possiblySubmittedTxIds =
+        possiblySubmitted
+          .sortBy(_.index)
+          .map(_.transaction.txId)
+          .distinct
+          .filterNot(submittedTxIds.toSet)
+      cause match {
+        case BlockFlowClientError(apiError) =>
+          SweepSubmissionFailed(apiError, submittedTxIds, possiblySubmittedTxIds)
+        case SweepTransactionConflicted(txId, _, _) =>
+          SweepTransactionConflicted(txId, submittedTxIds, possiblySubmittedTxIds)
+        case SweepConfirmationTimeout(txIds, _, _) =>
+          SweepConfirmationTimeout(txIds, submittedTxIds, possiblySubmittedTxIds)
+        case error =>
+          SweepSubmissionFailed(
+            ApiError.InternalServerError(error.message),
+            submittedTxIds,
+            possiblySubmittedTxIds
+          )
+      }
+    }
+  }
+
+  private[service] object SweepBatchSettings {
+    val Default: SweepBatchSettings = SweepBatchSettings(
+      batchSize = 2,
+      confirmationPollInterval = Duration.ofSecondsUnsafe(1),
+      confirmationTimeout = Duration.ofMinutesUnsafe(10)
+    )
+  }
+
   def apply(
       blockFlowClient: BlockFlowClient,
       secretDir: Path,
       lockingTimeout: Duration
   )(implicit groupConfig: GroupConfig, executionContext: ExecutionContext): WalletService = {
 
-    new Impl(blockFlowClient, secretDir, lockingTimeout)
+    apply(blockFlowClient, secretDir, lockingTimeout, SweepBatchSettings.Default)
+  }
+
+  private[service] def apply(
+      blockFlowClient: BlockFlowClient,
+      secretDir: Path,
+      lockingTimeout: Duration,
+      sweepBatchSettings: SweepBatchSettings
+  )(implicit groupConfig: GroupConfig, executionContext: ExecutionContext): WalletService = {
+
+    new Impl(blockFlowClient, secretDir, lockingTimeout, sweepBatchSettings)
   }
 
   final private case class StorageState(secretStorage: SecretStorage, timerTask: TimerTask)
@@ -241,16 +389,25 @@ object WalletService {
     }
   }
 
-  // scalastyle:off number.of.methods
   private class Impl(
       blockFlowClient: BlockFlowClient,
       secretDir: Path,
-      lockingTimeout: Duration
+      lockingTimeout: Duration,
+      sweepBatchSettings: SweepBatchSettings
   )(implicit groupConfig: GroupConfig, val executionContext: ExecutionContext)
       extends WalletService {
     override def serviceName: String = "WalletService"
 
     private val secretStorages = Storages(mutable.Map.empty, lockingTimeout)
+
+    private val sweepScheduler: ScheduledExecutorService =
+      Executors.newSingleThreadScheduledExecutor(new ThreadFactory {
+        override def newThread(runnable: Runnable): Thread = {
+          val thread = new Thread(runnable, "wallet-sweep-confirmation")
+          thread.setDaemon(true)
+          thread
+        }
+      })
 
     private val path: AVector[Int] = Constants.path
 
@@ -263,6 +420,7 @@ object WalletService {
     }
 
     protected def stopSelfOnce(): Future[Unit] = {
+      discard(sweepScheduler.shutdownNow())
       Future.successful(())
     }
 
@@ -427,7 +585,11 @@ object WalletService {
         utxosLimit: Option[Int]
     ): Future[Either[WalletError, AVector[(TransactionId, GroupIndex, GroupIndex)]]] = {
       withPrivateKeyFut(wallet) { privateKey =>
-        sweepAddress(privateKey, address, lockTime, gas, gasPrice, utxosLimit)
+        prepareSweepAddress(privateKey, address, lockTime, gas, gasPrice, utxosLimit).flatMap {
+          case Left(error) => Future.successful(Left(error))
+          case Right(preparedTransactions) =>
+            submitPreparedSweepTransactions(preparedTransactions, isMiner = false)
+        }
       }
     }
 
@@ -439,23 +601,38 @@ object WalletService {
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
     ): Future[Either[WalletError, AVector[(TransactionId, GroupIndex, GroupIndex)]]] = {
-      withPrivateKeysFut(wallet) { case (_, privateKeys) =>
-        val init = AVector.empty[(TransactionId, GroupIndex, GroupIndex)]
-        FutureCollection.foldSequentialE(privateKeys)(init) { case (txs, privKey) =>
-          sweepAddress(privKey, address, lockTime, gas, gasPrice, utxosLimit)
-            .map(_.map(_ ++ txs))
+      withSweepPrivateKeysFut(wallet) { case (isMiner, privateKeys) =>
+        prepareSweepAddresses(privateKeys, address, lockTime, gas, gasPrice, utxosLimit).flatMap {
+          case Left(error) => Future.successful(Left(error))
+          case Right(preparedTransactions) =>
+            submitPreparedSweepTransactions(preparedTransactions, isMiner)
         }
       }
     }
 
-    private def sweepAddress(
+    private def prepareSweepAddresses(
+        privateKeys: AVector[ExtendedPrivateKey],
+        address: Address.Asset,
+        lockTime: Option[TimeStamp],
+        gas: Option[GasBox],
+        gasPrice: Option[GasPrice],
+        utxosLimit: Option[Int]
+    ): Future[Either[WalletError, AVector[PreparedSweepTransaction]]] = {
+      FutureCollection.foldSequentialE(privateKeys)(AVector.empty[PreparedSweepTransaction]) {
+        case (transactions, privateKey) =>
+          prepareSweepAddress(privateKey, address, lockTime, gas, gasPrice, utxosLimit)
+            .map(_.map(transactions ++ _))
+      }
+    }
+
+    private def prepareSweepAddress(
         privateKey: ExtendedPrivateKey,
         address: Address.Asset,
         lockTime: Option[TimeStamp],
         gas: Option[GasBox],
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, AVector[(TransactionId, GroupIndex, GroupIndex)]]] = {
+    ): Future[Either[WalletError, AVector[PreparedSweepTransaction]]] = {
       blockFlowClient
         .prepareSweepActiveAddressTransaction(
           privateKey.publicKey,
@@ -468,21 +645,253 @@ object WalletService {
         .flatMap {
           case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
           case Right(buildSweepAllTxResult) =>
-            FutureCollection
-              .foldSequentialE(buildSweepAllTxResult.unsignedTxs)(AVector.empty[TransactionId]) {
-                case (txIds, SweepAddressTransaction(txId, unsignedTx, _, _)) => {
-                  val signature = SignatureSchema.sign(txId.bytes, privateKey.privateKey)
-                  blockFlowClient
-                    .postTransaction(unsignedTx, signature, buildSweepAllTxResult.fromGroup)
-                    .map(_.map(_.txId +: txIds).left.map(BlockFlowClientError.apply))
+            val fromGroup = GroupIndex.unsafe(buildSweepAllTxResult.fromGroup)
+            val toGroup   = GroupIndex.unsafe(buildSweepAllTxResult.toGroup)
+            Future.successful(
+              Right(
+                buildSweepAllTxResult.unsignedTxs.map {
+                  case SweepAddressTransaction(txId, unsignedTx, _, _) =>
+                    val signature = SignatureSchema.sign(txId.bytes, privateKey.privateKey)
+                    PreparedSweepTransaction(txId, unsignedTx, signature, fromGroup, toGroup)
                 }
-              }
-              .map { res =>
-                val from = GroupIndex.unsafe(buildSweepAllTxResult.fromGroup)
-                val to   = GroupIndex.unsafe(buildSweepAllTxResult.toGroup)
-                res.map(_.map((_, from, to)))
-              }
+              )
+            )
         }
+    }
+
+    private def submitPreparedSweepTransactions(
+        preparedTransactions: AVector[PreparedSweepTransaction],
+        isMiner: Boolean
+    ): Future[Either[WalletError, AVector[(TransactionId, GroupIndex, GroupIndex)]]] = {
+      val queuedTransactions = preparedTransactions.mapWithIndex { case (transaction, index) =>
+        QueuedSweepTransaction(index, transaction)
+      }
+      val lanes =
+        if (queuedTransactions.isEmpty) {
+          AVector.empty[AVector[QueuedSweepTransaction]]
+        } else if (isMiner) {
+          AVector.from(
+            queuedTransactions
+              .groupBy(_.transaction.fromGroup)
+              .toSeq
+              .sortBy(_._1.value)
+              .map(_._2)
+          )
+        } else {
+          AVector(queuedTransactions)
+        }
+
+      Future
+        .sequence(lanes.toSeq.map(lane => recoverSweepLane(submitSweepLane(lane))))
+        .map(collectSweepLaneResults)
+    }
+
+    private def collectSweepLaneResults(
+        laneResults: Seq[Either[SweepFailure, AVector[SubmittedSweepTransaction]]]
+    ): Either[WalletError, AVector[(TransactionId, GroupIndex, GroupIndex)]] = {
+      val (submitted, failures) = AVector
+        .from(laneResults)
+        .fold(
+          (
+            AVector.empty[SubmittedSweepTransaction],
+            AVector.empty[SweepFailure]
+          )
+        ) {
+          case ((submitted, failures), Right(laneSubmitted)) =>
+            (submitted ++ laneSubmitted, failures)
+          case ((submitted, failures), Left(failure)) =>
+            (submitted, failures :+ failure)
+        }
+      failures.headOption match {
+        case None => Right(submitted.sortBy(_.index).map(_.result))
+        case Some(firstFailure) =>
+          val failedLaneSubmitted = failures.flatMap(_.submitted)
+          val possiblySubmitted   = failures.flatMap(_.possiblySubmitted)
+          Left(
+            SweepFailure(
+              firstFailure.cause,
+              submitted ++ failedLaneSubmitted,
+              possiblySubmitted
+            ).toWalletError
+          )
+      }
+    }
+
+    private def blockFlowClientError(error: Throwable): BlockFlowClientError = {
+      val message = Option(error.getMessage).getOrElse("BlockFlow request failed")
+      BlockFlowClientError(ApiError.InternalServerError(message))
+    }
+
+    private def recoverSweepLane(
+        result: Future[Either[SweepFailure, AVector[SubmittedSweepTransaction]]]
+    ): Future[Either[SweepFailure, AVector[SubmittedSweepTransaction]]] = {
+      result.recover { case NonFatal(error) =>
+        Left(SweepFailure(blockFlowClientError(error), AVector.empty, AVector.empty))
+      }
+    }
+
+    private def submitSweepLane(
+        transactions: AVector[QueuedSweepTransaction]
+    ): Future[Either[SweepFailure, AVector[SubmittedSweepTransaction]]] = {
+      val batches = transactions.groupedWithRemainder(sweepBatchSettings.batchSize)
+
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+      def submitNext(
+          remaining: AVector[AVector[QueuedSweepTransaction]],
+          submitted: AVector[SubmittedSweepTransaction]
+      ): Future[Either[SweepFailure, AVector[SubmittedSweepTransaction]]] = {
+        remaining.headOption match {
+          case None => Future.successful(Right(submitted))
+          case Some(batch) =>
+            submitSweepBatch(batch).flatMap {
+              case Left(failure) => Future.successful(Left(failure.addSubmitted(submitted)))
+              case Right(batchResult) =>
+                val allSubmitted = submitted ++ batchResult
+                if (remaining.length == 1) {
+                  Future.successful(Right(allSubmitted))
+                } else {
+                  waitForSweepBatchConfirmation(batchResult)
+                    .recover { case NonFatal(error) => Left(blockFlowClientError(error)) }
+                    .flatMap {
+                      case Left(error) =>
+                        Future.successful(
+                          Left(SweepFailure(error, allSubmitted, AVector.empty))
+                        )
+                      case Right(_) => submitNext(remaining.tail, allSubmitted)
+                    }
+                }
+            }
+        }
+      }
+
+      submitNext(batches, AVector.empty)
+    }
+
+    private def submitSweepBatch(
+        batch: AVector[QueuedSweepTransaction]
+    ): Future[Either[SweepFailure, AVector[SubmittedSweepTransaction]]] = {
+      Future
+        .sequence(batch.toSeq.map(submitSweepTransaction))
+        .map(collectSweepPostResults)
+    }
+
+    private def submitSweepTransaction(
+        queued: QueuedSweepTransaction
+    ): Future[SweepPostResult] = {
+      val transaction = queued.transaction
+      blockFlowClient
+        .postTransaction(
+          transaction.unsignedTx,
+          transaction.signature,
+          transaction.fromGroup.value
+        )
+        .map(
+          _.map(result =>
+            SubmittedSweepTransaction(
+              queued.index,
+              result.txId,
+              transaction.fromGroup,
+              transaction.toGroup
+            )
+          ).left.map(BlockFlowClientError.apply)
+        )
+        .map(result => SweepPostResult(queued, result, submissionUnknown = false))
+        .recover { case NonFatal(error) =>
+          SweepPostResult(
+            queued,
+            Left(blockFlowClientError(error)),
+            submissionUnknown = true
+          )
+        }
+    }
+
+    private def collectSweepPostResults(
+        results: Seq[SweepPostResult]
+    ): Either[SweepFailure, AVector[SubmittedSweepTransaction]] = {
+      val (submitted, failed) = AVector
+        .from(results)
+        .fold(
+          (
+            AVector.empty[SubmittedSweepTransaction],
+            AVector.empty[(QueuedSweepTransaction, WalletError, Boolean)]
+          )
+        ) {
+          case ((submitted, failed), SweepPostResult(_, Right(transaction), _)) =>
+            (submitted :+ transaction, failed)
+          case ((submitted, failed), SweepPostResult(queued, Left(error), unknown)) =>
+            (submitted, failed :+ ((queued, error, unknown)))
+        }
+      failed.headOption match {
+        case None => Right(submitted)
+        case Some((_, cause, _)) =>
+          val possiblySubmitted = failed.collect { case (queued, _, unknown) =>
+            Option.when(unknown)(queued)
+          }
+          Left(SweepFailure(cause, submitted, possiblySubmitted))
+      }
+    }
+
+    private def waitForSweepBatchConfirmation(
+        transactions: AVector[SubmittedSweepTransaction]
+    ): Future[Either[WalletError, Unit]] = {
+      val startNanos = System.nanoTime()
+      val timeoutNanos =
+        TimeUnit.MILLISECONDS.toNanos(sweepBatchSettings.confirmationTimeout.millis)
+
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+      def poll(
+          pending: AVector[SubmittedSweepTransaction]
+      ): Future[Either[WalletError, Unit]] = {
+        if (System.nanoTime() - startNanos >= timeoutNanos) {
+          Future.successful(Left(SweepConfirmationTimeout(pending.map(_.txId))))
+        } else {
+          delay(sweepBatchSettings.confirmationPollInterval).flatMap { _ =>
+            fetchPendingSweepTransactions(pending).flatMap {
+              case Left(error)                                 => Future.successful(Left(error))
+              case Right(stillPending) if stillPending.isEmpty => Future.successful(Right(()))
+              case Right(stillPending)                         => poll(stillPending)
+            }
+          }
+        }
+      }
+
+      poll(transactions)
+    }
+
+    private def fetchPendingSweepTransactions(
+        transactions: AVector[SubmittedSweepTransaction]
+    ): Future[Either[WalletError, AVector[SubmittedSweepTransaction]]] = {
+      Future
+        .sequence(transactions.toSeq.map { transaction =>
+          blockFlowClient
+            .fetchTransactionStatus(transaction.txId, transaction.fromGroup, transaction.toGroup)
+            .map(_.map(status => (transaction, status)).left.map(BlockFlowClientError.apply))
+        })
+        .map { responses =>
+          AVector.from(responses).mapE(identity).flatMap { statuses =>
+            statuses.foldE(AVector.empty[SubmittedSweepTransaction]) {
+              case (pending, (_, _: api.Confirmed)) => Right(pending)
+              case (_, (transaction, _: api.Conflicted)) =>
+                Left(SweepTransactionConflicted(transaction.txId))
+              case (pending, (transaction, _: api.MemPooled))  => Right(pending :+ transaction)
+              case (pending, (transaction, _: api.TxNotFound)) => Right(pending :+ transaction)
+            }
+          }
+        }
+    }
+
+    private def delay(duration: Duration): Future[Unit] = {
+      val promise = Promise[Unit]()
+      discard(
+        sweepScheduler.schedule(
+          new Runnable {
+            override def run(): Unit = discard(promise.trySuccess(()))
+          },
+          duration.millis,
+          TimeUnit.MILLISECONDS
+        )
+      )
+      promise.future
     }
 
     def sign(
@@ -671,11 +1080,22 @@ object WalletService {
         case Right(privateKey) => f(privateKey)
       })
 
-    def withPrivateKeysFut[A](wallet: String)(
-        f: ((ExtendedPrivateKey, AVector[ExtendedPrivateKey])) => Future[Either[WalletError, A]]
+    private def withSweepPrivateKeysFut[A](wallet: String)(
+        f: ((Boolean, AVector[ExtendedPrivateKey])) => Future[Either[WalletError, A]]
     ): Future[Either[WalletError, A]] =
       withWalletFut(wallet) { storage =>
-        withPrivateKeysM(storage)(f)(error => Future.successful(Left(error)))
+        (for {
+          privateKeys <- storage.getAllPrivateKeys()
+          isMiner     <- storage.isMiner()
+        } yield {
+          (privateKeys, isMiner)
+        }) match {
+          case Left(error) => Future.successful(Left(WalletError.from(error)))
+          case Right(((_, privateKeys), isMiner)) =>
+            val sweepPrivateKeys =
+              if (isMiner) buildMinerPrivateKeys(privateKeys) else privateKeys
+            f((isMiner, sweepPrivateKeys))
+        }
       }
 
     private def withPrivateKeysM[A, M[_]](storage: SecretStorage)(

@@ -20,6 +20,8 @@ import java.math.BigInteger
 import java.net.InetSocketAddress
 
 import scala.collection.immutable.ArraySeq
+import scala.collection.mutable
+import scala.reflect.ClassTag
 
 import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
@@ -164,6 +166,39 @@ class SerdeSpec extends AlephiumSpec {
       SerdeError.validation(s"Negative array size: -100")
     deserialize[AVector[Byte]](serialize[Int](1)).leftValue is
       SerdeError.validation(s"Malicious array size: 1")
+  }
+
+  it should "not preallocate a declared array before decoding its elements" in {
+    final case class Tracked(value: Int)
+
+    val declaredSize = Serde.MaxBatchPreallocatedElements * 10
+    val allocations  = mutable.ArrayBuffer.empty[Int]
+    implicit val trackedClassTag: ClassTag[Tracked] = new ClassTag[Tracked] {
+      override def runtimeClass: Class[_] = classOf[Tracked]
+      override def newArray(length: Int): Array[Tracked] = {
+        allocations.addOne(length)
+        new Array[Tracked](length)
+      }
+    }
+    val failure = SerdeError.validation("invalid tracked element")
+    val failingSerde = new Serde[Tracked] {
+      override def serialize(input: Tracked): ByteString = ByteString(input.value)
+      override def _deserialize(input: ByteString): SerdeResult[Staging[Tracked]] = Left(failure)
+    }
+    val input =
+      serialize(declaredSize) ++
+        ByteString.fromArrayUnsafe(Array.fill[Byte](declaredSize)(0))
+
+    Serde.avectorSerde(failingSerde)._deserialize(input).leftValue is failure
+    allocations.forall(_ <= Serde.MaxBatchPreallocatedElements) is true
+    allocations.contains(declaredSize) is false
+  }
+
+  it should "deserialize vectors larger than the bounded initial allocation" in {
+    val input =
+      AVector.tabulate(Serde.MaxBatchPreallocatedElements * 2)(index => index.toByte)
+
+    deserialize[AVector[Byte]](serialize(input)) isE input
   }
 
   "Serde for option" should "work" in {

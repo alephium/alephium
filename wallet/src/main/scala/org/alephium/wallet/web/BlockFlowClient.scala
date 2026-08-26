@@ -26,7 +26,7 @@ import org.alephium.api.model._
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.{PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.protocol.model.{Address, GroupIndex, TransactionId}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
@@ -54,6 +54,11 @@ trait BlockFlowClient {
       signature: Signature,
       fromGroup: Int
   ): Future[Either[ApiError[_ <: StatusCode], SubmitTxResult]]
+  def fetchTransactionStatus(
+      txId: TransactionId,
+      fromGroup: GroupIndex,
+      toGroup: GroupIndex
+  ): Future[Either[ApiError[_ <: StatusCode], TxStatus]]
 }
 
 object BlockFlowClient {
@@ -189,6 +194,18 @@ object BlockFlowClient {
         GroupIndex.unsafe(fromGroup),
         submitTransaction,
         SubmitTransaction(tx, signature)
+      )
+    }
+
+    def fetchTransactionStatus(
+        txId: TransactionId,
+        fromGroup: GroupIndex,
+        toGroup: GroupIndex
+    ): Future[Either[ApiError[_ <: StatusCode], TxStatus]] = {
+      requestFromGroup(
+        fromGroup,
+        getTransactionStatusLocal,
+        (txId, Some(fromGroup), Some(toGroup))
       )
     }
 

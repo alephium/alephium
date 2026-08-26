@@ -8,6 +8,9 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    # macos-latest (M1) has 7 GB RAM; ubuntu/windows runners have 16 GB.
+    env:
+      SBT_OPTS: ${{ startsWith(matrix.os, 'macos') && '-Xmx4g -XX:+UseG1GC' || '-Xmx6g -XX:+UseG1GC' }}
     strategy:
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]

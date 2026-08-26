@@ -16,14 +16,23 @@
 
 package org.alephium.flow
 
-import org.alephium.flow.core.maxSyncBlocksPerChain
 import org.alephium.flow.setting.NetworkSetting
+import org.alephium.protocol.message.{FlowDataPayloadLimits, TxPayload}
 import org.alephium.protocol.model.NetworkId
 import org.alephium.util.Duration
 
 package object network {
   // scalastyle:off magic.number
-  val MaxRequestNum: Int                     = maxSyncBlocksPerChain * 16
+  val MaxRequestNum: Int                     = FlowDataPayloadLimits.MaxBlockHeightsPerSyncRequest
+  val LegacyBlocksPerWindow: Int             = MaxRequestNum
+  val FastBlocksPerWindow: Int               = 2048
+  val FastBlocksWindowSizeMainnet: Duration  = Duration.ofSecondsUnsafe(15)
+  val MaxBlocksInFlightPerPeer: Int          = MaxRequestNum
+  val HeadersPerWindow: Int                  = FlowDataPayloadLimits.MaxHeaderHeightsPerSyncRequest
+  val MinFlowDataHashRequestNum: Int         = FlowDataPayloadLimits.MinHashesPerRequest
+  val MaxFlowDataHashesPerChain: Int         = FlowDataPayloadLimits.MaxHashesPerChain
+  val MaxTxsRequestNum: Int                  = TxPayload.MaxTxsPerMessage
+  val MaxTxsPerChainRequestNum: Int          = MaxTxsRequestNum
   val RateLimiterWindowSizeMainnet: Duration = Duration.ofSecondsUnsafe(30)
   val RateLimiterWindowSize: Duration        = Duration.ofSecondsUnsafe(10)
   // scalastyle:on magic.number

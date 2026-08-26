@@ -127,6 +127,9 @@ trait FixedSizeSerde[T] extends Serde[T] {
 
 object Serde extends ProductSerde {
 
+  // Serialized counts are untrusted; keep eager allocation small and grow only as elements decode.
+  private[serde] val MaxBatchPreallocatedElements: Int = 1024
+
   private[serde] object BoolSerde extends FixedSizeSerde[Boolean] {
     override val serdeSize: Int = java.lang.Byte.BYTES
 
@@ -289,36 +292,47 @@ object Serde extends ProductSerde {
         input: ByteString,
         newBuilder: => mutable.Builder[T, C]
     ): SerdeResult[Staging[C]] = {
-      val builder = newBuilder
-      builder.sizeHint(size)
-      __deserializeSeq(input, 0, size, builder)
+      validateBatchSize(size, input).flatMap { _ =>
+        val builder = newBuilder
+        builder.sizeHint(math.min(size, MaxBatchPreallocatedElements))
+        __deserializeSeq(input, 0, size, builder)
+      }
     }
 
     @tailrec
-    private def _deserializeArray(
+    private def __deserializeArray(
         rest: ByteString,
         index: Int,
-        output: Array[T]
+        length: Int,
+        builder: mutable.Builder[T, Array[T]]
     ): SerdeResult[Staging[Array[T]]] = {
-      if (index == output.length) {
-        Right(Staging(output, rest))
+      if (index == length) {
+        Right(Staging(builder.result(), rest))
       } else {
         deserializer._deserialize(rest) match {
           case Right(Staging(t, tRest)) =>
-            output.update(index, t)
-            _deserializeArray(tRest, index + 1, output)
+            builder += t
+            __deserializeArray(tRest, index + 1, length, builder)
           case Left(e) => Left(e)
         }
       }
     }
 
-    def _deserializeArray(n: Int, input: ByteString): SerdeResult[Staging[Array[T]]] = {
+    private def validateBatchSize(n: Int, input: ByteString): SerdeResult[Unit] = {
       if (n < 0) {
         Left(SerdeError.validation(s"Negative array size: $n"))
       } else if (n > input.length) { // might cause memory issues if n is too large
         Left(SerdeError.validation(s"Malicious array size: $n"))
       } else {
-        _deserializeArray(input, 0, Array.ofDim[T](n))
+        Right(())
+      }
+    }
+
+    def _deserializeArray(n: Int, input: ByteString): SerdeResult[Staging[Array[T]]] = {
+      validateBatchSize(n, input).flatMap { _ =>
+        val builder = Array.newBuilder[T]
+        builder.sizeHint(math.min(n, MaxBatchPreallocatedElements))
+        __deserializeArray(input, 0, n, builder)
       }
     }
 
@@ -382,6 +396,28 @@ object Serde extends ProductSerde {
         }
       }
     }
+
+  private[serde] def avectorSerde[T: ClassTag](
+      maxLength: Int,
+      serde: Serde[T]
+  ): Serde[AVector[T]] = {
+    assume(maxLength >= 0)
+    new BatchDeserializer[T](serde) with Serde[AVector[T]] {
+      override def serialize(input: AVector[T]): ByteString = {
+        input.map(serde.serialize).fold(IntSerde.serialize(input.length))(_ ++ _)
+      }
+
+      override def _deserialize(input: ByteString): SerdeResult[Staging[AVector[T]]] = {
+        IntSerde._deserialize(input).flatMap { case Staging(size, rest) =>
+          if (size > maxLength) {
+            Left(SerdeError.validation(s"Too many vector elements: $size, max: $maxLength"))
+          } else {
+            _deserializeAVector(size, rest)
+          }
+        }
+      }
+    }
+  }
 
   private[serde] def dynamicSizeSerde[C <: IndexedSeq[T], T: ClassTag](
       serde: Serde[T],

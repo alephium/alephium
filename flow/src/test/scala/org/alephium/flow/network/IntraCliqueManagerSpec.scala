@@ -103,6 +103,17 @@ class IntraCliqueManagerSpec extends AlephiumActorSpec {
     intraCliqueManager ! IntraCliqueManager.BroadCastTx(invalidTxs ++ txs)
     inboundConnection.expectMsg(BrokerHandler.Send(broadcastTxMsg))
     outboundConnection.expectMsg(BrokerHandler.Send(broadcastTxMsg))
+
+    val oversizedTxs = AVector.fill(MaxTxsRequestNum + 1)(tx)
+    intraCliqueManager ! IntraCliqueManager.BroadCastTx(
+      AVector(ChainIndex.unsafe(1, 0) -> oversizedTxs)
+    )
+    val chunks = inboundConnection.receiveN(2).map { case BrokerHandler.Send(message) =>
+      Message.deserialize(message).rightValue.payload.asInstanceOf[TxsResponse]
+    }
+    chunks.map(_.txs.length) is Seq(MaxTxsRequestNum, 1)
+    AVector.from(chunks).flatMap(_.txs) is oversizedTxs
+    outboundConnection.expectNoMessage()
   }
 
   it should "become ready immediately in single broker clique" in new Fixture {

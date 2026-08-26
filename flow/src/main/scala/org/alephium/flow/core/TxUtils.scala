@@ -1081,7 +1081,7 @@ trait TxUtils { Self: FlowUtils =>
             alphUtxos = restAlphUtxos
             Right(())
           case Left(error) =>
-            logger.info(
+            logger.debug(
               s"Build sweep tx with ascending order returns error: $error, try descending order instead"
             )
 

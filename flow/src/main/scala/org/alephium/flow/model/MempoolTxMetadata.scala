@@ -14,24 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.message
+package org.alephium.flow.model
 
-sealed trait P2PVersion
+import org.alephium.protocol.vm.{GasBox, LockupScript}
 
-object P2PVersion {
-  def fromClientId(clientId: String): Option[P2PVersion] = {
-    clientId.split("/") match {
-      case Array(_, _, _, "p2p-v2") => Some(P2PV2)
-      case _                        => None
-    }
-  }
-}
-
-// Kept as a source-level marker for code that needs to identify legacy peers. Legacy peers are
-// no longer accepted by P2PVersion.fromClientId.
-case object P2PV1 extends P2PVersion {
-  override def toString: String = "p2p-v1"
-}
-case object P2PV2 extends P2PVersion {
-  override def toString: String = "p2p-v2"
-}
+// The fee payer is the lockup script of the first resolved asset input. Reorg insertions use None
+// because their pre-outputs are not available on this path.
+final private[flow] case class MempoolTxMetadata(
+    feePayer: Option[LockupScript.Asset],
+    maximalGasPerBlock: GasBox
+)

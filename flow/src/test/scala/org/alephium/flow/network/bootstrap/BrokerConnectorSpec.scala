@@ -16,8 +16,10 @@
 
 package org.alephium.flow.network.bootstrap
 
+import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
+import org.apache.pekko.actor.Props
 import org.apache.pekko.io.Tcp
 import org.apache.pekko.testkit.{TestActorRef, TestProbe}
 import org.apache.pekko.util.ByteString
@@ -27,6 +29,34 @@ import org.alephium.protocol.model.ModelGenerators
 import org.alephium.serde.Staging
 
 class BrokerConnectorSpec extends AlephiumFlowActorSpec with InfoFixture with ModelGenerators {
+  private def createBrokerConnector(
+      connection: TestProbe,
+      cliqueCoordinator: TestProbe,
+      terminateSystemProbe: TestProbe
+  ): TestActorRef[BrokerConnector] = {
+    val remoteAddress = socketAddressGen.sample.get
+    TestActorRef[BrokerConnector](
+      Props(
+        new BrokerConnector(remoteAddress, connection.ref, cliqueCoordinator.ref) {
+          override def terminateSystem(): Unit = {
+            terminateSystemProbe.ref ! "terminate-system"
+            context.stop(self)
+          }
+        }
+      )
+    )
+  }
+
+  private def disconnectWithoutTerminatingSystem(
+      brokerConnector: TestActorRef[BrokerConnector],
+      terminateSystemProbe: TestProbe
+  ): Unit = {
+    watch(brokerConnector)
+    system.stop(brokerConnector.underlyingActor.connectionHandler.ref)
+    expectTerminated(brokerConnector)
+    terminateSystemProbe.expectNoMessage(100.millis)
+  }
+
   it should "follow this workflow" in {
     val connection        = TestProbe()
     val cliqueCoordinator = TestProbe()
@@ -61,6 +91,16 @@ class BrokerConnectorSpec extends AlephiumFlowActorSpec with InfoFixture with Mo
     }
 
     brokerConnector ! BrokerConnector.Received(Message.Ack(randomId))
+    cliqueCoordinator.expectMsg(Message.Ack(randomId))
+
+    val updatedCliqueInfo = genIntraCliqueInfo
+    brokerConnector ! BrokerConnector.Send(updatedCliqueInfo)
+    connection.expectMsgPF() { case Tcp.Write(data, _) =>
+      Message.deserialize(data) isE Staging(Message.Clique(updatedCliqueInfo), ByteString.empty)
+    }
+
+    brokerConnector ! BrokerConnector.Received(Message.Ack(randomId))
+    cliqueCoordinator.expectMsg(Message.Ack(randomId))
     brokerConnector ! CliqueCoordinator.Ready
     connection.expectMsgPF() { case Tcp.Write(data, _) =>
       Message.deserialize(data) isE Staging(Message.Ready, ByteString.empty)
@@ -68,5 +108,63 @@ class BrokerConnectorSpec extends AlephiumFlowActorSpec with InfoFixture with Mo
 
     system.stop(brokerConnector.underlyingActor.connectionHandler.ref)
     expectTerminated(brokerConnector)
+  }
+
+  it should "close safely when the connection terminates before PeerInfo" in {
+    val connection           = TestProbe()
+    val cliqueCoordinator    = TestProbe()
+    val terminateSystemProbe = TestProbe()
+    val brokerConnector =
+      createBrokerConnector(connection, cliqueCoordinator, terminateSystemProbe)
+
+    connection.expectMsgType[Tcp.Register]
+    disconnectWithoutTerminatingSystem(brokerConnector, terminateSystemProbe)
+  }
+
+  it should "close safely when the connection terminates before clique broadcast" in {
+    val connection           = TestProbe()
+    val cliqueCoordinator    = TestProbe()
+    val terminateSystemProbe = TestProbe()
+    val brokerConnector =
+      createBrokerConnector(connection, cliqueCoordinator, terminateSystemProbe)
+    val remoteAddress = socketAddressGen.sample.get
+    val peerInfo = PeerInfo.unsafe(
+      (brokerConfig.brokerId + 1) % brokerConfig.brokerNum,
+      brokerConfig.groupNumPerBroker,
+      Some(remoteAddress),
+      remoteAddress,
+      0,
+      0
+    )
+
+    connection.expectMsgType[Tcp.Register]
+    brokerConnector ! BrokerConnector.Received(Message.Peer(peerInfo))
+    cliqueCoordinator.expectMsg(peerInfo)
+    disconnectWithoutTerminatingSystem(brokerConnector, terminateSystemProbe)
+  }
+
+  it should "close safely when the connection terminates before Ack" in {
+    val connection           = TestProbe()
+    val cliqueCoordinator    = TestProbe()
+    val terminateSystemProbe = TestProbe()
+    val brokerConnector =
+      createBrokerConnector(connection, cliqueCoordinator, terminateSystemProbe)
+    val remoteAddress = socketAddressGen.sample.get
+    val peerInfo = PeerInfo.unsafe(
+      (brokerConfig.brokerId + 1) % brokerConfig.brokerNum,
+      brokerConfig.groupNumPerBroker,
+      Some(remoteAddress),
+      remoteAddress,
+      0,
+      0
+    )
+
+    connection.expectMsgType[Tcp.Register]
+    brokerConnector ! BrokerConnector.Received(Message.Peer(peerInfo))
+    cliqueCoordinator.expectMsg(peerInfo)
+    brokerConnector ! BrokerConnector.Send(genIntraCliqueInfo)
+    connection.expectMsg(Tcp.ResumeReading)
+    connection.expectMsgType[Tcp.Write]
+    disconnectWithoutTerminatingSystem(brokerConnector, terminateSystemProbe)
   }
 }

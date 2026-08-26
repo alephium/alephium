@@ -35,6 +35,7 @@ import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, SignatureSchema
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.{
   Address,
+  BlockHash,
   CliqueId,
   NetworkId,
   TokenId,
@@ -486,18 +487,24 @@ object WalletAppSpec extends {
       .path("/transactions/sweep-address/build")
       .handler(BodyHandler.create())
       .handler { ctx =>
-        val _          = read[BuildSweepAddressTransactions](ctx.body().asString())
-        val unsignedTx = transactionGen().sample.get.unsigned
+        val _           = read[BuildSweepAddressTransactions](ctx.body().asString())
+        val unsignedTxs = AVector.fill(3)(transactionGen().sample.get.unsigned)
+        val unsignedTx  = unsignedTxs.head
         complete(
           ctx,
           BuildSweepAddressTransactionsResult
-            .from(unsignedTx, unsignedTx.fromGroup, unsignedTx.toGroup)
+            .from(unsignedTxs, unsignedTx.fromGroup, unsignedTx.toGroup)
         )
       }
 
     router.route().path("/transactions/submit").handler(BodyHandler.create()).handler { ctx =>
       val _ = read[SubmitTransaction](ctx.body().asString())
       complete(ctx, SubmitTxResult(TransactionId.generate, 0, 0))
+    }
+
+    router.route().path("/transactions/local-status").handler { ctx =>
+      val status: TxStatus = Confirmed(BlockHash.generate, 0, 1, 1, 1)
+      complete(ctx, status)
     }
 
     router.route().path("/infos/chain-params").handler { ctx =>

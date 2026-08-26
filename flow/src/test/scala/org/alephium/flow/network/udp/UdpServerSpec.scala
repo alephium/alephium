@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.udp
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import org.apache.pekko.testkit.{EventFilter, SocketUtil, TestActorRef}
 import org.apache.pekko.util.ByteString
@@ -25,6 +25,30 @@ import org.alephium.crypto.Blake2b
 import org.alephium.util.{AlephiumActorSpec}
 
 class UdpServerSpec extends AlephiumActorSpec {
+  it should "rate limit inbound packets by source IP" in {
+    val limiter = new UdpServer.InboundPacketRateLimiter()
+    val remote  = new InetSocketAddress("127.0.0.1", 19000)
+
+    (0 until UdpServer.MaxInboundPacketsPerIp).foreach { _ =>
+      limiter.tryRequest(remote) is true
+    }
+    limiter.tryRequest(new InetSocketAddress("127.0.0.1", 19001)) is false
+    limiter.tryRequest(new InetSocketAddress("127.0.0.2", 19000)) is true
+  }
+
+  it should "rate limit inbound packets globally" in {
+    val limiter = new UdpServer.InboundPacketRateLimiter()
+
+    (0 until UdpServer.MaxInboundPacketsGlobal).foreach { index =>
+      val address = InetAddress.getByAddress(
+        Array[Byte](10, (index >>> 8).toByte, index.toByte, 1)
+      )
+      limiter.tryRequest(new InetSocketAddress(address, 19000)) is true
+    }
+    val extraAddress = InetAddress.getByAddress(Array[Byte](11, 0, 0, 1))
+    limiter.tryRequest(new InetSocketAddress(extraAddress, 19000)) is false
+  }
+
   it should "read and write messages" in new Fixture {
     val (bindAddress0, udpServer0) = createUdpServer()
     val (bindAddress1, udpServer1) = createUdpServer()

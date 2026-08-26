@@ -25,9 +25,19 @@ import org.apache.pekko.util.ByteString
 import org.alephium.flow.network.broker.ConnectionHandler.Ack
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.protocol.{SignatureSchema, WireVersion}
-import org.alephium.protocol.message.{Header, Hello, Message, P2PV1, Ping, RequestId}
-import org.alephium.protocol.model.{BrokerInfo, CliqueId}
-import org.alephium.util.{AlephiumActorSpec, TimeStamp}
+import org.alephium.protocol.message.{
+  BlocksRequest,
+  FlowDataPayloadLimits,
+  Header,
+  Hello,
+  Message,
+  MessageSerde,
+  P2PV2,
+  Ping,
+  RequestId
+}
+import org.alephium.protocol.model.{BlockHash, BrokerInfo, CliqueId}
+import org.alephium.util.{AlephiumActorSpec, AVector, Bytes, TimeStamp}
 
 class ConnectionHandlerSpec extends AlephiumActorSpec {
   trait Fixture extends AlephiumConfigFixture {
@@ -48,6 +58,12 @@ class ConnectionHandlerSpec extends AlephiumActorSpec {
     lazy val message                = Ping(RequestId.unsafe(1), TimeStamp.now())
     lazy val messageBytes           = Message.serialize(message)
 
+    def messagePrefixWithLength(length: Int): ByteString = {
+      val (_, _, body) = MessageSerde.unwrap(messageBytes).rightValue
+      val prefixLength = messageBytes.length - body.length
+      messageBytes.take(prefixLength - Integer.BYTES) ++ Bytes.from(length)
+    }
+
     def switchToBufferedCommunicating() = {
       connectionHandler ! ConnectionHandler.Send(messageBytes)
       connection.expectMsg(Tcp.Write(messageBytes, Ack(1)))
@@ -56,7 +72,7 @@ class ConnectionHandlerSpec extends AlephiumActorSpec {
     }
   }
 
-  it should "publish misbehavior when receive invalid message" in new Fixture {
+  it should "publish misbehavior and close connection when receiving an invalid message" in new Fixture {
     val invalidVersion   = WireVersion(WireVersion.currentWireVersion.value + 1)
     val (priKey, pubKey) = SignatureSchema.secureGeneratePriPub()
     val brokerInfo =
@@ -64,14 +80,33 @@ class ConnectionHandlerSpec extends AlephiumActorSpec {
     val handshakeMessage =
       Message(
         Header(invalidVersion),
-        Hello.unsafe(brokerInfo.interBrokerInfo, priKey, P2PV1)
+        Hello.unsafe(brokerInfo.interBrokerInfo, priKey, P2PV2)
       )
     val handshakeMessageBytes = Message.serialize(handshakeMessage)
 
     val listener = TestProbe()
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(connectionHandler)
+
     connectionHandler ! Tcp.Received(handshakeMessageBytes)
+
     listener.expectMsg(MisbehaviorManager.SerdeError(remoteAddress))
+    expectTerminated(connectionHandler)
+    connection.expectNoMessage()
+  }
+
+  it should "publish misbehavior and close connection for an oversized hash request" in new Fixture {
+    val maxHashes = FlowDataPayloadLimits.maxHashesPerRequest(groupConfig.chainNum)
+    val request   = BlocksRequest(AVector.fill(maxHashes + 1)(BlockHash.zero))
+    val listener  = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(connectionHandler)
+
+    connectionHandler ! Tcp.Received(Message.serialize(request))
+
+    listener.expectMsg(MisbehaviorManager.SerdeError(remoteAddress))
+    expectTerminated(connectionHandler)
+    brokerHandler.expectNoMessage()
   }
 
   it should "read data from connection" in new Fixture {
@@ -81,6 +116,18 @@ class ConnectionHandlerSpec extends AlephiumActorSpec {
     connectionHandler ! Tcp.Received(messageBytes ++ messageBytes)
     brokerHandler.expectMsg(BrokerHandler.Received(message))
     brokerHandler.expectMsg(BrokerHandler.Received(message))
+  }
+
+  it should "read a message split across multiple chunks" in new Fixture {
+    val (first, second) = messageBytes.splitAt(messageBytes.length / 2)
+
+    connectionHandler ! Tcp.Received(first)
+    connection.expectMsg(Tcp.ResumeReading)
+    brokerHandler.expectNoMessage()
+
+    connectionHandler ! Tcp.Received(second)
+    brokerHandler.expectMsg(BrokerHandler.Received(message))
+    connection.expectMsg(Tcp.ResumeReading)
   }
 
   it should "write data to connection" in new Fixture {
@@ -128,6 +175,36 @@ class ConnectionHandlerSpec extends AlephiumActorSpec {
     switchToBufferedCommunicating()
     val data = Array.fill[Byte](100)(0x01)
     connectionHandler ! ConnectionHandler.Send(ByteString.fromArrayUnsafe(data))
+    expectTerminated(connectionHandler)
+  }
+
+  it should "publish misbehavior and close connection for an oversized declared frame" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      "alephium.network.connection-buffer-capacity-in-byte" -> 64
+    )
+
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(connectionHandler)
+
+    connectionHandler ! Tcp.Received(messagePrefixWithLength(65))
+
+    listener.expectMsg(MisbehaviorManager.SerdeError(remoteAddress))
+    expectTerminated(connectionHandler)
+  }
+
+  it should "publish misbehavior and close connection when read buffer overruns" in new Fixture {
+    override val configValues: Map[String, Any] = Map(
+      "alephium.network.connection-buffer-capacity-in-byte" -> 4
+    )
+
+    val listener = TestProbe()
+    system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
+    watch(connectionHandler)
+
+    connectionHandler ! Tcp.Received(networkConfig.magicBytes ++ ByteString(0))
+
+    listener.expectMsg(MisbehaviorManager.SerdeError(remoteAddress))
     expectTerminated(connectionHandler)
   }
 

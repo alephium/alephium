@@ -92,10 +92,7 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
       transfer(publicKey, address4, transferAmount, privateKey, clique.masterRestPort)
 
     clique.startMining()
-    confirmTx(tx, clique.masterRestPort)
-    confirmTx(tx2, clique.masterRestPort)
-    confirmTx(tx3, clique.masterRestPort)
-    confirmTx(tx4, clique.masterRestPort)
+    confirmTxs(Seq(tx, tx2, tx3, tx4), clique.masterRestPort)
 
     val utxos = currentUTXOs(address).utxos
 

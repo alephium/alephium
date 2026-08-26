@@ -18,8 +18,6 @@ package org.alephium.protocol.message
 
 import java.net.InetSocketAddress
 
-import scala.util.Random
-
 import org.apache.pekko.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.compatible.Assertion
@@ -29,9 +27,10 @@ import org.alephium.macros.EnumerationMacros
 import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.message.Payload.Code
 import org.alephium.protocol.model._
-import org.alephium.serde.{serialize, Serde, SerdeError}
+import org.alephium.serde.{avectorSerde, intSerde, serialize, Serde, SerdeError}
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
+// scalastyle:off file.size.limit
 class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
   implicit val ordering: Ordering[Code] = Ordering.by(Code.toInt(_))
 
@@ -40,13 +39,37 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     Code.values is AVector.from(codes)
   }
 
+  it should "keep payload wire codes stable after retiring p2p v1" in {
+    Code.toInt(Hello) is 0
+    Code.toInt(Ping) is 1
+    Code.toInt(Pong) is 2
+    Code.toInt(BlocksRequest) is 3
+    Code.toInt(BlocksResponse) is 4
+    Code.toInt(HeadersRequest) is 5
+    Code.toInt(HeadersResponse) is 6
+    Code.toInt(InvRequest) is 7
+    Code.toInt(InvResponse) is 8
+    Code.toInt(NewBlock) is 9
+    Code.toInt(NewHeader) is 10
+    Code.toInt(NewInv) is 11
+    Code.toInt(NewBlockHash) is 12
+    Code.toInt(NewTxHashes) is 13
+    Code.toInt(TxsRequest) is 14
+    Code.toInt(TxsResponse) is 15
+    Code.toInt(ChainState) is 16
+    Code.toInt(HeadersByHeightsRequest) is 17
+    Code.toInt(HeadersByHeightsResponse) is 18
+    Code.toInt(BlocksAndUnclesByHeightsRequest) is 19
+    Code.toInt(BlocksAndUnclesByHeightsResponse) is 20
+  }
+
   it should "validate Hello message" in {
     val address            = new InetSocketAddress("127.0.0.1", 0)
     val (priKey1, pubKey1) = SignatureSchema.secureGeneratePriPub()
     val (priKey2, _)       = SignatureSchema.secureGeneratePriPub()
     val validBrokerInfo    = BrokerInfo.unsafe(CliqueId(pubKey1), 0, 1, address)
 
-    val p2pVersion  = if (Random.nextBoolean()) P2PV1 else P2PV2
+    val p2pVersion  = P2PV2
     val validInput  = Hello.unsafe(validBrokerInfo.interBrokerInfo, priKey1, p2pVersion)
     val validOutput = Hello._deserialize(Hello.serde.serialize(validInput))
     validOutput.map(_.value) isE validInput
@@ -204,6 +227,20 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
+  it should "reject oversized block and header hash vectors before decoding their elements" in {
+    val requestId = RequestId.unsafe(1)
+    val maxHashes = FlowDataPayloadLimits.maxHashesPerRequest(groupConfig.chainNum)
+    val inputTail = serialize(requestId) ++ intSerde.serialize(maxHashes + 1)
+    val expected = SerdeError.validation(
+      s"Too many vector elements: ${maxHashes + 1}, max: $maxHashes"
+    )
+
+    Seq[Code](BlocksRequest, BlocksResponse, HeadersRequest, HeadersResponse).foreach { code =>
+      val input = intSerde.serialize(Code.toInt(code)) ++ inputTail
+      Payload.deserialize(input).leftValue is expected
+    }
+  }
+
   it should "serialize/deserialize the ChainState payload" in {
     import Hex._
 
@@ -310,7 +347,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           hex"020101"
       )
       .leftValue is SerdeError.validation(
-      "Invalid ChainIndex or data in HeadersByHeightsRequest payload"
+      "Invalid block height range: BlockHeightRange(2,1,1)"
     )
   }
 
@@ -383,8 +420,38 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           hex"020101"
       )
       .leftValue is SerdeError.validation(
-      "Invalid ChainIndex or data in BlocksAndUnclesByHeightsRequest payload"
+      "Invalid block height range: BlockHeightRange(2,1,1)"
     )
+  }
+
+  it should "reject oversized sync height payloads before decoding their elements" in {
+    val requestId = RequestId.unsafe(1)
+
+    Seq[Code](HeadersByHeightsRequest, BlocksAndUnclesByHeightsRequest).foreach { code =>
+      val maxSize = code match {
+        case HeadersByHeightsRequest => FlowDataPayloadLimits.MaxHeaderHeightsPerSyncRequest
+        case _                       => FlowDataPayloadLimits.MaxBlockHeightsPerSyncRequest
+      }
+      val size = maxSize + 1
+      val input =
+        intSerde.serialize(Code.toInt(code)) ++ serialize(requestId) ++ intSerde.serialize(size)
+      Payload.deserialize(input).leftValue is
+        SerdeError.validation(s"Too many vector elements: $size, max: $maxSize")
+    }
+
+    Seq[(Code, Int)](
+      HeadersByHeightsResponse         -> FlowDataPayloadLimits.MaxHeadersPerHeightRange,
+      BlocksAndUnclesByHeightsResponse -> FlowDataPayloadLimits.MaxBlocksPerSyncResponse
+    ).foreach { case (code, maxPerChain) =>
+      val size = maxPerChain + 1
+      val input =
+        intSerde.serialize(Code.toInt(code)) ++
+          serialize(requestId) ++
+          intSerde.serialize(1) ++
+          intSerde.serialize(size)
+      Payload.deserialize(input).leftValue is
+        SerdeError.validation(s"Too many vector elements: $size, max: $maxPerChain")
+    }
   }
 
   it should "serialize/deserialize the InvRequest/InvResponse payload" in {
@@ -424,6 +491,23 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
         // hash 2
         serialize(block2.hash)
     }
+  }
+
+  it should "bound the total number of hashes in inventory payloads" in {
+    val requestId  = RequestId.unsafe(1)
+    val maxHashes  = FlowDataPayloadLimits.maxHashesPerRequest(groupConfig.chainNum)
+    val first      = AVector.fill(maxHashes / 2)(BlockHash.zero)
+    val secondSize = maxHashes - first.length + 1
+    val input =
+      intSerde.serialize(Code.toInt(InvRequest)) ++
+        serialize(requestId) ++
+        intSerde.serialize(2) ++
+        serialize(first) ++
+        intSerde.serialize(secondSize)
+
+    Payload.deserialize(input).leftValue is SerdeError.validation(
+      s"Too many nested vector elements: ${maxHashes + 1}, max: $maxHashes"
+    )
   }
 
   it should "serialize/deserialize the TxsRequest/TxsResponse payload" in {
@@ -466,6 +550,42 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
         // tx2
         serialize(tx2)
     }
+  }
+
+  it should "reject oversized transaction payload counts before decoding elements" in {
+    val requestId      = RequestId.unsafe(1)
+    val oversizedCount = TxPayload.MaxTxsPerMessage + 1
+    val expectedError =
+      SerdeError.validation(
+        s"Too many vector elements: $oversizedCount, max: ${TxPayload.MaxTxsPerMessage}"
+      )
+    val oversizedIndexedHashes =
+      serialize(1) ++ serialize(0) ++ serialize(0) ++ serialize(oversizedCount)
+
+    NewTxHashes._deserialize(serialize(oversizedCount)).leftValue is expectedError
+    NewTxHashes._deserialize(oversizedIndexedHashes).leftValue is expectedError
+    TxsRequest
+      ._deserialize(serialize(requestId) ++ serialize(oversizedCount))
+      .leftValue is expectedError
+    TxsRequest
+      ._deserialize(serialize(requestId) ++ oversizedIndexedHashes)
+      .leftValue is expectedError
+    TxsResponse
+      ._deserialize(serialize(requestId) ++ serialize(oversizedCount))
+      .leftValue is expectedError
+  }
+
+  it should "reject transaction hash payloads whose total exceeds the message limit" in {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val txIds =
+      AVector.fill(TxPayload.MaxTxsPerMessage / 2 + 1)(TransactionId.generate)
+    val hashes        = AVector(chainIndex -> txIds, chainIndex -> txIds)
+    val expectedError = "Too many transaction hashes in NewTxHashes payload"
+
+    NewTxHashes.validate(NewTxHashes(hashes)).leftValue is expectedError
+    TxsRequest
+      .validate(TxsRequest(RequestId.unsafe(1), hashes))
+      .leftValue is "Too many transaction hashes in TxsRequest payload"
   }
 
   it should "serialize/deserialize the NewBlock/NewHeader/NewInv/NewBlockHash/NewTxHashes payload" in {
