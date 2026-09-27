@@ -1,16 +1,13 @@
 alephium {
-  # Alephium's blockchain is sharded, which can be hosted by a single node or multiple nodes
-  # We use clique to refer to the set of nodes that are maintaining one copy of Alephium's blockchain
-  # When the group number is n, the number of chains is n * n, and the whole blockchain can be hosted
-  # on m nodes as long as n % m == 0. Each node is called a broker, with id ranging from 0 to m-1.
-  # For example, if broker.groups == 4, then the blockchain can run on 1, 2, or 4 brokers.
-  # Where there are 4 brokers, the ids of the brokers are 0, 1, 2, 3.
-  # The broker with id 0 is the master broker which will coordinate the bootstrap of the whole clique
+  # Alephium's blockchain is sharded into `groups` groups and `groups * groups` chains.
+  # A clique is one full copy of that chain set. Production nodes (especially mainnet)
+  # must use a single broker: broker-num = 1. Splitting a clique across multiple brokers
+  # is an unfinished scaling prototype and is not supported in production.
   broker {
-    # The id of the broker in the clique, ranging from 0 to broker-num-1
+    # The id of the broker in the clique. Must be 0 when broker-num is 1.
     broker-id = 0
 
-    # The number of broker in the clique, assert(groups % broker-num == 0)
+    # The number of brokers in the clique. Must be 1 on mainnet.
     broker-num = 1
 
     # The number of groups, which is a consensus constant of the network, and should not be changed.

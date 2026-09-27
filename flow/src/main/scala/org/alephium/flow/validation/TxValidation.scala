@@ -1200,7 +1200,12 @@ object TxValidation {
                 // This case should already be filtered by mempool and block assembly, double check here
                 invalidTx(UsingBreakingInstrs)
               case Left(Right(_)) =>
-                checkScriptExeFlag(tx, false, GasBox.zero)
+                // The failed script does not consume the declared contract inputs
+                if (tx.contractInputs.nonEmpty) {
+                  invalidTx(ContractInputsShouldBeEmptyForFailedTxScripts)
+                } else {
+                  checkScriptExeFlag(tx, false, GasBox.zero)
+                }
               case Left(Left(ioFalure)) => Left(Left(ioFalure.error))
             }
           case None =>

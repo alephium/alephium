@@ -346,6 +346,9 @@ trait SyncState { _: BlockFlowSynchronizer =>
     recomputeBestChainTips()
 
     _isNearSynced = checkIsNearSynced
+    if (isSyncingUsingV2 && continueDownloadTask.isDefined) {
+      downloadBlocks()
+    }
   }
 
   private[sync] def recomputeBestChainTips(): Unit = {
@@ -443,23 +446,22 @@ trait SyncState { _: BlockFlowSynchronizer =>
 
   def onBlockProcessedV2(event: ChainHandler.FlowDataValidationEvent): Unit = {
     if (isSyncingUsingV2) {
-      val isBlockValid = event match {
-        case _: ChainHandler.FlowDataAdded   => true
-        case _: ChainHandler.InvalidFlowData => false
-      }
       val block = event.data
-      if (isBlockValid) {
-        onBlockProcessed(block)
-      } else {
-        log.info(s"Block ${block.hash.toHexString} is invalid, resync")
-        val isFromOriginBroker = syncingChains(block.chainIndex).exists { state =>
-          state.validating.contains(block.hash) &&
-          getBrokerStatus(state.originBroker).exists(status => event.origin.isFrom(status.info))
-        }
-        if (isFromOriginBroker) {
-          invalidateActiveSyncTarget(s"${block.hash.shortHex} failed validation")
-        }
-        resync()
+      event match {
+        case _: ChainHandler.FlowDataAdded => onBlockProcessed(block)
+        case _: ChainHandler.InvalidFlowData =>
+          val activeState =
+            syncingChains(block.chainIndex).filter(_.validating.contains(block.hash))
+          activeState.foreach { state =>
+            log.info(s"Block ${block.hash.toHexString} is invalid, resync")
+            val isFromOriginBroker = getBrokerStatus(state.originBroker).exists { status =>
+              event.origin.isFrom(status.info)
+            }
+            if (isFromOriginBroker) {
+              invalidateActiveSyncTarget(s"${block.hash.shortHex} failed validation")
+            }
+            resync()
+          }
       }
     }
   }
@@ -825,6 +827,8 @@ trait SyncState { _: BlockFlowSynchronizer =>
   private[sync] var continueDownloadTask: Option[Cancellable] = None
 
   private[sync] def downloadBlocks(): Unit = {
+    continueDownloadTask.foreach(_.cancel())
+    continueDownloadTask = None
     val chains = syncingChains.array.collect {
       case Some(chain) if !chain.isTaskQueueEmpty => chain
     }
@@ -837,17 +841,14 @@ trait SyncState { _: BlockFlowSynchronizer =>
         )
         brokerActor ! BrokerHandler.DownloadBlockTasks(tasks)
       }
-      continueDownloadTask.foreach(_.cancel())
-      continueDownloadTask = if (allTasks.isEmpty) {
-        Some(
+      if (chains.exists(!_.isTaskQueueEmpty)) {
+        continueDownloadTask = Some(
           scheduleCancellableOnce(
             self,
             BlockFlowSynchronizer.ContinueDownload,
             continueDownloadDelay()
           )
         )
-      } else {
-        None
       }
     }
   }
@@ -1185,7 +1186,8 @@ object SyncState {
     ): Unit = {
       val size = if (isNearSynced) MaxValidationBlocksWhenSynced else maxSyncBlocksPerChain
       if (validating.size < size && pendingQueue.nonEmpty) {
-        val selected = pendingQueue.view.take(size).map(_._2).toSeq
+        val available = size - validating.size
+        val selected  = pendingQueue.view.take(available).map(_._2).toSeq
         logger.debug(
           s"Sending more blocks for validation: ${selected.size}, chain index: $chainIndex"
         )

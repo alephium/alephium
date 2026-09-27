@@ -39,6 +39,30 @@ class OutboundBrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandlerActor.pingPongTickOpt is a[Some[_]]
   }
 
+  it should "accept the remote broker when connecting by address only" in new Fixture {
+    val handler = TestActorRef[OutboundBrokerHandler](
+      OutboundBrokerHandler.props(
+        Generators.cliqueInfoGen.sample.get,
+        expectedRemoteBroker.address,
+        blockFlow,
+        allHandler,
+        ActorRefT(cliqueManager.ref),
+        ActorRefT(blockFlowSynchronizer.ref)
+      )
+    )
+    handler ! Tcp.Connected(
+      expectedRemoteBroker.address,
+      Generators.socketAddressGen.sample.get
+    )
+    val otherBroker = InterBrokerInfo.unsafe(
+      Generators.cliqueIdGen.sample.get,
+      expectedRemoteBroker.brokerId,
+      expectedRemoteBroker.brokerNum
+    )
+    handler ! BrokerHandler.Received(helloWithVersion(otherBroker))
+    handler.underlyingActor.pingPongTickOpt is a[Some[_]]
+  }
+
   it should "not connect to remote broker with invalid broker info" in new Fixture {
     val handlerProbe = TestProbe()
     handlerProbe.watch(brokerHandler)

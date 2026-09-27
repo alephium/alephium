@@ -195,3 +195,78 @@ object SlidingWindowRateLimiter {
     new SlidingWindowRateLimiter(maxRequests, windowSize, clock)
   }
 }
+
+/** A sliding-window limiter that also spaces accepted requests over time.
+  *
+  * The sliding window keeps the hard protocol limit, while pacing prevents an outbound client from
+  * consuming the whole window in one burst and then waiting for the window to expire.
+  */
+final class PacedRateLimiter(
+    maxRequests: Int,
+    windowSize: Duration,
+    clock: () => TimeStamp
+) extends RateLimiter {
+  require(maxRequests > 0, "maxRequests must be positive")
+  require(windowSize > Duration.zero, "windowSize must be positive")
+
+  private val windowLimiter = SlidingWindowRateLimiter(maxRequests, windowSize, clock)
+  private var nextRequestAt = clock()
+
+  override def tryRequest(size: Int): Boolean = {
+    if (size < 0 || size > maxRequests) {
+      false
+    } else if (size == 0) {
+      true
+    } else {
+      val now = clock()
+      if (now < nextRequestAt || !windowLimiter.tryRequest(size)) {
+        false
+      } else {
+        nextRequestAt = now.plusUnsafe(requestSpacing(size))
+        true
+      }
+    }
+  }
+
+  override def timeUntilAvailable(size: Int): Option[Duration] = {
+    if (size < 0 || size > maxRequests) {
+      None
+    } else if (size == 0) {
+      Some(Duration.zero)
+    } else {
+      windowLimiter.timeUntilAvailable(size).map { windowWait =>
+        val now = clock()
+        val pacingWait = nextRequestAt -- now match {
+          case Some(wait) => wait
+          case None       => Duration.zero
+        }
+        if (pacingWait > windowWait) pacingWait else windowWait
+      }
+    }
+  }
+
+  override def clear(): Unit = {
+    windowLimiter.clear()
+    nextRequestAt = clock()
+  }
+
+  private def requestSpacing(size: Int): Duration = {
+    val weightedWindow = Math.multiplyExact(size.toLong, windowSize.millis)
+    val spacingMillis  = (weightedWindow - 1L) / maxRequests.toLong + 1L
+    Duration.ofMillisUnsafe(spacingMillis)
+  }
+}
+
+object PacedRateLimiter {
+  def apply(maxRequests: Int, windowSize: Duration): PacedRateLimiter = {
+    apply(maxRequests, windowSize, () => TimeStamp.now())
+  }
+
+  def apply(
+      maxRequests: Int,
+      windowSize: Duration,
+      clock: () => TimeStamp
+  ): PacedRateLimiter = {
+    new PacedRateLimiter(maxRequests, windowSize, clock)
+  }
+}

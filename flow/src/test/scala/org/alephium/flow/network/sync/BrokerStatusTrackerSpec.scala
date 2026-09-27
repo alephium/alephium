@@ -25,7 +25,7 @@ import org.alephium.flow.network.{
   FixedWindowRateLimiter,
   LegacyBlocksPerWindow,
   MaxBlocksInFlightPerPeer,
-  SlidingWindowRateLimiter,
+  PacedRateLimiter,
   SyncPeerProfile
 }
 import org.alephium.flow.network.sync.BrokerStatusTracker.BrokerStatus
@@ -151,7 +151,7 @@ class BrokerStatusTrackerSpec extends AlephiumFlowActorSpec with Generators {
     legacy.rateLimiter.tryRequest(1) is false
 
     fast.syncPeerProfile is SyncPeerProfile.Fast
-    fast.rateLimiter is a[SlidingWindowRateLimiter]
+    fast.rateLimiter is a[PacedRateLimiter]
     fast.rateLimiter.tryRequest(FastBlocksPerWindow) is true
     fast.rateLimiter.tryRequest(1) is false
     val retryAfter = fast.rateLimiter.timeUntilAvailable(1).value

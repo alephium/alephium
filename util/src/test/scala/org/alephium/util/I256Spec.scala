@@ -258,6 +258,22 @@ class I256Spec extends AlephiumSpec {
     }
   }
 
+  it should "reject large pow exponents without overflowing or bypassing the size check" in {
+    for {
+      base <- Seq(
+        I256.MinValue,
+        I256.from(-4),
+        I256.from(-2),
+        I256.Two,
+        I256.from(4),
+        I256.MaxValue
+      )
+      exp <- Seq(257, 1 << 28, 1 << 30, Int.MaxValue)
+    } {
+      base.pow(U256.unsafe(exp)) is None
+    }
+  }
+
   def testBitwise(
       op: (I256, I256) => I256,
       opExpected: (BigInteger, BigInteger) => BigInteger

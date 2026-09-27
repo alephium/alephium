@@ -22,6 +22,12 @@ alephium {
     max-inbound-connections-per-group = 64
     max-clique-from-same-ip = 2
 
+    # Whitelist of peers (`host:port`). When non-empty, the node peers only with
+    # these nodes and disables P2P discovery, so it stays off the public peer network.
+    # Inbound connections are accepted only from the whitelisted hosts.
+    # Example: exclusive-nodes = ["1.2.3.4:9973", "node.example.com:9973"]
+    exclusive-nodes = []
+
     ws {
       enabled = false
       max-connections = 100

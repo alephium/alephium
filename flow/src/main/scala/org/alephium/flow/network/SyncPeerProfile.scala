@@ -26,7 +26,12 @@ sealed trait SyncPeerProfile {
 
   def windowSize(networkId: NetworkId): Duration
 
+  // This limiter guards requests received from the peer and must remain wire compatible.
   def newBlockRateLimiter(networkId: NetworkId): RateLimiter
+
+  def newBlockDownloadRateLimiter(networkId: NetworkId): RateLimiter = {
+    newBlockRateLimiter(networkId)
+  }
 
   def windowSize(implicit networkSetting: NetworkSetting): Duration = {
     windowSize(networkSetting.networkId)
@@ -34,6 +39,10 @@ sealed trait SyncPeerProfile {
 
   def newBlockRateLimiter()(implicit networkSetting: NetworkSetting): RateLimiter = {
     newBlockRateLimiter(networkSetting.networkId)
+  }
+
+  def newBlockDownloadRateLimiter()(implicit networkSetting: NetworkSetting): RateLimiter = {
+    newBlockDownloadRateLimiter(networkSetting.networkId)
   }
 }
 
@@ -67,6 +76,10 @@ object SyncPeerProfile {
 
     override def newBlockRateLimiter(networkId: NetworkId): RateLimiter = {
       SlidingWindowRateLimiter(blocksPerWindow, windowSize(networkId))
+    }
+
+    override def newBlockDownloadRateLimiter(networkId: NetworkId): RateLimiter = {
+      PacedRateLimiter(blocksPerWindow, windowSize(networkId))
     }
   }
 

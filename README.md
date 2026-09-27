@@ -74,6 +74,8 @@ Use the following command to build a docker image:
 
 You can define user specific settings in the file `$ALEPHIUM_HOME/user.conf`, where by default `$ALEPHIUM_HOME` points to `~/.alephium`.
 
+A mainnet node must run as a single broker (`alephium.broker.broker-num = 1`). Splitting a clique across multiple brokers was an experimental scaling setup and is not supported in production; the node refuses to start on mainnet if `broker-num` is greater than 1.
+
 ## Testing
 
 There are two kinds of tests:

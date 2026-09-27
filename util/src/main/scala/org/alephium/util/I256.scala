@@ -81,7 +81,8 @@ class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
       }
     } else {
       that.toInt.flatMap { n =>
-        if ((this.v.bitLength() - 1) * n > 256) {
+        // Bound the exponent first: the size check can overflow, or be zero for base -2.
+        if (n > 256 || (this.v.bitLength() - 1) * n > 256) {
           None
         } else {
           I256.from(this.v.pow(n))

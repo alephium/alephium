@@ -16,8 +16,9 @@
 
 package org.alephium.flow.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
+import scala.collection.immutable.ArraySeq
 import scala.util.Random
 
 import org.apache.pekko.actor.{ActorSystem, Props}
@@ -260,6 +261,31 @@ class DiscoveryServerSpec extends AlephiumActorSpec with SocketUtil {
       val bannedUntil = server2.underlyingActor.unreachables.get(remote).get
       (bannedUntil > TimeStamp.now() + Duration.ofHoursUnsafe(12)) is true
     }
+  }
+
+  it should "disable p2p discovery" in new Fixture {
+    val disabled =
+      TestActorRef[DiscoveryServer](
+        DiscoveryServer.props(
+          address0,
+          misbehaviorManager0,
+          storages.brokerStorage,
+          ArraySeq.empty[InetSocketAddress],
+          discoveryEnabled = false
+        )(brokerConfig, config0, networkConfig)
+      )
+
+    disabled ! DiscoveryServer.SendCliqueInfo(cliqueInfo0)
+
+    val probe = TestProbe()
+    disabled.tell(DiscoveryServer.GetNeighborPeers, probe.ref)
+    probe.expectMsg(DiscoveryServer.NeighborPeers(AVector.empty))
+    disabled.tell(DiscoveryServer.GetMorePeers(brokerConfig), probe.ref)
+    probe.expectMsg(DiscoveryServer.NeighborPeers(AVector.empty))
+    disabled.tell(DiscoveryServer.GetUnreachable, probe.ref)
+    probe.expectMsgType[AVector[InetAddress]].isEmpty is true
+    disabled.underlyingActor.scanScheduled is None
+    disabled.underlyingActor.context.children.isEmpty is true
   }
 
   it should "reply to GetMorePeers only when initial discovery is done" in new Fixture {

@@ -741,6 +741,122 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     eventually(expectMsg(InterCliqueManager.SyncedResult(true)))
   }
 
+  it should "peer only with exclusive nodes and disable discovery" in new Fixture {
+    val exclusivePort = 21073
+    override val configValues: Map[String, Any] = Map(
+      "alephium.network.exclusive-nodes"                    -> s"127.0.0.1:$exclusivePort",
+      "alephium.network.max-outbound-connections-per-group" -> 0,
+      "alephium.network.max-inbound-connections-per-group"  -> 0
+    )
+    val exclusiveAddress = new InetSocketAddress("127.0.0.1", exclusivePort)
+
+    val connectProbe = TestProbe()
+    system.eventStream.subscribe(connectProbe.ref, classOf[TcpController.ConnectTo])
+
+    interCliqueManager
+    discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
+    connectProbe.expectMsgPF() { case TcpController.ConnectTo(remote, _) =>
+      remote is exclusiveAddress
+    }
+    interCliqueManagerActor.pendingExclusive.contains(exclusiveAddress) is true
+
+    val discovered = BrokerInfo.unsafe(
+      cliqueIdGen.sample.get,
+      brokerConfig.brokerId,
+      cliqueInfo.groupNumPerBroker,
+      new InetSocketAddress("10.9.8.7", 9973)
+    )
+    interCliqueManager ! DiscoveryServer.NewPeer(discovered)
+    interCliqueManagerActor.connecting.contains(discovered.address) is false
+
+    val rejectedRemote = new InetSocketAddress("10.1.2.3", 9973)
+    val rejected       = connectInbound(rejectedRemote)
+    rejected.expectMsg(Tcp.Close)
+    interCliqueManagerActor.pendingInboundConnections.contains(rejectedRemote) is false
+
+    val acceptedRemote = new InetSocketAddress("127.0.0.1", 45678)
+    val accepted       = connectInbound(acceptedRemote)
+    eventually(interCliqueManagerActor.pendingInboundConnections.contains(acceptedRemote) is true)
+    accepted.expectMsgType[Tcp.Register]
+
+    val exclusiveBroker = BrokerInfo.unsafe(
+      cliqueIdGen.sample.get,
+      brokerConfig.brokerId,
+      cliqueInfo.groupNumPerBroker,
+      exclusiveAddress
+    )
+    publishHandShaked(TestProbe().ref, exclusiveBroker, OutboundConnection)
+    eventually(getPeers() is Seq(exclusiveAddress))
+  }
+
+  Seq(true, false).foreach { inboundFirst =>
+    it should s"retain an exclusive inbound peer and reconnect after disconnection (inbound first: $inboundFirst)" in new Fixture {
+      override val configValues: Map[String, Any] = Map(
+        "alephium.network.exclusive-nodes" -> "127.0.0.1:21073,127.0.0.1:21074"
+      )
+      val exclusiveAddress = new InetSocketAddress("127.0.0.1", 21073)
+      val otherAddress     = new InetSocketAddress("127.0.0.1", 21074)
+      val connectProbe     = TestProbe()
+      system.eventStream.subscribe(connectProbe.ref, classOf[TcpController.ConnectTo])
+      interCliqueManager
+      val attempts = connectProbe
+        .receiveN(2)
+        .map {
+          case attempt: TcpController.ConnectTo => attempt.remote -> attempt.forwardTo.ref
+          case other                            => fail(s"Unexpected connection event: $other")
+        }
+        .toMap
+
+      // This ordering makes duplicate-connection handling retain the inbound connection.
+      val remoteId = cliqueIdGen.retryUntil(_ < cliqueInfo.id).sample.get
+      val inboundInfo = BrokerInfo.unsafe(
+        remoteId,
+        brokerConfig.brokerId,
+        brokerConfig.brokerNum,
+        new InetSocketAddress("127.0.0.1", 45678)
+      )
+      val outboundInfo = BrokerInfo.unsafe(
+        remoteId,
+        brokerConfig.brokerId,
+        brokerConfig.brokerNum,
+        exclusiveAddress
+      )
+      val inbound = TestProbe()
+      interCliqueManagerActor.context.watchWith(
+        inbound.ref,
+        InterCliqueManager.PeerDisconnected(inboundInfo.address)
+      )
+      val handshakes = Seq(
+        InterCliqueManager.HandShaked(
+          ActorRefT[BrokerHandler.Command](inbound.ref),
+          inboundInfo,
+          InboundConnection,
+          clientInfo,
+          P2PV2
+        ),
+        InterCliqueManager.HandShaked(
+          ActorRefT[BrokerHandler.Command](attempts(exclusiveAddress)),
+          outboundInfo,
+          OutboundConnection,
+          clientInfo,
+          P2PV2
+        )
+      )
+      (if (inboundFirst) handshakes else handshakes.reverse).foreach(interCliqueManager ! _)
+      interCliqueManagerActor.brokers(inboundInfo.peerId).connectionType is InboundConnection
+      connectProbe.expectNoMessage()
+
+      // A different configured endpoint on the same host must still be retried.
+      system.stop(attempts(otherAddress))
+      connectProbe.expectMsgType[TcpController.ConnectTo].remote is otherAddress
+      connectProbe.expectNoMessage()
+
+      system.stop(inbound.ref)
+      connectProbe.expectMsgType[TcpController.ConnectTo].remote is exclusiveAddress
+      connectProbe.expectNoMessage()
+    }
+  }
+
   trait Fixture extends FlowFixture with Generators {
     lazy val maxOutboundConnectionsPerGroup: Int = config.network.maxOutboundConnectionsPerGroup
     lazy val maxInboundConnectionsPerGroup: Int  = config.network.maxInboundConnectionsPerGroup

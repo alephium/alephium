@@ -32,6 +32,14 @@ import org.alephium.protocol.model.{BrokerInfo, CliqueInfo}
 import org.alephium.util.ActorRefT
 
 object OutboundBrokerHandler {
+  sealed trait RemotePeer {
+    def address: InetSocketAddress
+  }
+  final case class KnownBroker(info: BrokerInfo) extends RemotePeer {
+    def address: InetSocketAddress = info.address
+  }
+  final case class AddressPeer(address: InetSocketAddress) extends RemotePeer
+
   // scalastyle:off parameter.number
   def props(
       selfCliqueInfo: CliqueInfo,
@@ -40,11 +48,47 @@ object OutboundBrokerHandler {
       allHandlers: AllHandlers,
       cliqueManager: ActorRefT[CliqueManager.Command],
       blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+  )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props = {
+    buildProps(
+      selfCliqueInfo,
+      KnownBroker(remoteBroker),
+      blockflow,
+      allHandlers,
+      cliqueManager,
+      blockFlowSynchronizer
+    )
+  }
+
+  def props(
+      selfCliqueInfo: CliqueInfo,
+      remoteAddress: InetSocketAddress,
+      blockflow: BlockFlow,
+      allHandlers: AllHandlers,
+      cliqueManager: ActorRefT[CliqueManager.Command],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
+  )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props = {
+    buildProps(
+      selfCliqueInfo,
+      AddressPeer(remoteAddress),
+      blockflow,
+      allHandlers,
+      cliqueManager,
+      blockFlowSynchronizer
+    )
+  }
+
+  private def buildProps(
+      selfCliqueInfo: CliqueInfo,
+      remotePeer: RemotePeer,
+      blockflow: BlockFlow,
+      allHandlers: AllHandlers,
+      cliqueManager: ActorRefT[CliqueManager.Command],
+      blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command]
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
       new OutboundBrokerHandler(
         selfCliqueInfo,
-        remoteBroker,
+        remotePeer,
         blockflow,
         allHandlers,
         cliqueManager,
@@ -56,7 +100,7 @@ object OutboundBrokerHandler {
 
 class OutboundBrokerHandler(
     val selfCliqueInfo: CliqueInfo,
-    val expectedRemoteBroker: BrokerInfo,
+    remotePeer: OutboundBrokerHandler.RemotePeer,
     val blockflow: BlockFlow,
     val allHandlers: AllHandlers,
     val cliqueManager: ActorRefT[CliqueManager.Command],
@@ -64,20 +108,21 @@ class OutboundBrokerHandler(
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BrokerHandler
     with BaseOutboundBrokerHandler {
-  val remoteAddress: InetSocketAddress = expectedRemoteBroker.address
+  val remoteAddress: InetSocketAddress = remotePeer.address
 
   override def handleHandshakeInfo(
       remoteBrokerInfo: BrokerInfo,
       clientInfo: String,
       p2pVersion: P2PVersion
   ): Unit = {
-    if (remoteBrokerInfo == expectedRemoteBroker) {
-      super.handleHandshakeInfo(remoteBrokerInfo, clientInfo, p2pVersion)
-    } else {
-      log.debug(
-        s"Remote broker has different broker info: expected: $expectedRemoteBroker, actual: $remoteBrokerInfo"
-      )
-      context.stop(self)
+    remotePeer match {
+      case OutboundBrokerHandler.KnownBroker(expected) if remoteBrokerInfo != expected =>
+        log.debug(
+          s"Remote broker has different broker info: expected: $expected, actual: $remoteBrokerInfo"
+        )
+        context.stop(self)
+      case _ =>
+        super.handleHandshakeInfo(remoteBrokerInfo, clientInfo, p2pVersion)
     }
   }
 }

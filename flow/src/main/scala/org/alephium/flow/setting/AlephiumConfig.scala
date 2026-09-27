@@ -169,6 +169,7 @@ final case class NetworkSetting(
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
     maxCliqueFromSameIp: Int,
+    exclusiveNodes: ArraySeq[InetSocketAddress],
     ws: WsConfig,
     pingFrequency: Duration,
     retryTimeout: Duration,
@@ -213,6 +214,29 @@ final case class NetworkSetting(
     } else {
       None
     }
+  }
+
+  def exclusiveNodesEnabled: Boolean = exclusiveNodes.nonEmpty
+
+  def isExclusiveHost(address: InetSocketAddress): Boolean = {
+    exclusiveNodes.exists(node => NetworkSetting.sameHost(node, address))
+  }
+
+  def acceptsPeer(address: InetSocketAddress): Boolean = {
+    !exclusiveNodesEnabled || isExclusiveHost(address)
+  }
+}
+
+object NetworkSetting {
+  def sameHost(left: InetSocketAddress, right: InetSocketAddress): Boolean = {
+    (Option(left.getAddress), Option(right.getAddress)) match {
+      case (Some(leftAddress), Some(rightAddress)) => leftAddress == rightAddress
+      case _ => left.getHostString.equalsIgnoreCase(right.getHostString)
+    }
+  }
+
+  def sameAddress(left: InetSocketAddress, right: InetSocketAddress): Boolean = {
+    left.getPort == right.getPort && sameHost(left, right)
   }
 }
 
@@ -345,6 +369,7 @@ object AlephiumConfig {
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
       maxCliqueFromSameIp: Int,
+      exclusiveNodes: ArraySeq[InetSocketAddress],
       ws: WsConfig,
       pingFrequency: Duration,
       retryTimeout: Duration,
@@ -385,6 +410,7 @@ object AlephiumConfig {
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
         maxCliqueFromSameIp,
+        exclusiveNodes,
         ws,
         pingFrequency,
         retryTimeout,
@@ -540,6 +566,12 @@ object AlephiumConfig {
     )
 
     val isMainNet = config.network.networkId == NetworkId.AlephiumMainNet
+    if (isMainNet && config.broker.brokerNum > 1) {
+      throw new IllegalArgumentException(
+        "Multi-broker full nodes are not supported on mainnet; alephium.broker.broker-num must be 1"
+      )
+    }
+
     if (isMainNet && config.network.lemanHardForkTimestamp != TimeStamp.unsafe(1680170400000L)) {
       throw new IllegalArgumentException("Invalid timestamp for leman hard fork")
     }

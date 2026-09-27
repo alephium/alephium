@@ -85,7 +85,8 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
       Some(U256.One)
     } else {
       that.toInt.flatMap { n =>
-        if ((this.v.bitLength() - 1) * n > 256) {
+        // Bound the exponent before multiplying to avoid Int overflow in the size check.
+        if (n > 256 || (this.v.bitLength() - 1) * n > 256) {
           None
         } else {
           U256.from(this.v.pow(n))

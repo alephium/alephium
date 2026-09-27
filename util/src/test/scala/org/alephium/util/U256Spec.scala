@@ -413,6 +413,15 @@ class U256Spec extends AlephiumSpec {
     }
   }
 
+  it should "reject large pow exponents without overflowing the size check" in {
+    for {
+      base <- Seq(U256.Two, U256.unsafe(4), U256.MaxValue)
+      exp  <- Seq(257, 1 << 28, 1 << 30, Int.MaxValue)
+    } {
+      base.pow(U256.unsafe(exp)) is None
+    }
+  }
+
   it should "test byte length" in {
     (0 until 256).foreach { n =>
       U256.unsafe(BigInteger.TWO.pow(n)).byteLength() is (n / 8 + 1)

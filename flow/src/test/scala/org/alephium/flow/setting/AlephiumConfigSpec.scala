@@ -134,6 +134,8 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.syncPeerSampleSizeV2 is 5
     config.network.enableP2pV2 is true
     config.network.txsRequestMaxIdsPerSecond is 1000
+    config.network.exclusiveNodesEnabled is false
+    config.network.exclusiveNodes is ArraySeq.empty
   }
 
   it should "load mainnet config" in {
@@ -142,6 +144,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
 
     config.network.networkId is NetworkId.AlephiumMainNet
     config.broker.groups is 4
+    config.broker.brokerNum is 1
     config.consensus.mainnet.numZerosAtLeastInHash is 37
     val initialHashRate =
       HashRate.from(
@@ -160,6 +163,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.getHardFork(TimeStamp.now()) is HardFork.Danube
     config.network.enableP2pV2 is true
     config.network.txsRequestMaxIdsPerSecond is 1000
+    config.network.exclusiveNodesEnabled is false
 
     config.node.assetTrieCacheMaxByteSize is 200_000_000
     config.node.contractTrieCacheMaxByteSize is 20_000_000
@@ -225,6 +229,29 @@ class AlephiumConfigSpec extends AlephiumSpec {
     ) is true
   }
 
+  it should "reject multi-broker setup on mainnet" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-id", 0),
+      ("alephium.broker.groups", 4),
+      ("alephium.broker.broker-num", 2)
+    )
+    intercept[IllegalArgumentException](
+      AlephiumConfig.load(buildNewConfig(), "alephium")
+    ).getMessage is
+      "Multi-broker full nodes are not supported on mainnet; alephium.broker.broker-num must be 1"
+  }
+
+  it should "allow multi-broker setup on testnet" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-id", 1),
+      ("alephium.broker.groups", 4),
+      ("alephium.broker.broker-num", 2)
+    )
+    val testnetConfig = AlephiumConfig.load(buildNewConfig(), "alephium")
+    testnetConfig.network.networkId is NetworkId.AlephiumTestNet
+    testnetConfig.broker.brokerNum is 2
+  }
+
   it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", 0),
@@ -253,6 +280,26 @@ class AlephiumConfigSpec extends AlephiumSpec {
       AlephiumConfig.load(buildNewConfig(), "alephium")
     ).getMessage is
       "Invalid timestamp for danube hard fork"
+  }
+
+  it should "load exclusive nodes and restrict peers to that whitelist" in {
+    val custom = new AlephiumConfigFixture {
+      override val configValues: Map[String, Any] = Map(
+        ("alephium.network.exclusive-nodes", "127.0.0.1:9973,10.0.0.2:9973")
+      )
+    }
+    val loaded       = AlephiumConfig.load(custom.buildNewConfig())
+    val exclusive    = new InetSocketAddress("127.0.0.1", 9973)
+    val otherHost    = new InetSocketAddress("10.0.0.8", 9973)
+    val sameHostPort = new InetSocketAddress("127.0.0.1", 40000)
+
+    loaded.network.exclusiveNodesEnabled is true
+    loaded.network.exclusiveNodes is ArraySeq(exclusive, new InetSocketAddress("10.0.0.2", 9973))
+    loaded.network.isExclusiveHost(sameHostPort) is true
+    loaded.network.acceptsPeer(sameHostPort) is true
+    loaded.network.acceptsPeer(otherHost) is false
+    NetworkSetting.sameAddress(exclusive, new InetSocketAddress("127.0.0.1", 9973)) is true
+    NetworkSetting.sameAddress(exclusive, sameHostPort) is false
   }
 
   it should "load bootstrap config" in {

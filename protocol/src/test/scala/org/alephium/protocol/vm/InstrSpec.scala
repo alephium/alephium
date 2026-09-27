@@ -1156,6 +1156,28 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
+  it should "return an arithmetic error for I256Exp with large exponents" in new StatelessInstrFixture {
+    for {
+      base <- Seq(Val.I256(I256.from(4)), Val.I256(I256.from(-2)))
+      exp  <- Seq(U256.unsafe(1 << 28), U256.unsafe(1 << 30), U256.unsafe(Int.MaxValue))
+    } {
+      stack.push(base)
+      stack.push(Val.U256(exp))
+      I256Exp.runWith(frame).leftValue is Right(ArithmeticError(s"Exp overflow: $base ** $exp"))
+      stack.size is 0
+    }
+  }
+
+  it should "return an arithmetic error for U256Exp with large exponents" in new StatelessInstrFixture {
+    val base = Val.U256(U256.unsafe(4))
+    Seq(U256.unsafe(1 << 30), U256.unsafe(Int.MaxValue)).foreach { exp =>
+      stack.push(base)
+      stack.push(Val.U256(exp))
+      U256Exp.runWith(frame).leftValue is Right(ArithmeticError(s"Exp overflow: $base ** $exp"))
+      stack.size is 0
+    }
+  }
+
   it should "U256ModExp" in new ExpArithmeticInstrFixture {
     val baseGen: Gen[Val.U256] = Gen.choose(0, 200).map(v => Val.U256(U256.unsafe(v)))
     test(

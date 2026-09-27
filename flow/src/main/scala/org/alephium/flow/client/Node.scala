@@ -93,7 +93,8 @@ object Node {
         networkSetting.bindAddress,
         misbehaviorManager,
         storages.brokerStorage,
-        config.discovery.bootstrap
+        config.discovery.bootstrap,
+        discoveryEnabled = !networkSetting.exclusiveNodesEnabled
       )
     val discoveryServer: ActorRefT[DiscoveryServer.Command] =
       ActorRefT.build[DiscoveryServer.Command](system, discoveryProps)
@@ -117,7 +118,11 @@ object Node {
           allHandlers,
           discoveryServer,
           blockFlowSynchronizer,
-          discoveryConfig.bootstrap.length
+          if (networkSetting.exclusiveNodesEnabled) {
+            networkSetting.exclusiveNodes.length
+          } else {
+            discoveryConfig.bootstrap.length
+          }
         ),
         "CliqueManager"
       )

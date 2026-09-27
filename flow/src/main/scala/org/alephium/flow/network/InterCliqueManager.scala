@@ -168,6 +168,12 @@ class InterCliqueManager(
 
   override def preStart(): Unit = {
     super.preStart()
+    if (networkSetting.exclusiveNodesEnabled) {
+      log.info(
+        "Exclusive nodes are configured, P2P discovery is disabled: " +
+          networkSetting.exclusiveNodes.mkString(", ")
+      )
+    }
     updateNodeSyncedStatus()
     schedule(self, UpdateNodeSyncedStatus, networkSetting.updateSyncedFrequency)
     subscribeEvent(self, classOf[DiscoveryServer.NewPeer])
@@ -181,14 +187,14 @@ class InterCliqueManager(
   override def receive: Receive = handleMessage orElse handleConnection orElse handleNewClique
 
   def handleNewClique: Receive = { case DiscoveryServer.NewPeer(peerInfo) =>
-    if (!containsBroker(peerInfo)) {
+    if (!networkSetting.exclusiveNodesEnabled && !containsBroker(peerInfo)) {
       connect(peerInfo)
     }
   }
 
   def handleConnection: Receive = {
     case Tcp.Connected(remoteAddress, _) =>
-      if (checkForInConnection(remoteAddress, networkSetting.maxInboundConnectionsPerGroup)) {
+      if (shouldAcceptInbound(remoteAddress)) {
         log.info(s"Connected to $remoteAddress")
         pendingInboundConnections.addOne(remoteAddress)
         val props =
@@ -209,6 +215,9 @@ class InterCliqueManager(
       }
     case InterCliqueManager.HandShaked(broker, brokerInfo, connectionType, clientInfo, _) =>
       connecting.remove(brokerInfo.address)
+      if (connectionType == OutboundConnection && pendingExclusive.remove(brokerInfo.address)) {
+        exclusivePeerIds.put(brokerInfo.address, brokerInfo.peerId)
+      }
       if (connectionType == InboundConnection) {
         pendingInboundConnections.remove(brokerInfo.address)
       }
@@ -268,18 +277,23 @@ class InterCliqueManager(
     case PeerDisconnected(peer) =>
       log.info(s"Peer disconnected: $peer")
       connecting.remove(peer)
+      pendingExclusive.remove(peer)
       pendingInboundConnections.remove(peer)
       publishEvent(DiscoveryServer.Unreachable(peer))
       removeBroker(peer)
       getMoreOutConnectionsIfNeeded()
 
     case DiscoveryServer.NeighborPeers(randomPeers) =>
-      extractPeersToConnect(randomPeers, networkSetting.maxOutboundConnectionsPerGroup)
-        .foreach(connectUnsafe)
+      if (!networkSetting.exclusiveNodesEnabled) {
+        extractPeersToConnect(randomPeers, networkSetting.maxOutboundConnectionsPerGroup)
+          .foreach(connectUnsafe)
+      }
   }
 
   def getMoreOutConnectionsIfNeeded(): Unit = {
-    if (needOutgoingConnections(networkSetting.maxOutboundConnectionsPerGroup)) {
+    if (networkSetting.exclusiveNodesEnabled) {
+      connectToExclusiveNodes()
+    } else if (needOutgoingConnections(networkSetting.maxOutboundConnectionsPerGroup)) {
       discoveryServer ! DiscoveryServer.GetMorePeers(brokerConfig)
     }
   }
@@ -354,6 +368,49 @@ class InterCliqueManager(
       connectUnsafe(broker)
     }
   }
+  private[network] val pendingExclusive = collection.mutable.HashSet.empty[InetSocketAddress]
+  // An inbound connection to the same peer has an ephemeral port, so retain the
+  // identity learned from the configured endpoint when resolving double connections.
+  private val exclusivePeerIds = collection.mutable.HashMap.empty[InetSocketAddress, PeerId]
+
+  private def shouldAcceptInbound(remoteAddress: InetSocketAddress): Boolean = {
+    if (!networkSetting.acceptsPeer(remoteAddress)) {
+      log.debug(s"Reject peer $remoteAddress: not in exclusive nodes")
+      false
+    } else {
+      networkSetting.isExclusiveHost(remoteAddress) ||
+      checkForInConnection(remoteAddress, networkSetting.maxInboundConnectionsPerGroup)
+    }
+  }
+
+  private def connectToExclusiveNodes(): Unit = {
+    networkSetting.exclusiveNodes.foreach { address =>
+      if (!isExclusiveConnectionOpen(address)) {
+        log.info(s"Try to connect to exclusive node $address")
+        val props =
+          OutboundBrokerHandler.props(
+            selfCliqueInfo,
+            address,
+            blockflow,
+            allHandlers,
+            ActorRefT(self),
+            blockFlowSynchronizer
+          )
+        val out = context.actorOf(props)
+        pendingExclusive.addOne(address)
+        context.watchWith(out, PeerDisconnected(address))
+        ()
+      }
+    }
+  }
+
+  private def isExclusiveConnectionOpen(address: InetSocketAddress): Boolean = {
+    pendingExclusive.exists(open => NetworkSetting.sameAddress(open, address)) ||
+    connecting.contains(address) ||
+    exclusivePeerIds.get(address).exists(brokers.contains) ||
+    brokers.values.exists(state => NetworkSetting.sameAddress(state.info.address, address))
+  }
+
   private def connectUnsafe(brokerInfo: BrokerInfo): Unit = {
     if (!connecting.contains(brokerInfo.address)) {
       log.info(s"Try to connect to $brokerInfo")
@@ -521,7 +578,10 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
 
   def handleNewBroker(brokerState: BrokerState): Unit = {
     val brokerInfo = brokerState.info
-    if (getCliqueNumPerIp(brokerInfo) < networkSetting.maxCliqueFromSameIp) {
+    if (
+      networkSetting.isExclusiveHost(brokerInfo.address) ||
+      getCliqueNumPerIp(brokerInfo) < networkSetting.maxCliqueFromSameIp
+    ) {
       val range = brokerConfig.calIntersection(brokerInfo)
       if (range.nonEmpty) {
         brokers.get(brokerInfo.peerId) match {
@@ -555,7 +615,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
   ): Unit = {
     val brokerInfo = brokerState.info
     val range      = brokerConfig.calIntersection(brokerInfo)
-    val available = range.exists { group =>
+    val available = networkSetting.isExclusiveHost(brokerInfo.address) || range.exists { group =>
       getInConnectionPerGroup(GroupIndex.unsafe(group)) < maxInboundConnectionsPerGroup
     }
     if (available) {
@@ -570,7 +630,10 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       brokerState: BrokerState,
       maxOutboundConnectionsPerGroup: Int
   ): Unit = {
-    if (needOutgoingConnections(brokerState.info, maxOutboundConnectionsPerGroup)) {
+    if (
+      networkSetting.isExclusiveHost(brokerState.info.address) ||
+      needOutgoingConnections(brokerState.info, maxOutboundConnectionsPerGroup)
+    ) {
       addBroker(brokerState)
     } else {
       log.info(s"Too many outbound connections, ignore the one from $brokerState")

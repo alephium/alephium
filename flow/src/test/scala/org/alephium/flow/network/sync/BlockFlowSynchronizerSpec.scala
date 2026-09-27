@@ -24,6 +24,7 @@ import org.apache.pekko.testkit.{EventFilter, TestActorRef, TestProbe}
 import org.scalacheck.Gen
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.core.maxSyncBlocksPerChain
 import org.alephium.flow.handler.{ChainHandler, DependencyHandler, FlowHandler, TestUtils}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.{
@@ -31,6 +32,7 @@ import org.alephium.flow.network.{
   InterCliqueManager,
   LegacyBlocksPerWindow,
   MaxBlocksInFlightPerPeer,
+  PacedRateLimiter,
   RateLimiter,
   SlidingWindowRateLimiter,
   SyncPeerProfile
@@ -1226,33 +1228,36 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     }
   }
 
-  it should "assign a second block wave to a fast peer within one window" in new BlockFlowSynchronizerV2Fixture {
-    val brokerInfo = BrokerInfo.unsafe(CliqueId.generate, 0, 1, socketAddressGen.sample.get)
-    val clientInfo =
-      s"scala-alephium/${SyncPeerProfile.FastSyncMinVersion}/Linux/p2p-v2"
-    val (brokerActor, brokerStatus, probe) = addBroker(brokerInfo, P2PV2, clientInfo)
+  it should "pace consecutive block waves to a fast peer" in new BlockFlowSynchronizerV2Fixture {
+    val windowSize  = Duration.ofSecondsUnsafe(15)
+    var now         = TimeStamp.unsafe(1_000_000)
+    val rateLimiter = PacedRateLimiter(FastBlocksPerWindow, windowSize, () => now)
+    val (brokerActor, brokerStatus, probe) = addBrokerWithRateLimiter(rateLimiter)
     val chainIndex                         = ChainIndex.unsafe(0, 0)
     val syncingChain                       = addSyncingChain(chainIndex, Int.MaxValue, brokerActor)
-    syncingChain.taskQueue.addAll(genTasks(chainIndex, 20))
+    syncingChain.taskQueue.addAll(genTasks(chainIndex, 2))
 
     blockFlowSynchronizerActor.downloadBlocks()
     val firstWave = probe.expectMsgType[BrokerHandler.DownloadBlockTasks]
     val firstSize = firstWave.tasks.fold(0)(_ + _.size)
     (firstSize > 0) is true
-    (firstSize <= MaxBlocksInFlightPerPeer) is true
     brokerStatus.requestNum is firstSize
+    blockFlowSynchronizerActor.continueDownloadTask.isDefined is true
 
     val completed = firstWave.tasks.map(task => (task, AVector.empty[Block], true))
-    blockFlowSynchronizer.tell(
-      BlockFlowSynchronizer.UpdateBlockDownloaded(completed),
-      brokerActor.ref
-    )
+    brokerStatus.handleBlockDownloaded(completed)
+    blockFlowSynchronizerActor.downloadBlocks()
+    probe.expectNoMessage(scala.concurrent.duration.Duration(100, "millis"))
+
+    val spacingMillis = (firstSize.toLong * windowSize.millis - 1L) /
+      FastBlocksPerWindow.toLong + 1L
+    now = now.plusUnsafe(Duration.ofMillisUnsafe(spacingMillis))
+    blockFlowSynchronizerActor.downloadBlocks()
     val secondWave = probe.expectMsgType[BrokerHandler.DownloadBlockTasks]
     val secondSize = secondWave.tasks.fold(0)(_ + _.size)
-    (firstSize + secondSize > LegacyBlocksPerWindow) is true
-    (firstSize + secondSize <= FastBlocksPerWindow) is true
+    secondSize is firstSize
     brokerStatus.requestNum is secondSize
-    (brokerStatus.requestNum <= MaxBlocksInFlightPerPeer) is true
+    blockFlowSynchronizerActor.continueDownloadTask is None
   }
 
   it should "not assign a second block wave to a legacy peer within one window" in new BlockFlowSynchronizerV2Fixture {
@@ -1542,6 +1547,21 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     blockFlowSynchronizerActor.syncingChains(chainIndex).value.originBroker is originBroker
   }
 
+  it should "ignore stale validation events from an earlier sync state" in new BlockFlowSynchronizerV2Fixture {
+    val chainIndex                      = ChainIndex.unsafe(0, 0)
+    val (originBroker, originStatus, _) = addBroker()
+    val syncingChain                    = addSyncingChain(chainIndex, 10, originBroker)
+    val staleBlock                      = emptyBlock(blockFlow, chainIndex)
+    blockFlowSynchronizerActor.isSyncingUsingV2 = true
+
+    blockFlowSynchronizerActor.onBlockProcessedV2(
+      ChainHandler.InvalidFlowData(staleBlock, DataOrigin.InterClique(originStatus.info))
+    )
+
+    blockFlowSynchronizerActor.isSyncingUsingV2 is true
+    blockFlowSynchronizerActor.syncingChains(chainIndex).value is syncingChain
+  }
+
   it should "check if the node is synced" in new BlockFlowSynchronizerV2Fixture {
     import SyncState._
     blockFlowSynchronizerActor.isSynced is true
@@ -1604,6 +1624,31 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     status.requestNum = 0
     blockFlowSynchronizer ! BlockFlowSynchronizer.ContinueDownload
     probe.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
+    blockFlowSynchronizerActor.continueDownloadTask is None
+  }
+
+  it should "wake pending downloads when a peer reports an eligible chain tip" in new BlockFlowSynchronizerV2Fixture {
+    import SyncState._
+
+    val chainIndex                                = ChainIndex.unsafe(0, 0)
+    val (originBroker, originStatus, originProbe) = addBroker()
+    val (_, _, helperProbe)                       = addBroker()
+    val syncingChain = addSyncingChain(chainIndex, Int.MaxValue, originBroker)
+    val task = BlockDownloadTask(chainIndex, 1, 50, Some(emptyBlock(blockFlow, chainIndex).header))
+    syncingChain.taskQueue.addOne(task)
+    originStatus.requestNum = MaxBlocksInFlightPerPeer
+    blockFlowSynchronizerActor.isSyncingUsingV2 = true
+
+    blockFlowSynchronizerActor.downloadBlocks()
+    blockFlowSynchronizerActor.continueDownloadTask.isDefined is true
+    originProbe.expectNoMessage(scala.concurrent.duration.Duration(100, "millis"))
+    helperProbe.expectNoMessage(scala.concurrent.duration.Duration(100, "millis"))
+
+    helperProbe.send(
+      blockFlowSynchronizer,
+      BlockFlowSynchronizer.UpdateChainState(AVector(syncingChain.bestTip), false)
+    )
+    helperProbe.expectMsg(BrokerHandler.DownloadBlockTasks(AVector(task)))
     blockFlowSynchronizerActor.continueDownloadTask is None
   }
 
@@ -1949,6 +1994,27 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     acc.toSeq is Seq.from(downloadedBlocks0 ++ downloadedBlocks1)
     state.validating.size is blocks1.length
     state.pendingQueue.isEmpty is true
+  }
+
+  it should "keep the total number of validating blocks within the limit" in new SyncStatePerChainFixture
+    with BlockGenerators {
+    import SyncState._
+
+    val state      = newState()
+    val fromBroker = (state.originBroker, brokerInfo)
+    val downloadedPending = AVector.fill(10) {
+      val block = blockGen(chainIndex).sample.get
+      DownloadedBlock(block, fromBroker)
+    }
+    state.validating.addAll(AVector.fill(maxSyncBlocksPerChain - 1)(BlockHash.generate))
+    state.pendingQueue.addAll(downloadedPending.map(block => block.block.hash -> block))
+    val acc = mutable.ArrayBuffer.empty[DownloadedBlock]
+
+    state.tryValidateMoreBlocks(acc, false)
+
+    acc.size is 1
+    state.validating.size is maxSyncBlocksPerChain
+    state.pendingQueue.size is downloadedPending.length - 1
   }
 
   it should "remove finalized blocks" in new SyncStatePerChainFixture {

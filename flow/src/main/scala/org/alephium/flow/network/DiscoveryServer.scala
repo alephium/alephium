@@ -21,7 +21,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import scala.collection.immutable.ArraySeq
 
 import io.prometheus.metrics.core.metrics.Gauge
-import org.apache.pekko.actor.{ActorRef, Cancellable, Props, Stash, Terminated}
+import org.apache.pekko.actor.{Cancellable, Props, Stash, Terminated}
 
 import org.alephium.flow.handler.IOBaseActor
 import org.alephium.flow.io.BrokerStorage
@@ -40,13 +40,22 @@ object DiscoveryServer {
       bindAddress: InetSocketAddress,
       misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
       brokerStorage: BrokerStorage,
-      bootstrap: ArraySeq[InetSocketAddress]
+      bootstrap: ArraySeq[InetSocketAddress],
+      discoveryEnabled: Boolean
   )(implicit
       brokerConfig: BrokerConfig,
       discoveryConfig: DiscoveryConfig,
       networkConfig: NetworkConfig
   ): Props =
-    Props(new DiscoveryServer(bindAddress, misbehaviorManager, bootstrap, brokerStorage))
+    Props(
+      new DiscoveryServer(
+        bindAddress,
+        misbehaviorManager,
+        bootstrap,
+        brokerStorage,
+        discoveryEnabled
+      )
+    )
 
   def props(
       bindAddress: InetSocketAddress,
@@ -58,7 +67,7 @@ object DiscoveryServer {
       discoveryConfig: DiscoveryConfig,
       networkConfig: NetworkConfig
   ): Props = {
-    props(bindAddress, misbehaviorManager, brokerStorage, ArraySeq.from(peers))
+    props(bindAddress, misbehaviorManager, brokerStorage, ArraySeq.from(peers), true)
   }
 
   final case class PeerStatus(info: BrokerInfo, updateAt: TimeStamp)
@@ -112,7 +121,8 @@ class DiscoveryServer(
     val bindAddress: InetSocketAddress,
     val misbehaviorManager: ActorRefT[MisbehaviorManager.Command],
     val bootstrap: ArraySeq[InetSocketAddress],
-    brokerStorage: BrokerStorage
+    brokerStorage: BrokerStorage,
+    discoveryEnabled: Boolean
 )(implicit
     val brokerConfig: BrokerConfig,
     val discoveryConfig: DiscoveryConfig,
@@ -130,27 +140,47 @@ class DiscoveryServer(
 
   var scanScheduled: Option[Cancellable] = None
 
-  val udpServer: ActorRef = context.actorOf(UdpServer.props())
-
   def awaitCliqueInfo: Receive = {
     case SendCliqueInfo(cliqueInfo) =>
       selfCliqueInfo = cliqueInfo
-      cliqueInfo.interBrokers.foreach(cacheBrokers)
-      unstashAll()
-      log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
-      startBinding()
-
-      if (networkConfig.networkId == NetworkId.AlephiumMainNet) {
-        scheduleOnce(self, InitialDiscoveryDone, discoveryConfig.initialDiscoveryPeriod)
+      if (discoveryEnabled) {
+        startDiscovery(cliqueInfo)
       } else {
-        scheduleOnce(self, InitialDiscoveryDone, Duration.ofSecondsUnsafe(1))
+        log.info("P2P discovery is disabled; the UDP discovery socket is not bound")
+        context.become(discoveryDisabled)
+        unstashAll()
       }
 
     case _ =>
       stash()
   }
 
+  // Local actor queries only. No UDP socket is opened, so remote nodes receive no discovery reply.
+  def discoveryDisabled: Receive = {
+    case GetNeighborPeers =>
+      sender() ! NeighborPeers(AVector.empty)
+    case GetMorePeers(_) =>
+      sender() ! NeighborPeers(AVector.empty)
+    case GetUnreachable =>
+      sender() ! AVector.empty[InetAddress]
+    case _ => ()
+  }
+
+  private def startDiscovery(cliqueInfo: CliqueInfo): Unit = {
+    cliqueInfo.interBrokers.foreach(cacheBrokers)
+    unstashAll()
+    log.debug(s"bootstrap nodes: ${bootstrap.mkString(";")}")
+    startBinding()
+
+    if (networkConfig.networkId == NetworkId.AlephiumMainNet) {
+      scheduleOnce(self, InitialDiscoveryDone, discoveryConfig.initialDiscoveryPeriod)
+    } else {
+      scheduleOnce(self, InitialDiscoveryDone, Duration.ofSecondsUnsafe(1))
+    }
+  }
+
   def startBinding(): Unit = {
+    val udpServer = context.actorOf(UdpServer.props())
     udpServer ! UdpServer.Bind(bindAddress)
     context become binding // binding will stash messages
   }

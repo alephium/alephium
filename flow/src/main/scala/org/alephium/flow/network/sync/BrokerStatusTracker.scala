@@ -153,7 +153,7 @@ object BrokerStatusTracker {
         version,
         syncPeerProfile,
         FlattenIndexedArray.empty,
-        syncPeerProfile.newBlockRateLimiter()
+        syncPeerProfile.newBlockDownloadRateLimiter()
       )
     }
 

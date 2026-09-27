@@ -31,11 +31,15 @@ class SyncPeerProfileSpec extends AlephiumSpec {
     SyncPeerProfile.Legacy.windowSize(NetworkId.AlephiumMainNet) is RateLimiterWindowSizeMainnet
   }
 
-  it should "use fixed windows for legacy peers and sliding windows for fast peers" in {
+  it should "keep inbound limiters compatible and pace fast outbound downloads" in {
     SyncPeerProfile.Legacy.newBlockRateLimiter(NetworkId.AlephiumMainNet) is
       a[FixedWindowRateLimiter]
     SyncPeerProfile.Fast.newBlockRateLimiter(NetworkId.AlephiumMainNet) is
       a[SlidingWindowRateLimiter]
+    SyncPeerProfile.Legacy.newBlockDownloadRateLimiter(NetworkId.AlephiumMainNet) is
+      a[FixedWindowRateLimiter]
+    SyncPeerProfile.Fast.newBlockDownloadRateLimiter(NetworkId.AlephiumMainNet) is
+      a[PacedRateLimiter]
   }
 
   it should "keep the shorter non-mainnet window for both profiles" in {

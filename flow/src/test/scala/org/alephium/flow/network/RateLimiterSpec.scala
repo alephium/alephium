@@ -142,3 +142,64 @@ class SlidingWindowRateLimiterSpec extends AlephiumSpec {
     }
   }
 }
+
+class PacedRateLimiterSpec extends AlephiumSpec {
+  it should "round request spacing up to the next millisecond" in {
+    var now     = TimeStamp.unsafe(1_000_000)
+    val limiter = PacedRateLimiter(2048, Duration.ofSecondsUnsafe(15), () => now)
+
+    limiter.tryRequest(128) is true
+    limiter.timeUntilAvailable(128).contains(Duration.ofMillisUnsafe(938)) is true
+    now = now.plusUnsafe(Duration.ofMillisUnsafe(937))
+    limiter.tryRequest(128) is false
+    now = now.plusUnsafe(Duration.ofMillisUnsafe(1))
+    limiter.tryRequest(128) is true
+  }
+
+  it should "pace requests while preserving the sliding-window limit" in new Fixture {
+    limiter.tryRequest(2) is true
+    limiter.tryRequest(1) is false
+    limiter.timeUntilAvailable(1).contains(Duration.ofMillisUnsafe(400)) is true
+
+    advance(Duration.ofMillisUnsafe(399))
+    limiter.tryRequest(1) is false
+    advance(Duration.ofMillisUnsafe(1))
+    limiter.tryRequest(3) is true
+
+    advance(Duration.ofMillisUnsafe(600))
+    limiter.tryRequest(2) is true
+  }
+
+  it should "wait for sliding-window capacity when a differently-sized request does not fit" in new Fixture {
+    limiter.tryRequest(1) is true
+    advance(Duration.ofMillisUnsafe(200))
+
+    limiter.tryRequest(5) is false
+    limiter.timeUntilAvailable(5).contains(Duration.ofMillisUnsafe(800)) is true
+
+    advance(Duration.ofMillisUnsafe(800))
+    limiter.tryRequest(5) is true
+  }
+
+  it should "reject invalid sizes and reset pacing on clear()" in new Fixture {
+    limiter.tryRequest(-1) is false
+    limiter.tryRequest(6) is false
+    limiter.timeUntilAvailable(-1) is None
+    limiter.timeUntilAvailable(6) is None
+
+    limiter.tryRequest(5) is true
+    limiter.tryRequest(0) is true
+    limiter.clear()
+    limiter.tryRequest(1) is true
+  }
+
+  trait Fixture {
+    var now: TimeStamp       = TimeStamp.unsafe(1_000_000)
+    val windowSize: Duration = Duration.ofMillisUnsafe(1000)
+    val limiter: RateLimiter = PacedRateLimiter(5, windowSize, () => now)
+
+    def advance(duration: Duration): Unit = {
+      now = now.plusUnsafe(duration)
+    }
+  }
+}
