@@ -65,6 +65,33 @@ class KeyedFlowSpec extends AlephiumSpec {
     flow.isEmpty is true
   }
 
+  it should "remove each ancestor once with duplicate parent edges" in {
+    val flow = Flow(ConcurrentHashMap.empty[K, N], ConcurrentHashMap.empty, _ => 0)
+    flow.addNewNode(flow.newNode(0, Seq.empty))
+    flow.addNewNode(flow.newNode(1, Seq(0, 0)))
+    var removed = Seq.empty[Int]
+
+    flow.removeNodeAndAncestors(1, node => removed = removed :+ node.value)
+
+    removed is Seq(1, 0)
+    flow.isEmpty is true
+    flow.checkSources()
+  }
+
+  it should "remove each ancestor once when ancestor paths overlap" in {
+    val flow = Flow(ConcurrentHashMap.empty[K, N], ConcurrentHashMap.empty, _ => 0)
+    flow.addNewNode(flow.newNode(0, Seq.empty))
+    flow.addNewNode(flow.newNode(1, Seq(0)))
+    flow.addNewNode(flow.newNode(2, Seq(1, 0)))
+    var removed = Seq.empty[Int]
+
+    flow.removeNodeAndAncestors(2, node => removed = removed :+ node.value)
+
+    removed is Seq(2, 1, 0)
+    flow.isEmpty is true
+    flow.checkSources()
+  }
+
   it should "test `removeNodeAndDescendants`" in new PathFixture {
     flow.removeNodeAndDescendants(0, _ => ())
     flow.isEmpty is true

@@ -77,7 +77,7 @@ class KeyedFlow[K, N <: KeyedFlow.Node[K, N]](
   def removeNodeAndAncestors(node: N, sideEffect: N => Unit): Unit = {
     removeNodeFromGraph(node)
     sideEffect(node)
-    node.getParents().foreach(_.foreach(removeNodeAndAncestors(_, sideEffect)))
+    node.getParents().foreach(_.foreach(parent => removeNodeAndAncestors(parent.key, sideEffect)))
   }
 
   private def removeNodeFromGraph(node: N): Unit = {
