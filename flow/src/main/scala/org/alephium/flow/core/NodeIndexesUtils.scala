@@ -23,6 +23,7 @@ import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
 import org.alephium.protocol.vm.subcontractindex.SubContractIndexStateId
+import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util.AVector
 
 trait NodeIndexesUtils { Self: FlowUtils =>
@@ -105,9 +106,11 @@ trait NodeIndexesUtils { Self: FlowUtils =>
           for {
             locator <- getOutputLocator(spentBlockHash, txOutputLocators, maxForkDepth)
             block   <- blockFlow.getBlock(locator.blockHash)
-          } yield Some(
-            (txId, block.getTransaction(locator.txIndex).getOutput(locator.txOutputIndex))
-          )
+            output = block.getTransaction(locator.txIndex).getOutput(locator.txOutputIndex)
+            // Copy output bytes so they no longer retain the source block buffer.
+            outputBytes = serialize(output).compact
+            copiedOutput <- deserialize[TxOutput](outputBytes).left.map(IOError.Serde.apply)
+          } yield Some((txId, copiedOutput))
         case None =>
           Right(None)
       }

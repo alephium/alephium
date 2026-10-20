@@ -16,11 +16,47 @@
 
 package org.alephium.flow.core
 
+import org.apache.pekko.util.ByteString
+
 import org.alephium.flow.FlowFixture
-import org.alephium.protocol.model.{Block, ChainIndex, GroupIndex}
-import org.alephium.util.AlephiumSpec
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model._
+import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm.nodeindexes.{TxIdTxOutputLocators, TxOutputLocator}
+import org.alephium.serde.{deserialize, serialize}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class NodeIndexesUtilsSpec extends AlephiumSpec {
+  it should "copy output bytes instead of sharing the source block buffer" in new FlowFixture {
+    override val configValues: Map[String, Any] = Map(
+      "alephium.node.indexes.tx-output-ref-index" -> true
+    )
+
+    val output = AssetOutput(
+      U256.One,
+      LockupScript.p2pkh(Hash.generate),
+      TimeStamp.zero,
+      AVector((TokenId.generate, U256.One)),
+      ByteString(1, 2, 3)
+    )
+    val block       = emptyBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    val tx          = block.coinbase.copy(generatedOutputs = AVector(output))
+    val blockBytes  = serialize(block.copy(transactions = AVector(tx))).toArray
+    val storedBlock = deserialize[Block](ByteString.fromArrayUnsafe(blockBytes)).rightValue
+    blockFlow.getBlockChain(block.chainIndex).blockCache.put(block.hash, storedBlock)
+
+    val outputIndex = tx.unsigned.fixedOutputs.length
+    val outputRef   = tx.outputRefs(outputIndex)
+    blockFlow.txOutputRefIndexStorage.rightValue.put(
+      outputRef.key,
+      TxIdTxOutputLocators(tx.id, AVector(TxOutputLocator(block.hash, 0, outputIndex)))
+    ) isE ()
+    val copiedOutput = blockFlow.getTxOutput(outputRef, block.hash).rightValue.value._2
+
+    java.util.Arrays.fill(blockBytes, 0.toByte)
+    copiedOutput is output
+  }
+
   it should "calc the block diff properly" in new FlowFixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
