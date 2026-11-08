@@ -78,6 +78,7 @@ lazy val util = project("util")
   .dependsOn(macros)
   .settings(
     libraryDependencies ++= Seq(
+      logback % Test,
       pekko,
       `pekko-slf4j`,
       bcprov,
