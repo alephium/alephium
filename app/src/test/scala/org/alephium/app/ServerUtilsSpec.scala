@@ -1761,17 +1761,17 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.callContract(blockFlow, params0).asInstanceOf[CallContractSucceeded]
     callContractResult0.returns is AVector[Val](ValU256(2))
     callContractResult0.gasUsed is 23206
-    callContractResult0.txOutputs.length is 2
+    callContractResult0.txOutputs.value.length is 2
     val contractAttoAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
-    callContractResult0.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount0
+    callContractResult0.txOutputs.value(0).attoAlphAmount.value is contractAttoAlphAmount0
 
-    callContractResult0.contracts.length is 2
-    val barState0 = callContractResult0.contracts(0)
+    callContractResult0.contracts.value.length is 2
+    val barState0 = callContractResult0.contracts.value(0)
     barState0.immFields is AVector.empty[Val]
     barState0.mutFields is AVector[Val](ValU256(2))
     barState0.address is barAddress
     barState0.asset is AssetState(minimalAlphInContract, Some(AVector.empty))
-    val fooState0 = callContractResult0.contracts(1)
+    val fooState0 = callContractResult0.contracts.value(1)
     barState0.immFields is AVector.empty[Val]
     fooState0.mutFields is AVector[Val](ValU256(2))
     fooState0.address is fooAddress
@@ -1783,17 +1783,17 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.callContract(blockFlow, params1).asInstanceOf[CallContractSucceeded]
     callContractResult1.returns is AVector[Val](ValU256(1))
     callContractResult1.gasUsed is 23206
-    callContractResult1.txOutputs.length is 2
+    callContractResult1.txOutputs.value.length is 2
     val contractAttoAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
-    callContractResult1.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount1
+    callContractResult1.txOutputs.value(0).attoAlphAmount.value is contractAttoAlphAmount1
 
-    callContractResult1.contracts.length is 2
-    val barState1 = callContractResult1.contracts(0)
+    callContractResult1.contracts.value.length is 2
+    val barState1 = callContractResult1.contracts.value(0)
     barState1.immFields is AVector.empty[Val]
     barState1.mutFields is AVector[Val](ValU256(1))
     barState1.address is barAddress
     barState1.asset is AssetState(minimalAlphInContract, Some(AVector.empty))
-    val fooState1 = callContractResult1.contracts(1)
+    val fooState1 = callContractResult1.contracts.value(1)
     barState1.immFields is AVector.empty[Val]
     fooState1.mutFields is AVector[Val](ValU256(1))
     fooState1.address is fooAddress
@@ -1969,6 +1969,34 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "only omit contract details when compact is explicitly true" in new CallContractFixture {
+    val params = CallContract(
+      group = chainIndex.from.value,
+      txId = Some(TransactionId.zero),
+      address = fooAddress,
+      methodIndex = 0,
+      inputAssets = Some(AVector(inputAsset)),
+      interestedContracts = Some(AVector(barAddress))
+    )
+    val full = serverUtils.callContract(blockFlow, params).asInstanceOf[CallContractSucceeded]
+    serverUtils.callContract(blockFlow, params.copy(compact = Some(false))) is full
+    full.contracts.value.nonEmpty is true
+    full.txOutputs.value.nonEmpty is true
+    val compact = serverUtils
+      .callContract(blockFlow, params.copy(compact = Some(true)))
+      .asInstanceOf[CallContractSucceeded]
+    compact is CallContractSucceeded(full.returns, full.gasUsed)
+    val invalid = params.copy(methodIndex = 10)
+    serverUtils.callContract(blockFlow, invalid.copy(compact = Some(true))) is
+      serverUtils.callContract(blockFlow, invalid)
+    checkContractStates(barId, U256.Zero, minimalAlphInContract)
+    checkContractStates(fooId, U256.Zero, minimalAlphInContract)
+
+    val calls   = MultipleCallContract(AVector(params, params.copy(compact = Some(true))))
+    val results = serverUtils.multipleCallContract(blockFlow, calls).rightValue.results
+    results is AVector[CallContractResult](full, compact)
+  }
+
   it should "multiple call contract" in new CallContractFixture {
     val groupIndex         = chainIndex.from.value
     val call0              = CallContract(group = groupIndex, address = barAddress, methodIndex = 1)
@@ -1982,13 +2010,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     multipleCallContractResult.results.length is 3
 
     val result0 = multipleCallContractResult.results(0).asInstanceOf[CallContractSucceeded]
-    result0.txOutputs.isEmpty is true
-    result0.events.isEmpty is true
+    result0.txOutputs.value.isEmpty is true
+    result0.events.value.isEmpty is true
     result0.returns is AVector[Val](ValByteVec(barId.bytes))
 
     val result1 = multipleCallContractResult.results(1).asInstanceOf[CallContractSucceeded]
-    result1.txOutputs.isEmpty is true
-    result1.events.isEmpty is true
+    result1.txOutputs.value.isEmpty is true
+    result1.events.value.isEmpty is true
     result1.returns is AVector[Val](ValByteVec(fooId.bytes))
 
     val result2 = multipleCallContractResult.results(2).asInstanceOf[CallContractFailed]

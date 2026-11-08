@@ -1110,11 +1110,12 @@ trait EndpointsExamples extends ErrorExamples {
   val callContractResultExample: CallContractResult = CallContractSucceeded(
     returns = AVector[Val](ValU256(U256.Zero)),
     gasUsed = 20000,
-    contracts = AVector(existingContract),
-    txInputs = AVector(contractAddress),
-    txOutputs = AVector(ContractOutput(1, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
-    events = AVector(eventByTxId),
-    debugMessages = AVector(DebugMessage(contractAddress, "Debugging!"))
+    contracts = Some(AVector(existingContract)),
+    txInputs = Some(AVector(contractAddress)),
+    txOutputs =
+      Some(AVector(ContractOutput(1, hash, Amount(ALPH.oneAlph), contractAddress, tokens))),
+    events = Some(AVector(eventByTxId)),
+    debugMessages = Some(AVector(DebugMessage(contractAddress, "Debugging!")))
   )
   implicit val callContractResultExamples: List[Example[CallContractResult]] = {
     simpleExample(callContractResultExample)

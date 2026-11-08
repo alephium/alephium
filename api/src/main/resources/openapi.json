@@ -15119,6 +15119,9 @@
             "items": {
               "$ref": "#/components/schemas/TestInputAsset"
             }
+          },
+          "compact": {
+            "type": "boolean"
           }
         }
       },
@@ -15163,11 +15166,6 @@
         "required": [
           "returns",
           "gasUsed",
-          "contracts",
-          "txInputs",
-          "txOutputs",
-          "events",
-          "debugMessages",
           "type"
         ],
         "properties": {

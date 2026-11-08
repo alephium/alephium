@@ -1921,16 +1921,20 @@ class ServerUtils(implicit
     val txId = params.txId.getOrElse(TransactionId.random)
     val result = call(blockFlow, params, callContract(blockFlow, params, _, _, _, txId)).map {
       case (returns, exeResult, contractsState, events, debugMessages) =>
+        val includeDetails = !params.compact.getOrElse(false)
         CallContractSucceeded(
           returns.map(Val.from),
           maximalGasPerTx.subUnsafe(exeResult.gasBox).value,
-          contractsState,
-          exeResult.contractPrevOutputs.map(_.lockupScript).map(Address.from),
-          exeResult.generatedOutputs.mapWithIndex { case (output, index) =>
-            Output.from(output, txId, index)
-          },
-          events,
-          debugMessages
+          Option.when(includeDetails)(contractsState),
+          Option.when(includeDetails)(
+            exeResult.contractPrevOutputs.map(_.lockupScript).map(Address.from)
+          ),
+          Option.when(includeDetails)(exeResult.generatedOutputs.mapWithIndex {
+            case (output, index) =>
+              Output.from(output, txId, index)
+          }),
+          Option.when(includeDetails)(events),
+          Option.when(includeDetails)(debugMessages)
         )
     }
     result match {
