@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <property name="defaultPattern" value="%-63(%yellow(%date{ISO8601}) %green([%.13thread])) %highlight(%-5level) %-50(%cyan(%logger{20})) - %msg%n"/>
+    <property name="colorPattern" value="%-63(%yellow(%date{ISO8601}) %green([%.13thread])) %highlight(%-5level) %-50(%cyan(%logger{20})) - %msg%n"/>
+    <property name="plainPattern" value="%-38(%date{ISO8601} [%.13thread]) %-5level %-32(%logger{20}) - %msg%n"/>
+    <property name="logStyle" value="${ALEPHIUM_LOG_STYLE:-color}"/>
+    <condition class="ch.qos.logback.core.boolex.PropertyEqualityCondition">
+        <key>logStyle</key>
+        <value>plain</value>
+    </condition>
+    <if>
+        <then>
+            <property name="defaultPattern" value="${plainPattern}"/>
+        </then>
+        <else>
+            <property name="defaultPattern" value="${colorPattern}"/>
+        </else>
+    </if>
     <appender name="ERRFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium-errors.log</file>
         <append>true</append>
