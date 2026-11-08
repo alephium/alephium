@@ -21,15 +21,16 @@ import org.alephium.util.AVector
 
 sealed trait CallContractResult
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 @upickle.implicits.key("CallContractSucceeded")
 final case class CallContractSucceeded(
     returns: AVector[Val],
     gasUsed: Int,
-    contracts: AVector[ContractState],
-    txInputs: AVector[Address],
-    txOutputs: AVector[Output],
-    events: AVector[ContractEventByTxId],
-    debugMessages: AVector[DebugMessage]
+    contracts: Option[AVector[ContractState]] = None,
+    txInputs: Option[AVector[Address]] = None,
+    txOutputs: Option[AVector[Output]] = None,
+    events: Option[AVector[ContractEventByTxId]] = None,
+    debugMessages: Option[AVector[DebugMessage]] = None
 ) extends CallContractResult
 
 @upickle.implicits.key("CallContractFailed")

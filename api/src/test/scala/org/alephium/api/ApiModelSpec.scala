@@ -1784,17 +1784,46 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
   }
 
+  it should "encode compact contract results without optional details" in {
+    val result: CallContractResult = CallContractSucceeded(AVector(ValU256(1)), 100000)
+    checkData(
+      result,
+      """{"type":"CallContractSucceeded","returns":[{"type":"U256","value":"1"}],"gasUsed":100000}"""
+    )
+    val empty: CallContractResult = CallContractSucceeded(AVector.empty, 1234)
+    checkData(empty, """{"type":"CallContractSucceeded","returns":[],"gasUsed":1234}""")
+    val failed: CallContractResult = CallContractFailed("InvalidContractMethodIndex")
+    checkData(failed, """{"type":"CallContractFailed","error":"InvalidContractMethodIndex"}""")
+    val multiple = MultipleCallContractResult(AVector(result, failed))
+    read[MultipleCallContractResult](write(multiple)) is multiple
+  }
+
+  it should "decode legacy, explicit full and compact contract requests" in {
+    val address = generateContractAddress()
+    val legacy  = s"""{"group":0,"address":"${address.toBase58}","methodIndex":0}"""
+    val request = CallContract(group = 0, address = address, methodIndex = 0)
+    checkData(request, legacy)
+    read[CallContract](legacy.dropRight(1) + """, "compact":null}""") is request
+    Seq(false, true).foreach { compact =>
+      val json = legacy.dropRight(1) + s""", "compact":$compact}"""
+      checkData(request.copy(compact = Some(compact)), json)
+    }
+    intercept[upickle.core.TraceVisitor.TraceException] {
+      read[CallContract](legacy.dropRight(1) + """, "compact":[]}""")
+    }
+  }
+
   it should "encode/decode MultipleCallContractResult" in {
     val callResults = MultipleCallContractResult(
       AVector(
         CallContractSucceeded(
           AVector(ValU256(1)),
           100000,
-          AVector(contractState),
-          AVector.empty,
-          AVector.empty,
-          AVector.empty,
-          AVector.empty
+          Some(AVector(contractState)),
+          Some(AVector.empty),
+          Some(AVector.empty),
+          Some(AVector.empty),
+          Some(AVector.empty)
         ),
         CallContractFailed("InvalidContractMethodIndex")
       )

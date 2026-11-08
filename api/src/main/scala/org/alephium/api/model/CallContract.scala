@@ -29,7 +29,8 @@ final case class CallContract(
     methodIndex: Int,
     args: Option[AVector[Val]] = None,
     interestedContracts: Option[AVector[Address.Contract]] = None,
-    inputAssets: Option[AVector[TestInputAsset]] = None
+    inputAssets: Option[AVector[TestInputAsset]] = None,
+    compact: Option[Boolean] = None
 ) extends CallBase {
   def fromAddress: Option[Address] = Some(address)
   def allContractAddresses: AVector[Address.Contract] =
