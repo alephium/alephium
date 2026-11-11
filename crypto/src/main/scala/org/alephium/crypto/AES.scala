@@ -30,7 +30,7 @@ object AES {
   final case class Encrypted(encrypted: ByteString, salt: ByteString, iv: ByteString)
 
   private val saltByteLength       = 64
-  private val ivByteLength         = 64
+  private val ivByteLength         = 12
   private val authTagLength        = 128
   private val keyAlgorithm         = "PBKDF2WithHmacSHA256"
   private val iterationCount       = 10000
